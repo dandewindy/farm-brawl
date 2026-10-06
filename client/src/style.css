@@ -54,15 +54,52 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #stats .weight b { font: 800 34px var(--f-display); color: var(--gold); }
 #stats .weight span { margin-left: 4px; font-weight: 700; color: var(--paper); }
 #stats .sub { font-size: 13px; color: #d8c9a8; }
-#lb { position: absolute; right: 12px; top: 12px; width: 210px; padding: 8px 10px; }
+#lb { position: absolute; right: 12px; top: 12px; width: 220px; padding: 8px 10px; }
 #lb h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #b9a98a; }
-#lbList { margin: 0; padding: 0 0 0 22px; font-size: 13px; }
+#lbList { margin: 0; padding: 0 0 0 20px; font-size: 13px; }
 #lbList li { padding: 1px 0; }
 #lbList li > div { display: flex; gap: 6px; }
 #lbList .n { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #lbList .k { color: #ff9b7a; }
 #lbList .v { color: #d8c9a8; }
 #lbList li.me { color: var(--gold); font-weight: 700; }
+#lbList li.nap .n { color: var(--gold); }
+#lbList li.nap .n::before { content: '♛ '; }
+
+#hof {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 2px dashed rgba(242, 234, 215, .2);
+}
+#hof h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+#hofList {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 13px;
+}
+#hofList li {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+#hofList .n {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper);
+}
+#hofList .v {
+  color: var(--gold);
+  font-weight: 700;
+}
+
 #minimap { position: absolute; right: 12px; bottom: 12px; width: 160px; height: 160px; border-radius: 50%; background: rgba(31, 26, 23, .55); }
 #feed { position: absolute; left: 12px; bottom: 12px; display: grid; gap: 4px; font-size: 13px; }
 #feed div { padding: 3px 10px; background: rgba(31, 26, 23, .7); border-radius: 8px; animation: fadeIn .2s; }
@@ -89,10 +126,53 @@ body.touch #dashBtn { display: block; }
 .float.big { font-size: 28px; color: var(--gold); }
 .float.loss { color: #ff8a7a; }
 
-#banner { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 8; text-align: center; pointer-events: none; }
-#banner .b { animation: bannerIn .35s ease-out, fadeOut .5s 2.4s forwards; }
-#banner .h { font: 800 40px var(--f-display); color: var(--gold); text-shadow: 0 4px 0 var(--red), 0 8px 20px rgba(0, 0, 0, .4); }
-#banner .s { font-size: 16px; font-weight: 700; text-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+/* Red propaganda announcement banner */
+#banner {
+  position: fixed;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%) skewY(-2deg);
+  width: max-content;
+  max-width: min(92vw, 620px);
+  padding: 6px 20px 8px;
+  text-align: center;
+  background: var(--red);
+  border-top: 4px solid #0f0c0a;
+  border-bottom: 4px solid #0f0c0a;
+  box-shadow: 0 8px 0 rgba(0,0,0,.35);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
+#banner .head {
+  display: block;
+  font-family: var(--f-display);
+  font-weight: 900;
+  font-size: clamp(18px, 2.2vw, 26px);
+  line-height: 1.1;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,.5);
+}
+#banner .sub {
+  display: block;
+  font-size: clamp(13px, 1.2vw, 15px);
+  font-weight: 600;
+  color: #f7f4ec;
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+}
+#banner.show {
+  animation: bannerAnim 3.5s ease forwards;
+}
+@keyframes bannerAnim {
+  0% { opacity: 0; clip-path: inset(0 100% 0 0); }
+  12% { opacity: 1; clip-path: inset(0 0 0 0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 #toasts { position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 8; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
 #toasts div { padding: 6px 14px; background: rgba(31, 26, 23, .85); border-radius: 10px; font-weight: 700; font-size: 14px; animation: fadeIn .2s, fadeOut .4s 2.2s forwards; }
 
@@ -149,6 +229,17 @@ body.touch #dashBtn { display: block; }
   color: #b9b09b;
   line-height: 1.2;
   margin-top: 2px;
+}
+#reign {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 10px;
+  font-weight: 800;
+  font-size: 13px;
+  background: var(--red);
+  border-radius: 4px;
+  color: #fff;
+  letter-spacing: .02em;
 }
 
 body.menu #hud { display: none; }

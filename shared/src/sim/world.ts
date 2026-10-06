@@ -75,6 +75,14 @@ export class World {
   podiumProgress = 0;
   podiumContested = false;
   napoleonId = 0;
+  napoleonReign = 0;
+  currentRule = '';
+  ruleTimer = 0;
+  hof: [string, Species, number][] = [
+    ['Napoleon', 'pig', 35],
+    ['Snowball', 'pig', 22],
+    ['Boxer', 'horse', 16],
+  ];
 
   constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
@@ -258,8 +266,19 @@ export class World {
         const speed = Math.min(0.25, Math.max(0.08, 0.08 + c.mass / 600));
         this.podiumProgress = Math.min(1.0, this.podiumProgress + speed * DT);
         if (this.podiumProgress >= 1.0 && this.napoleonId !== c.id) {
+          if (this.napoleonId > 0) {
+            const prevKing = this.players.get(this.napoleonId);
+            const dur = Math.round(this.napoleonReign);
+            if (dur >= 5 && prevKing) {
+              this.hof.push([prevKing.name, prevKing.species, dur]);
+              this.hof.sort((a, b) => b[2] - a[2]);
+              this.hof = this.hof.slice(0, 3);
+            }
+          }
           this.napoleonId = c.id;
+          this.napoleonReign = 0;
           this.events.push({ k: 'napoleon', id: c.id });
+          this.pickRule();
         }
       } else {
         if (this.podiumProgress > 0) {
@@ -271,6 +290,45 @@ export class World {
       }
     } else {
       this.podiumContested = true;
+    }
+
+    // Sunday meeting rule: pull non-king animals gently towards podium
+    if (this.currentRule === 'sunday' && this.napoleonId > 0) {
+      for (const p of alive) {
+        if (p.id !== this.napoleonId) {
+          const dx = podX - p.x, dz = podZ - p.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > PR + 1) {
+            p.vx += (dx / dist) * 3.5 * DT;
+            p.vz += (dz / dist) * 3.5 * DT;
+          }
+        }
+      }
+    }
+
+    // King reign & rule timers
+    if (this.napoleonId > 0) {
+      this.napoleonReign += DT;
+      this.ruleTimer -= DT;
+      if (this.ruleTimer <= 0) {
+        this.pickRule();
+      }
+
+      // Tax rule: 2% of weight to king every second (20 ticks)
+      if (this.currentRule === 'tax' && this.tick % 20 === 0) {
+        const king = this.players.get(this.napoleonId);
+        if (king && king.alive) {
+          let taxSum = 0;
+          for (const p of alive) {
+            if (p.id !== this.napoleonId && p.mass > CFG.MIN_MASS + 2) {
+              const tax = Math.min(2, p.mass * 0.02);
+              p.mass -= tax;
+              taxSum += tax;
+            }
+          }
+          king.mass = Math.min(CFG.MAX_MASS, king.mass + taxSum);
+        }
+      }
     }
 
     // King periodic reign harvest bonus (every 3 seconds)
@@ -369,9 +427,33 @@ export class World {
     }
   }
 
+  private pickRule(): void {
+    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball'];
+    const candidates = rules.filter((r) => r !== this.currentRule);
+    this.currentRule = candidates[Math.floor(this.rnd() * candidates.length)] || 'twoleg';
+    this.ruleTimer = 40;
+    this.events.push({ k: 'rule', id: this.currentRule });
+  }
+
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
-    const k = clamp(speed * att.power * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX);
+    let k = clamp(speed * att.power * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX);
+
+    // Rule: "twoleg" (Two legs bad - chickens and ducks fly twice as far when hit)
+    if (this.currentRule === 'twoleg' && (vic.species === 'chicken' || vic.species === 'duck')) {
+      k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 2.0);
+    }
+
+    // Rule: "fourleg" (Four legs good - 4-legged animals ram 50% harder, King 80% harder)
+    if (this.currentRule === 'fourleg') {
+      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig';
+      if (att.id === this.napoleonId) {
+        k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
+      } else if (isFourLeg) {
+        k = Math.min(CFG.KNOCKBACK_MAX * 1.5, k * 1.5);
+      }
+    }
+
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
     vic.stunT = CFG.STUN_TIME * (0.7 + 0.3 * att.power);
@@ -395,7 +477,16 @@ export class World {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     if (p.id === this.napoleonId) {
+      const prevKing = this.players.get(this.napoleonId);
+      const dur = Math.round(this.napoleonReign);
+      if (dur >= 5 && prevKing) {
+        this.hof.push([prevKing.name, prevKing.species, dur]);
+        this.hof.sort((a, b) => b[2] - a[2]);
+        this.hof = this.hof.slice(0, 3);
+      }
       this.napoleonId = 0;
+      this.napoleonReign = 0;
+      this.currentRule = '';
       this.events.push({ k: 'napoleon', id: 0 });
     }
     const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
@@ -403,7 +494,9 @@ export class World {
     let spoils = 0;
     if (killer) {
       const isKingKill = p.id === this.napoleonId;
-      spoils = Math.round(p.mass * CFG.KILL_SPOILS * (isKingKill ? 1.5 : 1));
+      const isSnowballTraitor = this.currentRule === 'snowball' && this.ranked.length > 1 && p.id === (this.ranked[0]?.id === this.napoleonId ? this.ranked[1]?.id : this.ranked[0]?.id);
+      const mult = isSnowballTraitor ? 3.0 : isKingKill ? 1.5 : 1.0;
+      spoils = Math.round(p.mass * CFG.KILL_SPOILS * mult);
       killer.mass = Math.min(CFG.MAX_MASS, killer.mass + spoils);
       killer.kills++;
       killer.streak++;
@@ -430,7 +523,16 @@ export class World {
       for (const f of this.food.values()) {
         const dx = f.x - p.x, dz = f.z - p.z;
         if (dx > r || dx < -r || dz > r || dz < -r || dx * dx + dz * dz > r * r) continue;
-        p.mass = Math.min(CFG.MAX_MASS, p.mass + f.v);
+        let gain = f.v;
+        // Rule: "corn" (Corn is for pigs and Napoleon: 3x value, 1/3 for others)
+        if (this.currentRule === 'corn' && (f.k === 0 || f.k === 2)) {
+          if (p.species === 'pig' || p.id === this.napoleonId) {
+            gain *= 3;
+          } else {
+            gain = Math.max(0.5, gain / 3);
+          }
+        }
+        p.mass = Math.min(CFG.MAX_MASS, p.mass + gain);
         this.food.delete(f.id);
         this.foodRemoved.push(f.id);
       }
@@ -502,6 +604,9 @@ export class World {
       ev: this.events,
       pod: [this.podiumCaptor, Math.round(this.podiumProgress * 100) / 100, this.podiumContested],
       nap: this.napoleonId,
+      rule: this.currentRule,
+      reign: Math.round(this.napoleonReign),
+      hof: this.hof,
     };
     if (this.tick % 5 === 0) {
       snap.lb = this.ranked.slice(0, 10).map((o): LeaderRow => [o.id, o.name, Math.round(o.mass), o.kills]);

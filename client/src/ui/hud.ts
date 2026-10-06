@@ -1,5 +1,5 @@
 import { SPECIES, type Species } from '@shared/constants';
-import type { GameEvent, LeaderRow } from '@shared/protocol';
+import type { GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
 
 export interface FloatingText {
@@ -14,6 +14,10 @@ export class HudManager {
   private readonly rankTxt: HTMLElement;
   private readonly koTxt: HTMLElement;
   private readonly lbList: HTMLElement;
+  private readonly hofList: HTMLElement | null;
+  private readonly reignEl: HTMLElement | null;
+  private readonly ruleNameEl: HTMLElement | null;
+  private readonly ruleDescEl: HTMLElement | null;
   private readonly feedEl: HTMLElement;
   private readonly ramEl: HTMLElement;
   private readonly ramFill: HTMLElement;
@@ -24,6 +28,7 @@ export class HudManager {
   private readonly floatsEl: HTMLElement;
   private readonly toastsEl: HTMLElement;
   private readonly bannerEl: HTMLElement;
+  private bannerTimer = 0;
 
   private readonly startScreen: HTMLElement;
   private readonly deathScreen: HTMLElement;
@@ -46,6 +51,10 @@ export class HudManager {
     this.rankTxt = document.getElementById('rankTxt')!;
     this.koTxt = document.getElementById('koTxt')!;
     this.lbList = document.getElementById('lbList')!;
+    this.hofList = document.getElementById('hofList');
+    this.reignEl = document.getElementById('reign');
+    this.ruleNameEl = document.getElementById('ruleName');
+    this.ruleDescEl = document.getElementById('ruleDesc');
     this.feedEl = document.getElementById('feed')!;
     this.ramEl = document.getElementById('ram')!;
     this.ramFill = document.getElementById('ramFill')!;
@@ -193,11 +202,18 @@ export class HudManager {
     }
   }
 
-  updateLeaderboard(lb: LeaderRow[], myId: number): void {
+  fmtTime(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  updateLeaderboard(lb: LeaderRow[], myId: number, napoleonId = 0): void {
     this.lbList.innerHTML = '';
     lb.forEach(([id, name, mass, kills]) => {
       const li = document.createElement('li');
       if (id === myId) li.classList.add('me');
+      if (id === napoleonId) li.classList.add('nap');
       const row = document.createElement('div');
       const n = document.createElement('span');
       n.className = 'n';
@@ -215,6 +231,25 @@ export class HudManager {
     });
   }
 
+  updateHof(hof: HofRow[]): void {
+    if (!this.hofList) return;
+    const emojis: Record<Species, string> = {
+      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷',
+    };
+    this.hofList.innerHTML = '';
+    for (const [name, sp, dur] of hof) {
+      const li = document.createElement('li');
+      const n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = `${emojis[sp] || ''} ${name}`;
+      const v = document.createElement('span');
+      v.className = 'v';
+      v.textContent = this.fmtTime(dur);
+      li.append(n, v);
+      this.hofList.appendChild(li);
+    }
+  }
+
   addFeed(text: string, isMine = false): void {
     const div = document.createElement('div');
     if (isMine) div.classList.add('mine');
@@ -230,32 +265,52 @@ export class HudManager {
     setTimeout(() => div.remove(), 2600);
   }
 
-  updateBoard(kingName?: string): void {
-    const ruleName = document.getElementById('ruleName');
-    const ruleDesc = document.getElementById('ruleDesc');
-    if (!ruleName || !ruleDesc) return;
-    if (kingName) {
-      ruleName.textContent = `👑 ${kingName.toUpperCase()} LÀ VUA NÔNG TRẠI`;
-      ruleDesc.textContent = 'Mọi con vật đều bình đẳng, nhưng Vua bình đẳng hơn';
-    } else {
-      ruleName.textContent = 'MỌI CON VẬT ĐỀU BÌNH ĐẲNG';
-      ruleDesc.textContent = 'Nhưng một số con vật bình đẳng hơn những con vật khác';
+  showRuleBanner(ruleId: string): void {
+    const ruleTitle = t(`r_${ruleId}`);
+    const ruleDesc = t(`d_${ruleId}`);
+    this.showBanner(t('ruleNew', { rule: ruleTitle }), ruleDesc);
+  }
+
+  updateBoard(ruleId?: string, reignSec?: number, kingName?: string): void {
+    if (this.ruleNameEl && this.ruleDescEl) {
+      if (ruleId) {
+        this.ruleNameEl.textContent = t(`r_${ruleId}`);
+        this.ruleDescEl.textContent = t(`d_${ruleId}`);
+      } else if (kingName) {
+        this.ruleNameEl.textContent = t('r_equal');
+        this.ruleDescEl.textContent = t('d_equal');
+      } else {
+        this.ruleNameEl.textContent = t('noNap');
+        this.ruleDescEl.textContent = t('noNapDesc');
+      }
+    }
+    if (this.reignEl) {
+      if (reignSec && reignSec > 0) {
+        this.reignEl.hidden = false;
+        this.reignEl.textContent = `♛ ${this.fmtTime(reignSec)}`;
+      } else {
+        this.reignEl.hidden = true;
+      }
     }
   }
 
   showBanner(head: string, sub: string): void {
     this.bannerEl.innerHTML = '';
-    const b = document.createElement('div');
-    b.className = 'b';
-    const h = document.createElement('div');
-    h.className = 'h';
+    const h = document.createElement('span');
+    h.className = 'head';
     h.textContent = head;
-    const s = document.createElement('div');
-    s.className = 's';
-    s.textContent = sub;
-    b.append(h, s);
-    this.bannerEl.appendChild(b);
-    setTimeout(() => b.remove(), 3000);
+    this.bannerEl.appendChild(h);
+    if (sub) {
+      const s = document.createElement('span');
+      s.className = 'sub';
+      s.textContent = sub;
+      this.bannerEl.appendChild(s);
+    }
+    this.bannerEl.classList.remove('show');
+    void this.bannerEl.offsetWidth;
+    this.bannerEl.classList.add('show');
+    clearTimeout(this.bannerTimer);
+    this.bannerTimer = window.setTimeout(() => this.bannerEl.classList.remove('show'), 3500);
   }
 
   spawnFloat(text: string, screenX: number, screenY: number, isBig = false, isLoss = false): void {

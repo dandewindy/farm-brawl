@@ -25,6 +25,7 @@ const minimapCanvas = document.getElementById('minimap') as HTMLCanvasElement;
 const world = new WorldRenderer(canvas);
 const animals = new AnimalRenderer(world.scene);
 const foodParts = new FoodAndParticleRenderer(world.scene);
+animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -108,8 +109,15 @@ const gameState = new GameState({
     const isKing = gameState.napoleonId === capId && capProg >= 0.99;
     hud.updateCapture(capId, capProg, contested, gameState.myId, captorName, isKing);
 
+    const kingMeta = gameState.metas.get(gameState.napoleonId);
+    const kingName = kingMeta ? kingMeta.name : undefined;
+    hud.updateBoard(gameState.rule, gameState.reign, kingName);
+
     if (gameState.lb.length) {
-      hud.updateLeaderboard(gameState.lb, gameState.myId);
+      hud.updateLeaderboard(gameState.lb, gameState.myId, gameState.napoleonId);
+    }
+    if (gameState.hof.length) {
+      hud.updateHof(gameState.hof);
     }
   },
 });
@@ -120,7 +128,16 @@ function handleGameEvent(ev: GameEvent): void {
     case 'hit': {
       const isMine = ev.a === myId || ev.v === myId;
       sfxHit(ev.s, isMine ? 1 : 0.4);
-      foodParts.burst(ev.x, 1, ev.z, 0xfff3a0, 18, 9);
+      animals.notifyHit(ev.v);
+      const vm = gameState.metas.get(ev.v);
+      const FLUFF_COLORS: Record<Species, number> = {
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b,
+      };
+      if (vm) {
+        foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
+      }
+      foodParts.burst(ev.x, 1.4, ev.z, 0xfff3a0, 16, 7, 7, 0.6);
+      foodParts.burst(ev.x, 1.4, ev.z, 0xffffff, 8, 5, 5, 0.5);
       if (isMine) shake = Math.max(shake, 0.6);
       break;
     }
@@ -171,17 +188,22 @@ function handleGameEvent(ev: GameEvent): void {
       if (ev.id === myId) {
         hud.showBanner('BẠN LÀ VUA NÔNG TRẠI!', 'Giữ vững vị trí trên bục vinh quang 👑');
         sfxVictory();
-        hud.updateBoard(gameState.metas.get(myId)?.name || 'BẠN');
+        hud.updateBoard(gameState.rule, gameState.reign, gameState.metas.get(myId)?.name || 'BẠN');
       } else if (ev.id > 0) {
         const king = gameState.metas.get(ev.id);
         const name = king ? king.name : 'Ai đó';
         hud.showToast(`👑 ${name} đã lên ngôi Vua Nông Trại!`);
-        hud.updateBoard(name);
+        hud.updateBoard(gameState.rule, gameState.reign, name);
       } else {
         sfxDethrone();
         hud.showToast('👑 Ngai vàng đã bị bỏ trống!');
-        hud.updateBoard(undefined);
+        hud.updateBoard(undefined, 0, undefined);
       }
+      break;
+    }
+    case 'rule': {
+      hud.showRuleBanner(ev.id);
+      hud.updateBoard(ev.id, gameState.reign);
       break;
     }
     case 'leave': {
@@ -320,7 +342,21 @@ function animate(now: number): void {
       const pz = isMe ? predictor.z : ent.z;
       const pa = isMe ? predictor.a : ent.a;
       const isKing = ent.id === gameState.napoleonId;
-      animals.update(ent.id, meta, px, pz, pa, ent.mass, ent.flags, isKing, gameState.map?.podium);
+      animals.update(
+        ent.id,
+        meta,
+        px,
+        pz,
+        pa,
+        ent.mass,
+        ent.flags,
+        isKing,
+        gameState.map?.podium,
+        dt,
+        now,
+        ent.charge,
+        gameState.rule
+      );
     }
   }
 

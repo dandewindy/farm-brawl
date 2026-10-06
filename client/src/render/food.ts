@@ -13,6 +13,7 @@ interface Particle {
   maxLife: number;
   color: THREE.Color;
   size: number;
+  g: number;
 }
 
 export class FoodAndParticleRenderer {
@@ -175,7 +176,7 @@ export class FoodAndParticleRenderer {
     this.foodShadow.instanceMatrix.needsUpdate = true;
   }
 
-  burst(x: number, y: number, z: number, colorHex: number, count = 15, speed = 8): void {
+  burst(x: number, y: number, z: number, colorHex: number, count = 15, speed = 8, up = 6, life = 0.9): void {
     const col = new THREE.Color(colorHex);
     for (let i = 0; i < count && this.particles.length < this.maxParticles; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -183,18 +184,53 @@ export class FoodAndParticleRenderer {
       this.particles.push({
         x, y, z,
         vx: Math.cos(a) * sp,
-        vy: 2 + Math.random() * 6,
+        vy: 2 + Math.random() * Math.max(1, up - 2),
         vz: Math.sin(a) * sp,
-        life: 0.6 + Math.random() * 0.4,
-        maxLife: 1.0,
+        life,
+        maxLife: life,
         color: col,
-        size: 0.5 + Math.random() * 0.8,
+        size: 0.6 + Math.random() * 0.8,
+        g: 14,
+      });
+    }
+  }
+
+  puff(x: number, y: number, z: number, colorHex: number, size = 1.3, life = 0.8, vy = 2): void {
+    if (this.particles.length < this.maxParticles) {
+      this.particles.push({
+        x, y, z,
+        vx: (Math.random() - 0.5) * 1.2,
+        vy,
+        vz: (Math.random() - 0.5) * 1.2,
+        life,
+        maxLife: life,
+        color: new THREE.Color(colorHex),
+        size,
+        g: -0.5,
+      });
+    }
+  }
+
+  fluff(x: number, z: number, colorHex: number, count = 8): void {
+    const col = new THREE.Color(colorHex);
+    for (let i = 0; i < count && this.particles.length < this.maxParticles; i++) {
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 1.0,
+        y: 1.4,
+        z: z + (Math.random() - 0.5) * 1.0,
+        vx: (Math.random() - 0.5) * 8,
+        vy: 2 + Math.random() * 3,
+        vz: (Math.random() - 0.5) * 8,
+        life: 1.2,
+        maxLife: 1.2,
+        color: col,
+        size: 0.4 + Math.random() * 0.4,
+        g: 4,
       });
     }
   }
 
   updateParticles(dt: number): void {
-    let aliveCount = 0;
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
@@ -203,16 +239,27 @@ export class FoodAndParticleRenderer {
         continue;
       }
 
-      p.vy -= 14 * dt; // gravity
+      p.vy -= p.g * dt;
       p.x += p.vx * dt;
-      p.y = Math.max(0.1, p.y + p.vy * dt);
+      p.y += p.vy * dt;
       p.z += p.vz * dt;
 
-      const progress = p.life / p.maxLife;
-      const s = p.size * progress;
+      // Bounce on ground with friction and dampening (matching main.js.download)
+      if (p.y < 0.15) {
+        p.y = 0.15;
+        p.vy *= -0.3;
+        p.vx *= 0.7;
+        p.vz *= 0.7;
+      }
+    }
+
+    let aliveCount = 0;
+    for (const p of this.particles) {
+      // Smooth scale shrink formula: smoothly vanishes before dying
+      const s = p.size * Math.min(1, (p.life / p.maxLife) * 1.5);
 
       this.dummy.position.set(p.x, p.y, p.z);
-      this.dummy.rotation.set(p.x, p.y, p.z);
+      this.dummy.rotation.set(0, 0, 0);
       this.dummy.scale.setScalar(s);
       this.dummy.updateMatrix();
 
@@ -222,9 +269,7 @@ export class FoodAndParticleRenderer {
     }
 
     this.particleMesh.count = aliveCount;
-    if (aliveCount > 0) {
-      this.particleMesh.instanceMatrix.needsUpdate = true;
-      if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
-    }
+    this.particleMesh.instanceMatrix.needsUpdate = true;
+    if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
   }
 }

@@ -14,6 +14,12 @@ interface AnimalVisual {
   isCrowned: boolean;
   ring: THREE.Mesh;
   ringMat: THREE.MeshBasicMaterial;
+  stars: THREE.Group | null;
+  phase: number;
+  lastX: number;
+  lastZ: number;
+  hitT: number;
+  dust: number;
 }
 
 const ringGeo = new THREE.RingGeometry(0.88, 1.05, 32);
@@ -414,9 +420,22 @@ export class AnimalRenderer {
     return vis;
   }
 
+  onPuff?: (x: number, y: number, z: number, color: number, size?: number, life?: number, vy?: number) => void;
+
+  notifyHit(id: number): void {
+    const vis = this.visuals.get(id);
+    if (vis) {
+      vis.hitT = performance.now();
+    }
+  }
+
   remove(id: number): void {
     const vis = this.visuals.get(id);
     if (vis) {
+      if (vis.stars) {
+        this.scene.remove(vis.stars);
+        vis.stars = null;
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
       this.visuals.delete(id);
@@ -425,89 +444,189 @@ export class AnimalRenderer {
 
   clear(): void {
     for (const vis of this.visuals.values()) {
+      if (vis.stars) {
+        this.scene.remove(vis.stars);
+        vis.stars = null;
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
     }
     this.visuals.clear();
   }
 
-  update(id: number, meta: PlayerMeta, x: number, z: number, angle: number, mass: number, flags: number, isKing = false, podiumPos?: [number, number]): void {
+  update(
+    id: number,
+    meta: PlayerMeta,
+    x: number,
+    z: number,
+    angle: number,
+    mass: number,
+    flags: number,
+    isKing = false,
+    podiumPos?: [number, number],
+    dt = 0.016,
+    now = performance.now(),
+    charge = 0,
+    activeRule = ''
+  ): void {
     const vis = this.getVisual(id, meta);
     if (!vis) return;
 
-    // Position & orientation
-    vis.root.position.set(x, 0, z);
-    vis.root.rotation.y = -angle;
+    const speed = Math.hypot(x - vis.lastX, z - vis.lastZ);
+    vis.lastX = x;
+    vis.lastZ = z;
 
-    // Scale smoothly with mass
+    const isDashing = (flags & 1) !== 0;
+    const isPlowing = (flags & 2) !== 0;
+    const isCharging = (flags & 4) !== 0;
+    const isStunned = (flags & 8) !== 0;
+    const isWater = (flags & 16) !== 0;
+    const isMud = (flags & 32) !== 0;
+    const lvl = (charge || 0) / 10;
+
+    // Continuous walking / dashing leg phase accumulation
+    vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12));
     const r = radiusOf(mass);
-    vis.root.scale.setScalar(r);
+    const sc = r * 1.35 * (isKing ? 1.2 : 1);
 
-    // Grounding indicator ring
     const podX = podiumPos ? podiumPos[0] : 0;
     const podZ = podiumPos ? podiumPos[1] : 0;
     const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
-    vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
-
-    // Update regalia visibility
-    if (vis.regalia) {
-      vis.regalia.visible = isKing;
+    let y = onPodium ? 0.55 : 0;
+    if (isWater) {
+      // Ducks float peacefully, other animals sink deep & struggle
+      y = vis.species === 'duck'
+        ? -0.25 * sc + Math.sin(now / 300) * 0.05
+        : -0.55 * sc + Math.sin(now / 120) * 0.08;
     }
 
-    // Update name label (swap between normal and crowned badge when status changes)
-    if (vis.isCrowned !== isKing) {
-      if (vis.label) vis.root.remove(vis.label);
-      vis.label = createLabel(meta.name, isKing);
-      vis.root.add(vis.label);
-      vis.isCrowned = isKing;
+    // Body hopping & positioning
+    vis.root.position.set(x, y + (isWater ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r), z);
+    vis.root.rotation.y = -angle + (isStunned ? Math.sin(now / 50) * 0.5 : 0);
+
+    // Lean forward on dash/plow, lean back on charge, struggle tilt in water
+    vis.root.rotation.z = isPlowing
+      ? -0.4
+      : isDashing
+      ? -0.25
+      : isWater && vis.species !== 'duck'
+      ? Math.sin(now / 80) * 0.25
+      : isCharging
+      ? 0.15 + lvl * 0.15
+      : 0;
+
+    // Charge trembling wind-up
+    if (isCharging) {
+      vis.root.position.x += (Math.random() - 0.5) * 0.12 * lvl * r;
+      vis.root.position.z += (Math.random() - 0.5) * 0.12 * lvl * r;
     }
 
-    if (vis.label) {
-      const labelHeight = LABEL_Y[vis.species] + 0.6;
-      vis.label.position.set(0, labelHeight, 0);
-      const labelScale = 1.4 / r; // Keep label readable regardless of animal size
-      vis.label.scale.set(labelScale * vis.label.userData.aspect, labelScale, 1);
+    // Squash & stretch
+    const squash = isCharging ? 1 - 0.18 * lvl : 1;
+    vis.root.scale.set(
+      sc * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl),
+      sc * (isDashing ? 0.9 : squash),
+      sc
+    );
+
+    // Hit knockback tumble (seen in original game when rammed)
+    if (vis.hitT && now - vis.hitT < 450) {
+      const hk = Math.sin(((now - vis.hitT) / 450) * Math.PI);
+      vis.root.rotation.x = hk * 0.9 * (id % 2 ? 1 : -1);
+      vis.root.scale.y *= 1 - 0.3 * hk;
+      vis.root.scale.x *= 1 + 0.2 * hk;
+      vis.root.position.y += hk * 0.8;
+    } else {
+      vis.root.rotation.x = 0;
     }
 
-    // Stun tilt / spin & ring styling
-    const isStunned = (flags & 8) !== 0;
-    const isDashing = (flags & 1) !== 0;
+    // Dynamic leg swinging with amplitude 0.7
+    vis.legs.forEach((leg, idx) => {
+      leg.rotation.z = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0)) * 0.7;
+    });
 
+    // Stunned spinning stars above head
     if (isStunned) {
-      vis.root.rotation.z = Math.sin(performance.now() * 0.02) * 0.35;
-      vis.root.position.y = Math.abs(Math.sin(performance.now() * 0.015)) * 0.4;
-      vis.ring.scale.setScalar(r);
+      if (!vis.stars) {
+        vis.stars = new THREE.Group();
+        const starGeo = new THREE.OctahedronGeometry(0.22, 0);
+        const starMat = new THREE.MeshStandardMaterial({ color: 0xffe14d, emissive: 0x887700, roughness: 0.4 });
+        for (let i = 0; i < 3; i++) {
+          const m = new THREE.Mesh(starGeo, starMat);
+          m.position.set(Math.cos(i * 2.1) * 0.8, 0, Math.sin(i * 2.1) * 0.8);
+          vis.stars.add(m);
+        }
+        this.scene.add(vis.stars);
+      }
+      vis.stars.visible = true;
+      vis.stars.position.set(x, y + sc * 2.3, z);
+      vis.stars.rotation.y = now / 150;
+    } else if (vis.stars) {
+      vis.stars.visible = false;
+    }
+
+    // Dust particles
+    vis.dust -= dt;
+    if (vis.dust <= 0) {
+      if (isWater && vis.species !== 'duck') {
+        vis.dust = 0.25;
+        this.onPuff?.(x - Math.cos(angle) * r, 0.15, z - Math.sin(angle) * r, 0xbfe3ff, 0.8, 0.6, 1);
+      } else if (isCharging) {
+        vis.dust = 0.06;
+        const d = r * (1.6 + lvl);
+        const ang = Math.random() * Math.PI * 2;
+        this.onPuff?.(x + Math.cos(ang) * d, 0.3, z + Math.sin(ang) * d, lvl >= 1 ? 0xff5a3c : 0xfff3a0, 0.6, 0.35, 1.5);
+      } else if (isPlowing) {
+        vis.dust = 0.02;
+        this.onPuff?.(x - Math.cos(angle) * r + (Math.random() - 0.5) * 0.6, 0.5, z - Math.sin(angle) * r + (Math.random() - 0.5) * 0.6, 0xff5a3c, 1.6, 0.5);
+      } else if (isDashing || isMud) {
+        vis.dust = isDashing ? 0.03 : 0.15;
+        this.onPuff?.(x - Math.cos(angle) * r, 0.4, z - Math.sin(angle) * r, isMud ? 0x6b4a2b : 0xd8c09a, isDashing ? 1.4 : 0.8, 0.6);
+      }
+    }
+
+    // Regalia (crown + cape): visible on King, or on all if Squealer rule active
+    const showCrown = isKing || activeRule === 'squealer';
+    if (vis.regalia) {
+      vis.regalia.visible = showCrown;
+    }
+
+    // Update label
+    if (vis.isCrowned !== showCrown) {
+      if (vis.label) vis.root.remove(vis.label);
+      vis.label = createLabel(meta.name, showCrown);
+      vis.root.add(vis.label);
+      vis.isCrowned = showCrown;
+    }
+    if (vis.label) {
+      const lh = 1.3 + r * 0.25;
+      vis.label.position.set(0, (LABEL_Y[vis.species] || 1.8) + 0.6, 0);
+      vis.label.scale.set((lh * vis.label.userData.aspect) / sc, lh / sc, 1);
+    }
+
+    // Ground indicator ring
+    vis.ring.visible = !isWater;
+    vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
+    vis.ring.scale.setScalar(r);
+    if (isCharging) {
+      vis.ring.scale.setScalar(r * (1 + 0.6 * lvl));
+      vis.ringMat.color.set(lvl >= 1 ? 0xff3b30 : 0xfff3a0);
+      vis.ringMat.opacity = 0.5 + Math.sin(now / (lvl >= 1 ? 40 : 90)) * 0.4;
+    } else if (isStunned) {
       vis.ringMat.color.set(0x55504a);
       vis.ringMat.opacity = 0.5;
     } else if (isDashing) {
-      vis.root.rotation.z = 0;
-      vis.root.rotation.x = 0.2;
-      vis.root.position.y = 0.1;
       vis.ring.scale.setScalar(r * 1.25);
       vis.ringMat.color.set(0xff3b30);
       vis.ringMat.opacity = 0.95;
     } else if (isKing) {
-      vis.root.rotation.z = 0;
-      vis.root.rotation.x = 0;
-      vis.root.position.y = 0;
       vis.ring.scale.setScalar(r * 1.15);
       vis.ringMat.color.set(0xffc928);
       vis.ringMat.opacity = 0.9;
     } else {
-      vis.root.rotation.z = 0;
-      vis.root.rotation.x = 0;
-      vis.root.position.y = 0;
-      vis.ring.scale.setScalar(r);
       vis.ringMat.color.set(SPECIES_RING_COLOR[vis.species] ?? 0xffffff);
       vis.ringMat.opacity = 0.85;
     }
-
-    // Walking leg animation
-    const speed = isDashing ? 18 : 8;
-    const legPhase = performance.now() * 0.001 * speed;
-    vis.legs.forEach((leg, idx) => {
-      leg.rotation.z = Math.sin(legPhase + (idx % 2 === 0 ? 0 : Math.PI)) * 0.35;
-    });
   }
 
   private buildAnimal(meta: PlayerMeta): AnimalVisual {
@@ -551,6 +670,12 @@ export class AnimalRenderer {
       isCrowned: false,
       ring,
       ringMat,
+      stars: null,
+      phase: 0,
+      lastX: 0,
+      lastZ: 0,
+      hitT: 0,
+      dust: 0,
     };
   }
 }

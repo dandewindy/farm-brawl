@@ -3,7 +3,7 @@
 import { TICK_MS, type Cfg, type FoodKind } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { wrapAngle } from '@shared/math';
-import type { GameEvent, LeaderRow, PlayerMeta, ServerMsg, Snapshot } from '@shared/protocol';
+import type { GameEvent, HofRow, LeaderRow, PlayerMeta, ServerMsg, Snapshot } from '@shared/protocol';
 
 /** [tick, x, z, angle] */
 type Sample = [number, number, number, number];
@@ -53,6 +53,9 @@ export class GameState {
   myMass = 0;
   pod: [number, number, boolean] = [0, 0, false];
   napoleonId = 0;
+  rule = '';
+  reign = 0;
+  hof: HofRow[] = [];
 
   snapTick = 0;
   readonly clockWin: number[] = [];
@@ -144,6 +147,9 @@ export class GameState {
     if (s.me) this.me = s.me;
     if (s.pod) this.pod = s.pod;
     if (s.nap !== undefined) this.napoleonId = s.nap;
+    if (s.rule !== undefined) this.rule = s.rule;
+    if (s.reign !== undefined) this.reign = s.reign;
+    if (s.hof) this.hof = s.hof;
     this.hooks.onSnapshot(s);
   }
 

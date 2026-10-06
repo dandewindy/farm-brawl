@@ -37,6 +37,8 @@ export const FLAG = {
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
 
+export type HofRow = [name: string, species: Species, dur: number];
+
 export type GameEvent =
   | ({ k: 'join' } & PlayerMeta)
   | { k: 'leave'; id: number }
@@ -55,7 +57,8 @@ export type GameEvent =
       spoils: number;
       streak: number;
     }
-  | { k: 'napoleon'; id: number };
+  | { k: 'napoleon'; id: number }
+  | { k: 'rule'; id: string };
 
 /** [id, name, mass, kills] */
 export type LeaderRow = [id: number, name: string, mass: number, kills: number];
@@ -76,6 +79,12 @@ export interface Snapshot {
   pod?: [number, number, boolean];
   /** current Napoleon / King id */
   nap?: number;
+  /** active commandment rule */
+  rule?: string;
+  /** Napoleon reign in seconds */
+  reign?: number;
+  /** hall of fame top reigns */
+  hof?: HofRow[];
   /** per-recipient extras */
   me?: { kills: number; cd: number; rank: number };
 }
