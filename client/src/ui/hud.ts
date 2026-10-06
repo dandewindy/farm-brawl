@@ -230,6 +230,19 @@ export class HudManager {
     setTimeout(() => div.remove(), 2600);
   }
 
+  updateBoard(kingName?: string): void {
+    const ruleName = document.getElementById('ruleName');
+    const ruleDesc = document.getElementById('ruleDesc');
+    if (!ruleName || !ruleDesc) return;
+    if (kingName) {
+      ruleName.textContent = `👑 ${kingName.toUpperCase()} LÀ VUA NÔNG TRẠI`;
+      ruleDesc.textContent = 'Mọi con vật đều bình đẳng, nhưng Vua bình đẳng hơn';
+    } else {
+      ruleName.textContent = 'MỌI CON VẬT ĐỀU BÌNH ĐẲNG';
+      ruleDesc.textContent = 'Nhưng một số con vật bình đẳng hơn những con vật khác';
+    }
+  }
+
   showBanner(head: string, sub: string): void {
     this.bannerEl.innerHTML = '';
     const b = document.createElement('div');

@@ -96,6 +96,61 @@ body.touch #dashBtn { display: block; }
 #toasts { position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 8; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
 #toasts div { padding: 6px 14px; background: rgba(31, 26, 23, .85); border-radius: 10px; font-weight: 700; font-size: 14px; animation: fadeIn .2s, fadeOut .4s 2.2s forwards; }
 
+/* Tarred planks: horizontal wooden boards with dark seams and grain */
+.plank {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 25px, rgba(0,0,0,.45) 25px 27px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, #2b231e, #1f1a17);
+  border: 2px solid #0f0c0a;
+  box-shadow: 0 6px 0 rgba(0,0,0,.35);
+}
+
+#board {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 260px;
+  max-width: min(520px, 60vw);
+  padding: 4px 18px 6px;
+  text-align: center;
+  pointer-events: none;
+  border-radius: 4px;
+}
+#board .eyebrow {
+  display: block;
+  color: var(--red-hi);
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+}
+#board .paint {
+  position: relative;
+  display: inline-block;
+  margin-top: 1px;
+}
+#ruleName {
+  display: inline-block;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1.1;
+  color: var(--paper);
+  text-shadow: 0 2px 0 rgba(0,0,0,.7);
+  letter-spacing: .03em;
+}
+#board small {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #b9b09b;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
 body.menu #hud { display: none; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } }

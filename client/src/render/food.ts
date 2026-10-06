@@ -86,10 +86,14 @@ export class FoodAndParticleRenderer {
       transparent: true,
       opacity: 0.38,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
     this.foodShadow = new THREE.InstancedMesh(shadowGeo, shadowMat, this.maxFoodTotal);
     this.foodShadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.foodShadow.frustumCulled = false; // CRITICAL: never cull shadow mesh!
+    this.foodShadow.renderOrder = 2; // Renders neatly above terrain and hazard ground meshes
     this.foodShadow.count = 0;
     this.scene.add(this.foodShadow);
 
@@ -119,7 +123,7 @@ export class FoodAndParticleRenderer {
       const idx = counts[k]++;
       const baseKg = FOOD_KG[k] || 1;
       const sz = Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)));
-      const grow = f.born ? Math.min(1, (now - f.born) / 350) : 1;
+      const grow = f.born ? Math.max(0, Math.min(1, (now - f.born) / 350)) : 1;
       const seed = f.id * 1.37;
       const onPod = Math.hypot(f.x - podX, f.z - podZ) < CFG.PODIUM_R ? 0.53 : 0;
 
@@ -130,11 +134,13 @@ export class FoodAndParticleRenderer {
       } else if (k === 1) {
         // Apple floats with gentle bobbing and tumble rotation
         this.dummy.position.set(f.x, onPod + 0.45 * sz + Math.sin(tt * 3 + seed) * 0.12, f.z);
-        this.dummy.rotation.set(tt * 0.7 + seed, tt + seed, 0);
+        this.dummy.rotation.set(0, tt + seed, 0);
+        this.dummy.rotateX(0.4);
       } else {
-        // Corn, Golden Corn, Carrot: angled lean with steady spinning
+        // Corn, Golden Corn, Carrot: angled lean with steady spinning around its axis
         this.dummy.position.set(f.x, onPod + 0.45 * sz + Math.sin(tt * 3 + seed) * 0.12, f.z);
-        this.dummy.rotation.set(0.5, tt + seed, Math.PI / 2.5);
+        this.dummy.rotation.set(0, tt + seed, 0);
+        this.dummy.rotateZ(Math.PI / 4);
       }
 
       // Golden corn has a gentle pulsating glow size
@@ -151,7 +157,7 @@ export class FoodAndParticleRenderer {
       if (nShadow < this.maxFoodTotal) {
         const shadowScale = grow * sz * (k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
-        this.shadowM.setPosition(f.x, onPod + 0.04, f.z);
+        this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);
       }
     }

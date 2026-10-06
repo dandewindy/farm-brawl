@@ -171,13 +171,16 @@ function handleGameEvent(ev: GameEvent): void {
       if (ev.id === myId) {
         hud.showBanner('BẠN LÀ VUA NÔNG TRẠI!', 'Giữ vững vị trí trên bục vinh quang 👑');
         sfxVictory();
+        hud.updateBoard(gameState.metas.get(myId)?.name || 'BẠN');
       } else if (ev.id > 0) {
         const king = gameState.metas.get(ev.id);
         const name = king ? king.name : 'Ai đó';
         hud.showToast(`👑 ${name} đã lên ngôi Vua Nông Trại!`);
+        hud.updateBoard(name);
       } else {
         sfxDethrone();
         hud.showToast('👑 Ngai vàng đã bị bỏ trống!');
+        hud.updateBoard(undefined);
       }
       break;
     }
@@ -332,6 +335,19 @@ function animate(now: number): void {
   // Update dynamic food and particle effects
   foodParts.updateFood(gameState.food, now, gameState.map?.podium);
   foodParts.updateParticles(dt);
+
+  // Update animated world hazards (water ripples, pulsing coals, flames)
+  world.updateHazards(now);
+
+  // Update player ground cooldown arc indicator
+  if (me && gameState.alive) {
+    const px = predictor.on ? predictor.x : me.x;
+    const pz = predictor.on ? predictor.z : me.z;
+    const onPod = gameState.map?.podium && Math.hypot(px - gameState.map.podium[0], pz - gameState.map.podium[1]) < CFG.PODIUM_R ? 0.53 : 0;
+    world.updateCdArc(px, onPod, pz, me.mass, gameState.me.cd, true);
+  } else {
+    world.updateCdArc(0, 0, 0, CFG.START_MASS, 0, false);
+  }
 
   // Update UI floating text animations
   hud.updateFloats();
