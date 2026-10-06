@@ -64,6 +64,7 @@ export class FoodAndParticleRenderer {
     const carrotTopGeo = new THREE.ConeGeometry(0.15, 0.32, 5).rotateX(Math.PI).translate(0, -0.52, 0);
     const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x3f9a3a, roughness: 0.7 });
     const carrotTopMesh = new THREE.InstancedMesh(carrotTopGeo, carrotTopMat, this.maxFoodPerKind);
+    carrotTopMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     carrotTopMesh.frustumCulled = false;
     carrotTopMesh.count = 0;
     this.scene.add(carrotTopMesh);
@@ -72,6 +73,7 @@ export class FoodAndParticleRenderer {
     const pumpkinStemGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.3, 5).translate(0, 0.62, 0);
     const pumpkinStemMat = new THREE.MeshStandardMaterial({ color: 0x4f7a2a, roughness: 0.7 });
     const pumpkinStemMesh = new THREE.InstancedMesh(pumpkinStemGeo, pumpkinStemMat, this.maxFoodPerKind);
+    pumpkinStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     pumpkinStemMesh.frustumCulled = false;
     pumpkinStemMesh.count = 0;
     this.scene.add(pumpkinStemMesh);
@@ -82,10 +84,11 @@ export class FoodAndParticleRenderer {
     const shadowMat = new THREE.MeshBasicMaterial({
       color: 0x1f3a12,
       transparent: true,
-      opacity: 0.32,
+      opacity: 0.38,
       depthWrite: false,
     });
     this.foodShadow = new THREE.InstancedMesh(shadowGeo, shadowMat, this.maxFoodTotal);
+    this.foodShadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.foodShadow.frustumCulled = false; // CRITICAL: never cull shadow mesh!
     this.foodShadow.count = 0;
     this.scene.add(this.foodShadow);
