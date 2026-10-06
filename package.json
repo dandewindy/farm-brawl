@@ -1,0 +1,27 @@
+{
+  "name": "farm-brawl",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Multiplayer .io farm brawler: ram rivals into fences, seize the podium, become king.",
+  "scripts": {
+    "dev": "vite --config client/vite.config.ts",
+    "build": "vite build --config client/vite.config.ts",
+    "preview": "vite preview --config client/vite.config.ts",
+    "dev:server": "npm run build && wrangler dev --config server/wrangler.toml",
+    "deploy": "npm run build && wrangler deploy --config server/wrangler.toml",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p client && tsc --noEmit -p server"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "@types/three": "^0.186.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
+  }
+}

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Farm Brawl – Vua Nông Trại</title>
+  <meta name="description" content="Game .io nhiều người chơi: húc đối thủ vào hàng rào điện, chiếm bục và trở thành Vua Nông Trại.">
+  <meta name="theme-color" content="#1f1a17">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23a5281b'/%3E%3Cpath d='M12 44 L16 22 L26 32 L32 16 L38 32 L48 22 L52 44 Z' fill='%23e8b641'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Be+Vietnam+Pro:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body class="menu">
+  <canvas id="c"></canvas>
+
+  <div id="hud" hidden>
+    <div id="stats" class="panel">
+      <div class="weight"><b id="mass">20</b><span>kg</span></div>
+      <div class="sub"><span id="rankTxt"></span> · <span id="koTxt"></span></div>
+    </div>
+    <aside id="lb" class="panel">
+      <h3 data-i18n="lbTitle"></h3>
+      <ol id="lbList"></ol>
+    </aside>
+    <canvas id="minimap" width="160" height="160"></canvas>
+    <div id="feed"></div>
+    <div id="capture" hidden><div id="capFill"></div><span id="capTxt"></span></div>
+    <div id="ram"><div id="ramFill"></div><span id="ramTxt"></span></div>
+    <button id="dashBtn" type="button" data-i18n="dash"></button>
+    <div id="stick" hidden><div id="stickKnob"></div></div>
+  </div>
+
+  <div id="floats" aria-hidden="true"></div>
+  <div id="banner" aria-live="polite"></div>
+  <div id="toasts" aria-live="polite"></div>
+
+  <div id="start" class="screen">
+    <div class="card">
+      <h1><span class="t1">FARM</span><span class="t2">BRAWL</span></h1>
+      <p class="slogan" data-i18n="slogan"></p>
+      <input id="name" maxlength="16" autocomplete="off" spellcheck="false">
+      <p class="label" data-i18n="pick"></p>
+      <div id="species"></div>
+      <p id="speciesHint" class="hint"></p>
+      <button id="play" class="btn-red" type="button" data-i18n="play"></button>
+      <p id="bestLine"></p>
+      <ul class="how">
+        <li data-i18n="how1"></li>
+        <li data-i18n="how2"></li>
+        <li data-i18n="how3"></li>
+        <li data-i18n="how4"></li>
+      </ul>
+      <p class="mode-note" data-i18n="offlineNote"></p>
+    </div>
+  </div>
+
+  <div id="death" class="screen" hidden>
+    <div class="card notice">
+      <div id="deathTitle" class="stamp"></div>
+      <p id="deathCause"></p>
+      <div class="deathStats">
+        <div><b id="dMass">0</b><span data-i18n="stKg"></span></div>
+        <div><b id="dKills">0</b><span data-i18n="stKo"></span></div>
+        <div><b id="dTime">0:00</b><span data-i18n="stTime"></span></div>
+      </div>
+      <p id="deathBest"></p>
+      <button id="again" class="btn-red" type="button" data-i18n="again"></button>
+      <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
