@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CFG } from '@shared/constants';
+import { CFG, radiusOf } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { blobOutline, type Blob } from '@shared/math';
 
@@ -11,6 +11,9 @@ export class WorldRenderer {
   private podiumGroup = new THREE.Group();
   private fenceRails: THREE.Mesh[] = [];
   private blades: THREE.Group | null = null;
+  private sun: THREE.DirectionalLight | null = null;
+  readonly camTarget = { x: 0, z: 0 };
+  private camH = 48;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -56,7 +59,8 @@ export class WorldRenderer {
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 200;
     sun.shadow.bias = -0.0006;
-    this.scene.add(sun);
+    this.sun = sun;
+    this.scene.add(sun, sun.target);
   }
 
   private buildStaticGround(): void {
@@ -401,15 +405,27 @@ export class WorldRenderer {
     return mesh;
   }
 
-  updateCamera(targetX: number, targetZ: number, dt: number): void {
-    const camTarget = new THREE.Vector3(targetX, 0, targetZ);
-    const desiredPos = new THREE.Vector3(targetX, 48, targetZ + 36);
-    this.camera.position.lerp(desiredPos, Math.min(1, 6 * dt));
-    this.camera.lookAt(camTarget);
+  updateCamera(targetX: number, targetZ: number, mass: number, dt: number, shake = 0): void {
+    const r = radiusOf(mass);
+    const h = 30 + r * 6;
+    const k = 1 - Math.exp(-dt * 7);
+    this.camTarget.x += (targetX - this.camTarget.x) * k;
+    this.camTarget.z += (targetZ - this.camTarget.z) * k;
+    this.camH += (h - this.camH) * (1 - Math.exp(-dt * 2));
 
-    // Rotate windmill blades
+    const sx = (Math.random() - 0.5) * shake;
+    const sz = (Math.random() - 0.5) * shake;
+
+    this.camera.position.set(this.camTarget.x + sx, this.camH, this.camTarget.z + this.camH * 0.7 + sz);
+    this.camera.lookAt(this.camTarget.x + sx, 0, this.camTarget.z - 1 + sz);
+
+    if (this.sun) {
+      this.sun.position.set(this.camTarget.x + 30, 65, this.camTarget.z + 22);
+      this.sun.target.position.set(this.camTarget.x, 0, this.camTarget.z);
+    }
+
     if (this.blades) {
-      this.blades.rotation.z += dt * 0.3;
+      this.blades.rotation.z += dt * 0.9;
     }
   }
 

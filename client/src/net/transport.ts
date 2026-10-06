@@ -7,12 +7,16 @@ import { World } from '@shared/sim/world';
 export interface Transport {
   send(m: ClientMsg): void;
   close(): void;
+  readonly rtt: number;
+  readonly rttMin: number;
 }
 
 export type Handler = (m: ServerMsg) => void;
 
 /** runs the authoritative World inside the page at the real tick rate */
 export class LocalServer implements Transport {
+  public readonly rtt = 0;
+  public readonly rttMin = 0;
   private readonly world = new World();
   private myId = 0;
   private last = performance.now();

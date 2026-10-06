@@ -6,7 +6,9 @@ export class WsClient implements Transport {
   private readonly queue: ClientMsg[] = [];
   private closed = false;
   private pingInterval: number | null = null;
-  public rtt = 0;
+  public rtt = 100;
+  public rttMin = 100;
+  private readonly rttWin: number[] = [];
 
   constructor(
     private readonly url: string,
@@ -45,7 +47,13 @@ export class WsClient implements Transport {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'pong') {
-          this.rtt = Math.max(1, Math.round(performance.now() - msg.c));
+          const s = performance.now() - msg.c;
+          if (s >= 0 && s < 3000) {
+            this.rtt += (s - this.rtt) * 0.25;
+            this.rttWin.push(s);
+            if (this.rttWin.length > 5) this.rttWin.shift();
+            this.rttMin = Math.min(...this.rttWin);
+          }
         } else {
           this.onMsg(msg);
         }

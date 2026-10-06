@@ -54,14 +54,23 @@ export class GameState {
   pod: [number, number, boolean] = [0, 0, false];
   napoleonId = 0;
 
-  private lastSnapAt = 0;
-  /** how far behind the newest snapshot we draw, in ticks */
-  delayTicks = 1.2;
+  readonly clockWin: number[] = [];
+  clockOff: number | null = null;
+  lateAvg = 0;
+  interpDelay = 100;
 
   constructor(private readonly hooks: GameHooks) {}
 
+  resetClock(): void {
+    this.clockWin.length = 0;
+    this.clockOff = null;
+    this.lateAvg = 0;
+    this.interpDelay = 100;
+  }
+
   handle(m: ServerMsg): void {
     if (m.t === 'init') {
+      this.resetClock();
       this.cfg = m.cfg;
       this.map = m.map;
       this.tick = m.tick;
@@ -84,7 +93,9 @@ export class GameState {
 
   private onSnapshot(s: Snapshot): void {
     this.tick = s.tick;
-    this.lastSnapAt = performance.now();
+    const now = performance.now();
+    this.stampSnapshot(now);
+
     for (const ev of s.ev) {
       if (ev.k === 'join') {
         this.metas.set(ev.id, { id: ev.id, name: ev.name, species: ev.species, skin: ev.skin, bot: ev.bot });
@@ -125,15 +136,31 @@ export class GameState {
     this.hooks.onSnapshot(s);
   }
 
+  stampSnapshot(now: number): void {
+    const sample = now - this.tick * TICK_MS;
+    this.clockWin.push(sample);
+    if (this.clockWin.length > 40) this.clockWin.shift();
+    const lo = Math.min(...this.clockWin);
+    this.clockOff = this.clockOff === null ? lo : this.clockOff + (lo - this.clockOff) * 0.1;
+    const late = this.clockWin.map((v) => v - lo).sort((a, b) => a - b);
+    this.lateAvg = late[Math.floor(late.length * 0.9)] || 0;
+    const want = Math.min(320, Math.max(60, TICK_MS + 10 + this.lateAvg));
+    this.interpDelay += (want - this.interpDelay) * (want > this.interpDelay ? 0.3 : 0.03);
+  }
+
   /** fractional tick to draw at this moment */
   renderTick(now: number): number {
-    return this.tick + Math.min(2, (now - this.lastSnapAt) / TICK_MS) - this.delayTicks;
+    return this.clockOff === null ? this.tick : (now - this.clockOff - this.interpDelay) / TICK_MS;
   }
 
   /** move every animal to its interpolated pose for `now` */
   interpolate(now: number): void {
     const rt = this.renderTick(now);
-    for (const e of this.ents.values()) sample(e, rt);
+    for (const e of this.ents.values()) {
+      if (e.id !== this.myId) {
+        sample(e, rt);
+      }
+    }
   }
 }
 
@@ -141,10 +168,10 @@ function sample(e: Ent, rt: number): void {
   const h = e.hist, n = h.length;
   if (!n) return;
   const last = h[n - 1];
-  if (n === 1 || rt >= last[0]) {
+  if (rt >= last[0] || n === 1) {
     // late packet: coast a little along the last movement
     if (n >= 2 && rt > last[0]) {
-      const p = h[n - 2], k = Math.min(rt - last[0], 1) / (last[0] - p[0]);
+      const p = h[n - 2], k = Math.min(rt - last[0], 1.5) / (last[0] - p[0]);
       e.x = last[1] + (last[1] - p[1]) * k;
       e.z = last[2] + (last[2] - p[2]) * k;
     } else { e.x = last[1]; e.z = last[2]; }

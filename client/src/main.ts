@@ -30,12 +30,18 @@ let transport: Transport | null = null;
 let lastTime = performance.now();
 let shake = 0;
 let prevMass = 0;
-let holdStartTime = 0;
 let wasDashing = false;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
+
+input.onReleaseRam = (held: number) => {
+  const myMeta = gameState.metas.get(gameState.myId);
+  if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
+    predictor.predictDash(myMeta.species, held, input.aimA, gameState.map);
+  }
+};
 
 const hud = new HudManager((name: string, species: Species) => {
   unlockAudio();
@@ -59,8 +65,10 @@ const gameState = new GameState({
   },
   onSnapshot(_s: Snapshot) {
     const me = gameState.ents.get(gameState.myId);
-    if (me) {
-      predictor.onServerUpdate(me.x, me.z, me.a);
+    if (me && gameState.alive) {
+      const rttMin = transport ? transport.rttMin : 0;
+      predictor.onServerSnapshot(me.x, me.z, me.flags, gameState.tick, gameState.clockOff, rttMin);
+
       hud.updateStats(me.mass, gameState.me.rank, gameState.total, gameState.me.kills);
       // Floating text on mass gain
       if (me.mass > prevMass) {
@@ -75,6 +83,7 @@ const gameState = new GameState({
       if (isDashing && !wasDashing) sfxDash(1);
       wasDashing = isDashing;
     }
+
     // Update podium capture UI
     const [capId, capProg, contested] = gameState.pod;
     const captorMeta = gameState.metas.get(capId);
@@ -107,7 +116,7 @@ function handleGameEvent(ev: GameEvent): void {
       const killerName = killer ? killer.name : '';
 
       if (ev.id === myId) {
-        predictor.reset();
+        predictor.on = false;
         hud.showDeath(ev, killerName);
       } else if (ev.by === myId) {
         sfxReward();
@@ -178,6 +187,20 @@ if (isExplicitOffline) {
   );
 }
 
+// Optional Debug status bar (shows RTT, jitter, prediction error, and FPS)
+const showDebug = params.has('debug') || window.location.hostname === 'localhost';
+let debugEl: HTMLDivElement | null = null;
+let fpsFrames = 0;
+let lastFpsTime = performance.now();
+let currentFps = 60;
+
+if (showDebug) {
+  debugEl = document.createElement('div');
+  debugEl.style.cssText =
+    'position:fixed;left:50%;bottom:6px;transform:translateX(-50%);z-index:20;padding:2px 10px;font:12px/1.4 monospace;color:#f2ead7;background:rgba(0,0,0,0.65);border-radius:4px;pointer-events:none;white-space:nowrap';
+  document.body.appendChild(debugEl);
+}
+
 // Main Animation & Render Loop
 function animate(now: number): void {
   requestAnimationFrame(animate);
@@ -185,49 +208,77 @@ function animate(now: number): void {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  // Send input to transport with smart rate-limiting and change detection
+  fpsFrames++;
+  if (now - lastFpsTime >= 500) {
+    currentFps = Math.round((fpsFrames * 1000) / (now - lastFpsTime));
+    fpsFrames = 0;
+    lastFpsTime = now;
+    if (debugEl && transport) {
+      const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
+      debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;
+    }
+  }
+
+  // Local animal input & prediction step
   if (transport && gameState.alive) {
+    const me = gameState.ents.get(gameState.myId);
+    const myMeta = gameState.metas.get(gameState.myId);
+    const myMass = me ? me.mass : CFG.START_MASS;
+    const myX = predictor.on ? predictor.x : (me ? me.x : 0);
+    const myZ = predictor.on ? predictor.z : (me ? me.z : 0);
+
+    // Precise 3D raycasted aiming
+    input.computeAim(world.camera, myX, myZ, myMass);
+
+    // Authoritative client physics prediction step
+    if (myMeta && me) {
+      predictor.step(
+        dt,
+        now,
+        myMeta.species,
+        me.flags,
+        myMass,
+        input.holding,
+        input.aimA,
+        input.aimMove,
+        gameState.map,
+        gameState.ents,
+        gameState.myId,
+        gameState.tick,
+        transport.rtt
+      );
+    }
+
+    // Rate-limited input transmission
     const inp = input.getInput();
     const btnChanged = inp.btn !== lastSentInput.btn;
     const mvChanged = inp.mv !== lastSentInput.mv;
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
 
-    if (btnChanged || mvChanged || (angleDiff > 0.04 && timeSinceLast >= 45) || timeSinceLast >= 90) {
+    if (btnChanged || (timeSinceLast >= 50 && (angleDiff > 0.01 || mvChanged))) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;
     }
 
-    // Step local prediction for 60fps immediate response
-    const myMeta = gameState.metas.get(gameState.myId);
-    const myEnt = gameState.ents.get(gameState.myId);
-    if (myMeta && myEnt) {
-      const isDashing = (myEnt.flags & 1) !== 0;
-      const terrain = (myEnt.flags & 16) ? 1 : (myEnt.flags & 32) ? 2 : 0;
-      predictor.step(inp, dt, myMeta.species, terrain, isDashing);
-    }
-
-    // Track charging for HUD meter
-    if (inp.btn) {
-      if (!holdStartTime) holdStartTime = now;
-    } else {
-      holdStartTime = 0;
-    }
-    const held = holdStartTime > 0 ? (now - holdStartTime) / 1000 : 0;
+    // Update charging meter in HUD
+    const held = input.holding ? (now - input.holdStart) / 1000 : 0;
     const isCharging = held >= CFG.CHARGE_MIN;
     const chargeLevel = Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN)));
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
+  } else {
+    predictor.on = false;
   }
 
-  // Interpolate remote entity positions for smooth rendering
+  // Interpolate remote entity positions smoothly using dynamic timeline
   gameState.interpolate(now);
 
-  // Update 3D animal meshes (use zero-lag predicted position for myself)
+  // Update 3D animal visual poses
   for (const ent of gameState.ents.values()) {
     const meta = gameState.metas.get(ent.id);
     if (meta) {
-      const isMe = ent.id === gameState.myId && predictor.initialized;
+      const isMe = ent.id === gameState.myId && predictor.on;
       const px = isMe ? predictor.x : ent.x;
       const pz = isMe ? predictor.z : ent.z;
       const pa = isMe ? predictor.a : ent.a;
@@ -236,18 +287,13 @@ function animate(now: number): void {
     }
   }
 
-  // Camera follow local animal with zero-lag predicted coordinates
+  // Camera follow local animal with zero latency & exponential smoothing
   const me = gameState.ents.get(gameState.myId);
-  const targetX = me ? (predictor.initialized ? predictor.x : me.x) : 0;
-  const targetZ = me ? (predictor.initialized ? predictor.z : me.z) : 0;
-  world.updateCamera(targetX, targetZ, dt);
-
-  // Screen shake on hit
-  if (shake > 0) {
-    world.camera.position.x += (Math.random() - 0.5) * shake * 1.5;
-    world.camera.position.z += (Math.random() - 0.5) * shake * 1.5;
-    shake = Math.max(0, shake - dt * 2.5);
-  }
+  const targetX = me ? (predictor.on ? predictor.x : me.x) : 0;
+  const targetZ = me ? (predictor.on ? predictor.z : me.z) : 0;
+  const targetMass = me ? me.mass : CFG.START_MASS;
+  world.updateCamera(targetX, targetZ, targetMass, dt, shake);
+  shake = Math.max(0, shake - dt * 2.5);
 
   // Update dynamic food and particle effects
   foodParts.updateFood(gameState.food, now);
