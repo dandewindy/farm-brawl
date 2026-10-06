@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { radiusOf, type Species } from '@shared/constants';
+import { CFG, radiusOf, type Species } from '@shared/constants';
 import type { PlayerMeta } from '@shared/protocol';
 
 interface AnimalVisual {
@@ -12,7 +12,21 @@ interface AnimalVisual {
   labelName: string;
   regalia: THREE.Group | null;
   isCrowned: boolean;
+  ring: THREE.Mesh;
+  ringMat: THREE.MeshBasicMaterial;
 }
+
+const ringGeo = new THREE.RingGeometry(0.88, 1.05, 32);
+ringGeo.rotateX(-Math.PI / 2);
+
+const SPECIES_RING_COLOR: Record<Species, number> = {
+  chicken: 0xffb74d,
+  sheep: 0xf3f1ea,
+  horse: 0x8b5a2b,
+  cow: 0x4fc3f7,
+  duck: 0xffd54f,
+  pig: 0xf48fb1,
+};
 
 // Detailed color palettes per species (matching original game)
 const SKINS: Record<Species, Record<string, number>[]> = {
@@ -55,16 +69,16 @@ function animalMat(color: number, opts: Partial<THREE.MeshStandardMaterialParame
   return new THREE.MeshStandardMaterial({ color, roughness: 0.72, flatShading: false, ...opts });
 }
 
-// Helper: create a mesh positioned at (x, y, z)
-function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, opts?: Partial<THREE.MeshStandardMaterialParameters>, shadow = false): THREE.Mesh {
+// Helper: create a mesh positioned at (x, y, z) - shadow enabled by default
+function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, opts?: Partial<THREE.MeshStandardMaterialParameters>, shadow = true): THREE.Mesh {
   const m = new THREE.Mesh(geo, animalMat(color, opts));
   m.position.set(x, y, z);
   m.castShadow = shadow;
   return m;
 }
 
-// Helper: scaled sphere "blob"
-function blob(g: THREE.Group, color: number, r: number, scale: [number, number, number], x: number, y: number, z: number, rot?: [number, number, number], shadow = false): THREE.Mesh {
+// Helper: scaled sphere "blob" - shadow enabled by default
+function blob(g: THREE.Group, color: number, r: number, scale: [number, number, number], x: number, y: number, z: number, rot?: [number, number, number], shadow = true): THREE.Mesh {
   const m = part(new THREE.SphereGeometry(r, 14, 10), color, x, y, z, undefined, shadow);
   m.scale.set(...scale);
   if (rot) m.rotation.set(...rot);
@@ -88,16 +102,16 @@ function addEyes(g: THREE.Group, x: number, y: number, sep: number, s: number): 
   }
 }
 
-// Helper: add legs with optional hooves
+// Helper: add legs with hooves casting shadows
 function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: number, rad: number, hoofColor?: number): THREE.Group[] {
   const arr: THREE.Group[] = [];
   for (const [x, z] of pts) {
     const pivot = new THREE.Group();
     pivot.position.set(x, len, z);
-    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0);
+    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0, undefined, true);
     pivot.add(legMesh);
     if (hoofColor !== undefined) {
-      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0);
+      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0, undefined, true);
       pivot.add(hoof);
     }
     g.add(pivot);
@@ -404,12 +418,16 @@ export class AnimalRenderer {
     const vis = this.visuals.get(id);
     if (vis) {
       this.group.remove(vis.root);
+      this.scene.remove(vis.ring);
       this.visuals.delete(id);
     }
   }
 
   clear(): void {
-    for (const vis of this.visuals.values()) this.group.remove(vis.root);
+    for (const vis of this.visuals.values()) {
+      this.group.remove(vis.root);
+      this.scene.remove(vis.ring);
+    }
     this.visuals.clear();
   }
 
@@ -424,6 +442,10 @@ export class AnimalRenderer {
     // Scale smoothly with mass
     const r = radiusOf(mass);
     vis.root.scale.setScalar(r);
+
+    // Grounding indicator ring
+    const onPodium = Math.hypot(x, z) < CFG.PODIUM_R;
+    vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
 
     // Update regalia visibility
     if (vis.regalia) {
@@ -445,20 +467,37 @@ export class AnimalRenderer {
       vis.label.scale.set(labelScale * vis.label.userData.aspect, labelScale, 1);
     }
 
-    // Stun tilt / spin
+    // Stun tilt / spin & ring styling
     const isStunned = (flags & 8) !== 0;
     const isDashing = (flags & 1) !== 0;
+
     if (isStunned) {
       vis.root.rotation.z = Math.sin(performance.now() * 0.02) * 0.35;
       vis.root.position.y = Math.abs(Math.sin(performance.now() * 0.015)) * 0.4;
+      vis.ring.scale.setScalar(r);
+      vis.ringMat.color.set(0x55504a);
+      vis.ringMat.opacity = 0.5;
     } else if (isDashing) {
       vis.root.rotation.z = 0;
       vis.root.rotation.x = 0.2;
       vis.root.position.y = 0.1;
+      vis.ring.scale.setScalar(r * 1.25);
+      vis.ringMat.color.set(0xff3b30);
+      vis.ringMat.opacity = 0.95;
+    } else if (isKing) {
+      vis.root.rotation.z = 0;
+      vis.root.rotation.x = 0;
+      vis.root.position.y = 0;
+      vis.ring.scale.setScalar(r * 1.15);
+      vis.ringMat.color.set(0xffc928);
+      vis.ringMat.opacity = 0.9;
     } else {
       vis.root.rotation.z = 0;
       vis.root.rotation.x = 0;
       vis.root.position.y = 0;
+      vis.ring.scale.setScalar(r);
+      vis.ringMat.color.set(SPECIES_RING_COLOR[vis.species] ?? 0xffffff);
+      vis.ringMat.opacity = 0.85;
     }
 
     // Walking leg animation
@@ -488,6 +527,16 @@ export class AnimalRenderer {
     const label = createLabel(meta.name, false);
     root.add(label);
 
+    // Add ground indicator ring
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: SPECIES_RING_COLOR[meta.species] ?? 0xffffff,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    this.scene.add(ring);
+
     return {
       root,
       body,
@@ -498,6 +547,8 @@ export class AnimalRenderer {
       labelName: meta.name,
       regalia,
       isCrowned: false,
+      ring,
+      ringMat,
     };
   }
 }

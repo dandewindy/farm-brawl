@@ -48,10 +48,10 @@ export class WorldRenderer {
     this.scene.add(hemi);
 
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
-    sun.position.set(40, 80, 50);
+    sun.position.set(30, 65, 22);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    const d = 75;
+    sun.shadow.mapSize.set(2048, 2048);
+    const d = 60;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
     sun.shadow.camera.top = d;

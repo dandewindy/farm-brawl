@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FOOD_KG, type FoodKind } from '@shared/constants';
+import { CFG, FOOD_KG, type FoodKind } from '@shared/constants';
 import type { FoodItem } from '../game/state';
 
 interface Particle {
@@ -17,52 +17,85 @@ interface Particle {
 
 export class FoodAndParticleRenderer {
   private readonly foodMeshes: THREE.InstancedMesh[] = [];
+  private readonly foodTops: Partial<Record<FoodKind, THREE.InstancedMesh>> = {};
+  private readonly foodShadow: THREE.InstancedMesh;
   private readonly particleMesh: THREE.InstancedMesh;
   private readonly particles: Particle[] = [];
   private readonly dummy = new THREE.Object3D();
-  private readonly maxFoodPerKind = 400;
+  private readonly shadowM = new THREE.Matrix4();
+  private readonly maxFoodPerKind = 800;
+  private readonly maxFoodTotal = 1500;
   private readonly maxParticles = 600;
 
   constructor(private readonly scene: THREE.Scene) {
-    // Geometries & materials for 5 food types:
+    // Geometries & materials matching original game:
     // 0: Corn (yellow capsule)
     // 1: Apple (red sphere)
     // 2: Golden Corn (gold glowing capsule)
-    // 3: Carrot (orange cone)
-    // 4: Pumpkin (orange squashed sphere)
+    // 3: Carrot (orange cone) + green leaves top
+    // 4: Pumpkin (squashed orange sphere) + green stem top
 
     const geos = [
-      new THREE.CapsuleGeometry(0.22, 0.45, 4, 8),
-      new THREE.SphereGeometry(0.35, 8, 8),
-      new THREE.CapsuleGeometry(0.32, 0.65, 4, 8),
-      new THREE.ConeGeometry(0.2, 0.7, 6),
-      new THREE.SphereGeometry(0.55, 8, 8),
+      new THREE.CapsuleGeometry(0.22, 0.5, 4, 8),
+      new THREE.SphereGeometry(0.42, 8, 8),
+      new THREE.CapsuleGeometry(0.36, 0.8, 4, 8),
+      new THREE.ConeGeometry(0.2, 0.75, 6),
+      new THREE.SphereGeometry(0.75, 10, 8).scale(1, 0.72, 1),
     ];
-    geos[4].scale(1, 0.75, 1);
 
     const mats = [
-      new THREE.MeshStandardMaterial({ color: 0xffd94a, roughness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xeb3b3b, roughness: 0.4 }),
-      new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0x553300, metalness: 0.5, roughness: 0.3 }),
-      new THREE.MeshStandardMaterial({ color: 0xff8c1a, roughness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xf58220, roughness: 0.7 }),
+      new THREE.MeshStandardMaterial({ color: 0xffd84a, emissive: 0x554000, roughness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: 0xe8322e, emissive: 0x220000, roughness: 0.4 }),
+      new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0x996600, metalness: 0.5, roughness: 0.3 }),
+      new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0x331100, roughness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: 0xf28a1a, emissive: 0x2a1000, roughness: 0.7 }),
     ];
 
     for (let i = 0; i < 5; i++) {
       const mesh = new THREE.InstancedMesh(geos[i], mats[i], this.maxFoodPerKind);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
+      mesh.frustumCulled = false; // CRITICAL: prevent disappearing when camera moves away from origin!
       mesh.count = 0;
       this.scene.add(mesh);
       this.foodMeshes.push(mesh);
     }
 
+    // Green carrot leaves & pumpkin stems (matching main.js.download lines 699-702)
+    const carrotTopGeo = new THREE.ConeGeometry(0.15, 0.32, 5).rotateX(Math.PI).translate(0, -0.52, 0);
+    const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x3f9a3a, roughness: 0.7 });
+    const carrotTopMesh = new THREE.InstancedMesh(carrotTopGeo, carrotTopMat, this.maxFoodPerKind);
+    carrotTopMesh.frustumCulled = false;
+    carrotTopMesh.count = 0;
+    this.scene.add(carrotTopMesh);
+    this.foodTops[3] = carrotTopMesh;
+
+    const pumpkinStemGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.3, 5).translate(0, 0.62, 0);
+    const pumpkinStemMat = new THREE.MeshStandardMaterial({ color: 0x4f7a2a, roughness: 0.7 });
+    const pumpkinStemMesh = new THREE.InstancedMesh(pumpkinStemGeo, pumpkinStemMat, this.maxFoodPerKind);
+    pumpkinStemMesh.frustumCulled = false;
+    pumpkinStemMesh.count = 0;
+    this.scene.add(pumpkinStemMesh);
+    this.foodTops[4] = pumpkinStemMesh;
+
+    // Soft dark circular shadows under all food items (matching main.js.download line 707)
+    const shadowGeo = new THREE.CircleGeometry(0.42, 12).rotateX(-Math.PI / 2);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x1f3a12,
+      transparent: true,
+      opacity: 0.32,
+      depthWrite: false,
+    });
+    this.foodShadow = new THREE.InstancedMesh(shadowGeo, shadowMat, this.maxFoodTotal);
+    this.foodShadow.frustumCulled = false; // CRITICAL: never cull shadow mesh!
+    this.foodShadow.count = 0;
+    this.scene.add(this.foodShadow);
+
     // Instanced particle mesh
-    const partGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+    const partGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
     const partMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     this.particleMesh = new THREE.InstancedMesh(partGeo, partMat, this.maxParticles);
     this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.particleMesh.frustumCulled = false;
     this.particleMesh.count = 0;
     this.scene.add(this.particleMesh);
   }
@@ -70,28 +103,65 @@ export class FoodAndParticleRenderer {
   updateFood(foodMap: Map<number, FoodItem>, now: number): void {
     const counts = [0, 0, 0, 0, 0];
     const max = this.maxFoodPerKind;
+    let nShadow = 0;
+    const tt = now / 1000; // Continuous time in seconds, ensures smooth constant rotational speed
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
+      if (k < 0 || k > 4) continue;
       if (counts[k] >= max) continue;
 
       const idx = counts[k]++;
       const baseKg = FOOD_KG[k] || 1;
-      const scale = Math.min(1.6, Math.max(0.7, Math.sqrt(f.v / baseKg)));
-      const bob = Math.sin(now * 0.003 + f.id * 1.5) * 0.08;
+      const sz = Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)));
+      const grow = f.born ? Math.min(1, (now - f.born) / 350) : 1;
+      const seed = f.id * 1.37;
+      const onPod = Math.hypot(f.x, f.z) < CFG.PODIUM_R ? 0.53 : 0;
 
-      this.dummy.position.set(f.x, 0.35 * scale + bob, f.z);
-      this.dummy.rotation.y = f.id * 0.7 + now * 0.001;
-      this.dummy.scale.setScalar(scale);
+      if (k === 4) {
+        // Pumpkin sits on the ground and turns slowly (0.3 rad/s)
+        this.dummy.position.set(f.x, onPod + 0.5 * sz, f.z);
+        this.dummy.rotation.set(0, seed + tt * 0.3, 0);
+      } else if (k === 1) {
+        // Apple floats with gentle bobbing and tumble rotation
+        this.dummy.position.set(f.x, onPod + 0.45 * sz + Math.sin(tt * 3 + seed) * 0.12, f.z);
+        this.dummy.rotation.set(tt * 0.7 + seed, tt + seed, 0);
+      } else {
+        // Corn, Golden Corn, Carrot: angled lean with steady spinning
+        this.dummy.position.set(f.x, onPod + 0.45 * sz + Math.sin(tt * 3 + seed) * 0.12, f.z);
+        this.dummy.rotation.set(0.5, tt + seed, Math.PI / 2.5);
+      }
+
+      // Golden corn has a gentle pulsating glow size
+      const pulse = k === 2 ? 1 + Math.sin(tt * 6 + seed) * 0.12 : 1;
+      this.dummy.scale.setScalar(grow * sz * pulse);
       this.dummy.updateMatrix();
 
       this.foodMeshes[k].setMatrixAt(idx, this.dummy.matrix);
+      if (this.foodTops[k]) {
+        this.foodTops[k]!.setMatrixAt(idx, this.dummy.matrix);
+      }
+
+      // Render ground shadow disc under food item
+      if (nShadow < this.maxFoodTotal) {
+        const shadowScale = grow * sz * (k === 4 ? 2.0 : 1.0);
+        this.shadowM.makeScale(shadowScale, 1, shadowScale);
+        this.shadowM.setPosition(f.x, onPod + 0.04, f.z);
+        this.foodShadow.setMatrixAt(nShadow++, this.shadowM);
+      }
     }
 
     for (let k = 0; k < 5; k++) {
       this.foodMeshes[k].count = counts[k];
       this.foodMeshes[k].instanceMatrix.needsUpdate = true;
+      if (this.foodTops[k as FoodKind]) {
+        this.foodTops[k as FoodKind]!.count = counts[k];
+        this.foodTops[k as FoodKind]!.instanceMatrix.needsUpdate = true;
+      }
     }
+
+    this.foodShadow.count = nShadow;
+    this.foodShadow.instanceMatrix.needsUpdate = true;
   }
 
   burst(x: number, y: number, z: number, colorHex: number, count = 15, speed = 8): void {
