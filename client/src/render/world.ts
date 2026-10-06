@@ -317,6 +317,8 @@ export class WorldRenderer {
   readonly renderer: THREE.WebGLRenderer;
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
+  private podiumRing: THREE.Mesh | null = null;
+  private podiumRingMat: THREE.MeshBasicMaterial | null = null;
   private readonly fenceRails: THREE.Mesh[] = [];
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
@@ -526,6 +528,21 @@ export class WorldRenderer {
     flag.position.set(1.15, 5.8, -(PR - 1.6));
     flag.castShadow = true;
     this.podiumGroup.add(flag);
+
+    // Capture progress ring (glowing ring around podium base)
+    const captureRingGeo = new THREE.RingGeometry(PR + 0.15, PR + 0.65, 64, 1, -Math.PI / 2, Math.PI * 2);
+    this.podiumRingMat = new THREE.MeshBasicMaterial({
+      color: 0xffc928,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.podiumRing = new THREE.Mesh(captureRingGeo, this.podiumRingMat);
+    this.podiumRing.rotation.x = -Math.PI / 2;
+    this.podiumRing.position.y = 0.52;
+    this.podiumRing.renderOrder = 5;
+    this.podiumGroup.add(this.podiumRing);
 
     this.scene.add(this.podiumGroup);
   }
@@ -875,6 +892,29 @@ export class WorldRenderer {
     this.cdTrack.scale.set(r, r, r);
     this.cdArc.scale.set(-r, r, r); // mirrored so it fills clockwise!
     this.cdArc.geometry.setDrawRange(0, 6 * Math.floor(ARC_SEG * (1 - cdFrac)));
+  }
+
+  updatePodiumRing(progress: number, contested: boolean, now: number): void {
+    if (!this.podiumRing || !this.podiumRingMat) return;
+    if (progress <= 0) {
+      this.podiumRing.visible = false;
+      return;
+    }
+    this.podiumRing.visible = true;
+    // Draw partial ring based on capture progress
+    const segs = 64;
+    const drawCount = Math.floor(segs * progress) * 6;
+    this.podiumRing.geometry.setDrawRange(0, drawCount);
+    // Color: gold when capturing, red-flash when contested
+    if (contested) {
+      const flash = 0.4 + 0.3 * Math.sin(now / 120);
+      this.podiumRingMat.color.setHex(0xff4444);
+      this.podiumRingMat.opacity = flash;
+    } else {
+      const pulse = 0.6 + 0.25 * Math.sin(now / 200);
+      this.podiumRingMat.color.setHex(0xffc928);
+      this.podiumRingMat.opacity = pulse;
+    }
   }
 
   updateCamera(targetX: number, targetZ: number, mass: number, dt: number, shake = 0): void {

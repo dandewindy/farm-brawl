@@ -239,7 +239,7 @@ export class World {
       }
       if (!p.alive) continue;
 
-      // 4. Pond drowning (ducks swim freely; other animals struggle for 3s before drowning)
+      // 4. Pond drowning (ducks swim freely; other animals struggle for 1.5s before drowning)
       if (p.species !== 'duck') {
         let inPond = false;
         for (const b of (this.map.pond || [])) {
@@ -250,7 +250,7 @@ export class World {
         }
         if (inPond && p.dashT <= 0) {
           p.inWaterT += DT;
-          if (p.inWaterT >= 3.0) {
+          if (p.inWaterT >= 1.5) {
             this.kill(p, 'drown');
             continue;
           }

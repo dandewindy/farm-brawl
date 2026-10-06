@@ -169,6 +169,7 @@ function handleGameEvent(ev: GameEvent): void {
       const killerName = killer ? killer.name : '';
 
       corpses.spawn(ev, victim);
+      animals.remove(ev.id);
 
       if (ev.cause === 'drown') {
         for (let i = 0; i < 16; i++) {
@@ -410,6 +411,10 @@ function animate(now: number): void {
 
   // Update animated world hazards (water ripples, pulsing coals, flames)
   world.updateHazards(now);
+
+    // Update podium capture ring glow
+    const [_capId, capProg, capContested] = gameState.pod;
+    world.updatePodiumRing(capProg, capContested, now);
 
   // Update player ground cooldown arc indicator
   if (me && gameState.alive) {
