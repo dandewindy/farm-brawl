@@ -83,8 +83,12 @@ export class InputManager {
     });
 
     window.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && e.button === 0) {
-        this.pressRam();
+      if (e.pointerType === 'mouse') {
+        this.pointer.x = e.clientX;
+        this.pointer.y = e.clientY;
+        this.pointer.has = true;
+        this.keyAim = false;
+        if (e.button === 0) this.pressRam();
       }
     });
 

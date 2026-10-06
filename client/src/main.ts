@@ -50,6 +50,8 @@ const hud = new HudManager((name: string, species: Species) => {
   }
 });
 
+let firstSpawn = true;
+
 const gameState = new GameState({
   onInit(map) {
     world.buildMap(map);
@@ -58,30 +60,43 @@ const gameState = new GameState({
     hud.showInGame();
     hud.showBanner(t('welcome'), t('welcomeSub'));
     prevMass = CFG.START_MASS;
-    predictor.reset();
+    firstSpawn = true;
+    predictor.on = false;
   },
   onEvent(ev: GameEvent) {
     handleGameEvent(ev);
   },
-  onSnapshot(_s: Snapshot) {
-    const me = gameState.ents.get(gameState.myId);
-    if (me && gameState.alive) {
-      const rttMin = transport ? transport.rttMin : 0;
-      predictor.onServerSnapshot(me.x, me.z, me.flags, gameState.tick, gameState.clockOff, rttMin);
-
-      hud.updateStats(me.mass, gameState.me.rank, gameState.total, gameState.me.kills);
-      // Floating text on mass gain
-      if (me.mass > prevMass) {
-        const gained = Math.round(me.mass - prevMass);
-        if (gained >= 1) {
-          hud.spawnFloat(`+${gained} kg`, window.innerWidth / 2, window.innerHeight / 2 - 40, gained >= 6);
-          sfxEat(gained >= 5);
+  onSnapshot(s: Snapshot) {
+    let seenMe = false;
+    for (const [id, x, z, _a, mass, flags, _charge] of s.p) {
+      if (id === gameState.myId && gameState.alive) {
+        seenMe = true;
+        if (firstSpawn) {
+          firstSpawn = false;
+          predictor.reset(x, z);
+          world.camTarget.x = x;
+          world.camTarget.z = z;
         }
-        prevMass = me.mass;
+        const rttMin = transport ? transport.rttMin : 0;
+        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, rttMin);
+
+        hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
+        // Floating text on mass gain
+        if (mass > prevMass) {
+          const gained = Math.round(mass - prevMass);
+          if (gained >= 1) {
+            hud.spawnFloat(`+${gained} kg`, window.innerWidth / 2, window.innerHeight / 2 - 40, gained >= 6);
+            sfxEat(gained >= 5);
+          }
+          prevMass = mass;
+        }
+        const isDashing = (flags & 1) !== 0;
+        if (isDashing && !wasDashing) sfxDash(1);
+        wasDashing = isDashing;
       }
-      const isDashing = (me.flags & 1) !== 0;
-      if (isDashing && !wasDashing) sfxDash(1);
-      wasDashing = isDashing;
+    }
+    if (!seenMe) {
+      predictor.on = false;
     }
 
     // Update podium capture UI
@@ -244,7 +259,7 @@ function animate(now: number): void {
         gameState.map,
         gameState.ents,
         gameState.myId,
-        gameState.tick,
+        gameState.snapTick,
         transport.rtt
       );
     }

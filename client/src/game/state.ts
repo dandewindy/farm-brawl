@@ -54,6 +54,7 @@ export class GameState {
   pod: [number, number, boolean] = [0, 0, false];
   napoleonId = 0;
 
+  snapTick = 0;
   readonly clockWin: number[] = [];
   clockOff: number | null = null;
   lateAvg = 0;
@@ -62,6 +63,7 @@ export class GameState {
   constructor(private readonly hooks: GameHooks) {}
 
   resetClock(): void {
+    this.snapTick = 0;
     this.clockWin.length = 0;
     this.clockOff = null;
     this.lateAvg = 0;
@@ -92,6 +94,7 @@ export class GameState {
   }
 
   private onSnapshot(s: Snapshot): void {
+    this.snapTick++;
     this.tick = s.tick;
     const now = performance.now();
     this.stampSnapshot(now);
@@ -115,18 +118,26 @@ export class GameState {
     for (const [id, x, z, a, mass, flags, charge] of s.p) {
       let e = this.ents.get(id);
       if (!e) {
-        e = { id, hist: [], mass, flags, charge, seen: s.tick, x, z, a };
+        e = { id, hist: [], mass, flags, charge, seen: this.snapTick, x, z, a };
         this.ents.set(id, e);
       }
-      e.mass = mass; e.flags = flags; e.charge = charge; e.seen = s.tick;
+      e.mass = mass; e.flags = flags; e.charge = charge; e.seen = this.snapTick;
       const last = e.hist[e.hist.length - 1];
-      if (last && Math.hypot(last[1] - x, last[2] - z) > 15) e.hist.length = 0; // teleport
-      e.hist.push([s.tick, x, z, a]);
+      if (last && Math.hypot(last[1] - x, last[2] - z) > 15) {
+        e.hist.length = 0; // teleport
+        e.x = x; e.z = z; e.a = a;
+      }
+      e.hist.push([this.snapTick, x, z, a]);
       if (e.hist.length > 12) e.hist.shift();
-      if (id === this.myId) this.myMass = mass;
+      if (id === this.myId) {
+        this.myMass = mass;
+        e.x = x;
+        e.z = z;
+        e.a = a;
+      }
     }
     // anyone missing from this snapshot is gone
-    for (const [id, e] of this.ents) if (e.seen !== s.tick) this.ents.delete(id);
+    for (const [id, e] of this.ents) if (e.seen !== this.snapTick) this.ents.delete(id);
 
     if (s.lb) this.lb = s.lb;
     if (s.total) this.total = s.total;
@@ -137,7 +148,7 @@ export class GameState {
   }
 
   stampSnapshot(now: number): void {
-    const sample = now - this.tick * TICK_MS;
+    const sample = now - this.snapTick * TICK_MS;
     this.clockWin.push(sample);
     if (this.clockWin.length > 40) this.clockWin.shift();
     const lo = Math.min(...this.clockWin);
@@ -150,7 +161,7 @@ export class GameState {
 
   /** fractional tick to draw at this moment */
   renderTick(now: number): number {
-    return this.clockOff === null ? this.tick : (now - this.clockOff - this.interpDelay) / TICK_MS;
+    return this.clockOff === null ? this.snapTick : (now - this.clockOff - this.interpDelay) / TICK_MS;
   }
 
   /** move every animal to its interpolated pose for `now` */
