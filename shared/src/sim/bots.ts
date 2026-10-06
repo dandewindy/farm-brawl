@@ -70,6 +70,14 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     return;
   }
 
+  // podium desire: if bot is healthy (>35 kg) and reasonably close to podium, steer towards it
+  const [podX, podZ] = w.map.podium;
+  const distToPod = Math.hypot(podX - p.x, podZ - p.z);
+  if (p.mass >= 35 && distToPod < 32 && w.rand() < 0.35) {
+    p.input.a = aimAt(p, podX, podZ);
+    return;
+  }
+
   // graze: best kg per distance
   let fx = 0, fz = 0, best = 0;
   for (const f of w.food.values()) {

@@ -141,7 +141,7 @@ export class HudManager {
     const dTime = document.getElementById('dTime')!;
 
     titleEl.textContent = t(`t_${ev.cause}`);
-    causeEl.textContent = killerName ? t('fenceBy', { killer: killerName }) : t('fenceSelf');
+    causeEl.textContent = killerName ? t(`${ev.cause}By`, { killer: killerName }) : t(`${ev.cause}Self`);
     dMass.textContent = String(ev.best);
     dKills.textContent = String(ev.kills);
     const mins = Math.floor(ev.alive / 60);

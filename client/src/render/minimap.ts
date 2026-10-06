@@ -49,6 +49,22 @@ export class MinimapRenderer {
       ctx.fill();
     }
 
+    // Hazards: Wells / Pits (dark void)
+    ctx.fillStyle = '#0f0c0a';
+    for (const [wx, wz, wr] of (map.well || [])) {
+      ctx.beginPath();
+      ctx.arc(center + wx * scale, center + wz * scale, Math.max(2, wr * scale * 1.2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Hazards: Fire pits (orange / red)
+    ctx.fillStyle = '#ff5511';
+    for (const [fx, fz, fr] of (map.fire || [])) {
+      ctx.beginPath();
+      ctx.arc(center + fx * scale, center + fz * scale, Math.max(2, fr * scale), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Podium (red carpet)
     ctx.beginPath();
     ctx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);

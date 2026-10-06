@@ -1,7 +1,9 @@
 import { CFG, type Species } from '@shared/constants';
 import { wrapAngle } from '@shared/math';
 import type { GameEvent, Snapshot } from '@shared/protocol';
-import { sfxDash, sfxEat, sfxHit, sfxReward, sfxZap, unlockAudio } from './audio/sfx';
+import {
+  sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSplash, sfxVictory, sfxZap, unlockAudio,
+} from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
 import { applyTexts, t } from './i18n';
@@ -123,12 +125,25 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'die': {
-      foodParts.burst(ev.x, 1, ev.z, 0xfff35c, 28, 12);
-      sfxZap(ev.id === myId ? 1 : 0.5);
+      const isMine = ev.id === myId;
       const killer = gameState.metas.get(ev.by);
       const victim = gameState.metas.get(ev.id);
       const victimName = victim ? victim.name : '???';
       const killerName = killer ? killer.name : '';
+
+      if (ev.cause === 'drown') {
+        foodParts.burst(ev.x, 0.4, ev.z, 0x64b5f6, 24, 7);
+        sfxSplash(isMine ? 1 : 0.5);
+      } else if (ev.cause === 'well') {
+        foodParts.burst(ev.x, 0.8, ev.z, 0x8d6e63, 20, 6);
+        sfxFall(isMine ? 1 : 0.5);
+      } else if (ev.cause === 'fire') {
+        foodParts.burst(ev.x, 1.2, ev.z, 0xff7043, 26, 10);
+        sfxBurn(isMine ? 1 : 0.5);
+      } else {
+        foodParts.burst(ev.x, 1.5, ev.z, 0xfff35c, 28, 12);
+        sfxZap(isMine ? 1 : 0.5);
+      }
 
       if (ev.id === myId) {
         predictor.on = false;
@@ -145,20 +160,24 @@ function handleGameEvent(ev: GameEvent): void {
         }
       }
 
+      const causeTag = t(`c_${ev.cause}`) || t('c_fence');
       const feedText = killerName
-        ? `⚡ ${killerName} ➔ ${victimName}`
-        : `⚡ ${t('c_fence')} ➔ ${victimName}`;
+        ? `${killerName} ➔ ${victimName}`
+        : `${causeTag} ➔ ${victimName}`;
       hud.addFeed(feedText, ev.id === myId || ev.by === myId);
       break;
     }
     case 'napoleon': {
       if (ev.id === myId) {
         hud.showBanner('BẠN LÀ VUA NÔNG TRẠI!', 'Giữ vững vị trí trên bục vinh quang 👑');
-        sfxReward();
+        sfxVictory();
       } else if (ev.id > 0) {
         const king = gameState.metas.get(ev.id);
         const name = king ? king.name : 'Ai đó';
         hud.showToast(`👑 ${name} đã lên ngôi Vua Nông Trại!`);
+      } else {
+        sfxDethrone();
+        hud.showToast('👑 Ngai vàng đã bị bỏ trống!');
       }
       break;
     }

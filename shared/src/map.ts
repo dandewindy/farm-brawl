@@ -8,6 +8,8 @@ export interface MapData {
   pond: Blob[];
   mud: Blob[];
   hay: Circle[];
+  well: Circle[];
+  fire: Circle[];
 }
 
 export function generateMap(seed: number, R: number = CFG.R): MapData {
@@ -50,12 +52,28 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   }
 
   const hay: Circle[] = [];
-  const nHay = 5 + Math.floor(rnd() * 3);
+  const nHay = 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < nHay; i++) {
     const r = between(1.3, 2);
     const p = place(r, 6);
     if (p) hay.push([p[0], p[1], r]);
   }
 
-  return { seed, podium, pond, mud, hay };
+  const well: Circle[] = [];
+  const nWell = 1;
+  for (let i = 0; i < nWell; i++) {
+    const r = between(1.6, 2.2);
+    const p = place(r, 7);
+    if (p) well.push([p[0], p[1], r]);
+  }
+
+  const fire: Circle[] = [];
+  const nFire = 1;
+  for (let i = 0; i < nFire; i++) {
+    const r = between(1.8, 2.4);
+    const p = place(r, 7);
+    if (p) fire.push([p[0], p[1], r]);
+  }
+
+  return { seed, podium, pond, mud, hay, well, fire };
 }

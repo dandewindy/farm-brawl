@@ -35,7 +35,7 @@ export const FLAG = {
   MUD: 32,
 } as const;
 
-export type DeathCause = 'fence';
+export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
 
 export type GameEvent =
   | ({ k: 'join' } & PlayerMeta)

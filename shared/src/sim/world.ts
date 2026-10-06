@@ -6,7 +6,7 @@ import {
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type MapData } from '../map';
-import { clamp, mulberry32 } from '../math';
+import { clamp, insideBlob, mulberry32 } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
   FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
@@ -203,7 +203,41 @@ export class World {
 
     for (const p of alive) {
       if (p.dashT <= 0) p.plow = false;
-      if (p.alive && outsideFence(p)) this.kill(p, 'fence');
+      if (!p.alive) continue;
+
+      // 1. Electric fence
+      if (outsideFence(p)) {
+        this.kill(p, 'fence');
+        continue;
+      }
+
+      // 2. Stone pit / Well
+      for (const [wx, wz, wr] of (this.map.well || [])) {
+        if (Math.hypot(p.x - wx, p.z - wz) < wr + radiusOf(p.mass) * 0.35) {
+          this.kill(p, 'well');
+          break;
+        }
+      }
+      if (!p.alive) continue;
+
+      // 3. Fire pit
+      for (const [fx, fz, fr] of (this.map.fire || [])) {
+        if (Math.hypot(p.x - fx, p.z - fz) < fr + radiusOf(p.mass) * 0.35) {
+          this.kill(p, 'fire');
+          break;
+        }
+      }
+      if (!p.alive) continue;
+
+      // 4. Pond drowning (ducks swim freely and never drown)
+      if (p.species !== 'duck') {
+        for (const b of (this.map.pond || [])) {
+          if (insideBlob(b, p.x, p.z, -0.7) && p.dashT <= 0) {
+            this.kill(p, 'drown');
+            break;
+          }
+        }
+      }
     }
 
     this.eat(alive);
@@ -237,6 +271,16 @@ export class World {
       }
     } else {
       this.podiumContested = true;
+    }
+
+    // King periodic reign harvest bonus (every 3 seconds)
+    if (this.napoleonId > 0 && this.tick % 60 === 0) {
+      const king = this.players.get(this.napoleonId);
+      if (king && king.alive) {
+        king.mass = Math.min(CFG.MAX_MASS, king.mass + 2);
+        // Spawn golden corn directly on podium
+        this.addFood(podX + (this.rnd() - 0.5) * 4, podZ + (this.rnd() - 0.5) * 4, 2, 6);
+      }
     }
 
     for (const p of alive) {
@@ -358,7 +402,8 @@ export class World {
     const killer = credited && credited.alive && credited !== p ? credited : undefined;
     let spoils = 0;
     if (killer) {
-      spoils = Math.round(p.mass * CFG.KILL_SPOILS);
+      const isKingKill = p.id === this.napoleonId;
+      spoils = Math.round(p.mass * CFG.KILL_SPOILS * (isKingKill ? 1.5 : 1));
       killer.mass = Math.min(CFG.MAX_MASS, killer.mass + spoils);
       killer.kills++;
       killer.streak++;

@@ -387,6 +387,70 @@ export class WorldRenderer {
       cap.castShadow = true;
       this.hazardGroup.add(hay, cap);
     }
+
+    // Build Wells / Pits
+    for (const [wx, wz, wr] of (map.well || [])) {
+      const g = new THREE.Group();
+      g.position.set(wx, 0, wz);
+
+      const lipGeo = new THREE.CylinderGeometry(wr + 0.3, wr + 1.8, 0.6, 20, 1, true);
+      const lipMat = new THREE.MeshStandardMaterial({ color: 0x6e5238, roughness: 0.9, flatShading: true });
+      const lip = new THREE.Mesh(lipGeo, lipMat);
+      lip.position.y = 0.3;
+      lip.receiveShadow = true;
+      g.add(lip);
+
+      const wallGeo = new THREE.CylinderGeometry(wr + 0.3, wr + 0.3, 0.6, 20, 1, true);
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x221a14, roughness: 0.95 });
+      const wall = new THREE.Mesh(wallGeo, wallMat);
+      wall.position.y = 0.3;
+      g.add(wall);
+
+      const holeGeo = new THREE.CircleGeometry(wr + 0.32, 24);
+      const holeMat = new THREE.MeshBasicMaterial({ color: 0x050403 });
+      const hole = new THREE.Mesh(holeGeo, holeMat);
+      hole.rotation.x = -Math.PI / 2;
+      hole.position.y = 0.02;
+      g.add(hole);
+
+      this.hazardGroup.add(g);
+    }
+
+    // Build Fire Furnaces
+    for (const [fx, fz, fr] of (map.fire || [])) {
+      const g = new THREE.Group();
+      g.position.set(fx, 0, fz);
+
+      const wallGeo = new THREE.CylinderGeometry(fr + 0.5, fr + 0.7, 1.2, 16, 1, true);
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x7c3826, roughness: 0.85, flatShading: true });
+      const wall = new THREE.Mesh(wallGeo, wallMat);
+      wall.position.y = 0.6;
+      wall.castShadow = true;
+      g.add(wall);
+
+      const rimGeo = new THREE.RingGeometry(fr, fr + 0.7, 16);
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0x5a2014, roughness: 0.7 });
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.y = 1.2;
+      g.add(rim);
+
+      const coalsGeo = new THREE.CircleGeometry(fr, 16);
+      const coalsMat = new THREE.MeshBasicMaterial({ color: 0xff3700 });
+      const coals = new THREE.Mesh(coalsGeo, coalsMat);
+      coals.rotation.x = -Math.PI / 2;
+      coals.position.y = 0.7;
+      g.add(coals);
+
+      const chimneyGeo = new THREE.BoxGeometry(0.9, 4.2, 0.9);
+      const chimneyMat = new THREE.MeshStandardMaterial({ color: 0x4a1d12, roughness: 0.8 });
+      const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+      chimney.position.set(fr + 0.6, 2.1, 0);
+      chimney.castShadow = true;
+      g.add(chimney);
+
+      this.hazardGroup.add(g);
+    }
   }
 
   private createBlobMesh(blob: Blob, extra: number, color: number, y: number, metalness = 0): THREE.Mesh {
