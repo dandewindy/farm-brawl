@@ -9,8 +9,8 @@ export const SUBSTEPS = 2;
 
 export const CFG = {
   /** radius of the electric fence */
-  R: 60,
-  PODIUM_R: 5,
+  R: 70,
+  PODIUM_R: 7,
   START_MASS: 20,
   MIN_MASS: 10,
   MAX_MASS: 600,
@@ -20,7 +20,7 @@ export const CFG = {
 
   DASH_SPEED: 34,
   DASH_TIME: 0.22,
-  DASH_CD: 0.9,
+  DASH_CD: 1,
   /** extra cooldown after a charged ram */
   PLOW_CD: 0.4,
   /** button held shorter than this = a plain dash on release */
@@ -29,6 +29,15 @@ export const CFG = {
   CHARGE_MAX: 1.2,
   /** charging only slows you down after this long, so quick taps feel instant */
   CHARGE_SLOW_AFTER: 0.12,
+
+  CAPTURE_TIME: 4,
+  TRACTOR_R: 5.2,
+  SUNDAY_PULL: 7,
+  SUNDAY_TEAM: 0.6,
+  SUNDAY_RING: 2,
+  POD_WARN: 1,
+  SUPER_FLY_SPEED: 62,
+  SUPER_FLY_TIME: 0.55,
 
   STUN_TIME: 0.55,
   /** closing speed a dash needs to count as a hit */

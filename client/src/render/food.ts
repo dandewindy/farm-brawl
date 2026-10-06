@@ -100,11 +100,13 @@ export class FoodAndParticleRenderer {
     this.scene.add(this.particleMesh);
   }
 
-  updateFood(foodMap: Map<number, FoodItem>, now: number): void {
+  updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {
     const counts = [0, 0, 0, 0, 0];
     const max = this.maxFoodPerKind;
     let nShadow = 0;
     const tt = now / 1000; // Continuous time in seconds, ensures smooth constant rotational speed
+    const podX = podiumPos ? podiumPos[0] : 0;
+    const podZ = podiumPos ? podiumPos[1] : 0;
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
@@ -116,7 +118,7 @@ export class FoodAndParticleRenderer {
       const sz = Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)));
       const grow = f.born ? Math.min(1, (now - f.born) / 350) : 1;
       const seed = f.id * 1.37;
-      const onPod = Math.hypot(f.x, f.z) < CFG.PODIUM_R ? 0.53 : 0;
+      const onPod = Math.hypot(f.x - podX, f.z - podZ) < CFG.PODIUM_R ? 0.53 : 0;
 
       if (k === 4) {
         // Pumpkin sits on the ground and turns slowly (0.3 rad/s)

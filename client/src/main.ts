@@ -298,7 +298,7 @@ function animate(now: number): void {
       const pz = isMe ? predictor.z : ent.z;
       const pa = isMe ? predictor.a : ent.a;
       const isKing = ent.id === gameState.napoleonId;
-      animals.update(ent.id, meta, px, pz, pa, ent.mass, ent.flags, isKing);
+      animals.update(ent.id, meta, px, pz, pa, ent.mass, ent.flags, isKing, gameState.map?.podium);
     }
   }
 
@@ -311,7 +311,7 @@ function animate(now: number): void {
   shake = Math.max(0, shake - dt * 2.5);
 
   // Update dynamic food and particle effects
-  foodParts.updateFood(gameState.food, now);
+  foodParts.updateFood(gameState.food, now, gameState.map?.podium);
   foodParts.updateParticles(dt);
 
   // Update UI floating text animations

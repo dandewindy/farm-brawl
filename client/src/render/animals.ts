@@ -431,7 +431,7 @@ export class AnimalRenderer {
     this.visuals.clear();
   }
 
-  update(id: number, meta: PlayerMeta, x: number, z: number, angle: number, mass: number, flags: number, isKing = false): void {
+  update(id: number, meta: PlayerMeta, x: number, z: number, angle: number, mass: number, flags: number, isKing = false, podiumPos?: [number, number]): void {
     const vis = this.getVisual(id, meta);
     if (!vis) return;
 
@@ -444,7 +444,9 @@ export class AnimalRenderer {
     vis.root.scale.setScalar(r);
 
     // Grounding indicator ring
-    const onPodium = Math.hypot(x, z) < CFG.PODIUM_R;
+    const podX = podiumPos ? podiumPos[0] : 0;
+    const podZ = podiumPos ? podiumPos[1] : 0;
+    const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
     vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
 
     // Update regalia visibility
