@@ -15,6 +15,13 @@
 <body class="menu">
   <canvas id="c"></canvas>
 
+  <!-- Team mode: reign time per farm and match clock -->
+  <div id="teamBar" hidden>
+    <span class="tb tb0"><b data-i18n="team0">Foxwood</b><i id="ts0">0</i></span>
+    <span id="tClock">5:00</span>
+    <span class="tb tb1"><i id="ts1">0</i><b data-i18n="team1">Pinchfield</b></span>
+  </div>
+
   <div id="hud" hidden>
     <header id="board" class="plank">
       <span class="eyebrow">★ ĐIỀU RĂN ★</span>
@@ -35,7 +42,10 @@
         <ol id="hofList"></ol>
       </div>
     </aside>
-    <canvas id="minimap" width="160" height="160"></canvas>
+    <div id="mapWrap">
+      <canvas id="minimap" width="160" height="160"></canvas>
+      <div id="roomTag" hidden>Phòng 1</div>
+    </div>
     <div id="feed"></div>
     <div id="capture" hidden><div id="capFill"></div><span id="capTxt"></span></div>
     <div id="ram"><div id="ramFill"></div><span id="ramTxt"></span></div>
@@ -47,11 +57,25 @@
   <div id="banner" aria-live="polite"></div>
   <div id="toasts" aria-live="polite"></div>
 
+  <!-- King commandment cards selection overlay -->
+  <div id="choice" hidden>
+    <h3><span data-i18n="choiceTitle">Napoleon, hãy sửa một điều răn</span> <span id="choiceLeft"></span></h3>
+    <div id="choiceCards"></div>
+  </div>
+
   <div id="start" class="screen">
     <div class="card">
+      <div class="wall-top">
+        <button id="mute" type="button" title="M"><span class="ico">🔊</span> <span data-i18n="sound">Âm thanh</span></button>
+      </div>
       <h1><span class="t1">FARM</span><span class="t2">BRAWL</span></h1>
       <p class="slogan" data-i18n="slogan"></p>
       <input id="name" maxlength="16" autocomplete="off" spellcheck="false">
+      <p class="eyebrow" data-i18n="modeLabel">Chế độ chơi</p>
+      <div id="modes">
+        <button type="button" class="on" data-mode="ffa"><span class="n">Tự do</span><span class="p">Ai lo thân nấy</span></button>
+        <button type="button" data-mode="team"><span class="n">Trại đấu trại</span><span class="p">Foxwood đấu Pinchfield</span></button>
+      </div>
       <p class="label" data-i18n="pick"></p>
       <div id="species"></div>
       <p id="speciesHint" class="hint"></p>

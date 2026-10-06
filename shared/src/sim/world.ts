@@ -39,6 +39,7 @@ export interface Player extends Body {
   bornT: number;
   best: number;
   respawnT: number;
+  inWaterT: number;
   ai: BotBrain | null;
 }
 
@@ -78,6 +79,7 @@ export class World {
   napoleonReign = 0;
   currentRule = '';
   ruleTimer = 0;
+  kingChoice: { options: string[]; expireT: number } | null = null;
   hof: [string, Species, number][] = [
     ['Napoleon', 'pig', 35],
     ['Snowball', 'pig', 22],
@@ -105,7 +107,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -144,7 +146,7 @@ export class World {
     Object.assign(p, {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
-      kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false,
+      kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false, inWaterT: 0,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -237,14 +239,26 @@ export class World {
       }
       if (!p.alive) continue;
 
-      // 4. Pond drowning (ducks swim freely and never drown)
+      // 4. Pond drowning (ducks swim freely; other animals struggle for 3s before drowning)
       if (p.species !== 'duck') {
+        let inPond = false;
         for (const b of (this.map.pond || [])) {
-          if (insideBlob(b, p.x, p.z, -0.7) && p.dashT <= 0) {
-            this.kill(p, 'drown');
+          if (insideBlob(b, p.x, p.z, -0.7)) {
+            inPond = true;
             break;
           }
         }
+        if (inPond && p.dashT <= 0) {
+          p.inWaterT += DT;
+          if (p.inWaterT >= 3.0) {
+            this.kill(p, 'drown');
+            continue;
+          }
+        } else {
+          p.inWaterT = 0;
+        }
+      } else {
+        p.inWaterT = 0;
       }
     }
 
@@ -278,7 +292,7 @@ export class World {
           this.napoleonId = c.id;
           this.napoleonReign = 0;
           this.events.push({ k: 'napoleon', id: c.id });
-          this.pickRule();
+          this.startKingChoice();
         }
       } else {
         if (this.podiumProgress > 0) {
@@ -310,8 +324,19 @@ export class World {
     if (this.napoleonId > 0) {
       this.napoleonReign += DT;
       this.ruleTimer -= DT;
-      if (this.ruleTimer <= 0) {
+      if (this.ruleTimer <= 0 && !this.kingChoice) {
         this.pickRule();
+      }
+
+      // King rule choice timer: bot king picks after 1.5s, or timeout
+      if (this.kingChoice) {
+        const king = this.players.get(this.napoleonId);
+        const isBotKing = king?.bot ?? false;
+        const left = this.kingChoice.expireT - this.time;
+        if ((isBotKing && left <= 8.5) || left <= 0) {
+          const pick = this.kingChoice.options[Math.floor(this.rnd() * this.kingChoice.options.length)];
+          this.applyRule(pick);
+        }
       }
 
       // Tax rule: 2% of weight to king every second (20 ticks)
@@ -427,12 +452,34 @@ export class World {
     }
   }
 
+  startKingChoice(): void {
+    const rules = ['twoleg', 'fourleg', 'corn', 'sunday', 'tax', 'squealer', 'snowball'];
+    const candidates = rules.filter((r) => r !== this.currentRule);
+    const shuffled = [...candidates].sort(() => this.rnd() - 0.5);
+    this.kingChoice = {
+      options: shuffled.slice(0, 3),
+      expireT: this.time + 10.0,
+    };
+  }
+
+  chooseRule(playerId: number, ruleId: string): void {
+    if (playerId === this.napoleonId && this.kingChoice && this.kingChoice.options.includes(ruleId)) {
+      this.applyRule(ruleId);
+    }
+  }
+
+  applyRule(ruleId: string): void {
+    this.currentRule = ruleId;
+    this.ruleTimer = 40;
+    this.kingChoice = null;
+    this.events.push({ k: 'rule', id: ruleId });
+  }
+
   private pickRule(): void {
     const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball'];
     const candidates = rules.filter((r) => r !== this.currentRule);
-    this.currentRule = candidates[Math.floor(this.rnd() * candidates.length)] || 'twoleg';
-    this.ruleTimer = 40;
-    this.events.push({ k: 'rule', id: this.currentRule });
+    const pick = candidates[Math.floor(this.rnd() * candidates.length)] || 'twoleg';
+    this.applyRule(pick);
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
@@ -487,6 +534,7 @@ export class World {
       this.napoleonId = 0;
       this.napoleonReign = 0;
       this.currentRule = '';
+      this.kingChoice = null;
       this.events.push({ k: 'napoleon', id: 0 });
     }
     const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
@@ -592,7 +640,8 @@ export class World {
     for (const o of this.players.values()) {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
-        | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0);
+        | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0)
+        | (o.species !== 'duck' && o.inWaterT > 0 ? FLAG.DROWNING : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     const snap: Snapshot = {
@@ -613,7 +662,19 @@ export class World {
       snap.total = this.ranked.length;
     }
     const me = this.players.get(id);
-    if (me) snap.me = { kills: me.kills, cd: r2(me.cd), rank: me.alive ? this.ranked.indexOf(me) + 1 : 0 };
+    if (me) {
+      snap.me = {
+        kills: me.kills,
+        cd: r2(me.cd),
+        rank: me.alive ? this.ranked.indexOf(me) + 1 : 0,
+        choice: id === this.napoleonId && this.kingChoice
+          ? {
+              options: this.kingChoice.options,
+              left: Math.max(0, Math.ceil(this.kingChoice.expireT - this.time)),
+            }
+          : null,
+      };
+    }
     return snap;
   }
 

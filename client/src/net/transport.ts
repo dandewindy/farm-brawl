@@ -48,6 +48,8 @@ export class LocalServer implements Transport {
       this.onMsg({ t: 'joined', id: this.myId });
     } else if (m.t === 'input') {
       this.world.setInput(this.myId, m);
+    } else if (m.t === 'rule') {
+      this.world.chooseRule(this.myId, m.id);
     }
   }
 

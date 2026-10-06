@@ -18,6 +18,7 @@ export interface PlayerMeta {
   species: Species;
   skin: number;
   bot: boolean;
+  team?: number;
 }
 
 /** [id, x, z, kind, kg] */
@@ -33,11 +34,17 @@ export const FLAG = {
   STUN: 8,
   WATER: 16,
   MUD: 32,
+  DROWNING: 64,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
 
 export type HofRow = [name: string, species: Species, dur: number];
+
+export interface ChoiceWire {
+  options: string[];
+  left: number;
+}
 
 export type GameEvent =
   | ({ k: 'join' } & PlayerMeta)
@@ -86,7 +93,7 @@ export interface Snapshot {
   /** hall of fame top reigns */
   hof?: HofRow[];
   /** per-recipient extras */
-  me?: { kills: number; cd: number; rank: number };
+  me?: { kills: number; cd: number; rank: number; choice?: ChoiceWire | null };
 }
 
 export type ServerMsg =
@@ -98,4 +105,5 @@ export type ServerMsg =
 export type ClientMsg =
   | { t: 'join'; name: string; species: Species }
   | { t: 'ping'; c: number }
+  | { t: 'rule'; id: string }
   | ({ t: 'input' } & Input);

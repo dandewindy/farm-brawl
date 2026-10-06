@@ -482,6 +482,7 @@ export class AnimalRenderer {
     const isStunned = (flags & 8) !== 0;
     const isWater = (flags & 16) !== 0;
     const isMud = (flags & 32) !== 0;
+    const isDrowning = (flags & 64) !== 0;
     const lvl = (charge || 0) / 10;
 
     // Continuous walking / dashing leg phase accumulation
@@ -494,10 +495,17 @@ export class AnimalRenderer {
     const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
     let y = onPodium ? 0.55 : 0;
     if (isWater) {
-      // Ducks float peacefully, other animals sink deep & struggle
-      y = vis.species === 'duck'
-        ? -0.25 * sc + Math.sin(now / 300) * 0.05
-        : -0.55 * sc + Math.sin(now / 120) * 0.08;
+      // Ducks float peacefully; other animals sink and struggle frantically when drowning
+      if (vis.species === 'duck') {
+        y = -0.25 * sc + Math.sin(now / 300) * 0.05;
+      } else if (isDrowning) {
+        y = -0.65 * sc + Math.sin(now / 60) * 0.12;
+        if (this.onPuff && Math.random() < 0.3) {
+          this.onPuff(x + (Math.random() - 0.5) * 0.7, 0.1, z + (Math.random() - 0.5) * 0.7, 0xdff1ff, 0.7, 0.8, 2.5);
+        }
+      } else {
+        y = -0.55 * sc + Math.sin(now / 120) * 0.08;
+      }
     }
 
     // Body hopping & positioning
@@ -509,11 +517,17 @@ export class AnimalRenderer {
       ? -0.4
       : isDashing
       ? -0.25
+      : isDrowning
+      ? Math.sin(now / 50) * 0.45
       : isWater && vis.species !== 'duck'
       ? Math.sin(now / 80) * 0.25
       : isCharging
       ? 0.15 + lvl * 0.15
       : 0;
+
+    if (isDrowning) {
+      vis.root.rotation.x = Math.cos(now / 60) * 0.35;
+    }
 
     // Charge trembling wind-up
     if (isCharging) {
@@ -679,3 +693,21 @@ export class AnimalRenderer {
     };
   }
 }
+
+export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false): { group: THREE.Group; regalia: THREE.Group | null } {
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+
+  const skinList = SKINS[species] || SKINS.chicken;
+  const skin = skinList[skinIdx % skinList.length];
+  const builder = BUILDERS[species] || BUILDERS.chicken;
+  builder(body, skin);
+
+  const regalia = buildRegalia(species);
+  regalia.visible = crowned;
+  root.add(regalia);
+
+  return { group: root, regalia };
+}
+

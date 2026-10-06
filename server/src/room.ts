@@ -102,6 +102,11 @@ export class GameRoom extends DurableObject {
     } else if (msg.t === 'ping') {
       const pongMsg: ServerMsg = { t: 'pong', c: msg.c };
       ws.send(JSON.stringify(pongMsg));
+    } else if (msg.t === 'rule') {
+      const playerId = this.sockets.get(ws);
+      if (playerId) {
+        this.world.chooseRule(playerId, msg.id);
+      }
     }
   }
 

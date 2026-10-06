@@ -1,5 +1,5 @@
 import { SPECIES, type Species } from '@shared/constants';
-import type { GameEvent, HofRow, LeaderRow } from '@shared/protocol';
+import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
 
 export interface FloatingText {
@@ -41,11 +41,27 @@ export class HudManager {
   private readonly againBtn: HTMLButtonElement;
   private readonly changeBtn: HTMLButtonElement;
 
+  private readonly choiceEl: HTMLElement | null;
+  private readonly choiceLeftEl: HTMLElement | null;
+  private readonly choiceCardsEl: HTMLElement | null;
+  private readonly teamBarEl: HTMLElement | null;
+  private readonly ts0El: HTMLElement | null;
+  private readonly ts1El: HTMLElement | null;
+  private readonly tClockEl: HTMLElement | null;
+  private readonly muteBtn: HTMLElement | null;
+  private readonly modesContainer: HTMLElement | null;
+  private readonly roomTagEl: HTMLElement | null;
+
+  public onPickRule?: (id: string) => void;
+  public onToggleMute?: () => void;
+  public onSelectMode?: (mode: 'ffa' | 'team') => void;
+  private currentChoiceOptions: string[] = [];
+
   private selectedSpecies: Species = 'pig';
   private floatingTexts: FloatingText[] = [];
 
   constructor(
-    private readonly onStartPlay: (name: string, species: Species) => void
+    private readonly onStartPlay: (name: string, species: Species, mode: 'ffa' | 'team') => void
   ) {
     this.massEl = document.getElementById('mass')!;
     this.rankTxt = document.getElementById('rankTxt')!;
@@ -77,9 +93,22 @@ export class HudManager {
     this.againBtn = document.getElementById('again') as HTMLButtonElement;
     this.changeBtn = document.getElementById('change') as HTMLButtonElement;
 
+    this.choiceEl = document.getElementById('choice');
+    this.choiceLeftEl = document.getElementById('choiceLeft');
+    this.choiceCardsEl = document.getElementById('choiceCards');
+    this.teamBarEl = document.getElementById('teamBar');
+    this.ts0El = document.getElementById('ts0');
+    this.ts1El = document.getElementById('ts1');
+    this.tClockEl = document.getElementById('tClock');
+    this.muteBtn = document.getElementById('mute');
+    this.modesContainer = document.getElementById('modes');
+    this.roomTagEl = document.getElementById('roomTag');
+
     this.initSpeciesPicker();
     this.initEvents();
   }
+
+  private selectedMode: 'ffa' | 'team' = 'ffa';
 
   private initSpeciesPicker(): void {
     const emojis: Record<Species, string> = {
@@ -111,7 +140,7 @@ export class HudManager {
     const play = () => {
       const name = this.nameInput.value.trim() || t('defaultName');
       localStorage.setItem('fb_name', name);
-      this.onStartPlay(name, this.selectedSpecies);
+      this.onStartPlay(name, this.selectedSpecies, this.selectedMode);
     };
 
     this.playBtn.addEventListener('click', play);
@@ -129,6 +158,100 @@ export class HudManager {
       this.startScreen.hidden = false;
       document.body.classList.add('menu');
     });
+
+    if (this.muteBtn) {
+      this.muteBtn.addEventListener('click', () => {
+        this.onToggleMute?.();
+      });
+    }
+
+    if (this.modesContainer) {
+      this.modesContainer.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mode = btn.dataset.mode as 'ffa' | 'team';
+          if (mode) {
+            this.selectedMode = mode;
+            this.modesContainer?.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+            btn.classList.add('on');
+            this.onSelectMode?.(mode);
+          }
+        });
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (this.choiceEl && !this.choiceEl.hidden && this.currentChoiceOptions.length) {
+        if (e.key === '1' && this.currentChoiceOptions[0]) {
+          this.pickChoice(this.currentChoiceOptions[0]);
+        } else if (e.key === '2' && this.currentChoiceOptions[1]) {
+          this.pickChoice(this.currentChoiceOptions[1]);
+        } else if (e.key === '3' && this.currentChoiceOptions[2]) {
+          this.pickChoice(this.currentChoiceOptions[2]);
+        }
+      }
+    });
+  }
+
+  public pickChoice(id: string): void {
+    this.onPickRule?.(id);
+    if (this.choiceEl) this.choiceEl.hidden = true;
+    this.currentChoiceOptions = [];
+  }
+
+  public showChoice(c?: ChoiceWire | null): void {
+    if (!c || !c.options || c.options.length === 0) {
+      if (this.choiceEl) this.choiceEl.hidden = true;
+      this.currentChoiceOptions = [];
+      return;
+    }
+    this.currentChoiceOptions = c.options;
+    if (this.choiceLeftEl) {
+      this.choiceLeftEl.textContent = t('choiceLeft', { s: c.left });
+    }
+    if (this.choiceCardsEl) {
+      this.choiceCardsEl.innerHTML = '';
+      c.options.forEach((ruleId, idx) => {
+        const b = document.createElement('button');
+        b.className = 'plank';
+        const kbd = document.createElement('kbd');
+        kbd.textContent = String(idx + 1);
+        const name = document.createElement('span');
+        name.className = 'painted';
+        name.textContent = t(`r_${ruleId}`);
+        const desc = document.createElement('span');
+        desc.className = 'd';
+        desc.textContent = t(`d_${ruleId}`);
+        b.append(kbd, name, desc);
+        b.onclick = (e) => {
+          e.stopPropagation();
+          this.pickChoice(ruleId);
+        };
+        this.choiceCardsEl!.appendChild(b);
+      });
+    }
+    if (this.choiceEl) this.choiceEl.hidden = false;
+  }
+
+  public updateTeamBar(t0: number, t1: number, clockSec: number): void {
+    if (this.teamBarEl) this.teamBarEl.hidden = false;
+    if (this.ts0El) this.ts0El.textContent = String(t0);
+    if (this.ts1El) this.ts1El.textContent = String(t1);
+    if (this.tClockEl) this.tClockEl.textContent = this.fmtTime(clockSec);
+  }
+
+  public setRoomTag(name: string): void {
+    if (this.roomTagEl) {
+      this.roomTagEl.hidden = false;
+      this.roomTagEl.textContent = name;
+    }
+  }
+
+  public setMuteState(muted: boolean): void {
+    if (this.muteBtn) {
+      this.muteBtn.innerHTML = muted
+        ? `<span class="ico">🔇</span> <span>${t('sound')}</span>`
+        : `<span class="ico">🔊</span> <span>${t('sound')}</span>`;
+    }
   }
 
   showInGame(): void {

@@ -2,7 +2,9 @@ import { CFG, type Species } from '@shared/constants';
 import { wrapAngle } from '@shared/math';
 import type { GameEvent, Snapshot } from '@shared/protocol';
 import {
-  sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSplash, sfxVictory, sfxZap, unlockAudio,
+  chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
+  sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSplash, sfxVictory, sfxZap,
+  unlockAudio, yelp,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
@@ -11,6 +13,7 @@ import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
 import { WsClient } from './net/ws';
 import { AnimalRenderer } from './render/animals';
+import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
 import { MinimapRenderer } from './render/minimap';
 import { WorldRenderer } from './render/world';
@@ -24,6 +27,7 @@ const minimapCanvas = document.getElementById('minimap') as HTMLCanvasElement;
 
 const world = new WorldRenderer(canvas);
 const animals = new AnimalRenderer(world.scene);
+const corpses = new CorpseRenderer(world.scene);
 const foodParts = new FoodAndParticleRenderer(world.scene);
 animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
 const minimap = new MinimapRenderer(minimapCanvas);
@@ -40,24 +44,34 @@ let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
 
 input.onReleaseRam = (held: number) => {
+  chargeStop();
   const myMeta = gameState.metas.get(gameState.myId);
   if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
     predictor.predictDash(myMeta.species, held, input.aimA, gameState.map);
   }
 };
 
-const hud = new HudManager((name: string, species: Species) => {
+const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team') => {
   unlockAudio();
   if (transport) {
     transport.send({ t: 'join', name, species });
   }
 });
+hud.onPickRule = (ruleId) => {
+  transport?.send({ t: 'rule', id: ruleId });
+};
+hud.onToggleMute = () => {
+  const next = !isMuted();
+  setMuted(next);
+  hud.setMuteState(next);
+};
 
 let firstSpawn = true;
 
 const gameState = new GameState({
   onInit(map) {
     world.buildMap(map);
+    corpses.setMap(map);
   },
   onJoined(_id) {
     hud.showInGame();
@@ -102,6 +116,9 @@ const gameState = new GameState({
       predictor.on = false;
     }
 
+    // King choice card options
+    hud.showChoice(s.me?.choice);
+
     // Update podium capture UI
     const [capId, capProg, contested] = gameState.pod;
     const captorMeta = gameState.metas.get(capId);
@@ -130,6 +147,9 @@ function handleGameEvent(ev: GameEvent): void {
       sfxHit(ev.s, isMine ? 1 : 0.4);
       animals.notifyHit(ev.v);
       const vm = gameState.metas.get(ev.v);
+      if (vm) {
+        yelp(vm.species, isMine ? 1 : 0.5);
+      }
       const FLUFF_COLORS: Record<Species, number> = {
         chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b,
       };
@@ -148,17 +168,21 @@ function handleGameEvent(ev: GameEvent): void {
       const victimName = victim ? victim.name : '???';
       const killerName = killer ? killer.name : '';
 
+      corpses.spawn(ev, victim);
+
       if (ev.cause === 'drown') {
-        foodParts.burst(ev.x, 0.4, ev.z, 0x64b5f6, 24, 7);
+        for (let i = 0; i < 16; i++) {
+          foodParts.puff(ev.x + (Math.random() - 0.5) * 2, 0.3, ev.z + (Math.random() - 0.5) * 2, 0xbfe3ff, 1, 1.1, 3);
+        }
         sfxSplash(isMine ? 1 : 0.5);
       } else if (ev.cause === 'well') {
-        foodParts.burst(ev.x, 0.8, ev.z, 0x8d6e63, 20, 6);
+        foodParts.burst(ev.x, 1.5, ev.z, 0x8f8a80, 14, 4, 5);
         sfxFall(isMine ? 1 : 0.5);
       } else if (ev.cause === 'fire') {
         foodParts.burst(ev.x, 1.2, ev.z, 0xff7043, 26, 10);
         sfxBurn(isMine ? 1 : 0.5);
       } else {
-        foodParts.burst(ev.x, 1.5, ev.z, 0xfff35c, 28, 12);
+        foodParts.burst(ev.x, 1.6, ev.z, 0xfff35c, 18, 10, 9, 0.5);
         sfxZap(isMine ? 1 : 0.5);
       }
 
@@ -185,6 +209,7 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'napoleon': {
+      setMood(ev.id === myId ? 'napoleon' : 'normal');
       if (ev.id === myId) {
         hud.showBanner('BẠN LÀ VUA NÔNG TRẠI!', 'Giữ vững vị trí trên bục vinh quang 👑');
         sfxVictory();
@@ -202,6 +227,7 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'rule': {
+      repaint();
       hud.showRuleBanner(ev.id);
       hud.updateBoard(ev.id, gameState.reign);
       break;
@@ -217,6 +243,7 @@ function handleGameEvent(ev: GameEvent): void {
 const params = new URLSearchParams(window.location.search);
 const isExplicitOffline = params.get('offline') === '1' || params.get('mode') === 'offline';
 const roomName = params.get('room') || 'pub-1';
+hud.setRoomTag(`Phòng ${roomName.toUpperCase()}`);
 let fallbackLocal = false;
 
 if (isExplicitOffline) {
@@ -321,12 +348,18 @@ function animate(now: number): void {
       lastSentTime = now;
     }
 
-    // Update charging meter in HUD
+    // Update charging meter in HUD and charge whine audio
     const held = input.holding ? (now - input.holdStart) / 1000 : 0;
     const isCharging = held >= CFG.CHARGE_MIN;
     const chargeLevel = Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN)));
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
+    if (isCharging) {
+      chargeUpdate(chargeLevel);
+    } else {
+      chargeStop();
+    }
   } else {
+    chargeStop();
     predictor.on = false;
   }
 
@@ -359,6 +392,9 @@ function animate(now: number): void {
       );
     }
   }
+
+  // Update hazard death corpses
+  corpses.update(now, dt, foodParts);
 
   // Camera follow local animal with zero latency & exponential smoothing
   const me = gameState.ents.get(gameState.myId);

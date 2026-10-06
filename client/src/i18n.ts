@@ -86,6 +86,12 @@ const vi = {
   noNapDesc: 'Đứng một mình trên bục để nắm quyền',
   reignYou: 'Bạn đã tại vị {t}',
   reignOther: '{name} đã tại vị {t}',
+  choiceTitle: 'Napoleon, hãy sửa một điều răn',
+  choiceLeft: 'còn {s}s',
+  modeLabel: 'Chế độ chơi',
+  sound: 'Âm thanh',
+  team0: 'Foxwood',
+  team1: 'Pinchfield',
 } as const;
 
 export type TextKey = keyof typeof vi;
