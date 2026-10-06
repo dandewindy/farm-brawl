@@ -14,10 +14,10 @@ export class WorldRenderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene = new THREE.Scene();
     const SKY_COLOR = 0xa8dcff;
@@ -47,7 +47,7 @@ export class WorldRenderer {
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
     sun.position.set(40, 80, 50);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     const d = 75;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;

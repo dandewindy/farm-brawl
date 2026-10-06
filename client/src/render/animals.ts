@@ -56,16 +56,16 @@ function animalMat(color: number, opts: Partial<THREE.MeshStandardMaterialParame
 }
 
 // Helper: create a mesh positioned at (x, y, z)
-function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, opts?: Partial<THREE.MeshStandardMaterialParameters>): THREE.Mesh {
+function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0, opts?: Partial<THREE.MeshStandardMaterialParameters>, shadow = false): THREE.Mesh {
   const m = new THREE.Mesh(geo, animalMat(color, opts));
   m.position.set(x, y, z);
-  m.castShadow = true;
+  m.castShadow = shadow;
   return m;
 }
 
 // Helper: scaled sphere "blob"
-function blob(g: THREE.Group, color: number, r: number, scale: [number, number, number], x: number, y: number, z: number, rot?: [number, number, number]): THREE.Mesh {
-  const m = part(new THREE.SphereGeometry(r, 14, 10), color, x, y, z);
+function blob(g: THREE.Group, color: number, r: number, scale: [number, number, number], x: number, y: number, z: number, rot?: [number, number, number], shadow = false): THREE.Mesh {
+  const m = part(new THREE.SphereGeometry(r, 14, 10), color, x, y, z, undefined, shadow);
   m.scale.set(...scale);
   if (rot) m.rotation.set(...rot);
   g.add(m);
@@ -108,8 +108,8 @@ function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: nu
 
 // Build species-specific 3D model
 function buildChicken(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Body - oval shape
-  blob(g, s.body, 0.62, [1.15, 0.9, 0.9], 0, 0.95, 0);
+  // Body - oval shape (main shadow caster)
+  blob(g, s.body, 0.62, [1.15, 0.9, 0.9], 0, 0.95, 0, undefined, true);
   // Head
   g.add(part(new THREE.SphereGeometry(0.36, 18, 12), s.body, 0.55, 1.6, 0));
   // Wings
@@ -133,9 +133,10 @@ function buildChicken(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
 }
 
 function buildSheep(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Fluffy wool body - multiple overlapping icosahedrons
+  // Fluffy wool body - central one casts shadow
+  g.add(part(new THREE.IcosahedronGeometry(0.44, 1), s.wool, 0, 1.05, 0, undefined, true));
   const woolPositions: [number, number, number][] = [
-    [0, 1.05, 0], [0.38, 1.1, 0.22], [0.38, 1.1, -0.22],
+    [0.38, 1.1, 0.22], [0.38, 1.1, -0.22],
     [-0.38, 1.1, 0.22], [-0.38, 1.1, -0.22], [0, 1.42, 0],
     [0.05, 1.05, 0.38], [0.05, 1.05, -0.38],
   ];
@@ -155,8 +156,8 @@ function buildSheep(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Elongated body
-  g.add(part(new THREE.BoxGeometry(1.5, 0.7, 0.62), s.body, 0, 1.4, 0));
+  // Elongated body (casts shadow)
+  g.add(part(new THREE.BoxGeometry(1.5, 0.7, 0.62), s.body, 0, 1.4, 0, undefined, true));
   // Neck (tilted)
   const neck = part(new THREE.BoxGeometry(0.36, 0.85, 0.34), s.body, 0.72, 1.85, 0);
   neck.rotation.z = -0.5;
@@ -180,8 +181,8 @@ function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Large body
-  g.add(part(new THREE.BoxGeometry(1.45, 0.8, 0.85), s.body, 0, 1.2, 0));
+  // Large body (casts shadow)
+  g.add(part(new THREE.BoxGeometry(1.45, 0.8, 0.85), s.body, 0, 1.2, 0, undefined, true));
   // Spots (if the skin has them)
   if (s.spot) {
     blob(g, s.spot, 0.24, [1, 0.8, 0.14], 0.2, 1.25, 0.41);
@@ -209,8 +210,8 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildDuck(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Body - plump oval
-  blob(g, s.body, 0.6, [1.25, 0.8, 0.85], 0, 0.85, 0);
+  // Body - plump oval (casts shadow)
+  blob(g, s.body, 0.6, [1.25, 0.8, 0.85], 0, 0.85, 0, undefined, true);
   // Head
   g.add(part(new THREE.SphereGeometry(0.34, 18, 12), s.head ?? s.body, 0.55, 1.45, 0));
   // Wings
@@ -228,8 +229,8 @@ function buildDuck(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Round plump body
-  blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0);
+  // Round plump body (casts shadow)
+  blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0, undefined, true);
   // Head
   g.add(part(new THREE.SphereGeometry(0.5, 18, 12), s.body, 0.85, 1.3, 0));
   // Snout cylinder

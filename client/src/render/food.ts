@@ -51,7 +51,7 @@ export class FoodAndParticleRenderer {
     for (let i = 0; i < 5; i++) {
       const mesh = new THREE.InstancedMesh(geos[i], mats[i], this.maxFoodPerKind);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.castShadow = true;
+      mesh.castShadow = false;
       mesh.receiveShadow = true;
       mesh.count = 0;
       this.scene.add(mesh);

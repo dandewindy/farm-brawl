@@ -7,7 +7,6 @@ export class WsClient implements Transport {
   private closed = false;
   private pingInterval: number | null = null;
   public rtt = 0;
-  private lastPingSent = 0;
 
   constructor(
     private readonly url: string,
@@ -71,7 +70,6 @@ export class WsClient implements Transport {
     this.pingInterval = window.setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const now = Math.round(performance.now());
-        this.lastPingSent = now;
         this.send({ t: 'ping', c: now });
       }
     }, 1000);

@@ -1,6 +1,8 @@
 import { CFG, type Species } from '@shared/constants';
+import { wrapAngle } from '@shared/math';
 import type { GameEvent, Snapshot } from '@shared/protocol';
 import { sfxDash, sfxEat, sfxHit, sfxReward, sfxZap, unlockAudio } from './audio/sfx';
+import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
 import { applyTexts, t } from './i18n';
 import { InputManager } from './input/controls';
@@ -31,6 +33,10 @@ let prevMass = 0;
 let holdStartTime = 0;
 let wasDashing = false;
 
+const predictor = new ClientPredictor();
+let lastSentInput = { a: 0, mv: false, btn: false };
+let lastSentTime = 0;
+
 const hud = new HudManager((name: string, species: Species) => {
   unlockAudio();
   if (transport) {
@@ -46,6 +52,7 @@ const gameState = new GameState({
     hud.showInGame();
     hud.showBanner(t('welcome'), t('welcomeSub'));
     prevMass = CFG.START_MASS;
+    predictor.reset();
   },
   onEvent(ev: GameEvent) {
     handleGameEvent(ev);
@@ -53,6 +60,7 @@ const gameState = new GameState({
   onSnapshot(_s: Snapshot) {
     const me = gameState.ents.get(gameState.myId);
     if (me) {
+      predictor.onServerUpdate(me.x, me.z, me.a);
       hud.updateStats(me.mass, gameState.me.rank, gameState.total, gameState.me.kills);
       // Floating text on mass gain
       if (me.mass > prevMass) {
@@ -99,6 +107,7 @@ function handleGameEvent(ev: GameEvent): void {
       const killerName = killer ? killer.name : '';
 
       if (ev.id === myId) {
+        predictor.reset();
         hud.showDeath(ev, killerName);
       } else if (ev.by === myId) {
         sfxReward();
@@ -176,10 +185,28 @@ function animate(now: number): void {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  // Send input to transport
+  // Send input to transport with smart rate-limiting and change detection
   if (transport && gameState.alive) {
     const inp = input.getInput();
-    transport.send({ t: 'input', ...inp });
+    const btnChanged = inp.btn !== lastSentInput.btn;
+    const mvChanged = inp.mv !== lastSentInput.mv;
+    const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
+    const timeSinceLast = now - lastSentTime;
+
+    if (btnChanged || mvChanged || (angleDiff > 0.04 && timeSinceLast >= 45) || timeSinceLast >= 90) {
+      transport.send({ t: 'input', ...inp });
+      lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
+      lastSentTime = now;
+    }
+
+    // Step local prediction for 60fps immediate response
+    const myMeta = gameState.metas.get(gameState.myId);
+    const myEnt = gameState.ents.get(gameState.myId);
+    if (myMeta && myEnt) {
+      const isDashing = (myEnt.flags & 1) !== 0;
+      const terrain = (myEnt.flags & 16) ? 1 : (myEnt.flags & 32) ? 2 : 0;
+      predictor.step(inp, dt, myMeta.species, terrain, isDashing);
+    }
 
     // Track charging for HUD meter
     if (inp.btn) {
@@ -193,22 +220,26 @@ function animate(now: number): void {
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
   }
 
-  // Interpolate entity positions for smooth rendering
+  // Interpolate remote entity positions for smooth rendering
   gameState.interpolate(now);
 
-  // Update 3D animal meshes
+  // Update 3D animal meshes (use zero-lag predicted position for myself)
   for (const ent of gameState.ents.values()) {
     const meta = gameState.metas.get(ent.id);
     if (meta) {
+      const isMe = ent.id === gameState.myId && predictor.initialized;
+      const px = isMe ? predictor.x : ent.x;
+      const pz = isMe ? predictor.z : ent.z;
+      const pa = isMe ? predictor.a : ent.a;
       const isKing = ent.id === gameState.napoleonId;
-      animals.update(ent.id, meta, ent.x, ent.z, ent.a, ent.mass, ent.flags, isKing);
+      animals.update(ent.id, meta, px, pz, pa, ent.mass, ent.flags, isKing);
     }
   }
 
-  // Camera follow local animal (or arena center if dead)
+  // Camera follow local animal with zero-lag predicted coordinates
   const me = gameState.ents.get(gameState.myId);
-  const targetX = me ? me.x : 0;
-  const targetZ = me ? me.z : 0;
+  const targetX = me ? (predictor.initialized ? predictor.x : me.x) : 0;
+  const targetZ = me ? (predictor.initialized ? predictor.z : me.z) : 0;
   world.updateCamera(targetX, targetZ, dt);
 
   // Screen shake on hit
