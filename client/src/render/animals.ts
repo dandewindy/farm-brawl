@@ -457,6 +457,12 @@ export class AnimalRenderer {
         this.scene.remove(vis.stars);
         vis.stars = null;
       }
+      if (vis.label) {
+        this.scene.remove(vis.label);
+        vis.label.material.map?.dispose();
+        vis.label.material.dispose();
+        vis.label = null;
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
       this.visuals.delete(id);
@@ -468,6 +474,12 @@ export class AnimalRenderer {
       if (vis.stars) {
         this.scene.remove(vis.stars);
         vis.stars = null;
+      }
+      if (vis.label) {
+        this.scene.remove(vis.label);
+        vis.label.material.map?.dispose();
+        vis.label.material.dispose();
+        vis.label = null;
       }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
@@ -638,15 +650,20 @@ export class AnimalRenderer {
 
     // Update label
     if (vis.isCrowned !== showCrown) {
-      if (vis.label) vis.root.remove(vis.label);
+      if (vis.label) {
+        this.scene.remove(vis.label);
+        vis.label.material.map?.dispose();
+        vis.label.material.dispose();
+      }
       vis.label = createLabel(meta.name, showCrown);
-      vis.root.add(vis.label);
+      this.scene.add(vis.label);
       vis.isCrowned = showCrown;
     }
     if (vis.label) {
       const lh = 1.3 + r * 0.25;
-      vis.label.position.set(0, (LABEL_Y[vis.species] || 1.8) + 0.6, 0);
-      vis.label.scale.set((lh * vis.label.userData.aspect) / sc, lh / sc, 1);
+      const labelY = (LABEL_Y[vis.species] || 1.8) + 0.6;
+      vis.label.position.set(x, y + labelY * sc, z);
+      vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
     }
 
     // Ground indicator ring
@@ -694,7 +711,7 @@ export class AnimalRenderer {
 
     // Add floating name label
     const label = createLabel(meta.name, false);
-    root.add(label);
+    this.scene.add(label);
 
     // Add ground indicator ring
     const ringMat = new THREE.MeshBasicMaterial({
