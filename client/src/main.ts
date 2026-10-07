@@ -39,6 +39,8 @@ let transport: Transport | null = null;
 let lastTime = performance.now();
 let shake = 0;
 let prevMass = 0;
+let gainAcc = 0;
+let gainTimer = 0;
 let wasDashing = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 
@@ -81,6 +83,8 @@ const gameState = new GameState({
     hud.showInGame();
     hud.showBanner(t('welcome'), t('welcomeSub'));
     prevMass = CFG.START_MASS;
+    gainAcc = 0;
+    gainTimer = 0;
     firstSpawn = true;
     predictor.on = false;
   },
@@ -103,15 +107,15 @@ const gameState = new GameState({
         predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, currentRtt);
 
         hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
-        // Floating text on mass gain
-        if (mass > prevMass) {
-          const gained = Math.round(mass - prevMass);
-          if (gained >= 1) {
-            hud.spawnFloat(`+${gained} kg`, window.innerWidth / 2, window.innerHeight / 2 - 40, gained >= 6);
-            sfxEat(gained >= 5);
+        // Mass change tracking with accumulator matching original game
+        if (gameState.alive && prevMass > 0 && mass !== prevMass) {
+          gainAcc += mass - prevMass;
+          if (mass > prevMass && mass - prevMass < 20) {
+            sfxEat(mass - prevMass >= 5);
           }
-          prevMass = mass;
         }
+        prevMass = mass;
+
         const isDashing = (flags & 1) !== 0;
         if (isDashing && !wasDashing) sfxDash(1);
         wasDashing = isDashing;
@@ -133,7 +137,7 @@ const gameState = new GameState({
 
     const kingMeta = gameState.metas.get(gameState.napoleonId);
     const kingName = kingMeta ? kingMeta.name : undefined;
-    hud.updateBoard(gameState.rule, gameState.reign, kingName);
+    hud.updateBoard(gameState.rule, gameState.reign, kingName, gameState.napoleonId === gameState.myId);
 
     if (gameState.lb.length) {
       hud.updateLeaderboard(gameState.lb, gameState.myId, gameState.napoleonId);
@@ -164,6 +168,16 @@ function handleGameEvent(ev: GameEvent): void {
       foodParts.burst(ev.x, 1.4, ev.z, 0xfff3a0, 16, 7, 7, 0.6);
       foodParts.burst(ev.x, 1.4, ev.z, 0xffffff, 8, 5, 5, 0.5);
       if (isMine) shake = Math.max(shake, 0.6);
+
+      // Floating loss text matching original game
+      if (ev.loss && ev.loss >= 1) {
+        const lossNum = Math.round(ev.loss);
+        if (ev.a === myId) {
+          hud.floatText(`-${lossNum} kg`, 'loss', ev.v);
+        } else if (ev.v === gameState.napoleonId && ev.v !== myId) {
+          hud.floatText(`-${lossNum} kg`, 'loss', ev.v);
+        }
+      }
       break;
     }
     case 'die': {
@@ -486,8 +500,24 @@ function animate(now: number): void {
     world.updateCdArc(0, 0, 0, CFG.START_MASS, 0, false);
   }
 
-  // Update UI floating text animations
-  hud.updateFloats();
+  // Accumulate mass gain/loss and spawn floating 3D text (matching original game)
+  gainTimer -= dt;
+  if (gainTimer <= 0) {
+    gainTimer = 0.3;
+    const g = Math.round(gainAcc);
+    if (g >= 1) {
+      hud.floatText(`+${g} kg`, g >= 10 ? 'big' : '', gameState.myId);
+      gainAcc = 0;
+    } else if (g <= -3) {
+      hud.floatText(`${g} kg`, 'loss', gameState.myId);
+      gainAcc = 0;
+    } else if (gainAcc < 0) {
+      gainAcc = 0;
+    }
+  }
+
+  // Update UI floating text animations projected in 3D
+  hud.updateFloats(world.camera, gameState.ents);
 
   // Update floating bonus tools on the farm
   tools.update(now);

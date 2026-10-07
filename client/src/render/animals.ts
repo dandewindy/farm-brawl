@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CFG, radiusOf, type Species } from '@shared/constants';
 import { FLAG, type PlayerMeta } from '@shared/protocol';
+import { t } from '../i18n';
 
 interface AnimalVisual {
   root: THREE.Group;
@@ -9,7 +10,7 @@ interface AnimalVisual {
   species: Species;
   skin: number;
   label: THREE.Sprite | null;
-  labelName: string;
+  labelKey: string;
   regalia: THREE.Group | null;
   isCrowned: boolean;
   ring: THREE.Mesh;
@@ -390,7 +391,7 @@ const LABEL_Y: Record<Species, number> = {
   pig: 2.1,
 };
 
-function createLabel(text: string, crowned = false): THREE.Sprite {
+function createLabel(text: string, crowned = false, traitor = false): THREE.Sprite {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const font = `700 40px ${LABEL_FONT}`;
@@ -402,11 +403,11 @@ function createLabel(text: string, crowned = false): THREE.Sprite {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  if (crowned) {
-    ctx.fillStyle = '#e8b641';
+  if (crowned || traitor) {
+    ctx.fillStyle = crowned ? '#e8b641' : '#a5281b';
     ctx.fillRect(0, 4, w, 50);
-    ctx.fillStyle = '#1f1a17';
-    ctx.fillText(`👑 ${text}`, w / 2, 30);
+    ctx.fillStyle = crowned ? '#1f1a17' : '#f2ead7';
+    ctx.fillText(text, w / 2, 30);
   } else {
     ctx.lineWidth = 7;
     ctx.strokeStyle = 'rgba(31, 26, 23, 0.75)';
@@ -657,21 +658,40 @@ export class AnimalRenderer {
       vis.regalia.visible = showCrown;
     }
 
-    // Update label
-    if (vis.isCrowned !== showCrown) {
+    // Update label matching original game:
+    // King: "👑 Name · 45kg" on gold badge
+    // Traitor: "⚡ Name · Kẻ phản bội" on red badge
+    // Normal: "Name"
+    const isTraitor = (flags & FLAG.TRAITOR) !== 0;
+
+    let iconPrefix = '';
+    if (flags & FLAG.SONG) iconPrefix += '🎵 ';
+    if (flags & FLAG.DYNAMITE) iconPrefix += '🧨 ';
+    if (flags & FLAG.PITCHFORK) iconPrefix += '🍴 ';
+
+    const roundedMass = Math.round(mass / 5) * 5;
+    const labelText = showCrown
+      ? `${iconPrefix}👑 ${meta.name} · ${roundedMass}kg`
+      : isTraitor
+      ? `${iconPrefix}⚡ ${meta.name} · ${t('traitor')}`
+      : `${iconPrefix}${meta.name}`;
+
+    if (vis.labelKey !== labelText) {
       if (vis.label) {
         this.scene.remove(vis.label);
         vis.label.material.map?.dispose();
         vis.label.material.dispose();
       }
-      vis.label = createLabel(meta.name, showCrown);
+      vis.label = createLabel(labelText, showCrown, isTraitor);
       this.scene.add(vis.label);
+      vis.labelKey = labelText;
       vis.isCrowned = showCrown;
     }
+
     if (vis.label) {
       const lh = 1.3 + r * 0.25;
-      const labelY = (LABEL_Y[vis.species] || 1.8) + 0.6;
-      vis.label.position.set(x, y + labelY * sc, z);
+      const labelY = (LABEL_Y[vis.species] || 2.1) + 0.6;
+      vis.label.position.set(x, Math.max(0, y) + labelY * sc, z);
       vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
     }
 
@@ -719,7 +739,7 @@ export class AnimalRenderer {
     root.add(regalia);
 
     // Add floating name label
-    const label = createLabel(meta.name, false);
+    const label = createLabel(meta.name, false, false);
     this.scene.add(label);
 
     // Add ground indicator ring
@@ -741,7 +761,7 @@ export class AnimalRenderer {
       species: meta.species,
       skin: meta.skin,
       label,
-      labelName: meta.name,
+      labelKey: meta.name,
       regalia,
       isCrowned: false,
       ring,

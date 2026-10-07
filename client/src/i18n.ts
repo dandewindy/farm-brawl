@@ -98,6 +98,9 @@ const vi = {
   songBanner: '{name} hát vang "Súc vật nước Anh"!',
   songSub: 'Napoleon yếu và chậm trong 6 giây',
   songYou: 'Cả trại đang hát chống lại bạn!',
+  traitor: 'Kẻ phản bội',
+  traitorCaught: 'Bắt được kẻ phản bội! Chiến lợi phẩm gấp 3',
+  youTraitor: 'Bạn bị gán tội phản bội! Cả trại đang săn bạn',
 } as const;
 
 export type TextKey = keyof typeof vi;

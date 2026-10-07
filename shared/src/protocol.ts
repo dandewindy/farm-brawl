@@ -38,6 +38,7 @@ export const FLAG = {
   SONG: 128,
   PITCHFORK: 256,
   DYNAMITE: 512,
+  TRAITOR: 1024,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
@@ -55,7 +56,7 @@ export interface ChoiceWire {
 export type GameEvent =
   | ({ k: 'join' } & PlayerMeta)
   | { k: 'leave'; id: number }
-  | { k: 'hit'; a: number; v: number; x: number; z: number; s: number }
+  | { k: 'hit'; a: number; v: number; x: number; z: number; s: number; loss?: number }
   | {
       k: 'die';
       id: number;

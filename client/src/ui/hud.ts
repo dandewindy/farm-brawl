@@ -1,12 +1,15 @@
-import { SPECIES, type Species } from '@shared/constants';
+import * as THREE from 'three';
+import { CFG, radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
 
 export interface FloatingText {
   el: HTMLDivElement;
-  x: number;
-  y: number;
   born: number;
+  id: number;
+  ax?: number;
+  az?: number;
+  ah?: number;
 }
 
 export class HudManager {
@@ -340,7 +343,7 @@ export class HudManager {
       const row = document.createElement('div');
       const n = document.createElement('span');
       n.className = 'n';
-      n.textContent = name;
+      n.textContent = (id === napoleonId && id > 0 ? '👑 ' : '') + name;
       const k = document.createElement('span');
       k.className = 'k';
       k.textContent = kills > 0 ? `💥${kills}` : '';
@@ -394,7 +397,7 @@ export class HudManager {
     this.showBanner(t('ruleNew', { rule: ruleTitle }), ruleDesc);
   }
 
-  updateBoard(ruleId?: string, reignSec?: number, kingName?: string): void {
+  updateBoard(ruleId?: string, reignSec?: number, kingName?: string, isMe = false): void {
     if (this.ruleNameEl && this.ruleDescEl) {
       if (ruleId) {
         this.ruleNameEl.textContent = t(`r_${ruleId}`);
@@ -408,9 +411,12 @@ export class HudManager {
       }
     }
     if (this.reignEl) {
-      if (reignSec && reignSec > 0) {
+      if (reignSec && reignSec > 0 && kingName) {
         this.reignEl.hidden = false;
-        this.reignEl.textContent = `♛ ${this.fmtTime(reignSec)}`;
+        const text = isMe
+          ? t('reignYou', { t: this.fmtTime(reignSec) })
+          : t('reignOther', { name: kingName, t: this.fmtTime(reignSec) });
+        this.reignEl.textContent = `👑 ${text}`;
       } else {
         this.reignEl.hidden = true;
       }
@@ -436,28 +442,68 @@ export class HudManager {
     this.bannerTimer = window.setTimeout(() => this.bannerEl.classList.remove('show'), 3500);
   }
 
-  spawnFloat(text: string, screenX: number, screenY: number, isBig = false, isLoss = false): void {
+  floatText(text: string, cls = '', id = 0, initialPos?: { x: number; z: number; mass: number }): void {
     const el = document.createElement('div');
-    el.className = `float ${isBig ? 'big' : ''} ${isLoss ? 'loss' : ''}`;
+    el.className = `float ${cls}`.trim();
     el.textContent = text;
-    el.style.left = `${screenX}px`;
-    el.style.top = `${screenY}px`;
     this.floatsEl.appendChild(el);
-    this.floatingTexts.push({ el, x: screenX, y: screenY, born: performance.now() });
+    const item: FloatingText = {
+      el,
+      born: performance.now(),
+      id,
+    };
+    if (initialPos) {
+      item.ax = initialPos.x;
+      item.az = initialPos.z;
+      item.ah = radiusOf(initialPos.mass) * 3.2 + 1.2;
+    }
+    this.floatingTexts.push(item);
   }
 
-  updateFloats(): void {
+  spawnFloat(text: string, screenX: number, screenY: number, isBig = false, isLoss = false): void {
+    this.floatText(text, isLoss ? 'loss' : isBig ? 'big' : '', 0);
+  }
+
+  updateFloats(
+    camera?: THREE.Camera,
+    ents?: Map<number, { x: number; z: number; mass: number }>
+  ): void {
     const now = performance.now();
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const f = this.floatingTexts[i];
       const age = (now - f.born) / 1000;
-      if (age > 0.9) {
+      if (age > 1.1) {
         f.el.remove();
         this.floatingTexts.splice(i, 1);
         continue;
       }
-      f.el.style.transform = `translate(-50%, calc(-50% - ${age * 45}px))`;
-      f.el.style.opacity = String(1 - age / 0.9);
+
+      if (ents && f.id) {
+        const st = ents.get(f.id);
+        if (st) {
+          f.ax = st.x;
+          f.az = st.z;
+          f.ah = radiusOf(st.mass) * 3.2 + 1.2;
+        }
+      }
+
+      if (camera && f.ax !== undefined && f.az !== undefined && f.ah !== undefined) {
+        const v = new THREE.Vector3(f.ax, f.ah, f.az).project(camera);
+        if (v.z > 1) {
+          f.el.style.display = 'none';
+          continue;
+        }
+        f.el.style.display = '';
+        const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+        f.el.style.transform = `translate(${sx}px, ${sy - age * 60}px) translate(-50%, -100%) scale(${age < 0.12 ? 0.6 + age * 3.3 : 1})`;
+        f.el.style.opacity = String(age > 0.7 ? (1.1 - age) / 0.4 : 1);
+      } else {
+        const sx = window.innerWidth / 2;
+        const sy = window.innerHeight / 2 - 40;
+        f.el.style.transform = `translate(${sx}px, ${sy - age * 60}px) translate(-50%, -100%) scale(${age < 0.12 ? 0.6 + age * 3.3 : 1})`;
+        f.el.style.opacity = String(age > 0.7 ? (1.1 - age) / 0.4 : 1);
+      }
     }
   }
 }

@@ -612,7 +612,15 @@ export class World {
     vic.lastHitBy = att.id;
     vic.lastHitT = this.time;
     const rv = radiusOf(vic.mass);
-    this.events.push({ k: 'hit', a: att.id, v: vic.id, x: r2(vic.x - nx * rv), z: r2(vic.z - nz * rv), s: Math.round(k) });
+    this.events.push({
+      k: 'hit',
+      a: att.id,
+      v: vic.id,
+      x: r2(vic.x - nx * rv),
+      z: r2(vic.z - nz * rv),
+      s: Math.round(k),
+      loss: loss > 0.5 ? Math.round(loss * 10) / 10 : 0,
+    });
   }
 
   private kill(p: Player, cause: DeathCause): void {
@@ -754,6 +762,10 @@ export class World {
 
   snapshotFor(id: number): Snapshot {
     const p: PlayerWire[] = [];
+    const traitorId = this.currentRule === 'snowball' && this.ranked.length > 1
+      ? (this.ranked[0]?.id === this.napoleonId ? this.ranked[1]?.id : this.ranked[0]?.id)
+      : 0;
+
     for (const o of this.players.values()) {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
@@ -761,7 +773,8 @@ export class World {
         | (o.species !== 'duck' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
         | (o.slowT > 0 ? FLAG.SONG : 0)
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
-        | (o.hasDynamite ? FLAG.DYNAMITE : 0);
+        | (o.hasDynamite ? FLAG.DYNAMITE : 0)
+        | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     const snap: Snapshot = {
