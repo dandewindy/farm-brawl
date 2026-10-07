@@ -176,18 +176,25 @@ function buildSheep(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Elongated body (casts shadow)
-  g.add(part(new THREE.BoxGeometry(1.5, 0.7, 0.62), s.body, 0, 1.4, 0, undefined, true));
-  // Neck (tilted)
-  const neck = part(new THREE.BoxGeometry(0.36, 0.85, 0.34), s.body, 0.72, 1.85, 0);
+  // Rounded elongated body using capsule (casts shadow)
+  const bodyGeo = new THREE.CapsuleGeometry(0.35, 0.8, 8, 16);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, s.body, 0, 1.4, 0, undefined, true);
+  bodyMesh.scale.set(1, 1.05, 0.9);
+  g.add(bodyMesh);
+  // Neck (tilted capsule)
+  const neckGeo = new THREE.CapsuleGeometry(0.16, 0.55, 6, 12);
+  const neck = part(neckGeo, s.body, 0.72, 1.85, 0);
   neck.rotation.z = -0.5;
   g.add(neck);
-  // Head (elongated snout)
-  const head = part(new THREE.BoxGeometry(0.7, 0.34, 0.34), s.body, 1.12, 2.2, 0);
+  // Head (rounded snout)
+  const headGeo = new THREE.CapsuleGeometry(0.15, 0.4, 6, 12);
+  headGeo.rotateZ(Math.PI / 2);
+  const head = part(headGeo, s.body, 1.12, 2.2, 0);
   head.rotation.z = -0.25;
   g.add(head);
   // Mane
-  const mane = part(new THREE.BoxGeometry(0.14, 0.82, 0.12), s.mane, 0.55, 2.0, 0);
+  const mane = part(new THREE.CapsuleGeometry(0.05, 0.55, 4, 8), s.mane, 0.55, 2.0, 0);
   mane.rotation.z = -0.5;
   g.add(mane);
   // Tail
@@ -201,18 +208,24 @@ function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Large body (casts shadow)
-  g.add(part(new THREE.BoxGeometry(1.45, 0.8, 0.85), s.body, 0, 1.2, 0, undefined, true));
+  // Rounded large body using capsule (casts shadow)
+  const bodyGeo = new THREE.CapsuleGeometry(0.42, 0.6, 8, 16);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, s.body, 0, 1.2, 0, undefined, true);
+  bodyMesh.scale.set(1, 1, 1.05);
+  g.add(bodyMesh);
   // Spots (if the skin has them)
   if (s.spot) {
     blob(g, s.spot, 0.24, [1, 0.8, 0.14], 0.2, 1.25, 0.41);
     blob(g, s.spot, 0.21, [1, 0.85, 0.14], -0.35, 1.1, -0.41);
     blob(g, s.spot, 0.26, [1.1, 0.14, 0.9], -0.15, 1.58, 0.1);
   }
-  // Head
-  g.add(part(new THREE.BoxGeometry(0.55, 0.55, 0.55), s.body, 0.92, 1.45, 0));
-  // Nose/muzzle
-  g.add(part(new THREE.BoxGeometry(0.22, 0.3, 0.46), s.nose ?? 0xf3a0a8, 1.22, 1.35, 0));
+  // Head (rounded)
+  g.add(part(new THREE.SphereGeometry(0.3, 16, 12), s.body, 0.92, 1.45, 0));
+  // Nose/muzzle (rounded)
+  const muzzleGeo = new THREE.CapsuleGeometry(0.14, 0.08, 6, 12);
+  muzzleGeo.rotateX(Math.PI / 2);
+  g.add(part(muzzleGeo, s.nose ?? 0xf3a0a8, 1.22, 1.35, 0));
   // Nostrils
   for (const z of [-0.08, 0.08]) {
     g.add(part(new THREE.SphereGeometry(0.035, 8, 6), 0x3a2a22, 1.33, 1.38, z));
@@ -225,6 +238,14 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   for (const z of [-0.34, 0.34]) {
     blob(g, s.body, 0.12, [0.6, 0.45, 1.4], 0.86, 1.62, z);
   }
+  // Cowbell on neck
+  const bellStrap = part(new THREE.TorusGeometry(0.2, 0.02, 8, 16), 0x5a3a22, 0.7, 1.35, 0);
+  bellStrap.rotation.y = Math.PI / 2;
+  g.add(bellStrap);
+  const bell = part(new THREE.SphereGeometry(0.1, 12, 8), 0xd4a017, 0.7, 1.12, 0, { metalness: 0.6, roughness: 0.3 });
+  g.add(bell);
+  const clapper = part(new THREE.SphereGeometry(0.035, 6, 4), 0x3a3a3a, 0.7, 1.04, 0);
+  g.add(clapper);
   addEyes(g, 1.2, 1.58, 0.16, 0.07);
   return addLegs(g, s.legs ?? s.body, [[0.5, 0.28], [0.5, -0.28], [-0.5, 0.28], [-0.5, -0.28]], 0.8, 0.11, 0x3a3330);
 }
@@ -499,12 +520,13 @@ export class AnimalRenderer {
       if (vis.species === 'duck') {
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
       } else if (isDrowning) {
-        y = -0.65 * sc + Math.sin(now / 60) * 0.12;
-        if (this.onPuff && Math.random() < 0.3) {
-          this.onPuff(x + (Math.random() - 0.5) * 0.7, 0.1, z + (Math.random() - 0.5) * 0.7, 0xdff1ff, 0.7, 0.8, 2.5);
+        // Gentle side-to-side flailing, slowly sinking
+        y = -0.45 * sc - (Math.min(1, vis.phase * 0.002)) * 0.3 * sc;
+        if (this.onPuff && Math.random() < 0.15) {
+          this.onPuff(x + (Math.random() - 0.5) * 0.8, 0.1, z + (Math.random() - 0.5) * 0.8, 0xdff1ff, 0.6, 0.7, 2);
         }
       } else {
-        y = -0.55 * sc + Math.sin(now / 120) * 0.08;
+        y = -0.45 * sc + Math.sin(now / 150) * 0.06;
       }
     }
 
@@ -518,15 +540,16 @@ export class AnimalRenderer {
       : isDashing
       ? -0.25
       : isDrowning
-      ? Math.sin(now / 50) * 0.45
+      ? Math.sin(now / 180) * 0.3
       : isWater && vis.species !== 'duck'
-      ? Math.sin(now / 80) * 0.25
+      ? Math.sin(now / 120) * 0.15
       : isCharging
       ? 0.15 + lvl * 0.15
       : 0;
 
     if (isDrowning) {
-      vis.root.rotation.x = Math.cos(now / 60) * 0.35;
+      // Gentle side-to-side flailing
+      vis.root.rotation.x = Math.sin(now / 200) * 0.2;
     }
 
     // Charge trembling wind-up
@@ -556,7 +579,15 @@ export class AnimalRenderer {
 
     // Dynamic leg swinging with amplitude 0.7
     vis.legs.forEach((leg, idx) => {
-      leg.rotation.z = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0)) * 0.7;
+      const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
+      if (isDrowning) {
+        // Slow paddling motion
+        leg.rotation.z = baseSwing * 0.4;
+        leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35;
+      } else {
+        leg.rotation.z = baseSwing * 0.7;
+        leg.rotation.x = 0;
+      }
     });
 
     // Stunned spinning stars above head
@@ -638,7 +669,10 @@ export class AnimalRenderer {
       vis.ringMat.color.set(0xffc928);
       vis.ringMat.opacity = 0.9;
     } else {
-      vis.ringMat.color.set(SPECIES_RING_COLOR[vis.species] ?? 0xffffff);
+      const ringColor = meta.team !== undefined
+        ? (meta.team === 0 ? 0x4fc3f7 : 0xf44336)
+        : (SPECIES_RING_COLOR[vis.species] ?? 0xffffff);
+      vis.ringMat.color.set(ringColor);
       vis.ringMat.opacity = 0.85;
     }
   }
@@ -664,7 +698,9 @@ export class AnimalRenderer {
 
     // Add ground indicator ring
     const ringMat = new THREE.MeshBasicMaterial({
-      color: SPECIES_RING_COLOR[meta.species] ?? 0xffffff,
+      color: meta.team !== undefined
+        ? (meta.team === 0 ? 0x4fc3f7 : 0xf44336)
+        : (SPECIES_RING_COLOR[meta.species] ?? 0xffffff),
       transparent: true,
       opacity: 0.85,
       depthWrite: false,

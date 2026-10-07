@@ -38,6 +38,7 @@ let lastTime = performance.now();
 let shake = 0;
 let prevMass = 0;
 let wasDashing = false;
+let deathCamTarget: { x: number; z: number } | null = null;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
@@ -189,7 +190,12 @@ function handleGameEvent(ev: GameEvent): void {
 
       if (ev.id === myId) {
         predictor.on = false;
-        hud.showDeath(ev, killerName);
+        // Delay death screen to show death animation first
+        deathCamTarget = { x: ev.x, z: ev.z };
+        setTimeout(() => {
+          deathCamTarget = null;
+          hud.showDeath(ev, killerName);
+        }, 1500);
       } else if (ev.by === myId) {
         sfxReward();
         hud.showToast(t('youKO', { name: victimName }));
@@ -399,8 +405,8 @@ function animate(now: number): void {
 
   // Camera follow local animal with zero latency & exponential smoothing
   const me = gameState.ents.get(gameState.myId);
-  const targetX = me ? (predictor.on ? predictor.x : me.x) : 0;
-  const targetZ = me ? (predictor.on ? predictor.z : me.z) : 0;
+  const targetX = deathCamTarget ? deathCamTarget.x : me ? (predictor.on ? predictor.x : me.x) : 0;
+  const targetZ = deathCamTarget ? deathCamTarget.z : me ? (predictor.on ? predictor.z : me.z) : 0;
   const targetMass = me ? me.mass : CFG.START_MASS;
   world.updateCamera(targetX, targetZ, targetMass, dt, shake);
   shake = Math.max(0, shake - dt * 2.5);
@@ -412,9 +418,15 @@ function animate(now: number): void {
   // Update animated world hazards (water ripples, pulsing coals, flames)
   world.updateHazards(now);
 
-    // Update podium capture ring glow
-    const [_capId, capProg, capContested] = gameState.pod;
-    world.updatePodiumRing(capProg, capContested, now);
+    // Update podium capture tile glow
+    const [capId, capProg, capContested] = gameState.pod;
+    const capMeta = gameState.metas.get(capId);
+    const capColor = capMeta
+      ? (capMeta.team !== undefined
+        ? (capMeta.team === 0 ? 0x4fc3f7 : 0xf44336)
+        : (({ chicken: 0xffb74d, sheep: 0xf3f1ea, horse: 0x8b5a2b, cow: 0x4fc3f7, duck: 0xffd54f, pig: 0xf48fb1 } as Record<string, number>)[capMeta.species] ?? 0xffc928))
+      : 0xffc928;
+    world.updatePodiumRing(capProg, capContested, now, capColor);
 
   // Update player ground cooldown arc indicator
   if (me && gameState.alive) {
