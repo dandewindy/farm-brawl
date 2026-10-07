@@ -21,6 +21,39 @@ interface AnimalVisual {
   lastZ: number;
   hitT: number;
   dust: number;
+  rainbow: [THREE.Mesh, THREE.Material][] | null;
+  wasSuper: boolean;
+  trailX?: number;
+  trailZ?: number;
+}
+
+function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
+  if (on && !vis.rainbow) {
+    vis.rainbow = [];
+    for (const part of [vis.body, ...vis.legs]) {
+      part.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh && !(m.userData && m.userData.eye)) {
+          vis.rainbow!.push([m, m.material as THREE.Material]);
+          m.material = (m.material as THREE.Material).clone();
+        }
+      });
+    }
+  } else if (!on && vis.rainbow) {
+    for (const [o, m] of vis.rainbow) {
+      if ((o.material as THREE.Material).dispose) (o.material as THREE.Material).dispose();
+      o.material = m;
+    }
+    vis.rainbow = null;
+  }
+  if (vis.rainbow) {
+    vis.rainbow.forEach(([o], i) => {
+      const h = (now / 600 + i * 0.13) % 1;
+      const mat = o.material as THREE.MeshStandardMaterial;
+      if (mat.color) mat.color.setHSL(h, 1, 0.52);
+      if (mat.emissive) mat.emissive.setHSL(h, 1, 0.16);
+    });
+  }
 }
 
 const ringGeo = new THREE.RingGeometry(0.88, 1.05, 32);
@@ -451,9 +484,15 @@ export class AnimalRenderer {
     }
   }
 
+  getPosition(id: number): { x: number; z: number } | undefined {
+    const vis = this.visuals.get(id);
+    return vis ? { x: vis.root.position.x, z: vis.root.position.z } : undefined;
+  }
+
   remove(id: number): void {
     const vis = this.visuals.get(id);
     if (vis) {
+      if (vis.rainbow) setRainbow(vis, false, 0);
       if (vis.stars) {
         this.scene.remove(vis.stars);
         vis.stars = null;
@@ -472,6 +511,7 @@ export class AnimalRenderer {
 
   clear(): void {
     for (const vis of this.visuals.values()) {
+      if (vis.rainbow) setRainbow(vis, false, 0);
       if (vis.stars) {
         this.scene.remove(vis.stars);
         vis.stars = null;
@@ -517,18 +557,22 @@ export class AnimalRenderer {
     const isWater = (flags & 16) !== 0;
     const isMud = (flags & 32) !== 0;
     const isDrowning = (flags & 64) !== 0;
+    const isSuper = (flags & FLAG.SUPER) !== 0;
+    const isFlying = (flags & FLAG.FLYING) !== 0;
     const lvl = (charge || 0) / 10;
+
+    setRainbow(vis, isSuper, now);
 
     // Continuous walking / dashing leg phase accumulation
     vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12));
     const r = radiusOf(mass);
-    const sc = r * 1.35 * (isKing ? 1.2 : 1);
+    const sc = r * 1.35 * (isKing ? 1.2 : 1) * (isSuper ? 1.15 : 1);
 
     const podX = podiumPos ? podiumPos[0] : 0;
     const podZ = podiumPos ? podiumPos[1] : 0;
     const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
     let y = onPodium ? 0.55 : 0;
-    if (isWater) {
+    if (isWater && !isSuper) {
       // Ducks float peacefully; other animals sink and struggle frantically when drowning
       if (vis.species === 'duck') {
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
@@ -544,11 +588,15 @@ export class AnimalRenderer {
     }
 
     // Body hopping & positioning
-    vis.root.position.set(x, y + (isWater ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r), z);
+    let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r);
+    if (isFlying) bodyY += 1.1 * r;
+    vis.root.position.set(x, bodyY, z);
     vis.root.rotation.y = -angle + (isStunned ? Math.sin(now / 50) * 0.5 : 0);
 
-    // Lean forward on dash/plow, lean back on charge, struggle tilt in water
-    vis.root.rotation.z = isPlowing
+    // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water
+    vis.root.rotation.z = isFlying
+      ? -0.5
+      : isPlowing
       ? -0.4
       : isDashing
       ? -0.25
@@ -699,7 +747,11 @@ export class AnimalRenderer {
     vis.ring.visible = !isWater;
     vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
     vis.ring.scale.setScalar(r);
-    if (isCharging) {
+    if (isSuper) {
+      vis.ring.scale.setScalar(r * 1.25);
+      vis.ringMat.color.setHSL((now / 500) % 1, 1, 0.6);
+      vis.ringMat.opacity = 0.9;
+    } else if (isCharging) {
       vis.ring.scale.setScalar(r * (1 + 0.6 * lvl));
       vis.ringMat.color.set(lvl >= 1 ? 0xff3b30 : 0xfff3a0);
       vis.ringMat.opacity = 0.5 + Math.sin(now / (lvl >= 1 ? 40 : 90)) * 0.4;
@@ -772,6 +824,8 @@ export class AnimalRenderer {
       lastZ: 0,
       hitT: 0,
       dust: 0,
+      rainbow: null,
+      wasSuper: false,
     };
   }
 }

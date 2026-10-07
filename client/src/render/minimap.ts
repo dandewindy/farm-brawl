@@ -17,7 +17,8 @@ export class MinimapRenderer {
     ents: Map<number, Ent>,
     myId: number,
     tools?: Map<number, ToolWire>,
-    napoleonId = 0
+    napoleonId = 0,
+    food?: Map<number, { k: number; x: number; z: number }>
   ): void {
     const { ctx, size } = this;
     const center = size / 2;
@@ -77,6 +78,24 @@ export class MinimapRenderer {
     ctx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);
     ctx.fillStyle = '#a5281b';
     ctx.fill();
+
+    // Rainbow Candy (flashing rainbow beacon on minimap)
+    if (food) {
+      for (const f of food.values()) {
+        if (f.k === 6) {
+          const fx = center + f.x * scale;
+          const fz = center + f.z * scale;
+          const hue = (performance.now() / 400) % 1;
+          ctx.beginPath();
+          ctx.arc(fx, fz, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(${Math.round(hue * 360)}, 100%, 55%)`;
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+        }
+      }
+    }
 
     // Bonus tools / weapons (gold squares like original game)
     if (tools) {

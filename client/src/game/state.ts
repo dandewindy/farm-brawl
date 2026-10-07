@@ -106,7 +106,7 @@ export class GameState {
 
     for (const ev of s.ev) {
       if (ev.k === 'join') {
-        this.metas.set(ev.id, { id: ev.id, name: ev.name, species: ev.species, skin: ev.skin, bot: ev.bot });
+        this.metas.set(ev.id, { id: ev.id, name: ev.name, species: ev.species, skin: ev.skin, bot: ev.bot, team: ev.team });
         this.ents.delete(ev.id); // a fresh body: don't slide from where it died
       } else if (ev.k === 'leave') {
         this.metas.delete(ev.id);

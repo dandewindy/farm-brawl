@@ -101,6 +101,11 @@ const vi = {
   traitor: 'Kẻ phản bội',
   traitorCaught: 'Bắt được kẻ phản bội! Chiến lợi phẩm gấp 3',
   youTraitor: 'Bạn bị gán tội phản bội! Cả trại đang săn bạn',
+  superFood: 'Một viên kẹo cầu vồng vừa rơi xuống trang trại! 🌈',
+  superHead: 'Siêu thú cầu vồng!',
+  superSub: 'Bấm húc để bay vút như tên lửa trong 10 giây',
+  superOther: '{name} ăn kẹo cầu vồng, hoá siêu thú! 🌈',
+  superEnd: 'Hết sức mạnh cầu vồng rồi',
 } as const;
 
 export type TextKey = keyof typeof vi;

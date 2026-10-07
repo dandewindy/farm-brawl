@@ -24,46 +24,127 @@ export class FoodAndParticleRenderer {
   private readonly particles: Particle[] = [];
   private readonly dummy = new THREE.Object3D();
   private readonly shadowM = new THREE.Matrix4();
+  private readonly hueCol = new THREE.Color();
+  private readonly rainbowColors = [0xff3b30, 0xff9500, 0xffcc00, 0x34c759, 0x007aff, 0xaf52de];
   private readonly maxFoodPerKind = 800;
   private readonly maxFoodTotal = 1500;
   private readonly maxParticles = 600;
 
   constructor(private readonly scene: THREE.Scene) {
-    // Geometries & materials matching original game:
-    // 0: Corn (yellow capsule)
-    // 1: Apple (red sphere)
-    // 2: Golden Corn (gold glowing capsule)
-    // 3: Carrot (orange cone) + green leaves top
-    // 4: Pumpkin (squashed orange sphere) + green stem top
+    // 0: Corn (Bắp ngô) - sculpted lathe ear of corn with plump kernels profile
+    const cornProfile = [
+      new THREE.Vector2(0.06, -0.38),
+      new THREE.Vector2(0.12, -0.32),
+      new THREE.Vector2(0.22, -0.16),
+      new THREE.Vector2(0.26, 0.06),  // plump middle
+      new THREE.Vector2(0.24, 0.22),
+      new THREE.Vector2(0.16, 0.36),  // tapered top
+      new THREE.Vector2(0.06, 0.44),
+      new THREE.Vector2(0.01, 0.46),
+    ];
+    const cornCobGeo = new THREE.LatheGeometry(cornProfile, 12);
+
+    // 1: Apple (Táo đỏ) - sculpted apple profile with indented top and bottom
+    const appleProfile = [
+      new THREE.Vector2(0.03, -0.34),
+      new THREE.Vector2(0.18, -0.28),
+      new THREE.Vector2(0.38, -0.05),
+      new THREE.Vector2(0.40, 0.12),
+      new THREE.Vector2(0.30, 0.28),
+      new THREE.Vector2(0.08, 0.35),
+      new THREE.Vector2(0.02, 0.32),
+    ];
+    const appleGeo = new THREE.LatheGeometry(appleProfile, 14);
+
+    // 2: Golden Corn (Bắp ngô vàng lớn) - large sculpted lathe profile
+    const goldenCornGeo = cornCobGeo.clone().scale(1.35, 1.35, 1.35);
+
+    // 3: Carrot (Cà rốt) - tapered cone
+    const carrotGeo = new THREE.ConeGeometry(0.22, 0.85, 10).rotateX(Math.PI).translate(0, 0.12, 0);
+
+    // 4: Pumpkin (Bí ngô) - squashed ribbed sphere
+    const pumpkinGeo = new THREE.SphereGeometry(0.78, 14, 10).scale(1.08, 0.74, 1.08);
+
+    // 5: Turnip (Củ cải trắng)
+    const turnipGeo = new THREE.SphereGeometry(0.45, 10, 8);
+
+    // 6: Rainbow Candy (Kẹo cầu vồng siêu thú) - sparkling octahedron
+    const rainbowCandyGeo = new THREE.OctahedronGeometry(1.5, 0);
 
     const geos = [
-      new THREE.CapsuleGeometry(0.22, 0.5, 4, 8),
-      new THREE.SphereGeometry(0.42, 8, 8),
-      new THREE.CapsuleGeometry(0.36, 0.8, 4, 8),
-      new THREE.ConeGeometry(0.2, 0.75, 6),
-      new THREE.SphereGeometry(0.75, 10, 8).scale(1, 0.72, 1),
+      cornCobGeo,
+      appleGeo,
+      goldenCornGeo,
+      carrotGeo,
+      pumpkinGeo,
+      turnipGeo,
+      rainbowCandyGeo,
     ];
 
     const mats = [
-      new THREE.MeshStandardMaterial({ color: 0xffd84a, emissive: 0x554000, roughness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xe8322e, emissive: 0x220000, roughness: 0.4 }),
-      new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0x996600, metalness: 0.5, roughness: 0.3 }),
-      new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0x331100, roughness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xf28a1a, emissive: 0x2a1000, roughness: 0.7 }),
+      // 0: Corn - warm golden yellow
+      new THREE.MeshStandardMaterial({ color: 0xffcb2b, emissive: 0x442c00, roughness: 0.45 }),
+      // 1: Apple - glossy red
+      new THREE.MeshStandardMaterial({ color: 0xdb2828, emissive: 0x220000, roughness: 0.28 }),
+      // 2: Golden Corn - metallic gold
+      new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xaa7700, metalness: 0.7, roughness: 0.22 }),
+      // 3: Carrot - vibrant orange
+      new THREE.MeshStandardMaterial({ color: 0xff7a00, emissive: 0x331100, roughness: 0.55 }),
+      // 4: Pumpkin - deep pumpkin orange
+      new THREE.MeshStandardMaterial({ color: 0xee7200, emissive: 0x2a1000, roughness: 0.65 }),
+      // 5: Turnip - pale cream
+      new THREE.MeshStandardMaterial({ color: 0xf5f5f0, emissive: 0x222222, roughness: 0.6 }),
+      // 6: Rainbow Candy - sparkling crystalline
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.2, metalness: 0.25, flatShading: true }),
     ];
 
-    for (let i = 0; i < 5; i++) {
-      const mesh = new THREE.InstancedMesh(geos[i], mats[i], this.maxFoodPerKind);
+    for (let i = 0; i < 7; i++) {
+      const cap = i === 6 ? 8 : this.maxFoodPerKind;
+      const mesh = new THREE.InstancedMesh(geos[i], mats[i], cap);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.frustumCulled = false; // CRITICAL: prevent disappearing when camera moves away from origin!
+      mesh.frustumCulled = false;
       mesh.count = 0;
+      if (i === 6) {
+        // Initialize instance colors for rainbow candy
+        for (let j = 0; j < 8; j++) mesh.setColorAt(j, new THREE.Color(0xffffff));
+      }
       this.scene.add(mesh);
       this.foodMeshes.push(mesh);
     }
 
-    // Green carrot leaves & pumpkin stems (matching main.js.download lines 699-702)
-    const carrotTopGeo = new THREE.ConeGeometry(0.15, 0.32, 5).rotateX(Math.PI).translate(0, -0.52, 0);
-    const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x3f9a3a, roughness: 0.7 });
+    // 0: Corn Husk & stem (Vỏ bắp ngô màu xanh bọc chân bắp)
+    const cornHuskGeo = new THREE.ConeGeometry(0.30, 0.42, 6, 1, true).translate(0, -0.22, 0);
+    const cornHuskMat = new THREE.MeshStandardMaterial({ color: 0x689f38, roughness: 0.65, side: THREE.DoubleSide });
+    const cornHuskMesh = new THREE.InstancedMesh(cornHuskGeo, cornHuskMat, this.maxFoodPerKind);
+    cornHuskMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    cornHuskMesh.frustumCulled = false;
+    cornHuskMesh.count = 0;
+    this.scene.add(cornHuskMesh);
+    this.foodTops[0] = cornHuskMesh;
+
+    // 1: Apple stem (Cuống táo nâu)
+    const appleStemGeo = new THREE.CylinderGeometry(0.025, 0.035, 0.24, 6).translate(0, 0.42, 0);
+    const appleStemMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
+    const appleStemMesh = new THREE.InstancedMesh(appleStemGeo, appleStemMat, this.maxFoodPerKind);
+    appleStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    appleStemMesh.frustumCulled = false;
+    appleStemMesh.count = 0;
+    this.scene.add(appleStemMesh);
+    this.foodTops[1] = appleStemMesh;
+
+    // 2: Golden Corn Husk (Vỏ bắp vàng)
+    const goldenHuskGeo = cornHuskGeo.clone().scale(1.35, 1.35, 1.35);
+    const goldenHuskMat = new THREE.MeshStandardMaterial({ color: 0xe6b800, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+    const goldenHuskMesh = new THREE.InstancedMesh(goldenHuskGeo, goldenHuskMat, this.maxFoodPerKind);
+    goldenHuskMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    goldenHuskMesh.frustumCulled = false;
+    goldenHuskMesh.count = 0;
+    this.scene.add(goldenHuskMesh);
+    this.foodTops[2] = goldenHuskMesh;
+
+    // 3: Carrot greens (Lá cà rốt xanh)
+    const carrotTopGeo = new THREE.ConeGeometry(0.18, 0.36, 6).rotateX(Math.PI).translate(0, -0.52, 0);
+    const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.7 });
     const carrotTopMesh = new THREE.InstancedMesh(carrotTopGeo, carrotTopMat, this.maxFoodPerKind);
     carrotTopMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     carrotTopMesh.frustumCulled = false;
@@ -71,8 +152,9 @@ export class FoodAndParticleRenderer {
     this.scene.add(carrotTopMesh);
     this.foodTops[3] = carrotTopMesh;
 
-    const pumpkinStemGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.3, 5).translate(0, 0.62, 0);
-    const pumpkinStemMat = new THREE.MeshStandardMaterial({ color: 0x4f7a2a, roughness: 0.7 });
+    // 4: Pumpkin stem (Cuống bí ngô)
+    const pumpkinStemGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.35, 6).translate(0, 0.65, 0);
+    const pumpkinStemMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.8 });
     const pumpkinStemMesh = new THREE.InstancedMesh(pumpkinStemGeo, pumpkinStemMat, this.maxFoodPerKind);
     pumpkinStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     pumpkinStemMesh.frustumCulled = false;
@@ -80,7 +162,7 @@ export class FoodAndParticleRenderer {
     this.scene.add(pumpkinStemMesh);
     this.foodTops[4] = pumpkinStemMesh;
 
-    // Soft dark circular shadows under all food items (matching main.js.download line 707)
+    // Soft dark circular shadows under all food items
     const shadowGeo = new THREE.CircleGeometry(0.42, 12).rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({
       color: 0x1f3a12,
@@ -93,8 +175,8 @@ export class FoodAndParticleRenderer {
     });
     this.foodShadow = new THREE.InstancedMesh(shadowGeo, shadowMat, this.maxFoodTotal);
     this.foodShadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.foodShadow.frustumCulled = false; // CRITICAL: never cull shadow mesh!
-    this.foodShadow.renderOrder = 2; // Renders neatly above terrain and hazard ground meshes
+    this.foodShadow.frustumCulled = false;
+    this.foodShadow.renderOrder = 2;
     this.foodShadow.count = 0;
     this.scene.add(this.foodShadow);
 
@@ -109,17 +191,17 @@ export class FoodAndParticleRenderer {
   }
 
   updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {
-    const counts = [0, 0, 0, 0, 0];
-    const max = this.maxFoodPerKind;
+    const counts = [0, 0, 0, 0, 0, 0, 0];
     let nShadow = 0;
-    const tt = now / 1000; // Continuous time in seconds, ensures smooth constant rotational speed
+    const tt = now / 1000;
     const podX = podiumPos ? podiumPos[0] : 0;
     const podZ = podiumPos ? podiumPos[1] : 0;
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
-      if (k < 0 || k > 4) continue;
-      if (counts[k] >= max) continue;
+      if (k < 0 || k > 6) continue;
+      const maxForThis = k === 6 ? 8 : this.maxFoodPerKind;
+      if (counts[k] >= maxForThis) continue;
 
       const idx = counts[k]++;
       const baseKg = FOOD_KG[k] || 1;
@@ -128,7 +210,28 @@ export class FoodAndParticleRenderer {
       const seed = f.id * 1.37;
       const onPod = Math.hypot(f.x - podX, f.z - podZ) < CFG.PODIUM_R ? 0.53 : 0;
 
-      if (k === 4) {
+      if (k === 6) {
+        // Rainbow candy: floats high, spins fast, cycles colors and sparkles
+        this.dummy.position.set(f.x, onPod + 2.1 + Math.sin(tt * 2.5 + seed) * 0.35, f.z);
+        this.dummy.rotation.set(tt * 1.3, tt * 2.1, 0);
+        this.foodMeshes[6].setColorAt(idx, this.hueCol.setHSL((tt * 0.6) % 1, 1, 0.55));
+        if (Math.random() < 0.35 && this.particles.length < this.maxParticles) {
+          const c = this.rainbowColors[Math.floor(Math.random() * this.rainbowColors.length)];
+          this.particles.push({
+            x: f.x + (Math.random() - 0.5) * 3.2,
+            y: onPod + 0.6 + Math.random() * 2.2,
+            z: f.z + (Math.random() - 0.5) * 3.2,
+            vx: 0,
+            vy: 1 + Math.random() * 1.5,
+            vz: 0,
+            life: 0.9,
+            maxLife: 0.9,
+            color: new THREE.Color(c),
+            size: 0.65,
+            g: 0,
+          });
+        }
+      } else if (k === 4) {
         // Pumpkin sits on the ground and turns slowly (0.3 rad/s)
         this.dummy.position.set(f.x, onPod + 0.5 * sz, f.z);
         this.dummy.rotation.set(0, seed + tt * 0.3, 0);
@@ -156,20 +259,23 @@ export class FoodAndParticleRenderer {
 
       // Render ground shadow disc under food item
       if (nShadow < this.maxFoodTotal) {
-        const shadowScale = grow * sz * (k === 4 ? 2.0 : 1.0);
+        const shadowScale = grow * sz * (k === 6 ? 3.4 : k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
         this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);
       }
     }
 
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < 7; k++) {
       this.foodMeshes[k].count = counts[k];
       this.foodMeshes[k].instanceMatrix.needsUpdate = true;
       if (this.foodTops[k as FoodKind]) {
         this.foodTops[k as FoodKind]!.count = counts[k];
         this.foodTops[k as FoodKind]!.instanceMatrix.needsUpdate = true;
       }
+    }
+    if (this.foodMeshes[6].instanceColor) {
+      this.foodMeshes[6].instanceColor.needsUpdate = true;
     }
 
     this.foodShadow.count = nShadow;

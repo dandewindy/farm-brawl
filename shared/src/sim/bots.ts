@@ -53,30 +53,30 @@ const aimAt = (fromX: number, fromZ: number, toX: number, toZ: number) => Math.a
 /** Is (x, z) dangerously close to or inside any hazard? */
 export function isHazardAt(map: MapData, x: number, z: number, species: Species, margin = 4.0): boolean {
   // 1. Electric fence
-  if (Math.hypot(x, z) >= CFG.R - margin - 2.0) return true;
+  if (Math.hypot(x, z) >= CFG.R - margin - 3.5) return true;
 
   // 2. Stone wells
   for (const [wx, wz, wr] of map.well || []) {
-    if (Math.hypot(x - wx, z - wz) < wr + margin) return true;
+    if (Math.hypot(x - wx, z - wz) < wr + margin + 1.2) return true;
   }
 
   // 3. Fire pit
   for (const [fx, fz, fr] of map.fire || []) {
-    if (Math.hypot(x - fx, z - fz) < fr + margin) return true;
+    if (Math.hypot(x - fx, z - fz) < fr + margin + 1.2) return true;
   }
 
   // 4. Pond (dangerous for non-ducks)
   if (species !== 'duck') {
     for (const b of map.pond || []) {
-      if (insideBlob(b, x, z, margin * 0.4)) return true;
-      if (Math.hypot(x - b[0], z - b[1]) < b[2] * 1.35 + margin) return true;
+      if (insideBlob(b, x, z, margin * 0.6)) return true;
+      if (Math.hypot(x - b[0], z - b[1]) < b[2] * 1.4 + margin + 1.5) return true;
     }
   }
 
   return false;
 }
 
-/** Check if the straight-line segment from (x1, z1) to (x2, z2) passes through hazard circles */
+/** Check if the straight-line segment from (x1, z1) to (x2, z2) passes through hazard circles or close to fence */
 function rayCrossesHazard(map: MapData, x1: number, z1: number, x2: number, z2: number, species: Species): boolean {
   const dx = x2 - x1, dz = z2 - z1;
   const lenSq = dx * dx + dz * dz;
@@ -88,15 +88,19 @@ function rayCrossesHazard(map: MapData, x1: number, z1: number, x2: number, z2: 
     return Math.hypot(px - cx, pz - cz) < r;
   };
 
+  // Electric fence ray check
+  const midX = (x1 + x2) * 0.5, midZ = (z1 + z2) * 0.5;
+  if (Math.hypot(midX, midZ) > CFG.R - 4.5 || Math.hypot(x2, z2) > CFG.R - 4.5) return true;
+
   for (const [wx, wz, wr] of map.well || []) {
-    if (hits(wx, wz, wr + 2.5)) return true;
+    if (hits(wx, wz, wr + 3.2)) return true;
   }
   for (const [fx, fz, fr] of map.fire || []) {
-    if (hits(fx, fz, fr + 2.5)) return true;
+    if (hits(fx, fz, fr + 3.2)) return true;
   }
   if (species !== 'duck') {
     for (const b of map.pond || []) {
-      if (hits(b[0], b[1], b[2] * 1.25 + 2.0)) return true;
+      if (hits(b[0], b[1], b[2] * 1.35 + 3.0)) return true;
     }
   }
   return false;
@@ -105,18 +109,19 @@ function rayCrossesHazard(map: MapData, x1: number, z1: number, x2: number, z2: 
 /** Pick a long-range exploration waypoint across the wide farm arena */
 function pickNewWaypoint(w: World, p: Player): [number, number] {
   const [podX, podZ] = w.map.podium;
-  // If mass >= 20, 35% chance to wander towards podium area
-  if (p.mass >= 20 && w.rand() < 0.35) {
-    return [podX + (w.rand() - 0.5) * 8, podZ + (w.rand() - 0.5) * 8];
+  // If mass >= 20, 30% chance to wander towards podium area
+  if (p.mass >= 20 && w.rand() < 0.3) {
+    return [podX + (w.rand() - 0.5) * 10, podZ + (w.rand() - 0.5) * 10];
   }
 
-  // Pick across the whole farm (15m to 48m from center)
-  for (let tries = 0; tries < 20; tries++) {
-    const ang = w.rand() * Math.PI * 2;
-    const dist = 15 + w.rand() * (CFG.R - 28);
+  // Pick across the whole farm (18m to 52m from center, favoring crossing the map)
+  const currentAng = Math.atan2(p.z, p.x);
+  for (let tries = 0; tries < 25; tries++) {
+    const ang = currentAng + Math.PI * 0.5 + w.rand() * Math.PI;
+    const dist = 18 + w.rand() * (CFG.R - 26);
     const x = Math.cos(ang) * dist;
     const z = Math.sin(ang) * dist;
-    if (!isHazardAt(w.map, x, z, p.species, 5.0)) {
+    if (!isHazardAt(w.map, x, z, p.species, 5.5)) {
       return [x, z];
     }
   }
@@ -148,13 +153,13 @@ export function thinkBot(w: World, p: Player, dt: number): void {
   p.input.mv = true;
 
   // Update long-range exploration goal timer
-  b.goalT -= 0.1;
+  b.goalT -= dt;
   const distToGoal = Math.hypot(b.gx - p.x, b.gz - p.z);
-  if (b.goalT <= 0 || distToGoal < 5.0 || (b.gx === 0 && b.gz === 0)) {
+  if (b.goalT <= 0 || distToGoal < 6.0 || (b.gx === 0 && b.gz === 0)) {
     const [nx, nz] = pickNewWaypoint(w, p);
     b.gx = nx;
     b.gz = nz;
-    b.goalT = 5.0 + w.rand() * 6.0; // Roam towards this waypoint for 5-11 seconds
+    b.goalT = 8.0 + w.rand() * 8.0; // Roam towards this waypoint for 8-16 seconds across the map
   }
 
   // 2. CRITICAL SURVIVAL: Emergency water escape for non-ducks
@@ -296,10 +301,11 @@ export function thinkBot(w: World, p: Player, dt: number): void {
 
   for (const f of w.food.values()) {
     const d = Math.hypot(f.x - p.x, f.z - p.z);
-    if (d > 42) continue;
+    const maxLookDist = f.k === 6 ? 40 : f.v >= 5 ? 24 : 14;
+    if (d > maxLookDist) continue;
 
     // DISQUALIFY: food inside or near any hazard!
-    if (isHazardAt(w.map, f.x, f.z, p.species, 4.0)) continue;
+    if (isHazardAt(w.map, f.x, f.z, p.species, 4.5)) continue;
 
     // DISQUALIFY: straight line to food intersects hazard!
     if (rayCrossesHazard(w.map, p.x, p.z, f.x, f.z, p.species)) continue;
@@ -307,10 +313,10 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     // Bonus for food lying in our general travel direction
     const toFoodAng = aimAt(p.x, p.z, f.x, f.z);
     const align = Math.cos(toFoodAng - toGoalAng);
-    const alignBonus = 1 + align * 0.4;
+    if (align < -0.2 && f.v < 4 && d > 6) continue;
 
-    // Softer distance falloff (d + 8) so bots seek rich food further out
-    const score = (f.v * alignBonus) / (d + 8);
+    const alignBonus = 1 + align * 0.5;
+    const score = ((f.k === 6 ? 45 : f.v) * alignBonus) / (d + 6);
     if (score > bestFoodScore) {
       bestFoodScore = score;
       fx = f.x;

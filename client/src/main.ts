@@ -3,7 +3,8 @@ import { wrapAngle } from '@shared/math';
 import type { GameEvent, Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
-  sfxBoom, sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash, sfxVictory, sfxZap,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash,
+  sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxVictory, sfxZap,
   unlockAudio, yelp,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
@@ -42,6 +43,7 @@ let prevMass = 0;
 let gainAcc = 0;
 let gainTimer = 0;
 let wasDashing = false;
+let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 
 const predictor = new ClientPredictor();
@@ -51,8 +53,10 @@ let lastSentTime = 0;
 input.onReleaseRam = (held: number) => {
   chargeStop();
   const myMeta = gameState.metas.get(gameState.myId);
+  const myEnt = gameState.ents.get(gameState.myId);
+  const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
   if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
-    predictor.predictDash(myMeta.species, held, input.aimA, gameState.map);
+    predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
   }
 };
 
@@ -119,6 +123,12 @@ const gameState = new GameState({
         const isDashing = (flags & 1) !== 0;
         if (isDashing && !wasDashing) sfxDash(1);
         wasDashing = isDashing;
+
+        const isSuper = (flags & 32768) !== 0;
+        if (!isSuper && wasSuper) {
+          hud.showToast(t('superEnd'));
+        }
+        wasSuper = isSuper;
       }
     }
     if (!seenMe) {
@@ -206,6 +216,11 @@ function handleGameEvent(ev: GameEvent): void {
         sfxZap(isMine ? 1 : 0.5);
       }
 
+      if (ev.id === gameState.napoleonId && ev.id > 0) {
+        sfxDethrone();
+        hud.showBanner(killerName ? t('overthrown', { killer: killerName }) : t('napFell', { name: victimName }), killerName ? t('overSubCrown') : t('overSub'));
+      }
+
       if (ev.id === myId) {
         predictor.on = false;
         // Delay death screen to show death animation first
@@ -233,21 +248,44 @@ function handleGameEvent(ev: GameEvent): void {
       hud.addFeed(feedText, ev.id === myId || ev.by === myId);
       break;
     }
+    case 'superFood': {
+      sfxSuperFood();
+      hud.showToast(t('superFood'));
+      break;
+    }
+    case 'super': {
+      if (ev.id === myId) {
+        sfxSuperUp();
+        hud.showBanner(`🌈 ${t('superHead')}`, t('superSub'));
+      } else {
+        sfxSuperFood(0.6);
+        const m = gameState.metas.get(ev.id);
+        hud.showToast(t('superOther', { name: m ? m.name : 'Ai đó' }));
+      }
+      break;
+    }
+    case 'fly': {
+      sfxSuperFly(ev.id === myId ? 1 : 0.6);
+      if (ev.id === myId) shake = Math.max(shake, 0.7);
+      break;
+    }
     case 'napoleon': {
+      gameState.napoleonId = ev.id;
       setMood(ev.id === myId ? 'napoleon' : 'normal');
       if (ev.id === myId) {
-        hud.showBanner('BẠN LÀ VUA NÔNG TRẠI!', 'Giữ vững vị trí trên bục vinh quang 👑');
-        sfxVictory();
-        hud.updateBoard(gameState.rule, gameState.reign, gameState.metas.get(myId)?.name || 'BẠN');
+        sfxCrown();
+        hud.showBanner(t('youNap'), t('youNapSub'));
+        hud.updateBoard(gameState.rule, gameState.reign, gameState.metas.get(myId)?.name || 'BẠN', true);
       } else if (ev.id > 0) {
+        sfxCrown();
         const king = gameState.metas.get(ev.id);
         const name = king ? king.name : 'Ai đó';
-        hud.showToast(`👑 ${name} đã lên ngôi Vua Nông Trại!`);
-        hud.updateBoard(gameState.rule, gameState.reign, name);
+        hud.showBanner(t('napNew', { name }), t('napSub'));
+        hud.updateBoard(gameState.rule, gameState.reign, name, false);
       } else {
         sfxDethrone();
         hud.showToast('👑 Ngai vàng đã bị bỏ trống!');
-        hud.updateBoard(undefined, 0, undefined);
+        hud.updateBoard(undefined, 0, undefined, false);
       }
       break;
     }
@@ -505,19 +543,29 @@ function animate(now: number): void {
   if (gainTimer <= 0) {
     gainTimer = 0.3;
     const g = Math.round(gainAcc);
+    const myPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z, mass: me.mass } : undefined;
     if (g >= 1) {
-      hud.floatText(`+${g} kg`, g >= 10 ? 'big' : '', gameState.myId);
+      hud.floatText(`+${g} kg`, g >= 10 ? 'big' : '', gameState.myId, myPos);
       gainAcc = 0;
     } else if (g <= -3) {
-      hud.floatText(`${g} kg`, 'loss', gameState.myId);
+      hud.floatText(`${g} kg`, 'loss', gameState.myId, myPos);
       gainAcc = 0;
     } else if (gainAcc < 0) {
       gainAcc = 0;
     }
   }
 
-  // Update UI floating text animations projected in 3D
-  hud.updateFloats(world.camera, gameState.ents);
+  // Update UI floating text animations projected smoothly in 3D (60 FPS zero-jitter tracking)
+  hud.updateFloats(world.camera, (id: number) => {
+    if (id === gameState.myId && predictor.on) {
+      return { x: predictor.x, z: predictor.z, mass: me ? me.mass : CFG.START_MASS };
+    }
+    const pos = animals.getPosition(id);
+    const ent = gameState.ents.get(id);
+    if (pos && ent) return { x: pos.x, z: pos.z, mass: ent.mass };
+    if (ent) return { x: ent.x, z: ent.z, mass: ent.mass };
+    return undefined;
+  });
 
   // Update floating bonus tools on the farm
   tools.update(now);
@@ -526,7 +574,7 @@ function animate(now: number): void {
   world.render();
 
   // 2D Minimap Render
-  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId);
+  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId, gameState.food);
 }
 
 requestAnimationFrame(animate);

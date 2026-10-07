@@ -39,6 +39,8 @@ export const FLAG = {
   PITCHFORK: 256,
   DYNAMITE: 512,
   TRAITOR: 1024,
+  SUPER: 32768,
+  FLYING: 65536,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
@@ -75,10 +77,13 @@ export type GameEvent =
   | { k: 'rule'; id: string }
   | { k: 'tool'; id: number; kind: ToolKind; x: number; z: number }
   | { k: 'song'; id: number; nap: number }
-  | { k: 'boom'; id: number; x: number; z: number };
+  | { k: 'boom'; id: number; x: number; z: number }
+  | { k: 'superFood'; x: number; z: number }
+  | { k: 'super'; id: number }
+  | { k: 'fly'; id: number; x: number; z: number };
 
-/** [id, name, mass, kills] */
-export type LeaderRow = [id: number, name: string, mass: number, kills: number];
+/** [id, name, mass, kills, reign?] */
+export type LeaderRow = [id: number, name: string, mass: number, kills: number, reign?: number];
 
 export interface Snapshot {
   t: 's';

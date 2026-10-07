@@ -336,20 +336,26 @@ export class HudManager {
 
   updateLeaderboard(lb: LeaderRow[], myId: number, napoleonId = 0): void {
     this.lbList.innerHTML = '';
-    lb.forEach(([id, name, mass, kills]) => {
+    lb.forEach(([id, name, mass, kills, reign]) => {
       const li = document.createElement('li');
       if (id === myId) li.classList.add('me');
-      if (id === napoleonId) li.classList.add('nap');
+      const isKing = id === napoleonId && id > 0;
+      if (isKing) li.classList.add('nap');
+
       const row = document.createElement('div');
+      row.className = 'r';
+
       const n = document.createElement('span');
       n.className = 'n';
-      n.textContent = (id === napoleonId && id > 0 ? '👑 ' : '') + name;
+      n.textContent = name;
+
       const k = document.createElement('span');
       k.className = 'k';
       k.textContent = kills > 0 ? `💥${kills}` : '';
+
       const v = document.createElement('span');
       v.className = 'v';
-      v.textContent = `${mass} kg`;
+      v.textContent = (isKing && reign && reign > 0) ? `👑 ${this.fmtTime(reign)} · ${mass} kg` : `${mass} kg`;
 
       row.append(n, k, v);
       li.appendChild(row);
@@ -411,7 +417,7 @@ export class HudManager {
       }
     }
     if (this.reignEl) {
-      if (reignSec && reignSec > 0 && kingName) {
+      if (kingName && reignSec !== undefined) {
         this.reignEl.hidden = false;
         const text = isMe
           ? t('reignYou', { t: this.fmtTime(reignSec) })
@@ -455,7 +461,7 @@ export class HudManager {
     if (initialPos) {
       item.ax = initialPos.x;
       item.az = initialPos.z;
-      item.ah = radiusOf(initialPos.mass) * 3.2 + 1.2;
+      item.ah = radiusOf(initialPos.mass) * 3.6 + 1.5;
     }
     this.floatingTexts.push(item);
   }
@@ -466,7 +472,7 @@ export class HudManager {
 
   updateFloats(
     camera?: THREE.Camera,
-    ents?: Map<number, { x: number; z: number; mass: number }>
+    posResolver?: ((id: number) => { x: number; z: number; mass: number } | undefined) | Map<number, { x: number; z: number; mass: number }>
   ): void {
     const now = performance.now();
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
@@ -478,12 +484,12 @@ export class HudManager {
         continue;
       }
 
-      if (ents && f.id) {
-        const st = ents.get(f.id);
+      if (posResolver && f.id) {
+        const st = typeof posResolver === 'function' ? posResolver(f.id) : posResolver.get(f.id);
         if (st) {
           f.ax = st.x;
           f.az = st.z;
-          f.ah = radiusOf(st.mass) * 3.2 + 1.2;
+          f.ah = radiusOf(st.mass) * 3.6 + 1.5;
         }
       }
 

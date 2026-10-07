@@ -233,12 +233,40 @@ export function eat(big = false): void {
 }
 export const sfxEat = eat;
 
+export function superFood(vol = 1): void {
+  if (!ready()) return;
+  [84, 88, 91, 96].forEach((n, i) => {
+    const f = 440 * Math.pow(2, (n - 69) / 12);
+    tone('triangle', f, f, 0.12, 0.07 * vol, { delay: i * 0.05 });
+  });
+}
+export const sfxSuperFood = superFood;
+
+export function superUp(): void {
+  if (!ready()) return;
+  [60, 64, 67, 72, 76, 79, 84].forEach((n, i) => {
+    const f = 440 * Math.pow(2, (n - 69) / 12);
+    tone('square', f, f * 1.01, 0.1, 0.06, { delay: i * 0.055 });
+  });
+  tone('sine', 130, 520, 0.5, 0.25, { delay: 0.05 });
+}
+export const sfxSuperUp = superUp;
+
+export function superFly(vol = 1): void {
+  if (!ready() || vol <= 0) return;
+  noise('bandpass', 600, 4000, 0.9, 0.5, 0.45 * vol);
+  tone('sawtooth', 220, 880, 0.35, 0.1 * vol);
+  tone('triangle', 880, 1760, 0.3, 0.06 * vol, { delay: 0.08 });
+}
+export const sfxSuperFly = superFly;
+
 export function crown(): void {
   if (!ready()) return;
   [392, 523, 659, 784].forEach((f, i) => tone('triangle', f, f, 0.32, 0.22, { delay: i * 0.11, attack: 0.01 }));
   tone('sawtooth', 196, 196, 0.8, 0.08, { delay: 0.33, attack: 0.05 });
 }
 export const sfxVictory = crown;
+export const sfxCrown = crown;
 
 export function dethrone(): void {
   if (!ready()) return;

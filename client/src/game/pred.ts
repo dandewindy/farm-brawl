@@ -117,8 +117,17 @@ export class ClientPredictor {
     this.sTick = snapTick;
   }
 
-  predictDash(species: Species, held: number, aimA: number, map: MapData | null): void {
+  predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false): void {
     if (!this.on) return;
+    if (isSuper) {
+      this.plow = true;
+      this.vx = Math.cos(aimA) * 62;
+      this.vz = Math.sin(aimA) * 62;
+      this.a = aimA;
+      this.dashT = 0.55;
+      this.flyT = 0.55;
+      return;
+    }
     const inMud = map ? map.mud.some((b) => insideBlob(b, this.x, this.z)) : false;
     const mud = inMud && species !== 'pig' ? 0.6 : 1;
     const DS = CFG.DASH_SPEED;
@@ -187,6 +196,7 @@ export class ClientPredictor {
       const h = Math.min(left, 0.025);
       left -= h;
       this.dashT = Math.max(0, this.dashT - h);
+      this.flyT = Math.max(0, this.flyT - h);
 
       const water = map.pond.some((b) => insideBlob(b, this.x, this.z));
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
@@ -253,8 +263,15 @@ export class ClientPredictor {
       if (distCenter > limit) {
         this.x = (this.x / distCenter) * limit;
         this.z = (this.z / distCenter) * limit;
-        this.vx *= 0.5;
-        this.vz *= 0.5;
+        if (this.flyT > 0) {
+          this.vx *= -0.2;
+          this.vz *= -0.2;
+          this.flyT = 0;
+          this.dashT = 0;
+        } else {
+          this.vx *= 0.5;
+          this.vz *= 0.5;
+        }
       }
     }
 

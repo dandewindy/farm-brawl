@@ -263,4 +263,30 @@ describe('bonus weapons and tools', () => {
     expect(king.dashT).toBe(0);
     expect(king.charging).toBe(false);
   });
+
+  it('eating rainbow candy (kind 6) activates super mode and super flight', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('SuperPig', 'pig');
+    const p = place(w, pid, 0, 0, 20);
+
+    // Place rainbow candy right in front of the player
+    w.food.set(888, { id: 888, x: 0.5, z: 0, k: 6, v: 3 });
+    w.step();
+
+    expect(p.superT).toBeGreaterThan(9.0);
+    expect(p.mass).toBe(23);
+
+    // Snapshot encodes FLAG.SUPER
+    const snap = w.snapshotFor(pid);
+    const wire = snap.p.find((x) => x[0] === pid)!;
+    expect(wire[5] & 32768).toBe(32768); // FLAG.SUPER
+
+    // Trigger dash while super -> launches rocket flight
+    p.input = { a: 0, mv: true, btn: false };
+    p.btnLatch = true;
+    w.step();
+
+    expect(p.flyT).toBeGreaterThan(0.4);
+    expect(p.vx).toBeGreaterThan(40);
+  });
 });

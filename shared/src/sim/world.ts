@@ -43,6 +43,9 @@ export interface Player extends Body {
   pitchforkT: number;
   hasDynamite: boolean;
   slowT: number;
+  superT: number;
+  flyT: number;
+  team?: number;
   ai: BotBrain | null;
 }
 
@@ -77,6 +80,7 @@ export class World {
   private nextFood = 1;
   private nextTool = 1;
   private toolSpawnTimer = 3;
+  private superCandyTimer = 25;
   private readonly rnd: () => number;
   private events: GameEvent[] = [];
   private foodAdded: FoodWire[] = [];
@@ -114,14 +118,14 @@ export class World {
 
   // ------------------------------------------------------------------ players
 
-  addPlayer(name: string, species: Species, bot = false): number {
+  addPlayer(name: string, species: Species, bot = false, team?: number): number {
     const id = this.nextId++;
     const p: Player = {
       id, name: name.slice(0, 16), species, skin: Math.floor(this.rnd() * SKIN_COUNT), bot, alive: false,
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -152,7 +156,7 @@ export class World {
   }
 
   meta(p: Player): PlayerMeta {
-    return { id: p.id, name: p.name, species: p.species, skin: p.skin, bot: p.bot };
+    return { id: p.id, name: p.name, species: p.species, skin: p.skin, bot: p.bot, team: p.team };
   }
 
   private spawn(p: Player): void {
@@ -161,7 +165,7 @@ export class World {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false, inWaterT: 0,
-      pitchforkT: 0, hasDynamite: false, slowT: 0,
+      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -236,8 +240,20 @@ export class World {
 
       // 1. Electric fence
       if (outsideFence(p)) {
-        this.kill(p, 'fence');
-        continue;
+        if (p.flyT > 0) {
+          const d = Math.hypot(p.x, p.z), lim = CFG.R - radiusOf(p.mass) * 0.3 - 1;
+          if (d > 0) {
+            p.x = (p.x / d) * lim;
+            p.z = (p.z / d) * lim;
+          }
+          p.vx *= -0.2;
+          p.vz *= -0.2;
+          p.flyT = 0;
+          p.dashT = 0;
+        } else {
+          this.kill(p, 'fence');
+          continue;
+        }
       }
 
       // 2. Stone pit / Well
@@ -283,7 +299,7 @@ export class World {
 
     this.eat(alive);
 
-    // Tool spawning
+    // Tool & Super Candy spawning
     this.toolSpawnTimer -= DT;
     if (this.toolSpawnTimer <= 0) {
       this.toolSpawnTimer = 12 + this.rnd() * 8;
@@ -292,11 +308,25 @@ export class World {
       }
     }
 
+    this.superCandyTimer -= DT;
+    if (this.superCandyTimer <= 0) {
+      this.superCandyTimer = 35 + this.rnd() * 25;
+      let hasSuper = false;
+      for (const f of this.food.values()) {
+        if (f.k === 6) { hasSuper = true; break; }
+      }
+      if (!hasSuper) {
+        this.spawnSuperCandy();
+      }
+    }
+
     // Tool pickup & timer updates
     for (const p of alive) {
       if (!p.alive) continue;
       if (p.pitchforkT > 0) p.pitchforkT = Math.max(0, p.pitchforkT - DT);
       if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
+      if (p.superT > 0) p.superT = Math.max(0, p.superT - DT);
+      if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
 
       const pr = radiusOf(p.mass) + 1.2;
       for (const t of this.tools.values()) {
@@ -462,6 +492,19 @@ export class World {
   }
 
   private dash(p: Player): void {
+    if (p.superT > 0) {
+      p.a = p.input.a;
+      p.vx = Math.cos(p.a) * 62;
+      p.vz = Math.sin(p.a) * 62;
+      p.dashT = 0.55;
+      p.flyT = 0.55;
+      p.plow = true;
+      p.power = 2.5;
+      p.cd = CFG.DASH_CD;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      return;
+    }
     const d = dashParams(p.species, p.holdT, p.terrain);
     p.a = p.input.a;
     p.vx = Math.cos(p.a) * d.speed;
@@ -626,6 +669,7 @@ export class World {
   private kill(p: Player, cause: DeathCause): void {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
+    p.superT = 0; p.flyT = 0;
     if (p.id === this.napoleonId) {
       const prevKing = this.players.get(this.napoleonId);
       const dur = Math.round(this.napoleonReign);
@@ -675,6 +719,11 @@ export class World {
         const dx = f.x - p.x, dz = f.z - p.z;
         if (dx > r || dx < -r || dz > r || dz < -r || dx * dx + dz * dz > r * r) continue;
         let gain = f.v;
+        if (f.k === 6) {
+          p.superT = 10;
+          p.flyT = 0;
+          this.events.push({ k: 'super', id: p.id });
+        }
         // Rule: "corn" (Corn is for pigs and Napoleon: 3x value, 1/3 for others)
         if (this.currentRule === 'corn' && (f.k === 0 || f.k === 2)) {
           if (p.species === 'pig' || p.id === this.napoleonId) {
@@ -749,6 +798,25 @@ export class World {
     this.tools.set(id, { id, kind, x: r2(bx), z: r2(bz) });
   }
 
+  private spawnSuperCandy(): void {
+    let bx = 0, bz = 0;
+    for (let tries = 0; tries < 25; tries++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
+      const x = Math.cos(a) * d;
+      const z = Math.sin(a) * d;
+      if (terrainAt(this.map, x, z) === 1) continue;
+      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 3)) continue;
+      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 3)) continue;
+      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 1.5)) continue;
+      bx = x; bz = z;
+      break;
+    }
+    this.addFood(bx, bz, 6, 3);
+    this.events.push({ k: 'superFood', x: r2(bx), z: r2(bz) });
+  }
+
   // ------------------------------------------------------------------ output
 
   init(): ServerMsg {
@@ -774,7 +842,9 @@ export class World {
         | (o.slowT > 0 ? FLAG.SONG : 0)
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)
-        | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0);
+        | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0)
+        | (o.superT > 0 ? FLAG.SUPER : 0)
+        | (o.flyT > 0 ? FLAG.FLYING : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     const snap: Snapshot = {
@@ -792,7 +862,13 @@ export class World {
       hof: this.hof,
     };
     if (this.tick % 5 === 0) {
-      snap.lb = this.ranked.slice(0, 10).map((o): LeaderRow => [o.id, o.name, Math.round(o.mass), o.kills]);
+      snap.lb = this.ranked.slice(0, 10).map((o): LeaderRow => [
+        o.id,
+        o.name,
+        Math.round(o.mass),
+        o.kills,
+        o.id === this.napoleonId ? Math.round(this.napoleonReign) : 0,
+      ]);
       snap.total = this.ranked.length;
     }
     const me = this.players.get(id);
