@@ -95,8 +95,8 @@ const gameState = new GameState({
           world.camTarget.x = x;
           world.camTarget.z = z;
         }
-        const rttMin = transport ? transport.rttMin : 0;
-        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, rttMin);
+        const currentRtt = transport ? transport.rtt : 0;
+        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, currentRtt);
 
         hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
         // Floating text on mass gain
@@ -349,7 +349,7 @@ function animate(now: number): void {
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
 
-    if (btnChanged || (timeSinceLast >= 50 && (angleDiff > 0.01 || mvChanged))) {
+    if (btnChanged || (timeSinceLast >= 25 && (angleDiff > 0.008 || mvChanged))) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;

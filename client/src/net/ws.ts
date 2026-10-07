@@ -80,7 +80,7 @@ export class WsClient implements Transport {
         const now = Math.round(performance.now());
         this.send({ t: 'ping', c: now });
       }
-    }, 1000);
+    }, 400);
   }
 
   private stopPing(): void {

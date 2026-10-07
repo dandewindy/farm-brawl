@@ -156,13 +156,14 @@ export class GameState {
   stampSnapshot(now: number): void {
     const sample = now - this.snapTick * TICK_MS;
     this.clockWin.push(sample);
-    if (this.clockWin.length > 40) this.clockWin.shift();
+    if (this.clockWin.length > 16) this.clockWin.shift();
     const lo = Math.min(...this.clockWin);
-    this.clockOff = this.clockOff === null ? lo : this.clockOff + (lo - this.clockOff) * 0.1;
+    this.clockOff = this.clockOff === null ? lo : this.clockOff + (lo - this.clockOff) * 0.15;
     const late = this.clockWin.map((v) => v - lo).sort((a, b) => a - b);
-    this.lateAvg = late[Math.floor(late.length * 0.9)] || 0;
-    const want = Math.min(320, Math.max(60, TICK_MS + 10 + this.lateAvg));
-    this.interpDelay += (want - this.interpDelay) * (want > this.interpDelay ? 0.3 : 0.03);
+    this.lateAvg = late[Math.floor(late.length * 0.85)] || 0;
+    // Tight interpolation delay: 52ms to 85ms (enough to absorb 1 tick of jitter, zero perceptable lag)
+    const want = Math.min(85, Math.max(52, TICK_MS + 4 + Math.min(22, this.lateAvg * 0.35)));
+    this.interpDelay += (want - this.interpDelay) * (want > this.interpDelay ? 0.35 : 0.15);
   }
 
   /** fractional tick to draw at this moment */

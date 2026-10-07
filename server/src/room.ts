@@ -6,7 +6,8 @@ import type { ClientMsg, ServerMsg } from '@shared/protocol';
 export class GameRoom extends DurableObject {
   private readonly world: World;
   private readonly sockets = new Map<WebSocket, number>();
-  private loopInterval: ReturnType<typeof setInterval> | null = null;
+  private loopTimer: ReturnType<typeof setTimeout> | null = null;
+  private nextTickTime = 0;
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
@@ -111,15 +112,33 @@ export class GameRoom extends DurableObject {
   }
 
   private startLoop(): void {
-    if (this.loopInterval !== null) return;
-    this.loopInterval = setInterval(() => this.tick(), TICK_MS);
+    if (this.loopTimer !== null) return;
+    this.nextTickTime = performance.now();
+    this.scheduleNextTick();
   }
 
   private stopLoop(): void {
-    if (this.loopInterval !== null) {
-      clearInterval(this.loopInterval);
-      this.loopInterval = null;
+    if (this.loopTimer !== null) {
+      clearTimeout(this.loopTimer);
+      this.loopTimer = null;
     }
+  }
+
+  private scheduleNextTick(): void {
+    if (this.sockets.size === 0) {
+      this.stopLoop();
+      return;
+    }
+    const now = performance.now();
+    this.nextTickTime += TICK_MS;
+    if (now - this.nextTickTime > TICK_MS * 2) {
+      this.nextTickTime = now + TICK_MS;
+    }
+    const delay = Math.max(0, Math.round(this.nextTickTime - now));
+    this.loopTimer = setTimeout(() => {
+      this.tick();
+      this.scheduleNextTick();
+    }, delay);
   }
 
   private tick(): void {

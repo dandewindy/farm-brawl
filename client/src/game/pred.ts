@@ -74,12 +74,12 @@ export class ClientPredictor {
     flags: number,
     snapTick: number,
     clockOff: number | null,
-    rttMin: number
+    rtt: number
   ): void {
-    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - rttMin : null;
+    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - (rtt * 0.75) : null;
     const then = this.on && targetTime !== null ? this.predAt(targetTime) : null;
 
-    if (!then || Math.hypot(x - then.x, z - then.z) > 12) {
+    if (!then || Math.hypot(x - then.x, z - then.z) > 10) {
       if (this.on) this.resets++;
       this.reset(x, z);
       this.sx = x;
@@ -88,12 +88,22 @@ export class ClientPredictor {
       return;
     }
 
-    this.ex = x - then.x;
-    this.ez = z - then.z;
+    const rawEx = x - then.x;
+    const rawEz = z - then.z;
+    const dist = Math.hypot(rawEx, rawEz);
+
+    // Deadzone: under 0.35m discrepancy is normal clock jitter, do not jerk the player!
+    if (dist < 0.35) {
+      this.ex *= 0.75;
+      this.ez *= 0.75;
+    } else {
+      this.ex = rawEx * 0.65;
+      this.ez = rawEz * 0.65;
+    }
 
     const stunned = (flags & 8) !== 0;
     if (stunned && !this.stunned && this.sTick === snapTick - 1 && clockOff !== null) {
-      const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rttMin / 2) / 1000;
+      const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
       const decay = Math.exp(-3.5 * age);
       this.kicks++;
       this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
