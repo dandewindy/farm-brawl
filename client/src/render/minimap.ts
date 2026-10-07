@@ -1,5 +1,6 @@
 import { CFG } from '@shared/constants';
 import type { MapData } from '@shared/map';
+import type { ToolWire } from '@shared/protocol';
 import type { Ent } from '../game/state';
 
 export class MinimapRenderer {
@@ -11,7 +12,13 @@ export class MinimapRenderer {
     this.size = canvas.width;
   }
 
-  draw(map: MapData | null, ents: Map<number, Ent>, myId: number): void {
+  draw(
+    map: MapData | null,
+    ents: Map<number, Ent>,
+    myId: number,
+    tools?: Map<number, ToolWire>,
+    napoleonId = 0
+  ): void {
     const { ctx, size } = this;
     const center = size / 2;
     const scale = (center - 8) / CFG.R;
@@ -71,18 +78,29 @@ export class MinimapRenderer {
     ctx.fillStyle = '#a5281b';
     ctx.fill();
 
-    // Other Animals (small dots)
+    // Bonus tools / weapons (gold squares like original game)
+    if (tools) {
+      ctx.fillStyle = '#e8b641';
+      for (const t of tools.values()) {
+        const tx = center + t[2] * scale;
+        const tz = center + t[3] * scale;
+        ctx.fillRect(tx - 3, tz - 3, 6, 6);
+      }
+    }
+
+    // Other Animals
     for (const e of ents.values()) {
       if (e.id === myId) continue;
       const ex = center + e.x * scale;
       const ez = center + e.z * scale;
+      const isNap = e.id === napoleonId && napoleonId > 0;
       ctx.beginPath();
-      ctx.arc(ex, ez, Math.max(2.5, Math.sqrt(e.mass) * 0.45), 0, Math.PI * 2);
-      ctx.fillStyle = '#f2ead7';
+      ctx.arc(ex, ez, isNap ? 4.5 : Math.max(2.5, Math.sqrt(e.mass) * 0.45), 0, Math.PI * 2);
+      ctx.fillStyle = isNap ? '#e8b641' : '#f2ead7';
       ctx.fill();
     }
 
-    // My Animal (bright gold with glowing ring)
+    // My Animal (bright red with white ring)
     const me = ents.get(myId);
     if (me) {
       const mx = center + me.x * scale;

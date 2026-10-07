@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CFG, radiusOf, type Species } from '@shared/constants';
-import type { PlayerMeta } from '@shared/protocol';
+import { FLAG, type PlayerMeta } from '@shared/protocol';
 
 interface AnimalVisual {
   root: THREE.Group;
@@ -636,6 +636,15 @@ export class AnimalRenderer {
       } else if (isPlowing) {
         vis.dust = 0.02;
         this.onPuff?.(x - Math.cos(angle) * r + (Math.random() - 0.5) * 0.6, 0.5, z - Math.sin(angle) * r + (Math.random() - 0.5) * 0.6, 0xff5a3c, 1.6, 0.5);
+      } else if (flags & FLAG.SONG) {
+        vis.dust = 0.08;
+        this.onPuff?.(x + (Math.random() - 0.5) * 1.5, sc * 2.2, z + (Math.random() - 0.5) * 1.5, Math.random() < 0.5 ? 0xe8b641 : 0x1f1a17, 0.5, 0.8, 1.5);
+      } else if (flags & FLAG.PITCHFORK && Math.random() < 0.4) {
+        vis.dust = 0.1;
+        this.onPuff?.(x + (Math.random() - 0.5) * r, 0.8 * sc, z + (Math.random() - 0.5) * r, 0xe8b641, 0.35, 0.4, 0.8);
+      } else if (flags & FLAG.DYNAMITE && Math.random() < 0.4) {
+        vis.dust = 0.1;
+        this.onPuff?.(x + (Math.random() - 0.5) * 0.4 * r, sc * 1.8, z + (Math.random() - 0.5) * 0.4 * r, 0xff7043, 0.3, 0.3, 1.2);
       } else if (isDashing || isMud) {
         vis.dust = isDashing ? 0.03 : 0.15;
         this.onPuff?.(x - Math.cos(angle) * r, 0.4, z - Math.sin(angle) * r, isMud ? 0x6b4a2b : 0xd8c09a, isDashing ? 1.4 : 0.8, 0.6);

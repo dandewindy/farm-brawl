@@ -276,6 +276,22 @@ export function click(): void {
   tone('triangle', 700, 900, 0.05, 0.12);
 }
 
+export function boom(): void {
+  if (!ready()) return;
+  tone('sine', 160, 35, 0.5, 0.45, { attack: 0.005 });
+  noise('lowpass', 600, 80, 2, 0.6, 0.4, { attack: 0.01 });
+}
+export const sfxBoom = boom;
+
+export function song(): void {
+  if (!ready()) return;
+  [261, 329, 392, 523, 659].forEach((f, i) => {
+    tone('triangle', f, f, 0.35, 0.22, { attack: 0.02, delay: i * 0.12 });
+    tone('sawtooth', f / 2, f / 2, 0.35, 0.1, { attack: 0.02, delay: i * 0.12 });
+  });
+}
+export const sfxSong = song;
+
 // Gentle ambient wind + bird chirps
 function startAmbience(): void {
   if (ambienceTimer || !ctx || !noiseBuf) return;

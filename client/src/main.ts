@@ -3,7 +3,7 @@ import { wrapAngle } from '@shared/math';
 import type { GameEvent, Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
-  sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSplash, sfxVictory, sfxZap,
+  sfxBoom, sfxBurn, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash, sfxVictory, sfxZap,
   unlockAudio, yelp,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
@@ -16,6 +16,7 @@ import { AnimalRenderer } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
 import { MinimapRenderer } from './render/minimap';
+import { ToolRenderer } from './render/tools';
 import { WorldRenderer } from './render/world';
 import { HudManager } from './ui/hud';
 
@@ -30,6 +31,7 @@ const animals = new AnimalRenderer(world.scene);
 const corpses = new CorpseRenderer(world.scene);
 const foodParts = new FoodAndParticleRenderer(world.scene);
 animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
+const tools = new ToolRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -73,6 +75,7 @@ const gameState = new GameState({
   onInit(map) {
     world.buildMap(map);
     corpses.setMap(map);
+    tools.clear();
   },
   onJoined(_id) {
     hud.showInGame();
@@ -85,6 +88,7 @@ const gameState = new GameState({
     handleGameEvent(ev);
   },
   onSnapshot(s: Snapshot) {
+    tools.sync(s.tl || []);
     let seenMe = false;
     for (const [id, x, z, _a, mass, flags, _charge] of s.p) {
       if (id === gameState.myId && gameState.alive) {
@@ -237,6 +241,50 @@ function handleGameEvent(ev: GameEvent): void {
       repaint();
       hud.showRuleBanner(ev.id);
       hud.updateBoard(ev.id, gameState.reign);
+      break;
+    }
+    case 'tool': {
+      foodParts.burst(ev.x, 1, ev.z, 0xe8b641, 14, 5, 6, 0.7);
+      if (ev.id === myId) {
+        sfxReward();
+        hud.showToast(t(`tk_${ev.kind}`));
+      }
+      break;
+    }
+    case 'boom': {
+      foodParts.burst(ev.x, 1, ev.z, 0xff7a1a, 30, 12, 9, 0.8);
+      foodParts.burst(ev.x, 1, ev.z, 0x333333, 16, 6, 6, 1.1);
+      sfxBoom();
+      const me = gameState.ents.get(myId);
+      const distToBoom = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+      if (distToBoom < 25) {
+        shake = Math.max(shake, 1.2 * (1 - distToBoom / 25));
+      }
+      break;
+    }
+    case 'song': {
+      sfxSong();
+      const singer = gameState.metas.get(ev.id);
+      const singerName = singer ? singer.name : 'Ai đó';
+      if (ev.nap === myId) {
+        hud.showBanner(t('songYou'), t('songSub'));
+      } else {
+        hud.showBanner(t('songBanner', { name: singerName }), t('songSub'));
+      }
+      const napEnt = gameState.ents.get(ev.nap);
+      if (napEnt) {
+        for (let i = 0; i < 18; i++) {
+          foodParts.puff(
+            napEnt.x + (Math.random() - 0.5) * 2,
+            2.5,
+            napEnt.z + (Math.random() - 0.5) * 2,
+            i % 2 === 0 ? 0xe8b641 : 0x1f1a17,
+            0.6,
+            0.8,
+            1.5
+          );
+        }
+      }
       break;
     }
     case 'leave': {
@@ -441,11 +489,14 @@ function animate(now: number): void {
   // Update UI floating text animations
   hud.updateFloats();
 
+  // Update floating bonus tools on the farm
+  tools.update(now);
+
   // 3D Render
   world.render();
 
   // 2D Minimap Render
-  minimap.draw(gameState.map, gameState.ents, gameState.myId);
+  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId);
 }
 
 requestAnimationFrame(animate);

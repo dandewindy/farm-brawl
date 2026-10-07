@@ -35,9 +35,15 @@ export const FLAG = {
   WATER: 16,
   MUD: 32,
   DROWNING: 64,
+  SONG: 128,
+  PITCHFORK: 256,
+  DYNAMITE: 512,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
+
+export type ToolKind = 'pitchfork' | 'dynamite' | 'song';
+export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
 
 export type HofRow = [name: string, species: Species, dur: number];
 
@@ -65,7 +71,10 @@ export type GameEvent =
       streak: number;
     }
   | { k: 'napoleon'; id: number }
-  | { k: 'rule'; id: string };
+  | { k: 'rule'; id: string }
+  | { k: 'tool'; id: number; kind: ToolKind; x: number; z: number }
+  | { k: 'song'; id: number; nap: number }
+  | { k: 'boom'; id: number; x: number; z: number };
 
 /** [id, name, mass, kills] */
 export type LeaderRow = [id: number, name: string, mass: number, kills: number];
@@ -79,6 +88,8 @@ export interface Snapshot {
   /** food removed this tick */
   fr: number[];
   ev: GameEvent[];
+  /** bonus tools on the ground: [id, kind, x, z] */
+  tl?: ToolWire[];
   /** top 10, sent every few ticks */
   lb?: LeaderRow[];
   total?: number;
@@ -97,7 +108,7 @@ export interface Snapshot {
 }
 
 export type ServerMsg =
-  | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number }
+  | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[] }
   | { t: 'joined'; id: number }
   | { t: 'pong'; c: number }
   | Snapshot;

@@ -10,7 +10,7 @@ import { clamp, insideBlob, mulberry32 } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
   FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
-  type PlayerWire, type ServerMsg, type Snapshot,
+  type PlayerWire, type ServerMsg, type Snapshot, type ToolKind, type ToolWire,
 } from '../protocol';
 
 export interface Player extends Body {
@@ -40,7 +40,17 @@ export interface Player extends Body {
   best: number;
   respawnT: number;
   inWaterT: number;
+  pitchforkT: number;
+  hasDynamite: boolean;
+  slowT: number;
   ai: BotBrain | null;
+}
+
+export interface ToolItem {
+  id: number;
+  kind: ToolKind;
+  x: number;
+  z: number;
 }
 
 export interface Food {
@@ -57,6 +67,7 @@ export class World {
   readonly map: MapData;
   readonly players = new Map<number, Player>();
   readonly food = new Map<number, Food>();
+  readonly tools = new Map<number, ToolItem>();
   tick = 0;
   time = 0;
   /** alive animals, heaviest first (refreshed every tick) */
@@ -64,6 +75,8 @@ export class World {
 
   private nextId = 1;
   private nextFood = 1;
+  private nextTool = 1;
+  private toolSpawnTimer = 3;
   private readonly rnd: () => number;
   private events: GameEvent[] = [];
   private foodAdded: FoodWire[] = [];
@@ -91,6 +104,7 @@ export class World {
     this.map = generateMap(seed);
     this.botsEnabled = opts.bots ?? true;
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
+    for (let i = 0; i < 3; i++) this.spawnTool();
     this.flush();
   }
 
@@ -107,7 +121,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -147,6 +161,7 @@ export class World {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false, inWaterT: 0,
+      pitchforkT: 0, hasDynamite: false, slowT: 0,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -206,6 +221,10 @@ export class World {
       for (const p of alive) {
         p.terrain = terrainAt(this.map, p.x, p.z);
         stepMove(p, p.input, h, p.species, p.terrain);
+        if (p.slowT > 0) {
+          p.vx *= 0.85;
+          p.vz *= 0.85;
+        }
         collideHay(p, this.map.hay);
       }
       this.collidePlayers(alive);
@@ -263,6 +282,47 @@ export class World {
     }
 
     this.eat(alive);
+
+    // Tool spawning
+    this.toolSpawnTimer -= DT;
+    if (this.toolSpawnTimer <= 0) {
+      this.toolSpawnTimer = 12 + this.rnd() * 8;
+      if (this.tools.size < 3) {
+        this.spawnTool();
+      }
+    }
+
+    // Tool pickup & timer updates
+    for (const p of alive) {
+      if (!p.alive) continue;
+      if (p.pitchforkT > 0) p.pitchforkT = Math.max(0, p.pitchforkT - DT);
+      if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
+
+      const pr = radiusOf(p.mass) + 1.2;
+      for (const t of this.tools.values()) {
+        const dist = Math.hypot(t.x - p.x, t.z - p.z);
+        if (dist <= pr) {
+          this.tools.delete(t.id);
+          this.events.push({ k: 'tool', id: p.id, kind: t.kind, x: t.x, z: t.z });
+          if (t.kind === 'pitchfork') {
+            p.pitchforkT = 10;
+          } else if (t.kind === 'dynamite') {
+            p.hasDynamite = true;
+          } else if (t.kind === 'song') {
+            if (this.napoleonId > 0) {
+              const nap = this.players.get(this.napoleonId);
+              if (nap && nap.alive) {
+                nap.slowT = 6.0;
+                this.events.push({ k: 'song', id: p.id, nap: this.napoleonId });
+              }
+            } else {
+              this.events.push({ k: 'song', id: p.id, nap: 0 });
+            }
+          }
+          break;
+        }
+      }
+    }
 
     // Podium capture logic
     const [podX, podZ] = this.map.podium;
@@ -379,6 +439,10 @@ export class World {
 
   /** hold to charge, release to ram */
   private handleButton(p: Player): void {
+    if (p.slowT > 0) {
+      p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false;
+      return;
+    }
     p.cd = Math.max(0, p.cd - DT);
     const down = (p.input.btn || p.btnLatch) && p.stunT <= 0;
     p.btnLatch = false;
@@ -501,6 +565,33 @@ export class World {
       }
     }
 
+    // Weapon: Pitchfork (1.35x knockback)
+    if (att.pitchforkT > 0) {
+      k = clamp(k * 1.35, CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX * 1.5);
+    }
+
+    // Weapon: Dynamite explosion
+    if (att.hasDynamite) {
+      att.hasDynamite = false;
+      k = Math.max(k * 1.4, 25);
+      const boomX = r2((att.x + vic.x) / 2);
+      const boomZ = r2((att.z + vic.z) / 2);
+      this.events.push({ k: 'boom', id: att.id, x: boomX, z: boomZ });
+      const BOOM_R = 6.5;
+      for (const bystander of this.players.values()) {
+        if (!bystander.alive || bystander.id === att.id) continue;
+        const bdx = bystander.x - boomX;
+        const bdz = bystander.z - boomZ;
+        const bdist = Math.hypot(bdx, bdz);
+        if (bdist < BOOM_R && bdist > 0.01) {
+          const bForce = clamp((1 - bdist / BOOM_R) * 28, 6, 26);
+          bystander.vx += (bdx / bdist) * bForce;
+          bystander.vz += (bdz / bdist) * bForce;
+          bystander.stunT = Math.max(bystander.stunT, 0.35);
+        }
+      }
+    }
+
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
     vic.stunT = CFG.STUN_TIME * (0.7 + 0.3 * att.power);
@@ -509,7 +600,11 @@ export class World {
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
 
-    const loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
+    let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
+    // Pitchfork strips 3x weight off Napoleon
+    if (att.pitchforkT > 0 && vic.id === this.napoleonId) {
+      loss = Math.min(vic.mass - CFG.MIN_MASS, loss * 3);
+    }
     if (loss > 0.5) {
       vic.mass -= loss;
       this.scatter(vic.x, vic.z, loss, radiusOf(vic.mass) + 0.8, nx, nz);
@@ -625,6 +720,27 @@ export class World {
     }
   }
 
+  private spawnTool(): void {
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'song'];
+    const kind = kinds[Math.floor(this.rnd() * kinds.length)];
+    let bx = 0, bz = 0;
+    for (let tries = 0; tries < 25; tries++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
+      const x = Math.cos(a) * d;
+      const z = Math.sin(a) * d;
+      if (terrainAt(this.map, x, z) === 1) continue;
+      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 3)) continue;
+      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 3)) continue;
+      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2)) continue;
+      bx = x; bz = z;
+      break;
+    }
+    const id = this.nextTool++;
+    this.tools.set(id, { id, kind, x: r2(bx), z: r2(bz) });
+  }
+
   // ------------------------------------------------------------------ output
 
   init(): ServerMsg {
@@ -632,6 +748,7 @@ export class World {
       t: 'init', cfg: CFG, map: this.map, tick: this.tick,
       players: [...this.players.values()].filter((p) => p.alive).map((p) => this.meta(p)),
       food: [...this.food.values()].map((f) => [f.id, r2(f.x), r2(f.z), f.k, Math.round(f.v * 10) / 10]),
+      tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
     };
   }
 
@@ -641,7 +758,10 @@ export class World {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
         | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0)
-        | (o.species !== 'duck' && o.inWaterT > 0 ? FLAG.DROWNING : 0);
+        | (o.species !== 'duck' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
+        | (o.slowT > 0 ? FLAG.SONG : 0)
+        | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
+        | (o.hasDynamite ? FLAG.DYNAMITE : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     const snap: Snapshot = {
@@ -651,6 +771,7 @@ export class World {
       fa: this.foodAdded,
       fr: this.foodRemoved,
       ev: this.events,
+      tl: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
       pod: [this.podiumCaptor, Math.round(this.podiumProgress * 100) / 100, this.podiumContested],
       nap: this.napoleonId,
       rule: this.currentRule,

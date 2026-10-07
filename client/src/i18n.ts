@@ -92,6 +92,12 @@ const vi = {
   sound: 'Âm thanh',
   team0: 'Foxwood',
   team1: 'Pinchfield',
+  tk_pitchfork: '🍴 Chĩa ba! Húc mạnh hơn và rút cân Napoleon gấp 3 (10 giây)',
+  tk_dynamite: '🧨 Thuốc nổ! Cú húc kế tiếp sẽ phát nổ',
+  tk_song: '📜 "Súc vật nước Anh"! Napoleon sẽ bị suy yếu ngay khi có Napoleon',
+  songBanner: '{name} hát vang "Súc vật nước Anh"!',
+  songSub: 'Napoleon yếu và chậm trong 6 giây',
+  songYou: 'Cả trại đang hát chống lại bạn!',
 } as const;
 
 export type TextKey = keyof typeof vi;

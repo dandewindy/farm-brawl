@@ -318,6 +318,23 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     }
   }
 
+  // Consider nearby bonus tools (pitchfork, dynamite, song)
+  for (const t of w.tools.values()) {
+    const d = Math.hypot(t.x - p.x, t.z - p.z);
+    if (d > 35) continue;
+    if (isHazardAt(w.map, t.x, t.z, p.species, 4.0)) continue;
+    if (rayCrossesHazard(w.map, p.x, p.z, t.x, t.z, p.species)) continue;
+    if (t.kind === 'song' && w.napoleonId === 0) continue;
+    if (t.kind === 'dynamite' && p.hasDynamite) continue;
+    if (t.kind === 'pitchfork' && p.pitchforkT > 3) continue;
+    const toolScore = 18 / (d + 4);
+    if (toolScore > bestFoodScore) {
+      bestFoodScore = toolScore;
+      fx = t.x;
+      fz = t.z;
+    }
+  }
+
   if (bestFoodScore > 0) {
     p.input.a = aimAt(p.x, p.z, fx, fz);
   } else {

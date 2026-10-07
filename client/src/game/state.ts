@@ -3,7 +3,7 @@
 import { TICK_MS, type Cfg, type FoodKind } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { wrapAngle } from '@shared/math';
-import type { GameEvent, HofRow, LeaderRow, PlayerMeta, ServerMsg, Snapshot } from '@shared/protocol';
+import type { GameEvent, HofRow, LeaderRow, PlayerMeta, ServerMsg, Snapshot, ToolWire } from '@shared/protocol';
 
 /** [tick, x, z, angle] */
 type Sample = [number, number, number, number];
@@ -52,6 +52,7 @@ export class GameState {
   me = { kills: 0, cd: 0, rank: 0 };
   myMass = 0;
   pod: [number, number, boolean] = [0, 0, false];
+  tools = new Map<number, ToolWire>();
   napoleonId = 0;
   rule = '';
   reign = 0;
@@ -79,9 +80,10 @@ export class GameState {
       this.cfg = m.cfg;
       this.map = m.map;
       this.tick = m.tick;
-      this.metas.clear(); this.ents.clear(); this.food.clear();
+      this.metas.clear(); this.ents.clear(); this.food.clear(); this.tools.clear();
       for (const p of m.players) this.metas.set(p.id, p);
       for (const f of m.food) this.addFood(f, true);
+      if (m.tools) for (const t of m.tools) this.tools.set(t[0], t);
       this.hooks.onInit(m.map);
     } else if (m.t === 'joined') {
       this.myId = m.id;
@@ -142,6 +144,10 @@ export class GameState {
     // anyone missing from this snapshot is gone
     for (const [id, e] of this.ents) if (e.seen !== this.snapTick) this.ents.delete(id);
 
+    if (s.tl) {
+      this.tools.clear();
+      for (const t of s.tl) this.tools.set(t[0], t);
+    }
     if (s.lb) this.lb = s.lb;
     if (s.total) this.total = s.total;
     if (s.me) this.me = s.me;

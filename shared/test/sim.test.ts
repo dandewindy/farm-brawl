@@ -184,3 +184,83 @@ describe('world', () => {
     expect(w.food.has(888)).toBe(true);
   });
 });
+
+describe('bonus weapons and tools', () => {
+  it('players pick up tools lying on the ground', () => {
+    const w = emptyWorld();
+    const id = w.addPlayer('Picker', 'pig');
+    place(w, id, 0, 0);
+    w.tools.set(101, { id: 101, kind: 'pitchfork', x: 0.5, z: 0 });
+
+    w.step();
+    const p = w.players.get(id)!;
+    expect(p.pitchforkT).toBeGreaterThan(9.0);
+    expect(w.tools.has(101)).toBe(false);
+  });
+
+  it('pitchfork hits harder and strips extra weight off Napoleon', () => {
+    const w = emptyWorld();
+    const attacker = w.addPlayer('Attacker', 'pig');
+    const king = w.addPlayer('King', 'pig');
+    place(w, attacker, 0, 0, 40);
+    place(w, king, 2, 0, 40);
+    w.napoleonId = king;
+
+    const pAtt = w.players.get(attacker)!;
+    pAtt.pitchforkT = 10;
+    pAtt.input = { a: 0, mv: true, btn: true };
+    pAtt.dashT = 0.3;
+    pAtt.power = 1.0;
+    pAtt.vx = 20;
+
+    const massBefore = w.players.get(king)!.mass;
+    w.step();
+    const massAfter = w.players.get(king)!.mass;
+    expect(massBefore - massAfter).toBeGreaterThan(1.0);
+  });
+
+  it('dynamite explodes on hit and knocks back bystanders', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('Bomber', 'pig');
+    const vicId = w.addPlayer('Victim', 'pig');
+    const byId = w.addPlayer('Bystander', 'pig');
+    place(w, attId, 0, 0, 30);
+    place(w, vicId, 2, 0, 30);
+    place(w, byId, 1, 3, 30);
+
+    const att = w.players.get(attId)!;
+    att.hasDynamite = true;
+    att.dashT = 0.3;
+    att.power = 1.0;
+    att.vx = 20;
+
+    const bystander = w.players.get(byId)!;
+    expect(bystander.vx).toBe(0);
+
+    w.step();
+    expect(att.hasDynamite).toBe(false);
+    expect(Math.abs(bystander.vz)).toBeGreaterThan(0.5);
+  });
+
+  it('song slows down Napoleon and blocks ramming', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('KingPig', 'pig');
+    const singerId = w.addPlayer('Singer', 'pig');
+    place(w, kingId, 0, 0, 40);
+    place(w, singerId, 10, 10, 40);
+    w.napoleonId = kingId;
+
+    w.tools.set(999, { id: 999, kind: 'song', x: 10.2, z: 10 });
+    w.step();
+
+    const king = w.players.get(kingId)!;
+    expect(king.slowT).toBeGreaterThan(5.0);
+
+    // King tries to press ram button
+    king.input = { a: 0, mv: true, btn: true };
+    king.btnLatch = true;
+    w.step();
+    expect(king.dashT).toBe(0);
+    expect(king.charging).toBe(false);
+  });
+});
