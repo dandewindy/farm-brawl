@@ -167,4 +167,20 @@ describe('world', () => {
     expect(w.players.size).toBe(CFG.BOT_FILL);
     expect([...w.players.values()].some((p) => !p.bot)).toBe(true);
   });
+
+  it('bot ignores food placed inside fire pit or well', () => {
+    const w = emptyWorld();
+    // Add a fire pit at (10, 0) with radius 2
+    w.map.fire.push([10, 0, 2]);
+    const id = w.addPlayer('BotPig', 'pig', true);
+    place(w, id, 0, 0);
+    // Place food inside the fire pit
+    w.food.set(888, { id: 888, x: 10, z: 0, k: 0, v: 10 });
+    // Run simulation for 20 ticks
+    run(w, 20);
+    const p = w.players.get(id)!;
+    // Bot should still be alive and food should NOT be eaten
+    expect(p.alive).toBe(true);
+    expect(w.food.has(888)).toBe(true);
+  });
 });

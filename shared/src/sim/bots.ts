@@ -1,11 +1,14 @@
 // High-IQ farmyard AI:
 // - Proactively avoids hazards: electric fence, stone wells, fire incinerators, and ponds (for non-ducks)
-// - Emergency escape: frantically swims to land if caught in water to avoid drowning within 3s
+// - Filters out any food in or near hazards so bots never chase food into death traps
+// - Wide-range exploration waypoints across the full 70m farm arena so bots roam globally instead of lingering in small pockets
+// - Emergency escape: frantically swims to land if caught in water to avoid drowning within 1.5s
 // - Aggressively contests the podium to become Napoleon
 // - Defends the podium when King by charging challengers off the hill
 // - Hunts Napoleon when another animal rules
-// - Tactically rams rivals into nearby hazards (fence, wells, fire, water)
-import { CFG, radiusOf } from '../constants';
+// - Tactically rams rivals into nearby hazards safely without launching themselves into traps
+import { CFG, radiusOf, type Species } from '../constants';
+import type { MapData } from '../map';
 import { insideBlob, wrapAngle } from '../math';
 import type { Player, World } from './world';
 
@@ -20,6 +23,11 @@ export interface BotBrain {
   wander: number;
   /** 0..1: aggressiveness factor */
   aggro: number;
+  /** Long-range exploration destination (x, z) */
+  gx: number;
+  gz: number;
+  /** Seconds remaining until choosing a new long-range waypoint */
+  goalT: number;
 }
 
 export const BOT_NAMES = [
@@ -34,10 +42,86 @@ export function newBrain(rnd: () => number): BotBrain {
     target: 0,
     wander: rnd() * Math.PI * 2,
     aggro: 0.5 + rnd() * 0.5,
+    gx: 0,
+    gz: 0,
+    goalT: 0,
   };
 }
 
 const aimAt = (fromX: number, fromZ: number, toX: number, toZ: number) => Math.atan2(toZ - fromZ, toX - fromX);
+
+/** Is (x, z) dangerously close to or inside any hazard? */
+export function isHazardAt(map: MapData, x: number, z: number, species: Species, margin = 4.0): boolean {
+  // 1. Electric fence
+  if (Math.hypot(x, z) >= CFG.R - margin - 2.0) return true;
+
+  // 2. Stone wells
+  for (const [wx, wz, wr] of map.well || []) {
+    if (Math.hypot(x - wx, z - wz) < wr + margin) return true;
+  }
+
+  // 3. Fire pit
+  for (const [fx, fz, fr] of map.fire || []) {
+    if (Math.hypot(x - fx, z - fz) < fr + margin) return true;
+  }
+
+  // 4. Pond (dangerous for non-ducks)
+  if (species !== 'duck') {
+    for (const b of map.pond || []) {
+      if (insideBlob(b, x, z, margin * 0.4)) return true;
+      if (Math.hypot(x - b[0], z - b[1]) < b[2] * 1.35 + margin) return true;
+    }
+  }
+
+  return false;
+}
+
+/** Check if the straight-line segment from (x1, z1) to (x2, z2) passes through hazard circles */
+function rayCrossesHazard(map: MapData, x1: number, z1: number, x2: number, z2: number, species: Species): boolean {
+  const dx = x2 - x1, dz = z2 - z1;
+  const lenSq = dx * dx + dz * dz;
+  if (lenSq < 1e-3) return false;
+
+  const hits = (cx: number, cz: number, r: number): boolean => {
+    const t = Math.max(0, Math.min(1, ((cx - x1) * dx + (cz - z1) * dz) / lenSq));
+    const px = x1 + t * dx, pz = z1 + t * dz;
+    return Math.hypot(px - cx, pz - cz) < r;
+  };
+
+  for (const [wx, wz, wr] of map.well || []) {
+    if (hits(wx, wz, wr + 2.5)) return true;
+  }
+  for (const [fx, fz, fr] of map.fire || []) {
+    if (hits(fx, fz, fr + 2.5)) return true;
+  }
+  if (species !== 'duck') {
+    for (const b of map.pond || []) {
+      if (hits(b[0], b[1], b[2] * 1.25 + 2.0)) return true;
+    }
+  }
+  return false;
+}
+
+/** Pick a long-range exploration waypoint across the wide farm arena */
+function pickNewWaypoint(w: World, p: Player): [number, number] {
+  const [podX, podZ] = w.map.podium;
+  // If mass >= 20, 35% chance to wander towards podium area
+  if (p.mass >= 20 && w.rand() < 0.35) {
+    return [podX + (w.rand() - 0.5) * 8, podZ + (w.rand() - 0.5) * 8];
+  }
+
+  // Pick across the whole farm (15m to 48m from center)
+  for (let tries = 0; tries < 20; tries++) {
+    const ang = w.rand() * Math.PI * 2;
+    const dist = 15 + w.rand() * (CFG.R - 28);
+    const x = Math.cos(ang) * dist;
+    const z = Math.sin(ang) * dist;
+    if (!isHazardAt(w.map, x, z, p.species, 5.0)) {
+      return [x, z];
+    }
+  }
+  return [0, 0];
+}
 
 export function thinkBot(w: World, p: Player, dt: number): void {
   const b = p.ai!;
@@ -63,19 +147,26 @@ export function thinkBot(w: World, p: Player, dt: number): void {
   b.think = 0.08 + w.rand() * 0.12;
   p.input.mv = true;
 
+  // Update long-range exploration goal timer
+  b.goalT -= 0.1;
+  const distToGoal = Math.hypot(b.gx - p.x, b.gz - p.z);
+  if (b.goalT <= 0 || distToGoal < 5.0 || (b.gx === 0 && b.gz === 0)) {
+    const [nx, nz] = pickNewWaypoint(w, p);
+    b.gx = nx;
+    b.gz = nz;
+    b.goalT = 5.0 + w.rand() * 6.0; // Roam towards this waypoint for 5-11 seconds
+  }
+
   // 2. CRITICAL SURVIVAL: Emergency water escape for non-ducks
   if (p.species !== 'duck' && p.inWaterT > 0) {
-    // Find nearest shore by looking away from the center of current pond
     let bestLandAngle = Math.atan2(-p.z, -p.x);
     for (const bnd of w.map.pond || []) {
       if (insideBlob(bnd, p.x, p.z, 0)) {
-        // Point outward from pond center
         bestLandAngle = Math.atan2(p.z - bnd[1], p.x - bnd[0]);
         break;
       }
     }
     p.input.a = bestLandAngle;
-    // Dash immediately to escape water if available
     if (p.cd <= 0 && w.rand() < 0.8) {
       b.press = 0.05;
       p.input.btn = true;
@@ -85,13 +176,11 @@ export function thinkBot(w: World, p: Player, dt: number): void {
 
   // 3. KING BEHAVIOR: Defend the throne
   if (isKing) {
-    // If stepped off podium, immediately return to center
     if (distToPod > CFG.PODIUM_R * 0.75) {
       p.input.a = aimAt(p.x, p.z, podX, podZ);
       return;
     }
 
-    // On podium: guard perimeter and charge approaching challengers
     let closestChallenger: Player | null = null;
     let closestDist = 18;
     for (const o of w.players.values()) {
@@ -113,18 +202,16 @@ export function thinkBot(w: World, p: Player, dt: number): void {
       return;
     }
 
-    // Idle patrol in a tight circle on top of podium
     b.wander += 0.8 * dt;
     p.input.a = b.wander;
     return;
   }
 
   // 4. OVERTHROW / CONTEST PODIUM:
-  // If Napoleon is crowned, prioritize hunting Napoleon if bot is big enough or close enough
   const napoleon = w.napoleonId > 0 ? w.players.get(w.napoleonId) : null;
   if (napoleon && napoleon.alive && napoleon.id !== p.id) {
     const distToNap = Math.hypot(napoleon.x - p.x, napoleon.z - p.z);
-    if ((p.mass >= 22 || distToNap < 18) && w.rand() < b.aggro * 0.9) {
+    if ((p.mass >= 22 || distToNap < 20) && w.rand() < b.aggro * 0.9) {
       p.input.a = aimAt(p.x, p.z, napoleon.x, napoleon.z);
       if (distToNap < 10 && p.cd <= 0) {
         b.target = napoleon.id;
@@ -135,9 +222,8 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     }
   }
 
-  // If podium is uncaptured or contested, healthy bots (mass >= 20) charge in to capture it
   if (w.napoleonId === 0 || w.podiumContested) {
-    if (p.mass >= 20 && distToPod < 38 && w.rand() < 0.6) {
+    if (p.mass >= 20 && distToPod < 42 && w.rand() < 0.65) {
       p.input.a = aimAt(p.x, p.z, podX, podZ);
       return;
     }
@@ -151,30 +237,24 @@ export function thinkBot(w: World, p: Player, dt: number): void {
   for (const o of w.players.values()) {
     if (o === p || !o.alive) continue;
     const gap = Math.hypot(o.x - p.x, o.z - p.z) - r - radiusOf(o.mass);
-    if (gap > 11 || o.mass > p.mass * 1.6) continue;
+    if (gap > 12 || o.mass > p.mass * 1.5) continue;
 
     let hazardBonus = 1;
-    // Check if target is between us and fence
     const edgeDist = CFG.R - Math.hypot(o.x, o.z);
     if (edgeDist < 8) hazardBonus += 1.2;
 
-    // Check if target is near a well
     for (const [wx, wz, wr] of w.map.well || []) {
       if (Math.hypot(o.x - wx, o.z - wz) < wr + 5) {
         hazardBonus += 1.5;
         break;
       }
     }
-
-    // Check if target is near fire
     for (const [fx, fz, fr] of w.map.fire || []) {
       if (Math.hypot(o.x - fx, o.z - fz) < fr + 5) {
         hazardBonus += 1.5;
         break;
       }
     }
-
-    // Check if non-duck target is near pond
     if (o.species !== 'duck') {
       for (const [px, pz, pr] of w.map.pond || []) {
         if (Math.hypot(o.x - px, o.z - pz) < pr + 5) {
@@ -184,7 +264,7 @@ export function thinkBot(w: World, p: Player, dt: number): void {
       }
     }
 
-    const score = (1 - gap / 11) * hazardBonus * (o.stunT > 0 ? 1.8 : 1) * (o.mass < p.mass ? 1.3 : 0.8);
+    const score = (1 - gap / 12) * hazardBonus * (o.stunT > 0 ? 1.8 : 1) * (o.mass < p.mass ? 1.3 : 0.8);
     if (score > bestPreyScore) {
       bestPreyScore = score;
       bestPrey = o;
@@ -193,23 +273,46 @@ export function thinkBot(w: World, p: Player, dt: number): void {
   }
 
   if (bestPrey && p.cd <= 0 && w.rand() < b.aggro * bestPreyScore * 0.85) {
-    const gap = Math.hypot(bestPrey.x - p.x, bestPrey.z - p.z);
-    b.target = bestPrey.id;
-    // Charge harder if pushing toward a hazard
-    b.press = (bestPreyHazardMult > 1.4 || gap > 4.5) ? 0.6 + w.rand() * 0.5 : 0.08;
-    p.input.a = aimAt(p.x, p.z, bestPrey.x, bestPrey.z);
-    p.input.btn = true;
-    return;
+    const aimAng = aimAt(p.x, p.z, bestPrey.x, bestPrey.z);
+    // Project where the dash will end
+    const projectedDist = Math.min(12, Math.hypot(bestPrey.x - p.x, bestPrey.z - p.z) + 3.0);
+    const projX = p.x + Math.cos(aimAng) * projectedDist;
+    const projZ = p.z + Math.sin(aimAng) * projectedDist;
+
+    // Only dash if we won't launch ourselves straight into a hazard!
+    if (!isHazardAt(w.map, projX, projZ, p.species, 4.5) && !rayCrossesHazard(w.map, p.x, p.z, projX, projZ, p.species)) {
+      const gap = Math.hypot(bestPrey.x - p.x, bestPrey.z - p.z);
+      b.target = bestPrey.id;
+      b.press = (bestPreyHazardMult > 1.4 || gap > 4.5) ? 0.6 + w.rand() * 0.5 : 0.08;
+      p.input.a = aimAng;
+      p.input.btn = true;
+      return;
+    }
   }
 
-  // 6. GRAZING (Fallback when safe)
+  // 6. WIDE-RANGE ROAMING & SAFE GRAZING
   let fx = 0, fz = 0, bestFoodScore = 0;
+  const toGoalAng = aimAt(p.x, p.z, b.gx, b.gz);
+
   for (const f of w.food.values()) {
     const d = Math.hypot(f.x - p.x, f.z - p.z);
-    if (d > 28) continue;
-    const s = f.v / (d + 2.5);
-    if (s > bestFoodScore) {
-      bestFoodScore = s;
+    if (d > 42) continue;
+
+    // DISQUALIFY: food inside or near any hazard!
+    if (isHazardAt(w.map, f.x, f.z, p.species, 4.0)) continue;
+
+    // DISQUALIFY: straight line to food intersects hazard!
+    if (rayCrossesHazard(w.map, p.x, p.z, f.x, f.z, p.species)) continue;
+
+    // Bonus for food lying in our general travel direction
+    const toFoodAng = aimAt(p.x, p.z, f.x, f.z);
+    const align = Math.cos(toFoodAng - toGoalAng);
+    const alignBonus = 1 + align * 0.4;
+
+    // Softer distance falloff (d + 8) so bots seek rich food further out
+    const score = (f.v * alignBonus) / (d + 8);
+    if (score > bestFoodScore) {
+      bestFoodScore = score;
       fx = f.x;
       fz = f.z;
     }
@@ -218,48 +321,77 @@ export function thinkBot(w: World, p: Player, dt: number): void {
   if (bestFoodScore > 0) {
     p.input.a = aimAt(p.x, p.z, fx, fz);
   } else {
-    b.wander += (w.rand() - 0.5) * 1.0;
-    p.input.a = b.wander;
+    // Steer towards long-range strategic waypoint across the farm
+    p.input.a = toGoalAng;
   }
 
-  // 7. COMPREHENSIVE HAZARD STEERING AVOIDANCE
-  // Avoid electric fence: strong inward vector
+  // 7. COMPREHENSIVE HAZARD STEERING AVOIDANCE & REPULSION
+  let rx = 0, rz = 0;
+  let inDanger = false;
+
+  // Electric fence: strong inward vector if within 10m of fence
   const distFromCenter = Math.hypot(p.x, p.z);
-  if (distFromCenter > CFG.R - 8.5 - r) {
-    const inward = Math.atan2(-p.z, -p.x);
-    p.input.a = inward + (w.rand() - 0.5) * 0.4;
+  if (distFromCenter > CFG.R - 10.0 - r) {
+    const pen = (distFromCenter - (CFG.R - 10.0 - r)) / 5.0;
+    rx += (-p.x / distFromCenter) * Math.max(1.2, pen * 4);
+    rz += (-p.z / distFromCenter) * Math.max(1.2, pen * 4);
+    inDanger = true;
   }
 
-  // Avoid stone wells
+  // Stone wells: strong outward vector
   for (const [wx, wz, wr] of w.map.well || []) {
-    const d = Math.hypot(wx - p.x, wz - p.z);
-    if (d < wr + r + 4.5) {
-      const awayAng = Math.atan2(p.z - wz, p.x - wx);
-      p.input.a = awayAng + (w.rand() - 0.5) * 0.5;
+    const d = Math.hypot(p.x - wx, p.z - wz);
+    const safeDist = wr + r + 5.5;
+    if (d < safeDist) {
+      const pen = (safeDist - d) / 3.0;
+      const mag = Math.max(1.2, pen * 4);
+      rx += ((p.x - wx) / (d || 1)) * mag;
+      rz += ((p.z - wz) / (d || 1)) * mag;
+      inDanger = true;
     }
   }
 
-  // Avoid incinerator / fire pits
+  // Fire pits: strong outward vector
   for (const [fx2, fz2, fr2] of w.map.fire || []) {
-    const d = Math.hypot(fx2 - p.x, fz2 - p.z);
-    if (d < fr2 + r + 4.5) {
-      const awayAng = Math.atan2(p.z - fz2, p.x - fx2);
-      p.input.a = awayAng + (w.rand() - 0.5) * 0.5;
+    const d = Math.hypot(p.x - fx2, p.z - fz2);
+    const safeDist = fr2 + r + 5.5;
+    if (d < safeDist) {
+      const pen = (safeDist - d) / 3.0;
+      const mag = Math.max(1.2, pen * 4);
+      rx += ((p.x - fx2) / (d || 1)) * mag;
+      rz += ((p.z - fz2) / (d || 1)) * mag;
+      inDanger = true;
     }
   }
 
-  // Avoid ponds for non-ducks
+  // Ponds for non-ducks: strong outward vector
   if (p.species !== 'duck') {
-    for (const [px, pz, pr] of w.map.pond || []) {
-      const d = Math.hypot(px - p.x, pz - p.z);
-      if (d < pr * 1.35 + r + 4.0) {
-        const awayAng = Math.atan2(p.z - pz, p.x - px);
-        p.input.a = awayAng + (w.rand() - 0.5) * 0.5;
+    for (const bnd of w.map.pond || []) {
+      const d = Math.hypot(p.x - bnd[0], p.z - bnd[1]);
+      const safeDist = bnd[2] * 1.35 + r + 5.0;
+      if (d < safeDist) {
+        const pen = (safeDist - d) / 3.0;
+        const mag = Math.max(1.2, pen * 4);
+        rx += ((p.x - bnd[0]) / (d || 1)) * mag;
+        rz += ((p.z - bnd[1]) / (d || 1)) * mag;
+        inDanger = true;
       }
     }
   }
 
-  // Avoid hay bales
+  if (inDanger) {
+    p.input.a = Math.atan2(rz, rx);
+    // Cancel any dangerous charge
+    p.input.btn = false;
+    b.press = 0;
+    // Dash away if dangerously close
+    if (Math.hypot(rx, rz) > 3.0 && p.cd <= 0 && w.rand() < 0.65) {
+      b.press = 0.08;
+      p.input.btn = true;
+    }
+  }
+
+  // Avoid hay bales: smooth tangent steering
   for (const [hx, hz, hr] of w.map.hay || []) {
     const d = Math.hypot(hx - p.x, hz - p.z);
     if (d > hr + r + 2.5) continue;
