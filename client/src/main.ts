@@ -32,6 +32,8 @@ const animals = new AnimalRenderer(world.scene);
 const corpses = new CorpseRenderer(world.scene);
 const foodParts = new FoodAndParticleRenderer(world.scene);
 animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
+animals.onRainbowTrail = (x, y, z, a, r, isDash) => foodParts.rainbowTrail(x, y, z, a, r, isDash);
+animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
@@ -54,16 +56,18 @@ input.onReleaseRam = (held: number) => {
   chargeStop();
   const myMeta = gameState.metas.get(gameState.myId);
   const myEnt = gameState.ents.get(gameState.myId);
+  const inWater = ((myEnt?.flags ?? 0) & FLAG.WATER) !== 0;
+  if (inWater) return;
   const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
   if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
     predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
   }
 };
 
-const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team') => {
+const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team', skin: number) => {
   unlockAudio();
   if (transport) {
-    transport.send({ t: 'join', name, species });
+    transport.send({ t: 'join', name, species, skin });
   }
 });
 hud.onPickRule = (ruleId) => {
@@ -177,6 +181,10 @@ function handleGameEvent(ev: GameEvent): void {
       }
       foodParts.burst(ev.x, 1.4, ev.z, 0xfff3a0, 16, 7, 7, 0.6);
       foodParts.burst(ev.x, 1.4, ev.z, 0xffffff, 8, 5, 5, 0.5);
+      if (ev.a === 0) {
+        // Hay bale collision stun: burst of golden straw flying everywhere!
+        foodParts.burst(ev.x, 1.4, ev.z, 0xe8c55a, 26, 9, 8, 0.85);
+      }
       if (isMine) shake = Math.max(shake, 0.6);
 
       // Floating loss text matching original game
@@ -459,10 +467,11 @@ function animate(now: number): void {
       lastSentTime = now;
     }
 
-    // Update charging meter in HUD and charge whine audio
-    const held = input.holding ? (now - input.holdStart) / 1000 : 0;
-    const isCharging = held >= CFG.CHARGE_MIN;
-    const chargeLevel = Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN)));
+    // Update charging meter in HUD and charge whine audio (disabled in water)
+    const inWater = ((me.flags ?? 0) & FLAG.WATER) !== 0;
+    const held = !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
+    const isCharging = !inWater && held >= CFG.CHARGE_MIN;
+    const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
     if (isCharging) {
       chargeUpdate(chargeLevel);
@@ -518,6 +527,7 @@ function animate(now: number): void {
   // Update dynamic food and particle effects
   foodParts.updateFood(gameState.food, now, gameState.map?.podium);
   foodParts.updateParticles(dt);
+  animals.updateShockwaves(dt);
 
   // Update animated world hazards (water ripples, pulsing coals, flames)
   world.updateHazards(now);

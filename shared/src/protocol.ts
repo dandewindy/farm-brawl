@@ -120,7 +120,7 @@ export type ServerMsg =
   | Snapshot;
 
 export type ClientMsg =
-  | { t: 'join'; name: string; species: Species }
+  | { t: 'join'; name: string; species: Species; skin?: number }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }
   | ({ t: 'input' } & Input);

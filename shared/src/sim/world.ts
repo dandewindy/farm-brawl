@@ -118,10 +118,12 @@ export class World {
 
   // ------------------------------------------------------------------ players
 
-  addPlayer(name: string, species: Species, bot = false, team?: number): number {
+  addPlayer(name: string, species: Species, bot = false, team?: number, skin?: number): number {
     const id = this.nextId++;
     const p: Player = {
-      id, name: name.slice(0, 16), species, skin: Math.floor(this.rnd() * SKIN_COUNT), bot, alive: false,
+      id, name: name.slice(0, 16), species,
+      skin: skin !== undefined ? (skin % SKIN_COUNT) : Math.floor(this.rnd() * SKIN_COUNT),
+      bot, alive: false,
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
@@ -132,12 +134,13 @@ export class World {
     return id;
   }
 
-  /** bring a (dead) animal back, optionally as a different species */
-  respawn(id: number, name?: string, species?: Species): void {
+  /** bring a (dead) animal back, optionally as a different species and skin */
+  respawn(id: number, name?: string, species?: Species, skin?: number): void {
     const p = this.players.get(id);
     if (!p || p.alive) return;
     if (name !== undefined) p.name = name.slice(0, 16);
     if (species) p.species = species;
+    if (skin !== undefined) p.skin = skin % SKIN_COUNT;
     this.spawn(p);
   }
 
@@ -224,12 +227,27 @@ export class World {
     for (let s = 0; s < SUBSTEPS; s++) {
       for (const p of alive) {
         p.terrain = terrainAt(this.map, p.x, p.z);
+        if (p.terrain === 1) {
+          p.charging = false;
+          p.holdT = 0;
+          p.pressed = false;
+          p.btnLatch = false;
+        }
         stepMove(p, p.input, h, p.species, p.terrain);
         if (p.slowT > 0) {
           p.vx *= 0.85;
           p.vz *= 0.85;
         }
-        collideHay(p, this.map.hay);
+        const wasStunned = p.stunT >= 2.8;
+        const hayHit = collideHay(p, this.map.hay);
+        if (hayHit && !wasStunned) {
+          p.plow = false;
+          p.charging = false;
+          p.holdT = 0;
+          p.pressed = false;
+          p.btnLatch = false;
+          this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 3 });
+        }
       }
       this.collidePlayers(alive);
     }
@@ -469,7 +487,7 @@ export class World {
 
   /** hold to charge, release to ram */
   private handleButton(p: Player): void {
-    if (p.slowT > 0) {
+    if (p.slowT > 0 || p.terrain === 1) {
       p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false;
       return;
     }
@@ -487,11 +505,12 @@ export class World {
       return;
     }
     // released (or a tap that came and went between two ticks)
-    if ((p.pressed || down) && p.cd <= 0 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
+    if ((p.pressed || down) && p.cd <= 0 && p.dashT <= 0 && p.stunT <= 0 && p.terrain !== 1) this.dash(p);
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 
   private dash(p: Player): void {
+    if (p.terrain === 1) return;
     if (p.superT > 0) {
       p.a = p.input.a;
       p.vx = Math.cos(p.a) * 62;
@@ -635,9 +654,14 @@ export class World {
       }
     }
 
+    // Super Rainbow Dash: violent massive knockback launching victim far across the map!
+    if (att.superT > 0) {
+      k = Math.max(k * 3.2, 72);
+    }
+
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
-    vic.stunT = CFG.STUN_TIME * (0.7 + 0.3 * att.power);
+    vic.stunT = att.superT > 0 ? 2.0 : CFG.STUN_TIME * (0.7 + 0.3 * att.power);
     vic.dashT = 0; vic.plow = false; vic.holdT = 0; vic.charging = false; vic.pressed = false;
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }

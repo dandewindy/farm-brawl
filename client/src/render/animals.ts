@@ -25,6 +25,8 @@ interface AnimalVisual {
   wasSuper: boolean;
   trailX?: number;
   trailZ?: number;
+  shockwaveTimer?: number;
+  rainbowTimer?: number;
 }
 
 function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
@@ -68,37 +70,43 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   pig: 0xf48fb1,
 };
 
-// Detailed color palettes per species (matching original game)
+// Detailed color palettes per species (4 skins per animal matching original game)
 const SKINS: Record<Species, Record<string, number>[]> = {
   chicken: [
     { body: 0xfaf6ee, tail: 0xfaf6ee },
     { body: 0xb5652b, tail: 0x4a2412 },
     { body: 0x2e2c30, tail: 0x1d3b2c },
+    { body: 0xd8c08a, tail: 0x8a6a3a },
   ],
   sheep: [
     { wool: 0xf3f1ea, face: 0x3a3a3a },
     { wool: 0x4a4442, face: 0x1f1c1b },
     { wool: 0xe6d6b0, face: 0x6b4a33 },
+    { wool: 0xf8f6f0, face: 0xe2c9b8 },
   ],
   horse: [
     { body: 0x8b5a2b, mane: 0x2b1a0e, legs: 0x6b4220 },
     { body: 0x2a2522, mane: 0x121010, legs: 0x1c1816 },
     { body: 0xd6d2ca, mane: 0x8f8a82, legs: 0xb5b0a8 },
+    { body: 0xd9a441, mane: 0xf3ead0, legs: 0xbf8c33 },
   ],
   cow: [
     { body: 0xffffff, spot: 0x222222, legs: 0xeeeeee, nose: 0xf3a0a8 },
     { body: 0xffffff, spot: 0x7a4320, legs: 0xeeeeee, nose: 0xf3a0a8 },
     { body: 0xb8814a, spot: 0x000000, legs: 0x9a6a3c, nose: 0x3a2a22 },
+    { body: 0x2a2624, spot: 0, legs: 0x221e1c, nose: 0x5a4a48 },
   ],
   duck: [
     { body: 0xffd23f, head: 0xffd23f, bill: 0xff7f11 },
     { body: 0xf7f4ec, head: 0xf7f4ec, bill: 0xffa41b },
     { body: 0x8a6a4a, head: 0x1f6b3a, bill: 0xe8c547 },
+    { body: 0x34343a, head: 0x5c3322, bill: 0xe8c547 },
   ],
   pig: [
     { body: 0xf6a5b5, snout: 0xee8fa2 },
     { body: 0x2f2a2c, snout: 0xf0b9c4 },
     { body: 0xd2773a, snout: 0xe39a6b },
+    { body: 0xf6a5b5, snout: 0xee8fa2, spot: 0x3a3335 },
   ],
 };
 
@@ -309,6 +317,13 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   g.add(bell);
   const clapper = part(new THREE.SphereGeometry(0.035, 6, 4), 0x3a3a3a, 0.7, 1.04, 0);
   g.add(clapper);
+  // Cow tail hanging from rear
+  const tailStem = part(new THREE.CylinderGeometry(0.03, 0.022, 0.52, 6), s.body, -0.68, 1.15, 0);
+  tailStem.rotation.z = 0.28;
+  g.add(tailStem);
+  const tailTuft = part(new THREE.ConeGeometry(0.065, 0.22, 8), s.spot || 0x2a2624, -0.76, 0.86, 0);
+  tailTuft.rotation.z = Math.PI - 0.28;
+  g.add(tailTuft);
   addEyes(g, 1.2, 1.58, 0.16, 0.07);
   return addLegs(g, s.legs ?? s.body, [[0.5, 0.28], [0.5, -0.28], [-0.5, 0.28], [-0.5, -0.28]], 0.8, 0.11, 0x3a3330);
 }
@@ -335,6 +350,11 @@ function buildDuck(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   // Round plump body (casts shadow)
   blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0, undefined, true);
+  // Spots (if spotted skin)
+  if (s.spot) {
+    blob(g, s.spot, 0.22, [1, 0.8, 0.14], 0.2, 1.12, 0.44);
+    blob(g, s.spot, 0.2, [1, 0.85, 0.14], -0.28, 1.05, -0.44);
+  }
   // Head
   g.add(part(new THREE.SphereGeometry(0.5, 18, 12), s.body, 0.85, 1.3, 0));
   // Snout cylinder
@@ -486,25 +506,90 @@ function createLabel(text: string, crowned = false, traitor = false): THREE.Spri
   return sprite;
 }
 
+interface ShockwaveRing {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  x: number;
+  y: number;
+  z: number;
+  baseRadius: number;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
 export class AnimalRenderer {
   private readonly visuals = new Map<number, AnimalVisual>();
   private readonly group = new THREE.Group();
+  private readonly shockwavePool: ShockwaveRing[] = [];
 
   constructor(private readonly scene: THREE.Scene) {
     this.scene.add(this.group);
-  }
-
-  getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
-    let vis = this.visuals.get(id);
-    if (!vis && meta) {
-      vis = this.buildAnimal(meta);
-      this.visuals.set(id, vis);
-      this.group.add(vis.root);
+    // Shockwave rings pool for sonic boom effects
+    const swGeo = new THREE.RingGeometry(0.85, 1.25, 36);
+    swGeo.rotateX(-Math.PI / 2);
+    for (let i = 0; i < 16; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x64d8cb,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(swGeo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 4;
+      this.scene.add(mesh);
+      this.shockwavePool.push({
+        mesh,
+        mat,
+        x: 0,
+        y: 0,
+        z: 0,
+        baseRadius: 1,
+        life: 0,
+        maxLife: 0.38,
+        active: false,
+      });
     }
-    return vis;
   }
 
   onPuff?: (x: number, y: number, z: number, color: number, size?: number, life?: number, vy?: number) => void;
+  onRainbowTrail?: (x: number, y: number, z: number, angle: number, r: number, isDash: boolean) => void;
+  onSonicWave?: (x: number, y: number, z: number, r: number) => void;
+
+  spawnShockwave(x: number, y: number, z: number, r: number, color = 0x64d8cb): void {
+    let sw = this.shockwavePool.find((s) => !s.active);
+    if (!sw) sw = this.shockwavePool[0];
+    sw.active = true;
+    sw.x = x;
+    sw.y = y;
+    sw.z = z;
+    sw.baseRadius = r;
+    sw.life = 0;
+    sw.maxLife = 0.38;
+    sw.mat.color.setHex(color);
+    sw.mat.opacity = 0.9;
+    sw.mesh.position.set(x, y, z);
+    sw.mesh.scale.setScalar(r);
+    sw.mesh.visible = true;
+  }
+
+  updateShockwaves(dt: number): void {
+    for (const sw of this.shockwavePool) {
+      if (!sw.active) continue;
+      sw.life += dt;
+      if (sw.life >= sw.maxLife) {
+        sw.active = false;
+        sw.mesh.visible = false;
+      } else {
+        const k = sw.life / sw.maxLife;
+        const sc = sw.baseRadius * (1 + k * 4.2);
+        sw.mesh.scale.setScalar(sc);
+        sw.mat.opacity = (1 - k) * 0.9;
+      }
+    }
+  }
 
   notifyHit(id: number): void {
     const vis = this.visuals.get(id);
@@ -729,6 +814,29 @@ export class AnimalRenderer {
       }
     }
 
+    // Super Rainbow dash trail & powerful sonic shockwave effects
+    if (isSuper) {
+      // Rainbow ribbon trail trailing behind tail
+      if (speed > 0.05 || isDashing || isFlying) {
+        vis.rainbowTimer = (vis.rainbowTimer || 0) + dt;
+        const interval = isDashing || isFlying ? 0.015 : 0.04;
+        if (vis.rainbowTimer >= interval) {
+          vis.rainbowTimer = 0;
+          this.onRainbowTrail?.(x, bodyY + 0.35, z, angle, r, isDashing || isFlying);
+        }
+      }
+      // Powerful sonic wave shockwave ripples when dashing or flying
+      if (isDashing || isFlying) {
+        vis.shockwaveTimer = (vis.shockwaveTimer || 0) + dt;
+        if (vis.shockwaveTimer >= 0.065) {
+          vis.shockwaveTimer = 0;
+          const swColor = Math.random() < 0.5 ? 0x64d8cb : 0xe0f7fa;
+          this.spawnShockwave(x, y + 0.1, z, r * 1.15, swColor);
+          this.onSonicWave?.(x, bodyY + 0.3, z, r);
+        }
+      }
+    }
+
     // Regalia (crown + cape): visible on King, or on all if Squealer rule active
     const showCrown = isKing || activeRule === 'squealer';
     if (vis.regalia) {
@@ -855,6 +963,8 @@ export class AnimalRenderer {
       dust: 0,
       rainbow: null,
       wasSuper: false,
+      shockwaveTimer: 0,
+      rainbowTimer: 0,
     };
   }
 }

@@ -69,9 +69,10 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
   b.stunT = Math.max(0, b.stunT - dt);
 }
 
-/** hay bales are solid: push out and bounce */
-export function collideHay(b: Body, hay: Circle[]): void {
+/** hay bales are solid: push out, bounce, and stun on ram */
+export function collideHay(b: Body, hay: Circle[]): boolean {
   const r = radiusOf(b.mass);
+  let hit = false;
   for (const [hx, hz, hr] of hay) {
     const dx = b.x - hx, dz = b.z - hz;
     const d = Math.hypot(dx, dz);
@@ -84,7 +85,14 @@ export function collideHay(b: Body, hay: Circle[]): void {
       b.vx -= 1.6 * vn * nx;
       b.vz -= 1.6 * vn * nz;
     }
+    // Dashing or high-speed ramming into hay bale stuns for 3 seconds
+    if (b.dashT > 0 || Math.hypot(b.vx, b.vz) > 10) {
+      b.stunT = Math.max(b.stunT, 3.0);
+      b.dashT = 0;
+      hit = true;
+    }
   }
+  return hit;
 }
 
 /** touching the electric fence */

@@ -28,7 +28,7 @@ export class FoodAndParticleRenderer {
   private readonly rainbowColors = [0xff3b30, 0xff9500, 0xffcc00, 0x34c759, 0x007aff, 0xaf52de];
   private readonly maxFoodPerKind = 800;
   private readonly maxFoodTotal = 1500;
-  private readonly maxParticles = 600;
+  private readonly maxParticles = 1200;
 
   constructor(private readonly scene: THREE.Scene) {
     // 0: Corn (Bắp ngô) - elongated ear of corn with sculpted 3D kernel rows profile
@@ -357,6 +357,72 @@ export class FoodAndParticleRenderer {
         color: col,
         size: 0.4 + Math.random() * 0.4,
         g: 4,
+      });
+    }
+  }
+
+  rainbowTrail(x: number, y: number, z: number, angle: number, r: number, isDash: boolean): void {
+    const px = -Math.sin(angle);
+    const pz = Math.cos(angle);
+    const tx = x - Math.cos(angle) * r * 0.95;
+    const tz = z - Math.sin(angle) * r * 0.95;
+
+    if (isDash) {
+      // 6 parallel colored ribbon streams trailing behind the tail
+      for (let i = 0; i < 6 && this.particles.length < this.maxParticles; i++) {
+        const off = (i - 2.5) * 0.22 * r;
+        this.particles.push({
+          x: tx + px * off,
+          y: y + (Math.random() - 0.5) * 0.12,
+          z: tz + pz * off,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: 0.2 + Math.random() * 0.4,
+          vz: (Math.random() - 0.5) * 0.4,
+          life: 0.65,
+          maxLife: 0.65,
+          color: new THREE.Color(this.rainbowColors[i]),
+          size: 0.75 * r,
+          g: -0.2,
+        });
+      }
+    } else {
+      // Walking trail: cycling vibrant sparkles
+      const col = this.rainbowColors[Math.floor(Math.random() * this.rainbowColors.length)];
+      if (this.particles.length < this.maxParticles) {
+        this.particles.push({
+          x: tx + (Math.random() - 0.5) * 0.3 * r,
+          y: y + (Math.random() - 0.5) * 0.1,
+          z: tz + (Math.random() - 0.5) * 0.3 * r,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: 0.4 + Math.random() * 0.4,
+          vz: (Math.random() - 0.5) * 0.6,
+          life: 0.5,
+          maxLife: 0.5,
+          color: new THREE.Color(col),
+          size: 0.6 * r,
+          g: 0,
+        });
+      }
+    }
+  }
+
+  sonicWave(x: number, y: number, z: number, r: number): void {
+    const count = 16;
+    for (let i = 0; i < count && this.particles.length < this.maxParticles; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const sp = 8 + Math.random() * 5;
+      this.particles.push({
+        x: x + Math.cos(a) * r * 0.8,
+        y: y + 0.1,
+        z: z + Math.sin(a) * r * 0.8,
+        vx: Math.cos(a) * sp,
+        vy: 0.2,
+        vz: Math.sin(a) * sp,
+        life: 0.28,
+        maxLife: 0.28,
+        color: new THREE.Color(0xa7f3d0),
+        size: 0.65 * r,
+        g: 0,
       });
     }
   }

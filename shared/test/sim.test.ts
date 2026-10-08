@@ -289,4 +289,82 @@ describe('bonus weapons and tools', () => {
     expect(p.flyT).toBeGreaterThan(0.4);
     expect(p.vx).toBeGreaterThan(40);
   });
+
+  it('supports 4 skins per species and preserves custom skin on join/respawn', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('FancyCow', 'cow', false, undefined, 3);
+    const p = w.players.get(pid)!;
+    expect(p.skin).toBe(3);
+
+    p.alive = false;
+    w.respawn(pid, 'FancyCow', 'cow', 2);
+    expect(p.skin).toBe(2);
+  });
+
+  it('blocks charging and dashing when inside water', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Swimmer', 'pig');
+    const p = place(w, pid, 0, 0, 20);
+
+    // Place a pond at (0, 0)
+    w.map.pond = [[0, 0, 10, 0]];
+    w.step();
+    expect(p.terrain).toBe(1);
+
+    // Try to charge ram button in water
+    p.input = { a: 0, mv: true, btn: true };
+    p.btnLatch = true;
+    w.step();
+
+    expect(p.charging).toBe(false);
+    expect(p.holdT).toBe(0);
+
+    // Try to release/dash in water
+    p.input = { a: 0, mv: true, btn: false };
+    p.btnLatch = true;
+    w.step();
+
+    expect(p.dashT).toBe(0);
+  });
+
+  it('ramming into hay bale stuns for 3 seconds', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Rammer', 'pig');
+    const p = place(w, pid, 0, 0, 20);
+
+    // Hay bale at x=2, z=0, radius=1.5
+    w.map.hay = [[2, 0, 1.5]];
+
+    // Dash towards hay bale at high speed
+    p.dashT = 0.3;
+    p.vx = 25;
+    p.vz = 0;
+
+    w.step();
+
+    expect(p.stunT).toBeGreaterThanOrEqual(2.9);
+    expect(p.dashT).toBe(0);
+  });
+
+  it('super mode hit sends victim flying with extra knockback', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('SuperBull', 'cow');
+    const vicId = w.addPlayer('Victim', 'pig');
+    place(w, attId, 0, 0, 30);
+    place(w, vicId, 2, 0, 30);
+
+    const att = w.players.get(attId)!;
+    const vic = w.players.get(vicId)!;
+
+    att.superT = 8.0;
+    att.dashT = 0.3;
+    att.power = 2.5;
+    att.vx = 60;
+
+    w.step();
+
+    // Victim knocked back with extreme velocity
+    expect(vic.vx).toBeGreaterThan(60);
+    expect(vic.stunT).toBeGreaterThanOrEqual(1.8);
+  });
 });

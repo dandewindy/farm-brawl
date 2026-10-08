@@ -255,6 +255,7 @@ export const sfxSuperUp = superUp;
 export function superFly(vol = 1): void {
   if (!ready() || vol <= 0) return;
   noise('bandpass', 600, 4000, 0.9, 0.5, 0.45 * vol);
+  tone('sine', 85, 45, 0.45, 0.45 * vol);
   tone('sawtooth', 220, 880, 0.35, 0.1 * vol);
   tone('triangle', 880, 1760, 0.3, 0.06 * vol, { delay: 0.08 });
 }

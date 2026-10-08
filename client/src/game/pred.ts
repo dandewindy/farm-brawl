@@ -119,6 +119,8 @@ export class ClientPredictor {
 
   predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false): void {
     if (!this.on) return;
+    const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
+    if (inWater) return;
     if (isSuper) {
       this.plow = true;
       this.vx = Math.cos(aimA) * 62;
@@ -253,6 +255,12 @@ export class ClientPredictor {
           if (vn < 0) {
             this.vx -= 1.6 * vn * nx;
             this.vz -= 1.6 * vn * nz;
+          }
+          if (this.dashT > 0 || Math.hypot(this.vx, this.vz) > 10) {
+            this.stunned = true;
+            this.dashT = 0;
+            this.flyT = 0;
+            this.plow = false;
           }
         }
       }

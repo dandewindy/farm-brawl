@@ -95,7 +95,7 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
   pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1 },
 };
 
-export const SKIN_COUNT = 3;
+export const SKIN_COUNT = 4;
 
 /** food kinds: 0 corn, 1 apple, 2 golden corn, 3 carrot, 4 pumpkin, 5 turnip, 6 rainbow candy */
 export const FOOD_KG = [1, 2.5, 6, 1.6, 7, 2.5, 3] as const;

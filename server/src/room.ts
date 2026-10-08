@@ -80,10 +80,10 @@ export class GameRoom extends DurableObject {
     if (msg.t === 'join') {
       let playerId = this.sockets.get(ws);
       if (!playerId) {
-        playerId = this.world.addPlayer(msg.name, msg.species, false);
+        playerId = this.world.addPlayer(msg.name, msg.species, false, undefined, msg.skin);
         this.sockets.set(ws, playerId);
       } else {
-        this.world.respawn(playerId, msg.name, msg.species);
+        this.world.respawn(playerId, msg.name, msg.species, msg.skin);
       }
 
       // Send initial world configuration & map

@@ -64,9 +64,17 @@ export class HudManager {
 
   private selectedSpecies: Species = 'pig';
   private floatingTexts: FloatingText[] = [];
+  private mySkins: Record<Species, number> = {
+    chicken: 0,
+    sheep: 0,
+    horse: 0,
+    cow: 0,
+    duck: 0,
+    pig: 0,
+  };
 
   constructor(
-    private readonly onStartPlay: (name: string, species: Species, mode: 'ffa' | 'team') => void
+    private readonly onStartPlay: (name: string, species: Species, mode: 'ffa' | 'team', skin: number) => void
   ) {
     this.massEl = document.getElementById('mass')!;
     this.rankTxt = document.getElementById('rankTxt')!;
@@ -121,22 +129,61 @@ export class HudManager {
     };
 
     SPECIES.forEach((sp) => {
+      const saved = localStorage.getItem(`fb_skin_${sp}`);
+      if (saved !== null) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val)) this.mySkins[sp] = ((val % 4) + 4) % 4;
+      }
+    });
+
+    const updateAllButtons = () => {
+      this.speciesContainer.querySelectorAll('button').forEach((b) => {
+        const sp = b.dataset.species as Species;
+        if (!sp) return;
+        b.classList.toggle('on', sp === this.selectedSpecies);
+        const dots = b.querySelectorAll('.dot');
+        const currentSkin = this.mySkins[sp] ?? 0;
+        dots.forEach((d, idx) => {
+          d.classList.toggle('on', idx === currentSkin);
+        });
+      });
+      const activeSkin = this.mySkins[this.selectedSpecies] ?? 0;
+      this.speciesHint.textContent = `${t(`sp_${this.selectedSpecies}`)} · Skin ${activeSkin + 1}/4`;
+    };
+
+    SPECIES.forEach((sp) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = emojis[sp];
       btn.dataset.species = sp;
-      if (sp === this.selectedSpecies) btn.classList.add('on');
+
+      const emojiSpan = document.createElement('span');
+      emojiSpan.className = 'emoji';
+      emojiSpan.textContent = emojis[sp];
+      btn.appendChild(emojiSpan);
+
+      const dotsDiv = document.createElement('div');
+      dotsDiv.className = 'dots';
+      for (let i = 0; i < 4; i++) {
+        const dot = document.createElement('i');
+        dot.className = 'dot';
+        dotsDiv.appendChild(dot);
+      }
+      btn.appendChild(dotsDiv);
 
       btn.addEventListener('click', () => {
-        this.selectedSpecies = sp;
-        this.speciesContainer.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
-        btn.classList.add('on');
-        this.speciesHint.textContent = t(`sp_${sp}`);
+        if (this.selectedSpecies === sp) {
+          // Clicking active animal cycles its skin among the 4 skins!
+          this.mySkins[sp] = ((this.mySkins[sp] ?? 0) + 1) % 4;
+        } else {
+          this.selectedSpecies = sp;
+        }
+        localStorage.setItem(`fb_skin_${sp}`, String(this.mySkins[sp]));
+        updateAllButtons();
       });
       this.speciesContainer.appendChild(btn);
     });
 
-    this.speciesHint.textContent = t(`sp_${this.selectedSpecies}`);
+    updateAllButtons();
     this.nameInput.placeholder = t('namePh');
     this.nameInput.value = localStorage.getItem('fb_name') || '';
   }
@@ -145,7 +192,8 @@ export class HudManager {
     const play = () => {
       const name = this.nameInput.value.trim() || t('defaultName');
       localStorage.setItem('fb_name', name);
-      this.onStartPlay(name, this.selectedSpecies, this.selectedMode);
+      const skin = this.mySkins[this.selectedSpecies] ?? 0;
+      this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin);
     };
 
     this.playBtn.addEventListener('click', play);
