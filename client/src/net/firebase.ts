@@ -1,6 +1,6 @@
-// Firebase Realtime Lobby & Room Metadata Service
-// Hybrid architecture: Cloudflare Durable Objects manages 20Hz physics & WebSockets,
-// while Firebase tracks room metadata, active friend rooms, and presence.
+// Firebase & Firestore Realtime Lobby Service
+// Hybrid architecture: Cloudflare Durable Objects manages 20Hz authoritative physics & WebSockets,
+// while Google Cloud Firestore tracks room presence, metadata, and active friend rooms.
 
 export interface FriendRoomMeta {
   code: string;
@@ -12,47 +12,44 @@ export interface FriendRoomMeta {
 }
 
 const FIREBASE_API_KEY = 'AIzaSyBDgKuwPN1fUZ2sSv4PmfcsQe-OBepjk5U';
+const FIRESTORE_PROJECT_ID = 'farm-arena-game';
+const FIRESTORE_DATABASE_ID = 'farmarena';
 
-// Configurable Firebase Realtime Database URL
-// Can be set via window.FIREBASE_DB_URL or localStorage 'fb_rtdb_url'
-export function getFirebaseDbUrl(): string | null {
-  if (typeof window !== 'undefined') {
-    const custom = (window as any).FIREBASE_DB_URL || localStorage.getItem('fb_rtdb_url');
-    if (custom) return custom.replace(/\/+$/, '');
-  }
-  return null;
+function getFirestoreDocUrl(code: string): string {
+  return `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/rooms/${encodeURIComponent(code)}?key=${FIREBASE_API_KEY}`;
 }
 
-export function setFirebaseDbUrl(url: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('fb_rtdb_url', url.trim());
-    (window as any).FIREBASE_DB_URL = url.trim();
-  }
-}
-
-/** Register or update a friend room in Firebase / Lobby */
+/** Register or update a friend room in Firestore */
 export async function registerFriendRoom(code: string, host: string, players = 1): Promise<void> {
   const normCode = code.toUpperCase().trim();
+  const now = Date.now();
   const roomData: FriendRoomMeta = {
     code: normCode,
     host: host.slice(0, 16),
     players,
     max: 12,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
   };
 
-  const dbUrl = getFirebaseDbUrl();
-  if (dbUrl) {
-    try {
-      await fetch(`${dbUrl}/rooms/${encodeURIComponent(normCode)}.json?key=${FIREBASE_API_KEY}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(roomData),
-      });
-    } catch (err) {
-      console.warn('[Firebase] Failed to write room metadata:', err);
-    }
+  try {
+    const fsUrl = getFirestoreDocUrl(normCode);
+    await fetch(fsUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          code: { stringValue: normCode },
+          host: { stringValue: roomData.host },
+          players: { integerValue: String(players) },
+          max: { integerValue: '12' },
+          createdAt: { integerValue: String(now) },
+          updatedAt: { integerValue: String(now) },
+        },
+      }),
+    });
+  } catch (err) {
+    console.warn('[Firestore] Failed to write room metadata:', err);
   }
 
   // Also cache locally for instant lookup
@@ -64,21 +61,29 @@ export async function registerFriendRoom(code: string, host: string, players = 1
 /** Check if a friend room exists and get active metadata */
 export async function getFriendRoomInfo(code: string): Promise<FriendRoomMeta | null> {
   const normCode = code.toUpperCase().trim();
-  const dbUrl = getFirebaseDbUrl();
 
-  if (dbUrl) {
-    try {
-      const res = await fetch(`${dbUrl}/rooms/${encodeURIComponent(normCode)}.json?key=${FIREBASE_API_KEY}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.code) return data as FriendRoomMeta;
+  // 1. Try Firestore REST API directly
+  try {
+    const fsUrl = getFirestoreDocUrl(normCode);
+    const res = await fetch(fsUrl);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.fields) {
+        return {
+          code: data.fields.code?.stringValue || normCode,
+          host: data.fields.host?.stringValue || 'Bạn bè',
+          players: Number(data.fields.players?.integerValue || 1),
+          max: Number(data.fields.max?.integerValue || 12),
+          createdAt: Number(data.fields.createdAt?.integerValue || Date.now()),
+          updatedAt: Number(data.fields.updatedAt?.integerValue || Date.now()),
+        };
       }
-    } catch (err) {
-      console.warn('[Firebase] Failed to fetch room metadata:', err);
     }
+  } catch (err) {
+    console.warn('[Firestore] Failed to fetch room metadata:', err);
   }
 
-  // Fallback to Cloudflare Workers live room-info endpoint
+  // 2. Fallback to Cloudflare Workers live room-info endpoint
   try {
     const isViteDev = window.location.port === '5180';
     const proto = window.location.protocol;
@@ -97,11 +102,20 @@ export async function getFriendRoomInfo(code: string): Promise<FriendRoomMeta | 
     }
   } catch {}
 
-  // Local session cache fallback
+  // 3. Local session cache fallback
   try {
     const cached = sessionStorage.getItem(`fb_room_${normCode}`);
     if (cached) return JSON.parse(cached) as FriendRoomMeta;
   } catch {}
 
   return null;
+}
+
+/** Delete or leave friend room from Firestore */
+export async function deleteFriendRoom(code: string): Promise<void> {
+  const normCode = code.toUpperCase().trim();
+  try {
+    const fsUrl = getFirestoreDocUrl(normCode);
+    await fetch(fsUrl, { method: 'DELETE' });
+  } catch {}
 }
