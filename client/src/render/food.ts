@@ -31,16 +31,27 @@ export class FoodAndParticleRenderer {
   private readonly maxParticles = 600;
 
   constructor(private readonly scene: THREE.Scene) {
-    // 0: Corn (Bắp ngô) - sculpted lathe ear of corn with plump kernels profile
+    // 0: Corn (Bắp ngô) - elongated ear of corn with sculpted 3D kernel rows profile
     const cornProfile = [
-      new THREE.Vector2(0.06, -0.38),
-      new THREE.Vector2(0.12, -0.32),
-      new THREE.Vector2(0.22, -0.16),
-      new THREE.Vector2(0.26, 0.06),  // plump middle
-      new THREE.Vector2(0.24, 0.22),
-      new THREE.Vector2(0.16, 0.36),  // tapered top
-      new THREE.Vector2(0.06, 0.44),
-      new THREE.Vector2(0.01, 0.46),
+      new THREE.Vector2(0.08, -0.70), // base stem
+      new THREE.Vector2(0.14, -0.62), // kernel row 1
+      new THREE.Vector2(0.12, -0.56),
+      new THREE.Vector2(0.18, -0.47), // kernel row 2
+      new THREE.Vector2(0.16, -0.41),
+      new THREE.Vector2(0.22, -0.31), // kernel row 3
+      new THREE.Vector2(0.20, -0.25),
+      new THREE.Vector2(0.24, -0.14), // kernel row 4
+      new THREE.Vector2(0.22, -0.08),
+      new THREE.Vector2(0.24, 0.04),  // kernel row 5 (plump center)
+      new THREE.Vector2(0.22, 0.10),
+      new THREE.Vector2(0.23, 0.22),  // kernel row 6
+      new THREE.Vector2(0.20, 0.28),
+      new THREE.Vector2(0.21, 0.39),  // kernel row 7
+      new THREE.Vector2(0.18, 0.45),
+      new THREE.Vector2(0.17, 0.54),  // kernel row 8 (tapering)
+      new THREE.Vector2(0.13, 0.60),
+      new THREE.Vector2(0.11, 0.66),  // kernel row 9
+      new THREE.Vector2(0.01, 0.70),  // cob tip
     ];
     const cornCobGeo = new THREE.LatheGeometry(cornProfile, 12);
 
@@ -57,10 +68,10 @@ export class FoodAndParticleRenderer {
     const appleGeo = new THREE.LatheGeometry(appleProfile, 14);
 
     // 2: Golden Corn (Bắp ngô vàng lớn) - large sculpted lathe profile
-    const goldenCornGeo = cornCobGeo.clone().scale(1.35, 1.35, 1.35);
+    const goldenCornGeo = cornCobGeo.clone().scale(1.25, 1.25, 1.25);
 
-    // 3: Carrot (Cà rốt) - tapered cone
-    const carrotGeo = new THREE.ConeGeometry(0.22, 0.85, 10).rotateX(Math.PI).translate(0, 0.12, 0);
+    // 3: Carrot (Cà rốt) - tapered cone with wide crown at +Y and pointy root tip at -Y
+    const carrotGeo = new THREE.ConeGeometry(0.22, 0.85, 10).rotateX(Math.PI).translate(0, -0.075, 0);
 
     // 4: Pumpkin (Bí ngô) - squashed ribbed sphere
     const pumpkinGeo = new THREE.SphereGeometry(0.78, 14, 10).scale(1.08, 0.74, 1.08);
@@ -82,12 +93,12 @@ export class FoodAndParticleRenderer {
     ];
 
     const mats = [
-      // 0: Corn - warm golden yellow
-      new THREE.MeshStandardMaterial({ color: 0xffcb2b, emissive: 0x442c00, roughness: 0.45 }),
+      // 0: Corn - warm golden yellow with crisp faceted kernels
+      new THREE.MeshStandardMaterial({ color: 0xffcb2b, emissive: 0x442c00, roughness: 0.4, flatShading: true }),
       // 1: Apple - glossy red
       new THREE.MeshStandardMaterial({ color: 0xdb2828, emissive: 0x220000, roughness: 0.28 }),
-      // 2: Golden Corn - metallic gold
-      new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xaa7700, metalness: 0.7, roughness: 0.22 }),
+      // 2: Golden Corn - metallic gold with crisp faceted kernels
+      new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xaa7700, metalness: 0.65, roughness: 0.22, flatShading: true }),
       // 3: Carrot - vibrant orange
       new THREE.MeshStandardMaterial({ color: 0xff7a00, emissive: 0x331100, roughness: 0.55 }),
       // 4: Pumpkin - deep pumpkin orange
@@ -112,9 +123,16 @@ export class FoodAndParticleRenderer {
       this.foodMeshes.push(mesh);
     }
 
-    // 0: Corn Husk & stem (Vỏ bắp ngô màu xanh bọc chân bắp)
-    const cornHuskGeo = new THREE.ConeGeometry(0.30, 0.42, 6, 1, true).translate(0, -0.22, 0);
-    const cornHuskMat = new THREE.MeshStandardMaterial({ color: 0x689f38, roughness: 0.65, side: THREE.DoubleSide });
+    // 0: Corn Husk & stem (Vỏ bắp ngô xanh bọc chân bắp)
+    const huskProfile = [
+      new THREE.Vector2(0.05, -0.84), // stalk stem
+      new THREE.Vector2(0.06, -0.72),
+      new THREE.Vector2(0.16, -0.58), // wrapping cob base
+      new THREE.Vector2(0.25, -0.36), // husk body
+      new THREE.Vector2(0.29, -0.15), // peeling husk leaf tips
+    ];
+    const cornHuskGeo = new THREE.LatheGeometry(huskProfile, 6);
+    const cornHuskMat = new THREE.MeshStandardMaterial({ color: 0x689f38, roughness: 0.65, side: THREE.DoubleSide, flatShading: true });
     const cornHuskMesh = new THREE.InstancedMesh(cornHuskGeo, cornHuskMat, this.maxFoodPerKind);
     cornHuskMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     cornHuskMesh.frustumCulled = false;
@@ -133,8 +151,8 @@ export class FoodAndParticleRenderer {
     this.foodTops[1] = appleStemMesh;
 
     // 2: Golden Corn Husk (Vỏ bắp vàng)
-    const goldenHuskGeo = cornHuskGeo.clone().scale(1.35, 1.35, 1.35);
-    const goldenHuskMat = new THREE.MeshStandardMaterial({ color: 0xe6b800, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+    const goldenHuskGeo = cornHuskGeo.clone().scale(1.25, 1.25, 1.25);
+    const goldenHuskMat = new THREE.MeshStandardMaterial({ color: 0xe6b800, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide, flatShading: true });
     const goldenHuskMesh = new THREE.InstancedMesh(goldenHuskGeo, goldenHuskMat, this.maxFoodPerKind);
     goldenHuskMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     goldenHuskMesh.frustumCulled = false;
@@ -142,9 +160,16 @@ export class FoodAndParticleRenderer {
     this.scene.add(goldenHuskMesh);
     this.foodTops[2] = goldenHuskMesh;
 
-    // 3: Carrot greens (Lá cà rốt xanh)
-    const carrotTopGeo = new THREE.ConeGeometry(0.18, 0.36, 6).rotateX(Math.PI).translate(0, -0.52, 0);
-    const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.7 });
+    // 3: Carrot greens (Lá cà rốt xanh mọc từ cuống phẳng phía trên củ)
+    const leafProfile = [
+      new THREE.Vector2(0.04, 0.35), // stem base connecting to crown
+      new THREE.Vector2(0.06, 0.44), // stems
+      new THREE.Vector2(0.18, 0.60), // spreading lush leaves
+      new THREE.Vector2(0.14, 0.72),
+      new THREE.Vector2(0.01, 0.78), // leaf tips
+    ];
+    const carrotTopGeo = new THREE.LatheGeometry(leafProfile, 6);
+    const carrotTopMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.7, flatShading: true });
     const carrotTopMesh = new THREE.InstancedMesh(carrotTopGeo, carrotTopMat, this.maxFoodPerKind);
     carrotTopMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     carrotTopMesh.frustumCulled = false;

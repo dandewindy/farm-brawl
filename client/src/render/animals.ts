@@ -126,6 +126,37 @@ function blob(g: THREE.Group, color: number, r: number, scale: [number, number, 
   return m;
 }
 
+// Helper: create a rectangular box with softly curved/beveled edges
+function createRoundedBox(width: number, height: number, depth: number, radius = 0.12, bevel = 0.06): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  const w = width - bevel * 2;
+  const h = height - bevel * 2;
+  const r = Math.min(radius, w / 2, h / 2);
+  const x = -w / 2;
+  const y = -h / 2;
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r);
+  shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h);
+  shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+
+  const d = depth - bevel * 2;
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: d,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    steps: 1,
+    bevelSize: bevel,
+    bevelThickness: bevel,
+  });
+  geo.center();
+  return geo;
+}
+
 // Helper: add eyes pair
 function addEyes(g: THREE.Group, x: number, y: number, sep: number, s: number): void {
   const whiteMat = animalMat(0xffffff, { roughness: 0.5 });
@@ -242,17 +273,15 @@ function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Rounded large body using capsule (casts shadow)
-  const bodyGeo = new THREE.CapsuleGeometry(0.42, 0.6, 8, 16);
-  bodyGeo.rotateZ(Math.PI / 2);
-  const bodyMesh = part(bodyGeo, s.body, 0, 1.2, 0, undefined, true);
-  bodyMesh.scale.set(1, 1, 1.05);
+  // Rectangular box body with softly curved/beveled edges (not a round ball/capsule)
+  const bodyGeo = createRoundedBox(1.3, 0.86, 0.88, 0.14, 0.06);
+  const bodyMesh = part(bodyGeo, s.body, 0, 1.25, 0, undefined, true);
   g.add(bodyMesh);
   // Spots (if the skin has them)
   if (s.spot) {
-    blob(g, s.spot, 0.24, [1, 0.8, 0.14], 0.2, 1.25, 0.41);
-    blob(g, s.spot, 0.21, [1, 0.85, 0.14], -0.35, 1.1, -0.41);
-    blob(g, s.spot, 0.26, [1.1, 0.14, 0.9], -0.15, 1.58, 0.1);
+    blob(g, s.spot, 0.24, [1, 0.8, 0.14], 0.2, 1.3, 0.45);
+    blob(g, s.spot, 0.21, [1, 0.85, 0.14], -0.35, 1.2, -0.45);
+    blob(g, s.spot, 0.26, [1.1, 0.14, 0.9], -0.15, 1.68, 0.1);
   }
   // Head (rounded)
   g.add(part(new THREE.SphereGeometry(0.3, 16, 12), s.body, 0.92, 1.45, 0));
