@@ -274,11 +274,14 @@ export class ClientPredictor {
           this.x = hx + nx * (hr + r);
           this.z = hz + nz * (hr + r);
           const vn = this.vx * nx + this.vz * nz;
+          const impactSpeed = -vn;
           if (vn < 0) {
             this.vx -= 1.6 * vn * nx;
             this.vz -= 1.6 * vn * nz;
           }
-          if (this.dashT > 0 || Math.hypot(this.vx, this.vz) > 5) {
+          const isDirectDash = this.dashT > 0 && impactSpeed > 10;
+          const isDirectSlam = impactSpeed > 16;
+          if (isDirectDash || isDirectSlam) {
             this.setStun(1.5);
           }
         }

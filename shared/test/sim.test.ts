@@ -346,6 +346,23 @@ describe('bonus weapons and tools', () => {
     expect(p.dashT).toBe(0);
   });
 
+  it('walking into hay bale does not stun', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Walker', 'pig');
+    const p = place(w, pid, 0, 0, 20);
+
+    w.map.hay = [[2, 0, 1.5]];
+
+    // Normal walking speed towards hay bale, no dash
+    p.dashT = 0;
+    p.vx = 12;
+    p.vz = 0;
+
+    w.step();
+
+    expect(p.stunT).toBe(0);
+  });
+
   it('super mode hit sends victim flying with extra knockback', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('SuperBull', 'cow');

@@ -303,7 +303,7 @@ export class World {
         }
         if (inPond && p.dashT <= 0) {
           p.inWaterT += DT;
-          if (p.inWaterT >= 1.5) {
+          if (p.inWaterT >= CFG.DROWN_TIME) {
             this.kill(p, 'drown');
             continue;
           }

@@ -81,12 +81,16 @@ export function collideHay(b: Body, hay: Circle[]): boolean {
     b.x = hx + nx * (hr + r);
     b.z = hz + nz * (hr + r);
     const vn = b.vx * nx + b.vz * nz;
+    const impactSpeed = -vn;
     if (vn < 0) {
       b.vx -= 1.6 * vn * nx;
       b.vz -= 1.6 * vn * nz;
     }
-    // Dashing or knocking into hay bale / post stuns for 1.5 seconds
-    if (b.dashT > 0 || Math.hypot(b.vx, b.vz) > 5) {
+    // Only direct head-on dash into post, or being slammed hard into post stuns.
+    // Walking normally or scraping/brushing past does NOT stun!
+    const isDirectDash = b.dashT > 0 && impactSpeed > 10;
+    const isDirectSlam = impactSpeed > 16;
+    if (isDirectDash || isDirectSlam) {
       b.stunT = Math.max(b.stunT, 1.5);
       b.dashT = 0;
       hit = true;

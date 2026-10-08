@@ -699,13 +699,13 @@ export class AnimalRenderer {
     let y = onPodium ? 0.55 : 0;
 
     if (isWater && !isSuper) {
-      vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
+      vis.waterT = Math.min(4.0, (vis.waterT || 0) + dt);
     } else {
       vis.waterT = Math.max(0, (vis.waterT || 0) - dt * 3.5);
     }
 
-    // Fully submerged by ~1.3s so by 1.5s the animal has completely sunk into the pond
-    const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.3);
+    // Sinking speed reduced by 20% (takes ~1.6s to fully submerge, drowns at 1.8s)
+    const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.6);
 
     // Shrinking in water: non-ducks shrink smoothly down to ~0.62 as they submerge deeper
     const inWaterShrink = isWater && !isSuper && vis.species !== 'duck'
