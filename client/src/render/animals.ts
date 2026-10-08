@@ -699,17 +699,17 @@ export class AnimalRenderer {
     let y = onPodium ? 0.55 : 0;
 
     if (isWater && !isSuper) {
-      vis.waterT = Math.min(4.0, (vis.waterT || 0) + dt);
+      vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
     } else {
       vis.waterT = Math.max(0, (vis.waterT || 0) - dt * 3.5);
     }
 
-    // Sinking speed reduced by 20% (takes ~1.6s to fully submerge, drowns at 1.8s)
-    const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.6);
+    // Maximum water duration is 1.5s
+    const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
 
-    // Shrinking in water: non-ducks shrink smoothly down to ~0.62 as they submerge deeper
+    // Visual sinking effect reduced by 20%
     const inWaterShrink = isWater && !isSuper && vis.species !== 'duck'
-      ? Math.max(0.62, 1 - sinkProgress * 0.38)
+      ? Math.max(0.68, 1 - sinkProgress * 0.32)
       : 1;
 
     if (isWater && !isSuper) {
@@ -717,21 +717,21 @@ export class AnimalRenderer {
         // Ducks float peacefully on the surface with slight bobbing
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
       } else {
-        // Sinks gradually deeper into the water until completely submerged underwater
-        const sinkDepth = 0.35 + Math.pow(sinkProgress, 1.3) * 1.65;
+        // Visual sinking speed reduced by 20% over the 1.5s duration
+        const sinkDepth = 0.30 + Math.pow(sinkProgress, 1.3) * 1.32;
         const sinkY = -sinkDepth * sc;
         const rippleBob = Math.sin(now / 160) * 0.05 * (1 - sinkProgress);
-        y = sinkY + (sinkProgress < 0.9 ? rippleBob : 0);
+        y = sinkY + (sinkProgress < 0.95 ? rippleBob : 0);
 
         // Water bubble puffs floating up from underwater while sinking
-        if (this.onPuff && Math.random() < 0.25) {
+        if (this.onPuff && Math.random() < 0.22) {
           this.onPuff(
             x + (Math.random() - 0.5) * 0.7 * r,
             0.1,
             z + (Math.random() - 0.5) * 0.7 * r,
             0xdff1ff,
-            0.6,
-            0.7,
+            0.55,
+            0.65,
             2.0
           );
         }

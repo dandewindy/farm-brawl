@@ -40,7 +40,7 @@ export const CFG = {
   SUPER_FLY_TIME: 0.55,
 
   STUN_TIME: 1.5,
-  DROWN_TIME: 1.8,
+  DROWN_TIME: 1.5,
   /** closing speed a dash needs to count as a hit */
   HIT_MIN_SPEED: 8,
   KNOCKBACK: 1.15,
