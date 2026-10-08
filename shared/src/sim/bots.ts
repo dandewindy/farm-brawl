@@ -130,6 +130,12 @@ function pickNewWaypoint(w: World, p: Player): [number, number] {
 
 export function thinkBot(w: World, p: Player, dt: number): void {
   const b = p.ai!;
+  if (p.stunT > 0) {
+    b.press = 0;
+    p.input.btn = false;
+    p.input.mv = false;
+    return;
+  }
   const r = radiusOf(p.mass);
   const [podX, podZ] = w.map.podium;
   const distToPod = Math.hypot(podX - p.x, podZ - p.z);

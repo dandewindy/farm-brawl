@@ -66,6 +66,10 @@ export class InputManager {
     this.onPressRam?.();
   }
 
+  cancelRam(): void {
+    this.holding = false;
+  }
+
   private releaseRam(): void {
     if (!this.holding) return;
     const held = (performance.now() - this.holdStart) / 1000;

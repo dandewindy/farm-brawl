@@ -238,7 +238,7 @@ export class World {
           p.vx *= 0.85;
           p.vz *= 0.85;
         }
-        const wasStunned = p.stunT >= 2.8;
+        const wasStunned = p.stunT >= 1.9;
         const hayHit = collideHay(p, this.map.hay);
         if (hayHit && !wasStunned) {
           p.plow = false;
@@ -487,7 +487,7 @@ export class World {
 
   /** hold to charge, release to ram */
   private handleButton(p: Player): void {
-    if (p.slowT > 0 || p.terrain === 1) {
+    if (p.slowT > 0 || p.terrain === 1 || p.stunT > 0) {
       p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false;
       return;
     }
@@ -649,7 +649,7 @@ export class World {
           const bForce = clamp((1 - bdist / BOOM_R) * 28, 6, 26);
           bystander.vx += (bdx / bdist) * bForce;
           bystander.vz += (bdz / bdist) * bForce;
-          bystander.stunT = Math.max(bystander.stunT, 0.35);
+          bystander.stunT = Math.max(bystander.stunT, 2.0);
         }
       }
     }
@@ -661,7 +661,7 @@ export class World {
 
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
-    vic.stunT = att.superT > 0 ? 2.0 : CFG.STUN_TIME * (0.7 + 0.3 * att.power);
+    vic.stunT = Math.max(2.0, att.superT > 0 ? 2.0 : CFG.STUN_TIME * (0.7 + 0.3 * att.power));
     vic.dashT = 0; vic.plow = false; vic.holdT = 0; vic.charging = false; vic.pressed = false;
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }

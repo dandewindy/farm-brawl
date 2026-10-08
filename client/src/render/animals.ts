@@ -717,8 +717,10 @@ export class AnimalRenderer {
     vis.root.position.set(x, bodyY, z);
     vis.root.rotation.y = -angle + (isStunned ? Math.sin(now / 50) * 0.5 : 0);
 
-    // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water
-    vis.root.rotation.z = isFlying
+    // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water, dazed sway when stunned
+    vis.root.rotation.z = isStunned
+      ? Math.sin(now / 90) * 0.15
+      : isFlying
       ? -0.5
       : isPlowing
       ? -0.4
@@ -769,6 +771,9 @@ export class AnimalRenderer {
         // Slow paddling motion
         leg.rotation.z = baseSwing * 0.4;
         leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35;
+      } else if (isStunned) {
+        leg.rotation.z = 0;
+        leg.rotation.x = 0;
       } else {
         leg.rotation.z = baseSwing * 0.7;
         leg.rotation.x = 0;

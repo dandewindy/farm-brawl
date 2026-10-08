@@ -47,10 +47,20 @@ let gainTimer = 0;
 let wasDashing = false;
 let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
+let localStunTimer = 0;
+let lockedAimA = 0;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
+
+input.onPressRam = () => {
+  const me = gameState.ents.get(gameState.myId);
+  const isStunned = localStunTimer > 0 || (me ? (me.flags & FLAG.STUN) !== 0 : false);
+  if (isStunned) {
+    input.cancelRam();
+  }
+};
 
 input.onReleaseRam = (held: number) => {
   chargeStop();
@@ -58,6 +68,8 @@ input.onReleaseRam = (held: number) => {
   const myEnt = gameState.ents.get(gameState.myId);
   const inWater = ((myEnt?.flags ?? 0) & FLAG.WATER) !== 0;
   if (inWater) return;
+  const isStunned = localStunTimer > 0 || ((myEnt?.flags ?? 0) & FLAG.STUN) !== 0;
+  if (isStunned) return;
   const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
   if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
     predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
@@ -187,6 +199,16 @@ function handleGameEvent(ev: GameEvent): void {
       }
       if (isMine) shake = Math.max(shake, 0.6);
 
+      // Victim stun lockout: 2.0s for animal hit, 3.0s for hay bale collision
+      if (ev.v === myId) {
+        const stunDur = ev.a === 0 ? 3.0 : 2.0;
+        localStunTimer = Math.max(localStunTimer, stunDur);
+        lockedAimA = predictor.a;
+        predictor.setStun(stunDur);
+        input.cancelRam();
+        chargeStop();
+      }
+
       // Floating loss text matching original game
       if (ev.loss && ev.loss >= 1) {
         const lossNum = Math.round(ev.loss);
@@ -234,6 +256,7 @@ function handleGameEvent(ev: GameEvent): void {
       }
 
       if (ev.id === myId) {
+        localStunTimer = 0;
         predictor.on = false;
         // Delay death screen to show death animation first
         deathCamTarget = { x: ev.x, z: ev.z };
@@ -424,16 +447,38 @@ function animate(now: number): void {
     }
   }
 
+  if (localStunTimer > 0) {
+    localStunTimer = Math.max(0, localStunTimer - dt);
+  }
+
+  const me = gameState.ents.get(gameState.myId);
+  if (me && (me.flags & FLAG.STUN) !== 0) {
+    localStunTimer = Math.max(localStunTimer, 0.2);
+  }
+
+  const isStunned = localStunTimer > 0 || (me ? (me.flags & FLAG.STUN) !== 0 : false);
+  if (!isStunned && predictor.on) {
+    lockedAimA = predictor.a;
+  }
+
   // Local animal input & prediction step
   if (transport && gameState.alive) {
-    const me = gameState.ents.get(gameState.myId);
     const myMeta = gameState.metas.get(gameState.myId);
     const myMass = me ? me.mass : CFG.START_MASS;
     const myX = predictor.on ? predictor.x : (me ? me.x : 0);
     const myZ = predictor.on ? predictor.z : (me ? me.z : 0);
 
+    if (isStunned) {
+      input.cancelRam();
+    }
+
     // Precise 3D raycasted aiming
     input.computeAim(world.camera, myX, myZ, myMass);
+
+    const stepFlags = me ? (isStunned ? (me.flags | FLAG.STUN) : me.flags) : (isStunned ? FLAG.STUN : 0);
+    const stepAimA = isStunned ? lockedAimA : input.aimA;
+    const stepAimMove = isStunned ? false : input.aimMove;
+    const stepHolding = isStunned ? false : input.holding;
 
     // Authoritative client physics prediction step
     if (myMeta && me) {
@@ -441,11 +486,11 @@ function animate(now: number): void {
         dt,
         now,
         myMeta.species,
-        me.flags,
+        stepFlags,
         myMass,
-        input.holding,
-        input.aimA,
-        input.aimMove,
+        stepHolding,
+        stepAimA,
+        stepAimMove,
         gameState.map,
         gameState.ents,
         gameState.myId,
@@ -454,8 +499,11 @@ function animate(now: number): void {
       );
     }
 
-    // Rate-limited input transmission
-    const inp = input.getInput();
+    // Rate-limited input transmission (completely locked while stunned)
+    let inp = input.getInput();
+    if (isStunned) {
+      inp = { a: lockedAimA, mv: false, btn: false };
+    }
     const btnChanged = inp.btn !== lastSentInput.btn;
     const mvChanged = inp.mv !== lastSentInput.mv;
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
@@ -467,10 +515,10 @@ function animate(now: number): void {
       lastSentTime = now;
     }
 
-    // Update charging meter in HUD and charge whine audio (disabled in water)
+    // Update charging meter in HUD and charge whine audio (disabled in water and while stunned)
     const inWater = me ? ((me.flags & FLAG.WATER) !== 0) : false;
-    const held = !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
-    const isCharging = !inWater && held >= CFG.CHARGE_MIN;
+    const held = !isStunned && !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
+    const isCharging = !isStunned && !inWater && held >= CFG.CHARGE_MIN;
     const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
     if (isCharging) {
@@ -493,7 +541,8 @@ function animate(now: number): void {
       const isMe = ent.id === gameState.myId && predictor.on;
       const px = isMe ? predictor.x : ent.x;
       const pz = isMe ? predictor.z : ent.z;
-      const pa = isMe ? predictor.a : ent.a;
+      const pa = isMe ? (isStunned ? lockedAimA : predictor.a) : ent.a;
+      const pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
       const isKing = ent.id === gameState.napoleonId;
       animals.update(
         ent.id,
@@ -502,7 +551,7 @@ function animate(now: number): void {
         pz,
         pa,
         ent.mass,
-        ent.flags,
+        pFlags,
         isKing,
         gameState.map?.podium,
         dt,
@@ -517,7 +566,6 @@ function animate(now: number): void {
   corpses.update(now, dt, foodParts);
 
   // Camera follow local animal with zero latency & exponential smoothing
-  const me = gameState.ents.get(gameState.myId);
   const targetX = deathCamTarget ? deathCamTarget.x : me ? (predictor.on ? predictor.x : me.x) : 0;
   const targetZ = deathCamTarget ? deathCamTarget.z : me ? (predictor.on ? predictor.z : me.z) : 0;
   const targetMass = me ? me.mass : CFG.START_MASS;

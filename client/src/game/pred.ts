@@ -29,6 +29,7 @@ export class ClientPredictor {
   resets = 0;
   kicks = 0;
   stunned = false;
+  stunT = 0;
   plow = false;
 
   reset(x = 0, z = 0): void {
@@ -46,6 +47,15 @@ export class ClientPredictor {
     this.sz = z;
     this.sTick = -9;
     this.stunned = false;
+    this.stunT = 0;
+    this.plow = false;
+  }
+
+  setStun(duration = 2.0): void {
+    this.stunned = true;
+    this.stunT = Math.max(this.stunT, duration);
+    this.dashT = 0;
+    this.flyT = 0;
     this.plow = false;
   }
 
@@ -101,24 +111,28 @@ export class ClientPredictor {
       this.ez = rawEz * 0.65;
     }
 
-    const stunned = (flags & 8) !== 0;
-    if (stunned && !this.stunned && this.sTick === snapTick - 1 && clockOff !== null) {
-      const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
-      const decay = Math.exp(-3.5 * age);
-      this.kicks++;
-      this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
-      this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
-      this.dashT = 0;
-      this.flyT = 0;
+    const isServerStun = (flags & 8) !== 0;
+    if (isServerStun) {
+      this.setStun(2.0);
+      if (!this.stunned && this.sTick === snapTick - 1 && clockOff !== null) {
+        const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
+        const decay = Math.exp(-3.5 * age);
+        this.kicks++;
+        this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
+        this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
+        this.dashT = 0;
+        this.flyT = 0;
+      }
+    } else if (this.stunT <= 0) {
+      this.stunned = false;
     }
-    this.stunned = stunned;
     this.sx = x;
     this.sz = z;
     this.sTick = snapTick;
   }
 
   predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false): void {
-    if (!this.on) return;
+    if (!this.on || this.stunned || this.stunT > 0) return;
     const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
     if (inWater) return;
     if (isSuper) {
@@ -189,9 +203,10 @@ export class ClientPredictor {
     rtt: number
   ): void {
     if (!this.on || !map) return;
-    const stun = (flags & 8) !== 0;
+    const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
     const mm = Math.max(1, myMass);
-    const charging = holding;
+    const charging = !stun && holding;
+    const canMove = !stun && aimMove;
     const plowing = (flags & 2) !== 0 || this.plow;
 
     for (let left = dt; left > 1e-4;) {
@@ -199,6 +214,10 @@ export class ClientPredictor {
       left -= h;
       this.dashT = Math.max(0, this.dashT - h);
       this.flyT = Math.max(0, this.flyT - h);
+      this.stunT = Math.max(0, this.stunT - h);
+      if (this.stunT <= 0 && (flags & 8) === 0) {
+        this.stunned = false;
+      }
 
       const water = map.pond.some((b) => insideBlob(b, this.x, this.z));
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
@@ -215,7 +234,7 @@ export class ClientPredictor {
         const d = Math.exp(-1.2 * h);
         this.vx *= d;
         this.vz *= d;
-      } else if (stun || !aimMove) {
+      } else if (stun || !canMove) {
         const d = Math.exp(-3.5 * h);
         this.vx *= d;
         this.vz *= d;
@@ -231,7 +250,7 @@ export class ClientPredictor {
         this.vz *= d;
       }
 
-      if (!stun && this.dashT <= 0 && aimMove) {
+      if (!stun && this.dashT <= 0 && canMove) {
         this.a += wrapAngle(aimA - this.a) * Math.min(1, 12 * h);
       }
 
@@ -257,10 +276,7 @@ export class ClientPredictor {
             this.vz -= 1.6 * vn * nz;
           }
           if (this.dashT > 0 || Math.hypot(this.vx, this.vz) > 10) {
-            this.stunned = true;
-            this.dashT = 0;
-            this.flyT = 0;
-            this.plow = false;
+            this.setStun(3.0);
           }
         }
       }
