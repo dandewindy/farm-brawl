@@ -701,12 +701,15 @@ export class AnimalRenderer {
     if (isWater && !isSuper) {
       vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
     } else {
-      vis.waterT = Math.max(0, (vis.waterT || 0) - dt * 2.5);
+      vis.waterT = Math.max(0, (vis.waterT || 0) - dt * 3.5);
     }
 
-    // Shrinking in water: non-ducks shrink slightly (down to ~0.82) as they submerge
+    // Fully submerged by ~1.3s so by 1.5s the animal has completely sunk into the pond
+    const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.3);
+
+    // Shrinking in water: non-ducks shrink smoothly down to ~0.62 as they submerge deeper
     const inWaterShrink = isWater && !isSuper && vis.species !== 'duck'
-      ? Math.max(0.82, 1 - (vis.waterT || 0) * 0.12)
+      ? Math.max(0.62, 1 - sinkProgress * 0.38)
       : 1;
 
     if (isWater && !isSuper) {
@@ -714,22 +717,22 @@ export class AnimalRenderer {
         // Ducks float peacefully on the surface with slight bobbing
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
       } else {
-        // Sinks gradually deeper into the water over time
-        const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
-        const sinkY = -0.35 * sc - sinkProgress * 0.58 * sc;
-        const rippleBob = Math.sin(now / 160) * 0.05 * (1 - sinkProgress * 0.6);
-        y = sinkY + rippleBob;
+        // Sinks gradually deeper into the water until completely submerged underwater
+        const sinkDepth = 0.35 + Math.pow(sinkProgress, 1.3) * 1.65;
+        const sinkY = -sinkDepth * sc;
+        const rippleBob = Math.sin(now / 160) * 0.05 * (1 - sinkProgress);
+        y = sinkY + (sinkProgress < 0.9 ? rippleBob : 0);
 
-        // Gentle bubble puffs while sinking in water
-        if (this.onPuff && Math.random() < 0.2) {
+        // Water bubble puffs floating up from underwater while sinking
+        if (this.onPuff && Math.random() < 0.25) {
           this.onPuff(
-            x + (Math.random() - 0.5) * 0.8 * r,
+            x + (Math.random() - 0.5) * 0.7 * r,
             0.1,
-            z + (Math.random() - 0.5) * 0.8 * r,
+            z + (Math.random() - 0.5) * 0.7 * r,
             0xdff1ff,
-            0.5,
             0.6,
-            1.8
+            0.7,
+            2.0
           );
         }
       }
@@ -791,10 +794,11 @@ export class AnimalRenderer {
     // Dynamic leg swinging with amplitude 0.7
     vis.legs.forEach((leg, idx) => {
       const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
-      if (isDrowning) {
-        // Slow paddling motion
-        leg.rotation.z = baseSwing * 0.4;
-        leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35;
+      if (isDrowning || (isWater && vis.species !== 'duck')) {
+        // Slow paddling motion, slowing as it sinks deeper
+        const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
+        leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
+        leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
       } else if (isStunned) {
         leg.rotation.z = 0;
         leg.rotation.x = 0;
@@ -913,10 +917,14 @@ export class AnimalRenderer {
     }
 
     if (vis.label) {
-      const lh = 1.3 + r * 0.25;
-      const labelY = (LABEL_Y[vis.species] || 2.1) + 0.6;
-      vis.label.position.set(x, Math.max(0, y) + labelY * sc, z);
-      vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
+      const isHiddenInWater = isWater && vis.species !== 'duck' && sinkProgress >= 0.85;
+      vis.label.visible = !isHiddenInWater;
+      if (!isHiddenInWater) {
+        const lh = 1.3 + r * 0.25;
+        const labelY = (LABEL_Y[vis.species] || 2.1) + 0.6;
+        vis.label.position.set(x, y + labelY * sc * inWaterShrink, z);
+        vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
+      }
     }
 
     // Ground indicator ring

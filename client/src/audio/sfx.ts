@@ -193,29 +193,44 @@ export function zap(vol = 1): void {
 }
 export const sfxZap = zap;
 
-// Wet, bubbly liquid water splash: deep resonant "ker-plop" drop + liquid spray + rising bubble bloops
+// Crisp, punchy "TÕM!" / "ker-plop" water entry drop
 export function splash(vol = 1): void {
   if (!ready() || vol < 0.03) return;
   const v = Math.min(1.2, vol);
-  // 1. Deep resonant "KER-PLOP" body water displacement plunge (260Hz -> 65Hz)
-  tone('sine', 260, 65, 0.22, 0.75 * v, { attack: 0.005 });
-  // 2. Liquid spray & slosh noise burst (water rushing & foaming)
-  noise('bandpass', 1500, 550, 1.8, 0.38, 0.45 * v, { attack: 0.015 });
-  // 3. Heavy water displacement low-frequency thud
-  noise('lowpass', 500, 120, 1.2, 0.28, 0.5 * v, { attack: 0.01 });
-  // 4. Authentic cartoon water bubble "bloop-glug-bloop" chirps (fast rising sine sweeps)
-  const bubbles = [
-    { start: 320, end: 680, dur: 0.06, del: 0.04, gain: 0.25 },
-    { start: 440, end: 880, dur: 0.05, del: 0.09, gain: 0.22 },
-    { start: 280, end: 580, dur: 0.07, del: 0.15, gain: 0.26 },
-    { start: 420, end: 820, dur: 0.05, del: 0.22, gain: 0.20 },
-    { start: 350, end: 720, dur: 0.06, del: 0.30, gain: 0.18 },
-  ];
-  for (const b of bubbles) {
-    tone('sine', b.start, b.end, b.dur, b.gain * v, { delay: b.del });
-  }
+  // 1. Resonant downward "TÕM" pitch plunge (480Hz -> 95Hz)
+  tone('sine', 480, 95, 0.15, 0.9 * v, { attack: 0.003 });
+  // 2. Hollow cavity water displacement thump
+  tone('sine', 160, 50, 0.2, 0.65 * v, { attack: 0.004 });
+  // 3. Crisp wet surface slap
+  noise('bandpass', 1700, 650, 2.2, 0.11, 0.45 * v, { attack: 0.004 });
+  // 4. Quick secondary droplet pop
+  tone('sine', 360, 780, 0.07, 0.28 * v, { delay: 0.05 });
 }
 export const sfxSplash = splash;
+
+// Submerged underwater drowning & bubbling gurgle sound when completely sunken
+export function drown(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  const v = Math.min(1.2, vol);
+  // 1. Deep muffled underwater submersion whoosh
+  noise('lowpass', 550, 140, 1.4, 0.85, 0.65 * v, { attack: 0.04 });
+  // 2. Heavy sinking downward bass
+  tone('sine', 170, 42, 0.75, 0.75 * v, { attack: 0.03 });
+  // 3. Chain of muffled escaping air bubbles (glug-glub-bloop)
+  const gurgles = [
+    { start: 240, end: 480, dur: 0.1, del: 0.08, gain: 0.4 },
+    { start: 200, end: 420, dur: 0.11, del: 0.22, gain: 0.42 },
+    { start: 280, end: 560, dur: 0.1, del: 0.36, gain: 0.38 },
+    { start: 340, end: 680, dur: 0.09, del: 0.5, gain: 0.35 },
+    { start: 420, end: 840, dur: 0.08, del: 0.64, gain: 0.3 },
+  ];
+  for (const g of gurgles) {
+    tone('sine', g.start, g.end, g.dur, g.gain * v, { delay: g.del });
+  }
+  // 4. Underwater bubbling murmur
+  noise('bandpass', 850, 320, 2.5, 0.65, 0.35 * v, { delay: 0.14 });
+}
+export const sfxDrown = drown;
 
 export function fall(vol = 1): void {
   if (!ready() || vol < 0.03) return;

@@ -1,9 +1,9 @@
 import { CFG, type Species } from '@shared/constants';
-import { wrapAngle } from '@shared/math';
+import { insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
 } from './audio/sfx';
@@ -139,8 +139,8 @@ const gameState = new GameState({
         wasDashing = isDashing;
 
         const inWater = (flags & FLAG.WATER) !== 0;
-        if (inWater && !wasInWater) sfxSplash(0.85);
-        wasInWater = inWater;
+        if (inWater && !wasInWater && !predictor.on) sfxSplash(0.85);
+        if (!predictor.on) wasInWater = inWater;
 
         const isSuper = (flags & 32768) !== 0;
         if (!isSuper && wasSuper) {
@@ -238,10 +238,10 @@ function handleGameEvent(ev: GameEvent): void {
       animals.remove(ev.id);
 
       if (ev.cause === 'drown') {
-        for (let i = 0; i < 16; i++) {
-          foodParts.puff(ev.x + (Math.random() - 0.5) * 2, 0.3, ev.z + (Math.random() - 0.5) * 2, 0xbfe3ff, 1, 1.1, 3);
+        for (let i = 0; i < 20; i++) {
+          foodParts.puff(ev.x + (Math.random() - 0.5) * 2, 0.15, ev.z + (Math.random() - 0.5) * 2, 0xbfe3ff, 1.2, 1.2, 3.5);
         }
-        sfxSplash(isMine ? 1 : 0.5);
+        sfxDrown(isMine ? 1 : 0.6);
       } else if (ev.cause === 'well') {
         foodParts.burst(ev.x, 1.5, ev.z, 0x8f8a80, 14, 4, 5);
         sfxFall(isMine ? 1 : 0.5);
@@ -532,7 +532,14 @@ function animate(now: number): void {
     }
 
     // Update charging meter in HUD and charge whine audio (disabled in water and while stunned)
-    const inWater = me ? ((me.flags & FLAG.WATER) !== 0) : false;
+    const inWater = me
+      ? ((me.flags & FLAG.WATER) !== 0 || (gameState.map?.pond.some((b) => insideBlob(b, predictor.x, predictor.z)) ?? false))
+      : false;
+    if (inWater && !wasInWater) {
+      sfxSplash(0.9);
+    }
+    wasInWater = inWater;
+
     const held = !isStunned && !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
     const isCharging = !isStunned && !inWater && held >= CFG.CHARGE_MIN;
     const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;
@@ -558,7 +565,11 @@ function animate(now: number): void {
       const px = isMe ? predictor.x : ent.x;
       const pz = isMe ? predictor.z : ent.z;
       const pa = isMe ? (isStunned ? lockedAimA : (predictor.dashT > 0 ? predictor.a : input.aimA)) : ent.a;
-      const pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
+      let pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
+      if (isMe && wasInWater) {
+        pFlags |= FLAG.WATER;
+        if (meta.species !== 'duck') pFlags |= FLAG.DROWNING;
+      }
       const isKing = ent.id === gameState.napoleonId;
       animals.update(
         ent.id,

@@ -53,6 +53,8 @@ export class CorpseRenderer {
 
   spawn(ev: Extract<GameEvent, { k: 'die' }>, meta?: PlayerMeta): void {
     if (!meta) return;
+    // When drowning, the animal has already sunk completely underwater; do not pop back up!
+    if (ev.cause === 'drown') return;
     const isKing = false; // King crown/regalia
     const { group } = buildCorpseAnimal(meta.species, meta.skin, isKing);
 
