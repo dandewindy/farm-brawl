@@ -113,18 +113,21 @@ export class ClientPredictor {
 
     const isServerStun = (flags & 8) !== 0;
     if (isServerStun) {
-      this.setStun(2.0);
-      if (!this.stunned && this.sTick === snapTick - 1 && clockOff !== null) {
-        const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
-        const decay = Math.exp(-3.5 * age);
-        this.kicks++;
-        this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
-        this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
-        this.dashT = 0;
-        this.flyT = 0;
+      if (!this.stunned) {
+        this.setStun(2.0);
+        if (this.sTick === snapTick - 1 && clockOff !== null) {
+          const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
+          const decay = Math.exp(-3.5 * age);
+          this.kicks++;
+          this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
+          this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
+          this.dashT = 0;
+          this.flyT = 0;
+        }
       }
-    } else if (this.stunT <= 0) {
+    } else {
       this.stunned = false;
+      this.stunT = 0;
     }
     this.sx = x;
     this.sz = z;
@@ -250,8 +253,8 @@ export class ClientPredictor {
         this.vz *= d;
       }
 
-      if (!stun && this.dashT <= 0 && canMove) {
-        this.a += wrapAngle(aimA - this.a) * Math.min(1, 12 * h);
+      if (!stun && this.dashT <= 0) {
+        this.a += wrapAngle(aimA - this.a) * Math.min(1, 24 * h);
       }
 
       this.x += this.vx * h;

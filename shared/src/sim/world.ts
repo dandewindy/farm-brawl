@@ -661,7 +661,7 @@ export class World {
 
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
-    vic.stunT = Math.max(2.0, att.superT > 0 ? 2.0 : CFG.STUN_TIME * (0.7 + 0.3 * att.power));
+    vic.stunT = 2.0;
     vic.dashT = 0; vic.plow = false; vic.holdT = 0; vic.charging = false; vic.pressed = false;
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }

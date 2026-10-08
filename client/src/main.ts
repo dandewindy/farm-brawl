@@ -49,15 +49,14 @@ let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 let localStunTimer = 0;
 let lockedAimA = 0;
+let wasStunnedLastFrame = false;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
 
 input.onPressRam = () => {
-  const me = gameState.ents.get(gameState.myId);
-  const isStunned = localStunTimer > 0 || (me ? (me.flags & FLAG.STUN) !== 0 : false);
-  if (isStunned) {
+  if (localStunTimer > 0) {
     input.cancelRam();
   }
 };
@@ -67,9 +66,7 @@ input.onReleaseRam = (held: number) => {
   const myMeta = gameState.metas.get(gameState.myId);
   const myEnt = gameState.ents.get(gameState.myId);
   const inWater = ((myEnt?.flags ?? 0) & FLAG.WATER) !== 0;
-  if (inWater) return;
-  const isStunned = localStunTimer > 0 || ((myEnt?.flags ?? 0) & FLAG.STUN) !== 0;
-  if (isStunned) return;
+  if (inWater || localStunTimer > 0) return;
   const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
   if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
     predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
@@ -202,8 +199,8 @@ function handleGameEvent(ev: GameEvent): void {
       // Victim stun lockout: 2.0s for animal hit, 3.0s for hay bale collision
       if (ev.v === myId) {
         const stunDur = ev.a === 0 ? 3.0 : 2.0;
-        localStunTimer = Math.max(localStunTimer, stunDur);
-        lockedAimA = predictor.a;
+        localStunTimer = stunDur;
+        lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
         predictor.setStun(stunDur);
         input.cancelRam();
         chargeStop();
@@ -257,6 +254,7 @@ function handleGameEvent(ev: GameEvent): void {
 
       if (ev.id === myId) {
         localStunTimer = 0;
+        wasStunnedLastFrame = false;
         predictor.on = false;
         // Delay death screen to show death animation first
         deathCamTarget = { x: ev.x, z: ev.z };
@@ -452,14 +450,26 @@ function animate(now: number): void {
   }
 
   const me = gameState.ents.get(gameState.myId);
-  if (me && (me.flags & FLAG.STUN) !== 0) {
-    localStunTimer = Math.max(localStunTimer, 0.2);
+  const serverStun = me ? (me.flags & FLAG.STUN) !== 0 : false;
+  if (serverStun && localStunTimer <= 0 && !wasStunnedLastFrame) {
+    localStunTimer = 2.0;
+    lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
+    predictor.setStun(2.0);
   }
 
-  const isStunned = localStunTimer > 0 || (me ? (me.flags & FLAG.STUN) !== 0 : false);
-  if (!isStunned && predictor.on) {
-    lockedAimA = predictor.a;
+  const isStunned = localStunTimer > 0;
+  if (!isStunned) {
+    if (wasStunnedLastFrame) {
+      // Just recovered from stun! Immediately point to mouse cursor
+      predictor.stunned = false;
+      predictor.stunT = 0;
+      predictor.a = input.aimA;
+      lockedAimA = input.aimA;
+    } else if (predictor.on) {
+      lockedAimA = input.aimA;
+    }
   }
+  wasStunnedLastFrame = isStunned;
 
   // Local animal input & prediction step
   if (transport && gameState.alive) {
@@ -541,7 +551,7 @@ function animate(now: number): void {
       const isMe = ent.id === gameState.myId && predictor.on;
       const px = isMe ? predictor.x : ent.x;
       const pz = isMe ? predictor.z : ent.z;
-      const pa = isMe ? (isStunned ? lockedAimA : predictor.a) : ent.a;
+      const pa = isMe ? (isStunned ? lockedAimA : (predictor.dashT > 0 ? predictor.a : input.aimA)) : ent.a;
       const pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
       const isKing = ent.id === gameState.napoleonId;
       animals.update(
