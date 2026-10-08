@@ -214,7 +214,7 @@ body.touch #dashBtn { display: block; }
   100% { opacity: 0; }
 }
 
-#toasts { position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 8; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
+#toasts { position: fixed; left: 50%; top: 175px; transform: translateX(-50%); z-index: 8; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
 #toasts div { padding: 6px 14px; background: rgba(31, 26, 23, .85); border-radius: 10px; font-weight: 700; font-size: 14px; animation: fadeIn .2s, fadeOut .4s 2.2s forwards; }
 
 /* Tarred planks: horizontal wooden boards with dark seams and grain */

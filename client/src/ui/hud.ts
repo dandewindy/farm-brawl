@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CFG, radiusOf, SPECIES, type Species } from '@shared/constants';
+import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
 
@@ -516,7 +516,7 @@ export class HudManager {
     this.floatingTexts.push(item);
   }
 
-  spawnFloat(text: string, screenX: number, screenY: number, isBig = false, isLoss = false): void {
+  spawnFloat(text: string, _screenX: number, _screenY: number, isBig = false, isLoss = false): void {
     this.floatText(text, isLoss ? 'loss' : isBig ? 'big' : '', 0);
   }
 

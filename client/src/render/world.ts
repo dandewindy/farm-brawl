@@ -318,7 +318,6 @@ export class WorldRenderer {
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
   private readonly podiumTileMats: THREE.MeshStandardMaterial[] = [];
-  private podiumTileBaseColor = 0x5b4a33;
   private readonly fenceRails: THREE.Mesh[] = [];
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;

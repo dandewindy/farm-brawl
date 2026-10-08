@@ -1,10 +1,10 @@
 import { CFG, type Species } from '@shared/constants';
 import { wrapAngle } from '@shared/math';
-import type { GameEvent, Snapshot } from '@shared/protocol';
+import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash,
-  sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxVictory, sfxZap,
+  sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
@@ -64,7 +64,7 @@ input.onReleaseRam = (held: number) => {
   }
 };
 
-const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team', skin: number) => {
+const hud = new HudManager((name: string, species: Species, _mode: 'ffa' | 'team', skin: number) => {
   unlockAudio();
   if (transport) {
     transport.send({ t: 'join', name, species, skin });
@@ -468,7 +468,7 @@ function animate(now: number): void {
     }
 
     // Update charging meter in HUD and charge whine audio (disabled in water)
-    const inWater = ((me.flags ?? 0) & FLAG.WATER) !== 0;
+    const inWater = me ? ((me.flags & FLAG.WATER) !== 0) : false;
     const held = !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
     const isCharging = !inWater && held >= CFG.CHARGE_MIN;
     const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;

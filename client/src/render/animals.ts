@@ -591,6 +591,16 @@ export class AnimalRenderer {
     }
   }
 
+  getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
+    let vis = this.visuals.get(id);
+    if (!vis && meta) {
+      vis = this.buildAnimal(meta);
+      this.visuals.set(id, vis);
+      this.group.add(vis.root);
+    }
+    return vis;
+  }
+
   notifyHit(id: number): void {
     const vis = this.visuals.get(id);
     if (vis) {

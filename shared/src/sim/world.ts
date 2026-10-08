@@ -10,7 +10,7 @@ import { clamp, insideBlob, mulberry32 } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
   FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
-  type PlayerWire, type ServerMsg, type Snapshot, type ToolKind, type ToolWire,
+  type PlayerWire, type ServerMsg, type Snapshot, type ToolKind,
 } from '../protocol';
 
 export interface Player extends Body {
@@ -505,7 +505,7 @@ export class World {
       return;
     }
     // released (or a tap that came and went between two ticks)
-    if ((p.pressed || down) && p.cd <= 0 && p.dashT <= 0 && p.stunT <= 0 && p.terrain !== 1) this.dash(p);
+    if ((p.pressed || down) && p.cd <= 0 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 
@@ -776,7 +776,7 @@ export class World {
       x = Math.cos(a) * d; z = Math.sin(a) * d;
       if (!this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) break;
     }
-    let roll = this.rnd() * FOOD_WEIGHT.reduce((s, w) => s + w, 0);
+    let roll = this.rnd() * (FOOD_WEIGHT as readonly number[]).reduce((s, w) => s + w, 0);
     let k = 0 as FoodKind;
     for (let i = 0; i < FOOD_WEIGHT.length; i++) {
       roll -= FOOD_WEIGHT[i];
