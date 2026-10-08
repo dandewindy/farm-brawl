@@ -99,6 +99,26 @@ hud.onToggleMute = () => {
   hud.setMuteState(next);
 };
 
+// In-game zoom and mute controls
+const zoomInBtn = document.getElementById('zoomIn');
+const zoomOutBtn = document.getElementById('zoomOut');
+const muteInGameBtn = document.getElementById('muteInGame');
+
+if (zoomInBtn) zoomInBtn.addEventListener('click', () => {
+  world.zoomBias = Math.max(-20, world.zoomBias - 5);
+});
+if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => {
+  world.zoomBias = Math.min(30, world.zoomBias + 5);
+});
+if (muteInGameBtn) {
+  muteInGameBtn.addEventListener('click', () => {
+    const next = !isMuted();
+    setMuted(next);
+    hud.setMuteState(next);
+    muteInGameBtn.textContent = next ? '🔇' : '🔊';
+  });
+}
+
 let firstSpawn = true;
 
 const gameState = new GameState({

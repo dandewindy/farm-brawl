@@ -135,11 +135,14 @@ export class InputManager {
     document.body.classList.add('touch');
 
     let touchStartX = 0, touchStartY = 0;
+    let stickTouchId: number | null = null;
 
     window.addEventListener('touchstart', (e) => {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        if (t.clientX < window.innerWidth * 0.5) {
+        // Only create stick for touches on the left half that aren't already tracked
+        if (t.clientX < window.innerWidth * 0.5 && stickTouchId === null) {
+          stickTouchId = t.identifier;
           touchStartX = t.clientX;
           touchStartY = t.clientY;
           this.stickVec = { x: 0, y: 0 };
@@ -155,7 +158,8 @@ export class InputManager {
     window.addEventListener('touchmove', (e) => {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        if (t.clientX < window.innerWidth * 0.5 && this.stickVec) {
+        // Only track the stick finger by its identifier (not by screen position)
+        if (t.identifier === stickTouchId && this.stickVec) {
           const dx = t.clientX - touchStartX;
           const dy = t.clientY - touchStartY;
           const dist = Math.hypot(dx, dy);
@@ -172,10 +176,15 @@ export class InputManager {
       }
     }, { passive: true });
 
-    const endStick = () => {
-      this.stickVec = null;
-      if (this.stickEl) this.stickEl.hidden = true;
-      if (this.stickKnob) this.stickKnob.style.transform = '';
+    const endStick = (e: TouchEvent) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stickTouchId) {
+          stickTouchId = null;
+          this.stickVec = null;
+          if (this.stickEl) this.stickEl.hidden = true;
+          if (this.stickKnob) this.stickKnob.style.transform = '';
+        }
+      }
     };
 
     window.addEventListener('touchend', endStick, { passive: true });

@@ -318,12 +318,12 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   g.add(bell);
   const clapper = part(new THREE.SphereGeometry(0.035, 6, 4), 0x3a3a3a, 0.7, 1.04, 0);
   g.add(clapper);
-  // Cow tail hanging from rear
+  // Cow tail hanging from rear (tilts away from body)
   const tailStem = part(new THREE.CylinderGeometry(0.03, 0.022, 0.52, 6), s.body, -0.68, 1.15, 0);
-  tailStem.rotation.z = 0.28;
+  tailStem.rotation.z = -0.28;
   g.add(tailStem);
-  const tailTuft = part(new THREE.ConeGeometry(0.065, 0.22, 8), s.spot || 0x2a2624, -0.76, 0.86, 0);
-  tailTuft.rotation.z = Math.PI - 0.28;
+  const tailTuft = part(new THREE.ConeGeometry(0.065, 0.22, 8), s.spot || 0x2a2624, -0.82, 0.88, 0);
+  tailTuft.rotation.z = Math.PI + 0.28;
   g.add(tailTuft);
   addEyes(g, 1.2, 1.58, 0.16, 0.07);
   return addLegs(g, s.legs ?? s.body, [[0.5, 0.28], [0.5, -0.28], [-0.5, 0.28], [-0.5, -0.28]], 0.8, 0.11, 0x3a3330);
