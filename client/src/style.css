@@ -121,10 +121,22 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #stickKnob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(255, 255, 255, .6); }
 body.touch #dashBtn { display: block; }
 
-#floats { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
-.float { position: absolute; transform: translate(-50%, -50%); font: 800 20px var(--f-display); color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .45); white-space: nowrap; }
-.float.big { font-size: 28px; color: var(--gold); }
-.float.loss { color: #ff8a7a; }
+#floats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+.float {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--f-display);
+  font-weight: 900;
+  font-size: 22px;
+  color: var(--paper);
+  text-shadow: 2px 2px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.float.big { font-size: 32px; color: #ffd84a; }
+.float.loss { color: #ff6a4d; }
 
 /* Red propaganda announcement banner */
 #banner {

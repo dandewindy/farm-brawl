@@ -182,10 +182,14 @@ function handleGameEvent(ev: GameEvent): void {
       // Floating loss text matching original game
       if (ev.loss && ev.loss >= 1) {
         const lossNum = Math.round(ev.loss);
+        const victimEnt = gameState.ents.get(ev.v);
+        const victimPos = animals.getPosition(ev.v);
+        const victimMass = victimEnt ? victimEnt.mass : CFG.START_MASS;
+        const initPos = victimPos ? { x: victimPos.x, z: victimPos.z, mass: victimMass } : { x: ev.x, z: ev.z, mass: victimMass };
         if (ev.a === myId) {
-          hud.floatText(`-${lossNum} kg`, 'loss', ev.v);
+          hud.floatText(`-${lossNum} kg`, 'loss', ev.v, initPos);
         } else if (ev.v === gameState.napoleonId && ev.v !== myId) {
-          hud.floatText(`-${lossNum} kg`, 'loss', ev.v);
+          hud.floatText(`-${lossNum} kg`, 'loss', ev.v, initPos);
         }
       }
       break;

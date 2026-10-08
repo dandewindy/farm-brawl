@@ -12,6 +12,8 @@ export interface FloatingText {
   ah?: number;
 }
 
+const _projVec = new THREE.Vector3();
+
 export class HudManager {
   private readonly massEl: HTMLElement;
   private readonly rankTxt: HTMLElement;
@@ -461,7 +463,7 @@ export class HudManager {
     if (initialPos) {
       item.ax = initialPos.x;
       item.az = initialPos.z;
-      item.ah = radiusOf(initialPos.mass) * 3.6 + 1.5;
+      item.ah = radiusOf(initialPos.mass) * 3.4 + 1.2;
     }
     this.floatingTexts.push(item);
   }
@@ -489,26 +491,29 @@ export class HudManager {
         if (st) {
           f.ax = st.x;
           f.az = st.z;
-          f.ah = radiusOf(st.mass) * 3.6 + 1.5;
+          f.ah = radiusOf(st.mass) * 3.4 + 1.2;
         }
       }
 
+      const scale = age < 0.12 ? (0.6 + age * 3.3).toFixed(2) : '1';
+      const opacity = age > 0.7 ? ((1.1 - age) / 0.4).toFixed(2) : '1';
+
       if (camera && f.ax !== undefined && f.az !== undefined && f.ah !== undefined) {
-        const v = new THREE.Vector3(f.ax, f.ah, f.az).project(camera);
-        if (v.z > 1) {
+        _projVec.set(f.ax, f.ah, f.az).project(camera);
+        if (_projVec.z > 1) {
           f.el.style.display = 'none';
           continue;
         }
         f.el.style.display = '';
-        const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
-        const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
-        f.el.style.transform = `translate(${sx}px, ${sy - age * 60}px) translate(-50%, -100%) scale(${age < 0.12 ? 0.6 + age * 3.3 : 1})`;
-        f.el.style.opacity = String(age > 0.7 ? (1.1 - age) / 0.4 : 1);
+        const sx = (_projVec.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-_projVec.y * 0.5 + 0.5) * window.innerHeight;
+        f.el.style.transform = `translate3d(${sx.toFixed(1)}px, ${(sy - age * 60).toFixed(1)}px, 0) translate(-50%, -100%) scale(${scale})`;
+        f.el.style.opacity = opacity;
       } else {
         const sx = window.innerWidth / 2;
         const sy = window.innerHeight / 2 - 40;
-        f.el.style.transform = `translate(${sx}px, ${sy - age * 60}px) translate(-50%, -100%) scale(${age < 0.12 ? 0.6 + age * 3.3 : 1})`;
-        f.el.style.opacity = String(age > 0.7 ? (1.1 - age) / 0.4 : 1);
+        f.el.style.transform = `translate3d(${sx.toFixed(1)}px, ${(sy - age * 60).toFixed(1)}px, 0) translate(-50%, -100%) scale(${scale})`;
+        f.el.style.opacity = opacity;
       }
     }
   }

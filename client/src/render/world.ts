@@ -923,6 +923,7 @@ export class WorldRenderer {
 
     this.camera.position.set(this.camTarget.x + sx, this.camH, this.camTarget.z + this.camH * 0.7 + sz);
     this.camera.lookAt(this.camTarget.x + sx, 0, this.camTarget.z - 1 + sz);
+    this.camera.updateMatrixWorld(true);
 
     if (this.sun) {
       this.sun.position.set(this.camTarget.x + 30, 65, this.camTarget.z + 22);
