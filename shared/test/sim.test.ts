@@ -110,7 +110,7 @@ describe('world', () => {
     expect(hit).toBe(true);
     const vic = w.players.get(b)!;
     expect(vic.vx).toBeGreaterThan(10);
-    expect(vic.stunT).toBeGreaterThan(0);
+    expect(vic.stunT).toBe(0);
     expect(vic.mass).toBeLessThan(40);
     expect(vic.lastHitBy).toBe(a);
     expect(w.food.size).toBeGreaterThan(0);
@@ -327,7 +327,7 @@ describe('bonus weapons and tools', () => {
     expect(p.dashT).toBe(0);
   });
 
-  it('ramming into hay bale stuns for 3 seconds', () => {
+  it('ramming into hay bale stuns for 1.5 seconds', () => {
     const w = emptyWorld();
     const pid = w.addPlayer('Rammer', 'pig');
     const p = place(w, pid, 0, 0, 20);
@@ -342,7 +342,7 @@ describe('bonus weapons and tools', () => {
 
     w.step();
 
-    expect(p.stunT).toBeGreaterThanOrEqual(2.9);
+    expect(p.stunT).toBeGreaterThanOrEqual(1.4);
     expect(p.dashT).toBe(0);
   });
 
@@ -365,6 +365,6 @@ describe('bonus weapons and tools', () => {
 
     // Victim knocked back with extreme velocity
     expect(vic.vx).toBeGreaterThan(60);
-    expect(vic.stunT).toBeGreaterThanOrEqual(1.8);
+    expect(vic.stunT).toBe(0);
   });
 });

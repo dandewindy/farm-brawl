@@ -85,9 +85,9 @@ export function collideHay(b: Body, hay: Circle[]): boolean {
       b.vx -= 1.6 * vn * nx;
       b.vz -= 1.6 * vn * nz;
     }
-    // Dashing or high-speed ramming into hay bale stuns for 3 seconds
-    if (b.dashT > 0 || Math.hypot(b.vx, b.vz) > 10) {
-      b.stunT = Math.max(b.stunT, 3.0);
+    // Dashing or knocking into hay bale / post stuns for 1.5 seconds
+    if (b.dashT > 0 || Math.hypot(b.vx, b.vz) > 5) {
+      b.stunT = Math.max(b.stunT, 1.5);
       b.dashT = 0;
       hit = true;
     }

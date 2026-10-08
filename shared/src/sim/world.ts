@@ -238,7 +238,7 @@ export class World {
           p.vx *= 0.85;
           p.vz *= 0.85;
         }
-        const wasStunned = p.stunT >= 1.9;
+        const wasStunned = p.stunT >= 1.4;
         const hayHit = collideHay(p, this.map.hay);
         if (hayHit && !wasStunned) {
           p.plow = false;
@@ -649,7 +649,6 @@ export class World {
           const bForce = clamp((1 - bdist / BOOM_R) * 28, 6, 26);
           bystander.vx += (bdx / bdist) * bForce;
           bystander.vz += (bdz / bdist) * bForce;
-          bystander.stunT = Math.max(bystander.stunT, 2.0);
         }
       }
     }
@@ -661,7 +660,7 @@ export class World {
 
     vic.vx = nx * k + vic.vx * 0.15;
     vic.vz = nz * k + vic.vz * 0.15;
-    vic.stunT = 2.0;
+    vic.stunT = 0;
     vic.dashT = 0; vic.plow = false; vic.holdT = 0; vic.charging = false; vic.pressed = false;
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }

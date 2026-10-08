@@ -193,13 +193,26 @@ export function zap(vol = 1): void {
 }
 export const sfxZap = zap;
 
+// Wet, bubbly liquid water splash: deep resonant "ker-plop" drop + liquid spray + rising bubble bloops
 export function splash(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  noise('lowpass', 4000, 300, 0.6, 0.55, 0.6 * vol, { attack: 0.01 });
-  for (let i = 0; i < 4; i++) {
-    tone('sine', 500 + Math.random() * 500, 1200 + Math.random() * 600, 0.07, 0.12 * vol, {
-      delay: 0.25 + i * 0.09,
-    });
+  const v = Math.min(1.2, vol);
+  // 1. Deep resonant "KER-PLOP" body water displacement plunge (260Hz -> 65Hz)
+  tone('sine', 260, 65, 0.22, 0.75 * v, { attack: 0.005 });
+  // 2. Liquid spray & slosh noise burst (water rushing & foaming)
+  noise('bandpass', 1500, 550, 1.8, 0.38, 0.45 * v, { attack: 0.015 });
+  // 3. Heavy water displacement low-frequency thud
+  noise('lowpass', 500, 120, 1.2, 0.28, 0.5 * v, { attack: 0.01 });
+  // 4. Authentic cartoon water bubble "bloop-glug-bloop" chirps (fast rising sine sweeps)
+  const bubbles = [
+    { start: 320, end: 680, dur: 0.06, del: 0.04, gain: 0.25 },
+    { start: 440, end: 880, dur: 0.05, del: 0.09, gain: 0.22 },
+    { start: 280, end: 580, dur: 0.07, del: 0.15, gain: 0.26 },
+    { start: 420, end: 820, dur: 0.05, del: 0.22, gain: 0.20 },
+    { start: 350, end: 720, dur: 0.06, del: 0.30, gain: 0.18 },
+  ];
+  for (const b of bubbles) {
+    tone('sine', b.start, b.end, b.dur, b.gain * v, { delay: b.del });
   }
 }
 export const sfxSplash = splash;

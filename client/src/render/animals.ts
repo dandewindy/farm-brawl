@@ -27,6 +27,7 @@ interface AnimalVisual {
   trailZ?: number;
   shockwaveTimer?: number;
   rainbowTimer?: number;
+  waterT?: number;
 }
 
 function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
@@ -696,18 +697,41 @@ export class AnimalRenderer {
     const podZ = podiumPos ? podiumPos[1] : 0;
     const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
     let y = onPodium ? 0.55 : 0;
+
     if (isWater && !isSuper) {
-      // Ducks float peacefully; other animals sink and struggle frantically when drowning
+      vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
+    } else {
+      vis.waterT = Math.max(0, (vis.waterT || 0) - dt * 2.5);
+    }
+
+    // Shrinking in water: non-ducks shrink slightly (down to ~0.82) as they submerge
+    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck'
+      ? Math.max(0.82, 1 - (vis.waterT || 0) * 0.12)
+      : 1;
+
+    if (isWater && !isSuper) {
       if (vis.species === 'duck') {
+        // Ducks float peacefully on the surface with slight bobbing
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
-      } else if (isDrowning) {
-        // Gentle side-to-side flailing, slowly sinking
-        y = -0.45 * sc - (Math.min(1, vis.phase * 0.002)) * 0.3 * sc;
-        if (this.onPuff && Math.random() < 0.15) {
-          this.onPuff(x + (Math.random() - 0.5) * 0.8, 0.1, z + (Math.random() - 0.5) * 0.8, 0xdff1ff, 0.6, 0.7, 2);
-        }
       } else {
-        y = -0.45 * sc + Math.sin(now / 150) * 0.06;
+        // Sinks gradually deeper into the water over time
+        const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
+        const sinkY = -0.35 * sc - sinkProgress * 0.58 * sc;
+        const rippleBob = Math.sin(now / 160) * 0.05 * (1 - sinkProgress * 0.6);
+        y = sinkY + rippleBob;
+
+        // Gentle bubble puffs while sinking in water
+        if (this.onPuff && Math.random() < 0.2) {
+          this.onPuff(
+            x + (Math.random() - 0.5) * 0.8 * r,
+            0.1,
+            z + (Math.random() - 0.5) * 0.8 * r,
+            0xdff1ff,
+            0.5,
+            0.6,
+            1.8
+          );
+        }
       }
     }
 
@@ -745,12 +769,12 @@ export class AnimalRenderer {
       vis.root.position.z += (Math.random() - 0.5) * 0.12 * lvl * r;
     }
 
-    // Squash & stretch
+    // Squash & stretch & water shrinking
     const squash = isCharging ? 1 - 0.18 * lvl : 1;
     vis.root.scale.set(
-      sc * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl),
-      sc * (isDashing ? 0.9 : squash),
-      sc
+      sc * inWaterShrink * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl),
+      sc * inWaterShrink * (isDashing ? 0.9 : squash),
+      sc * inWaterShrink
     );
 
     // Hit knockback tumble (seen in original game when rammed)

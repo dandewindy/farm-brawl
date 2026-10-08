@@ -51,7 +51,7 @@ export class ClientPredictor {
     this.plow = false;
   }
 
-  setStun(duration = 2.0): void {
+  setStun(duration = 1.5): void {
     this.stunned = true;
     this.stunT = Math.max(this.stunT, duration);
     this.dashT = 0;
@@ -114,7 +114,7 @@ export class ClientPredictor {
     const isServerStun = (flags & 8) !== 0;
     if (isServerStun) {
       if (!this.stunned) {
-        this.setStun(2.0);
+        this.setStun(1.5);
         if (this.sTick === snapTick - 1 && clockOff !== null) {
           const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
           const decay = Math.exp(-3.5 * age);
@@ -278,8 +278,8 @@ export class ClientPredictor {
             this.vx -= 1.6 * vn * nx;
             this.vz -= 1.6 * vn * nz;
           }
-          if (this.dashT > 0 || Math.hypot(this.vx, this.vz) > 10) {
-            this.setStun(3.0);
+          if (this.dashT > 0 || Math.hypot(this.vx, this.vz) > 5) {
+            this.setStun(1.5);
           }
         }
       }

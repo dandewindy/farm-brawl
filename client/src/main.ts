@@ -50,6 +50,7 @@ let deathCamTarget: { x: number; z: number } | null = null;
 let localStunTimer = 0;
 let lockedAimA = 0;
 let wasStunnedLastFrame = false;
+let wasInWater = false;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
@@ -137,6 +138,10 @@ const gameState = new GameState({
         if (isDashing && !wasDashing) sfxDash(1);
         wasDashing = isDashing;
 
+        const inWater = (flags & FLAG.WATER) !== 0;
+        if (inWater && !wasInWater) sfxSplash(0.85);
+        wasInWater = inWater;
+
         const isSuper = (flags & 32768) !== 0;
         if (!isSuper && wasSuper) {
           hud.showToast(t('superEnd'));
@@ -196,9 +201,10 @@ function handleGameEvent(ev: GameEvent): void {
       }
       if (isMine) shake = Math.max(shake, 0.6);
 
-      // Victim stun lockout: 2.0s for animal hit, 3.0s for hay bale collision
-      if (ev.v === myId) {
-        const stunDur = ev.a === 0 ? 3.0 : 2.0;
+      // Stun lockout ONLY when hitting a post/obstacle ("trúng cọc" / "trúng bục", ev.a === 0)!
+      // Normal ramming between animals does NOT cause stun!
+      if (ev.v === myId && ev.a === 0) {
+        const stunDur = 1.5;
         localStunTimer = stunDur;
         lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
         predictor.setStun(stunDur);
@@ -452,9 +458,9 @@ function animate(now: number): void {
   const me = gameState.ents.get(gameState.myId);
   const serverStun = me ? (me.flags & FLAG.STUN) !== 0 : false;
   if (serverStun && localStunTimer <= 0 && !wasStunnedLastFrame) {
-    localStunTimer = 2.0;
+    localStunTimer = 1.5;
     lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
-    predictor.setStun(2.0);
+    predictor.setStun(1.5);
   }
 
   const isStunned = localStunTimer > 0;

@@ -52,6 +52,8 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   }
 
   const hay: Circle[] = [];
+  // Podium flag post as solid post obstacle ("cọc bục")
+  hay.push([podium[0], podium[1] - (CFG.PODIUM_R - 1.6), 0.6]);
   const nHay = 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < nHay; i++) {
     const r = between(1.3, 2);
