@@ -74,7 +74,28 @@
       <p class="eyebrow" data-i18n="modeLabel">Chế độ chơi</p>
       <div id="modes">
         <button type="button" class="on" data-mode="ffa"><span class="n">Tự do</span><span class="p">Ai lo thân nấy</span></button>
-        <button type="button" data-mode="team"><span class="n">Trại đấu trại</span><span class="p">Foxwood đấu Pinchfield</span></button>
+        <button type="button" data-mode="team"><span class="n">Trại đấu</span><span class="p">Foxwood vs Pinchfield</span></button>
+        <button type="button" data-mode="friend"><span class="n">Bạn bè 👥</span><span class="p">Phòng riêng không bot</span></button>
+      </div>
+
+      <!-- Friend Mode Panel (Private Room with Code) -->
+      <div id="friendPanel" class="friend-panel" hidden>
+        <div class="fp-section">
+          <button type="button" id="btnCreateRoom" class="btn-wood">🎲 Tạo phòng riêng</button>
+          <div id="createdRoomBox" class="room-box" hidden>
+            <div class="room-badge">MÃ PHÒNG: <span id="createdRoomCode">------</span></div>
+            <div class="room-btn-row">
+              <button type="button" id="btnCopyCode" class="btn-micro">📋 Copy mã</button>
+              <button type="button" id="btnCopyLink" class="btn-micro">🔗 Copy link mời</button>
+            </div>
+          </div>
+        </div>
+        <div class="fp-divider"><span>HOẶC NHẬP MÃ PHÒNG</span></div>
+        <div class="fp-join-row">
+          <input id="joinRoomCode" class="room-code-input" placeholder="Nhập mã (VD: BRAWL8)" maxlength="12" autocomplete="off" spellcheck="false">
+          <button type="button" id="btnApplyCode" class="btn-wood-sm">Chọn mã</button>
+        </div>
+        <div id="roomStatusNotice" class="room-notice"></div>
       </div>
       <p class="label" data-i18n="pick"></p>
       <div id="species"></div>

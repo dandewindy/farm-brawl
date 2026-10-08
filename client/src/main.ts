@@ -13,6 +13,7 @@ import { applyTexts, t } from './i18n';
 import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
 import { WsClient } from './net/ws';
+import { registerFriendRoom } from './net/firebase';
 import { AnimalRenderer } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
@@ -74,10 +75,19 @@ input.onReleaseRam = (held: number) => {
   }
 };
 
-const hud = new HudManager((name: string, species: Species, _mode: 'ffa' | 'team', skin: number) => {
+const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
+  if (mode === 'friend') {
+    const code = (roomCode || 'BRAWL').toUpperCase();
+    const privRoom = `priv-${code}`;
+    connectToRoom(privRoom);
+    registerFriendRoom(code, name, 1);
+  } else {
+    connectToRoom('pub-1');
+  }
   if (transport) {
-    transport.send({ t: 'join', name, species, skin });
+    const team = mode === 'team' ? Math.floor(Math.random() * 2) : undefined;
+    transport.send({ t: 'join', name, species, skin, team });
   }
 });
 hud.onPickRule = (ruleId) => {
@@ -95,6 +105,7 @@ const gameState = new GameState({
   onInit(map) {
     world.buildMap(map);
     corpses.setMap(map);
+    animals.clear();
     tools.clear();
   },
   onJoined(_id) {
@@ -388,19 +399,39 @@ function handleGameEvent(ev: GameEvent): void {
 // Transport setup: WebSocket to Cloudflare Durable Objects in prod/dev, LocalServer offline fallback
 const params = new URLSearchParams(window.location.search);
 const isExplicitOffline = params.get('offline') === '1' || params.get('mode') === 'offline';
-const roomName = params.get('room') || 'pub-1';
-hud.setRoomTag(`Phòng ${roomName.toUpperCase()}`);
+let currentRoomName = '';
 let fallbackLocal = false;
 
-if (isExplicitOffline) {
-  transport = new LocalServer((m) => {
-    gameState.handle(m);
-  });
-} else {
+function connectToRoom(targetRoom: string): void {
+  if (currentRoomName === targetRoom && transport) {
+    return;
+  }
+
+  if (transport && typeof (transport as any).close === 'function') {
+    (transport as any).close();
+  }
+
+  currentRoomName = targetRoom;
+  const isPrivate = targetRoom.startsWith('priv-') || targetRoom.startsWith('friend-');
+  const displayCode = isPrivate ? targetRoom.replace(/^(priv|friend)-/, '').toUpperCase() : targetRoom.toUpperCase();
+  const inviteUrl = isPrivate ? `${window.location.origin}${window.location.pathname}?room=priv-${displayCode}` : undefined;
+
+  hud.setRoomTag(
+    isPrivate ? `👥 Mã: ${displayCode} (Sao chép link)` : `Phòng ${displayCode}`,
+    inviteUrl
+  );
+
+  if (isExplicitOffline) {
+    transport = new LocalServer((m) => {
+      gameState.handle(m);
+    });
+    return;
+  }
+
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = isViteDev ? 'localhost:8787' : window.location.host;
-  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(roomName)}`;
+  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}`;
 
   transport = new WsClient(
     wsUrl,
@@ -409,7 +440,10 @@ if (isExplicitOffline) {
     },
     (status) => {
       if (status === 'open') {
-        hud.showToast(`Đã vào phòng trực tuyến: ${roomName} 🌐`);
+        const msg = isPrivate
+          ? `Đã vào phòng bạn bè: ${displayCode} (Không có bot) 👥`
+          : `Đã vào phòng trực tuyến: ${displayCode} 🌐`;
+        hud.showToast(msg);
       } else if (status === 'error' && isViteDev && !fallbackLocal) {
         console.warn('Worker server not detected at port 8787. Falling back to LocalServer.');
         fallbackLocal = true;
@@ -418,6 +452,19 @@ if (isExplicitOffline) {
     }
   );
 }
+
+const roomParam = params.get('room') || params.get('code');
+let initialRoom = 'pub-1';
+if (roomParam) {
+  if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
+    initialRoom = roomParam;
+  } else if (roomParam.length >= 3 && roomParam !== 'pub-1') {
+    initialRoom = `priv-${roomParam.toUpperCase()}`;
+  } else {
+    initialRoom = roomParam;
+  }
+}
+connectToRoom(initialRoom);
 
 // Optional Debug status bar (shows RTT, jitter, prediction error, and FPS)
 const showDebug = params.has('debug') || window.location.hostname === 'localhost';

@@ -16,6 +16,15 @@ export class GameRoom extends DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    const roomParam = url.searchParams.get('room') || 'pub-1';
+    const isPrivate = roomParam.startsWith('priv-') || roomParam.startsWith('friend-');
+    if (isPrivate) {
+      this.world.botsEnabled = false;
+      for (const [id, p] of this.world.players.entries()) {
+        if (p.bot) this.world.removePlayer(id);
+      }
+    }
+
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const upgradeHeader = request.headers.get('Upgrade');
       if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
@@ -36,6 +45,8 @@ export class GameRoom extends DurableObject {
     if (url.pathname === '/info') {
       return new Response(
         JSON.stringify({
+          room: roomParam,
+          isPrivate,
           players: this.sockets.size,
           bots: this.world.players.size - this.sockets.size,
           tick: this.world.tick,
@@ -80,7 +91,7 @@ export class GameRoom extends DurableObject {
     if (msg.t === 'join') {
       let playerId = this.sockets.get(ws);
       if (!playerId) {
-        playerId = this.world.addPlayer(msg.name, msg.species, false, undefined, msg.skin);
+        playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
         this.sockets.set(ws, playerId);
       } else {
         this.world.respawn(playerId, msg.name, msg.species, msg.skin);

@@ -59,7 +59,9 @@ export class HudManager {
 
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
-  public onSelectMode?: (mode: 'ffa' | 'team') => void;
+  public onSelectMode?: (mode: 'ffa' | 'team' | 'friend') => void;
+  public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
+  private currentFriendCode = '';
   private currentChoiceOptions: string[] = [];
 
   private selectedSpecies: Species = 'pig';
@@ -73,8 +75,24 @@ export class HudManager {
     pig: 0,
   };
 
+  private readonly friendPanel: HTMLElement | null;
+  private readonly btnCreateRoom: HTMLElement | null;
+  private readonly createdRoomBox: HTMLElement | null;
+  private readonly createdRoomCode: HTMLElement | null;
+  private readonly btnCopyCode: HTMLElement | null;
+  private readonly btnCopyLink: HTMLElement | null;
+  private readonly joinRoomCode: HTMLInputElement | null;
+  private readonly btnApplyCode: HTMLElement | null;
+  private readonly roomStatusNotice: HTMLElement | null;
+
   constructor(
-    private readonly onStartPlay: (name: string, species: Species, mode: 'ffa' | 'team', skin: number) => void
+    private readonly onStartPlay: (
+      name: string,
+      species: Species,
+      mode: 'ffa' | 'team' | 'friend',
+      skin: number,
+      roomCode?: string
+    ) => void
   ) {
     this.massEl = document.getElementById('mass')!;
     this.rankTxt = document.getElementById('rankTxt')!;
@@ -117,11 +135,19 @@ export class HudManager {
     this.modesContainer = document.getElementById('modes');
     this.roomTagEl = document.getElementById('roomTag');
 
+    this.friendPanel = document.getElementById('friendPanel');
+    this.btnCreateRoom = document.getElementById('btnCreateRoom');
+    this.createdRoomBox = document.getElementById('createdRoomBox');
+    this.createdRoomCode = document.getElementById('createdRoomCode');
+    this.btnCopyCode = document.getElementById('btnCopyCode');
+    this.btnCopyLink = document.getElementById('btnCopyLink');
+    this.joinRoomCode = document.getElementById('joinRoomCode') as HTMLInputElement | null;
+    this.btnApplyCode = document.getElementById('btnApplyCode');
+    this.roomStatusNotice = document.getElementById('roomStatusNotice');
+
     this.initSpeciesPicker();
     this.initEvents();
   }
-
-  private selectedMode: 'ffa' | 'team' = 'ffa';
 
   private initSpeciesPicker(): void {
     const emojis: Record<Species, string> = {
@@ -193,7 +219,20 @@ export class HudManager {
       const name = this.nameInput.value.trim() || t('defaultName');
       localStorage.setItem('fb_name', name);
       const skin = this.mySkins[this.selectedSpecies] ?? 0;
-      this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin);
+      if (this.selectedMode === 'friend') {
+        const inputVal = (this.joinRoomCode?.value || '').trim().toUpperCase();
+        if (inputVal.length >= 3) {
+          this.currentFriendCode = inputVal;
+        } else if (!this.currentFriendCode) {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          let res = '';
+          for (let i = 0; i < 6; i++) res += chars[Math.floor(Math.random() * chars.length)];
+          this.currentFriendCode = res;
+          if (this.createdRoomCode) this.createdRoomCode.textContent = res;
+          if (this.createdRoomBox) this.createdRoomBox.hidden = false;
+        }
+      }
+      this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin, this.currentFriendCode);
     };
 
     this.playBtn.addEventListener('click', play);
@@ -218,18 +257,117 @@ export class HudManager {
       });
     }
 
+    if (this.btnCreateRoom) {
+      this.btnCreateRoom.addEventListener('click', () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let res = '';
+        for (let i = 0; i < 6; i++) res += chars[Math.floor(Math.random() * chars.length)];
+        this.currentFriendCode = res;
+        if (this.createdRoomCode) this.createdRoomCode.textContent = res;
+        if (this.createdRoomBox) this.createdRoomBox.hidden = false;
+        if (this.joinRoomCode) this.joinRoomCode.value = res;
+        if (this.roomStatusNotice) {
+          this.roomStatusNotice.textContent = `Đã tạo phòng ${res}! Bấm Chơi để bắt đầu.`;
+          this.roomStatusNotice.style.color = '#52c41a';
+        }
+        this.showToast(`Đã tạo phòng riêng: ${res}! 🎲`);
+      });
+    }
+
+    if (this.btnCopyCode) {
+      this.btnCopyCode.addEventListener('click', () => {
+        if (this.currentFriendCode) {
+          navigator.clipboard.writeText(this.currentFriendCode);
+          this.showToast(`Đã chép mã phòng: ${this.currentFriendCode} 📋`);
+        }
+      });
+    }
+
+    if (this.btnCopyLink) {
+      this.btnCopyLink.addEventListener('click', () => {
+        if (this.currentFriendCode) {
+          const url = `${window.location.origin}${window.location.pathname}?room=priv-${this.currentFriendCode}`;
+          navigator.clipboard.writeText(url);
+          this.showToast(`Đã chép link mời: ${url} 🔗`);
+        }
+      });
+    }
+
+    if (this.joinRoomCode) {
+      this.joinRoomCode.addEventListener('input', () => {
+        if (this.joinRoomCode) {
+          this.joinRoomCode.value = this.joinRoomCode.value.toUpperCase();
+        }
+      });
+      this.joinRoomCode.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const code = this.joinRoomCode?.value.trim().toUpperCase() || '';
+          if (code.length >= 3) {
+            this.currentFriendCode = code;
+            if (this.roomStatusNotice) {
+              this.roomStatusNotice.textContent = `Đã chọn phòng: ${code}`;
+              this.roomStatusNotice.style.color = '#52c41a';
+            }
+            this.showToast(`Đã chọn phòng: ${code}`);
+          }
+        }
+      });
+    }
+
+    if (this.btnApplyCode) {
+      this.btnApplyCode.addEventListener('click', () => {
+        const code = (this.joinRoomCode?.value || '').trim().toUpperCase();
+        if (code.length >= 3) {
+          this.currentFriendCode = code;
+          if (this.roomStatusNotice) {
+            this.roomStatusNotice.textContent = `Đã chọn phòng: ${code}`;
+            this.roomStatusNotice.style.color = '#52c41a';
+          }
+          this.showToast(`Đã chọn phòng: ${code}`);
+        } else {
+          if (this.roomStatusNotice) {
+            this.roomStatusNotice.textContent = `Mã phòng ít nhất 3 ký tự!`;
+            this.roomStatusNotice.style.color = '#ff4d4f';
+          }
+        }
+      });
+    }
+
     if (this.modesContainer) {
       this.modesContainer.querySelectorAll('button').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const mode = btn.dataset.mode as 'ffa' | 'team';
+          const mode = btn.dataset.mode as 'ffa' | 'team' | 'friend';
           if (mode) {
             this.selectedMode = mode;
             this.modesContainer?.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
             btn.classList.add('on');
+            if (this.friendPanel) {
+              this.friendPanel.hidden = mode !== 'friend';
+            }
             this.onSelectMode?.(mode);
           }
         });
       });
+    }
+
+    // Auto-detect invite link from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room') || urlParams.get('code');
+    if (roomParam && (roomParam.startsWith('priv-') || roomParam.startsWith('friend-') || roomParam.length >= 3)) {
+      const cleanCode = roomParam.replace(/^(priv|friend)-/, '').toUpperCase();
+      this.currentFriendCode = cleanCode;
+      this.selectedMode = 'friend';
+      this.modesContainer?.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('on', b.dataset.mode === 'friend');
+      });
+      if (this.friendPanel) this.friendPanel.hidden = false;
+      if (this.joinRoomCode) this.joinRoomCode.value = cleanCode;
+      if (this.createdRoomCode) this.createdRoomCode.textContent = cleanCode;
+      if (this.createdRoomBox) this.createdRoomBox.hidden = false;
+      if (this.roomStatusNotice) {
+        this.roomStatusNotice.textContent = `Phòng từ link mời: ${cleanCode}`;
+        this.roomStatusNotice.style.color = '#52c41a';
+      }
     }
 
     window.addEventListener('keydown', (e) => {
@@ -292,10 +430,21 @@ export class HudManager {
     if (this.tClockEl) this.tClockEl.textContent = this.fmtTime(clockSec);
   }
 
-  public setRoomTag(name: string): void {
+  public setRoomTag(name: string, inviteUrl?: string): void {
     if (this.roomTagEl) {
       this.roomTagEl.hidden = false;
       this.roomTagEl.textContent = name;
+      if (inviteUrl) {
+        this.roomTagEl.style.cursor = 'pointer';
+        this.roomTagEl.title = 'Bấm để sao chép link mời bạn bè';
+        this.roomTagEl.onclick = () => {
+          navigator.clipboard.writeText(inviteUrl);
+          this.showToast('Đã sao chép link mời phòng bạn bè! 🔗');
+        };
+      } else {
+        this.roomTagEl.style.cursor = 'default';
+        this.roomTagEl.onclick = null;
+      }
     }
   }
 

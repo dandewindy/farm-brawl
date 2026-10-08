@@ -384,4 +384,17 @@ describe('bonus weapons and tools', () => {
     expect(vic.vx).toBeGreaterThan(60);
     expect(vic.stunT).toBe(0);
   });
+
+  it('private room with bots: false never spawns bots', () => {
+    const w = new World(1234, { bots: false });
+    expect(w.players.size).toBe(0);
+    const p1 = w.addPlayer('Friend1', 'cow');
+    const p2 = w.addPlayer('Friend2', 'pig');
+    for (let i = 0; i < 20; i++) {
+      w.step();
+    }
+    expect(w.players.size).toBe(2);
+    expect(w.players.get(p1)!.bot).toBe(false);
+    expect(w.players.get(p2)!.bot).toBe(false);
+  });
 });

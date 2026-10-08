@@ -44,7 +44,7 @@ export class LocalServer implements Transport {
     if (m.t === 'join') {
       const me = this.world.players.get(this.myId);
       if (me) this.world.respawn(this.myId, m.name, m.species, m.skin);
-      else this.myId = this.world.addPlayer(m.name, m.species, false, undefined, m.skin);
+      else this.myId = this.world.addPlayer(m.name, m.species, false, m.team, m.skin);
       this.onMsg({ t: 'joined', id: this.myId });
     } else if (m.t === 'input') {
       this.world.setInput(this.myId, m);

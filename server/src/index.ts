@@ -27,6 +27,14 @@ export default {
       });
     }
 
+    // Room info endpoint for lobby / checking private room status
+    if (url.pathname === '/api/room-info') {
+      const roomParam = url.searchParams.get('room') || 'pub-1';
+      const roomId = env.ROOM.idFromName(roomParam);
+      const roomStub = env.ROOM.get(roomId);
+      return roomStub.fetch(new Request(`${url.origin}/info?room=${encodeURIComponent(roomParam)}`));
+    }
+
     // Static assets fallback (served by Workers Static Assets)
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
