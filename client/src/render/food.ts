@@ -31,7 +31,7 @@ export class FoodAndParticleRenderer {
   private readonly maxParticles = 1200;
 
   constructor(private readonly scene: THREE.Scene) {
-    // 0: Corn (Bắp ngô) - elongated ear of corn with sculpted 3D kernel rows profile
+    // 0: Corn (Bắp) - elongated ear of corn with sculpted 3D kernel rows profile
     const cornProfile = [
       new THREE.Vector2(0.08, -0.70), // base stem
       new THREE.Vector2(0.14, -0.62), // kernel row 1
@@ -67,13 +67,13 @@ export class FoodAndParticleRenderer {
     ];
     const appleGeo = new THREE.LatheGeometry(appleProfile, 14);
 
-    // 2: Golden Corn (Bắp ngô vàng lớn) - large sculpted lathe profile
+    // 2: Golden Corn (Bắp vàng lớn) - large sculpted lathe profile
     const goldenCornGeo = cornCobGeo.clone().scale(1.25, 1.25, 1.25);
 
     // 3: Carrot (Cà rốt) - tapered cone with wide crown at +Y and pointy root tip at -Y
     const carrotGeo = new THREE.ConeGeometry(0.22, 0.85, 10).rotateX(Math.PI).translate(0, -0.075, 0);
 
-    // 4: Pumpkin (Bí ngô) - squashed ribbed sphere
+    // 4: Pumpkin (Bí đỏ) - squashed ribbed sphere
     const pumpkinGeo = new THREE.SphereGeometry(0.78, 14, 10).scale(1.08, 0.74, 1.08);
 
     // 5: Turnip (Củ cải trắng)
@@ -123,7 +123,7 @@ export class FoodAndParticleRenderer {
       this.foodMeshes.push(mesh);
     }
 
-    // 0: Corn Husk & stem (Vỏ bắp ngô xanh bọc chân bắp)
+    // 0: Corn Husk & stem (Vỏ bắp xanh bọc chân bắp)
     const huskProfile = [
       new THREE.Vector2(0.05, -0.84), // stalk stem
       new THREE.Vector2(0.06, -0.72),
@@ -177,7 +177,7 @@ export class FoodAndParticleRenderer {
     this.scene.add(carrotTopMesh);
     this.foodTops[3] = carrotTopMesh;
 
-    // 4: Pumpkin stem (Cuống bí ngô)
+    // 4: Pumpkin stem (Cuống bí đỏ)
     const pumpkinStemGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.35, 6).translate(0, 0.65, 0);
     const pumpkinStemMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.8 });
     const pumpkinStemMesh = new THREE.InstancedMesh(pumpkinStemGeo, pumpkinStemMat, this.maxFoodPerKind);

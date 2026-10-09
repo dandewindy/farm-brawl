@@ -31,7 +31,7 @@ export interface BotBrain {
 }
 
 export const BOT_NAMES = [
-  'Ủn Ỉn', 'Bé Mập', 'Gà Mờ', 'Bò Sữa', 'Vịt Bầu', 'Cừu Non', 'Ngựa Ô', 'Heo Hồng', 'Tí Nị', 'Lợn Lì',
+  'Ủn Ỉn', 'Bé Mập', 'Gà Mờ', 'Bò Sữa', 'Vịt Bầu', 'Cừu Non', 'Ngựa Ô', 'Heo Hồng', 'Tí Nị', 'Heo Lì',
   'Bò Tót', 'Gà Chiến', 'Vịt Xiêm', 'Cừu Bông', 'Ngựa Vằn', 'Mập Ú', 'Boxer', 'Clover', 'Muriel', 'Benjamin',
 ];
 

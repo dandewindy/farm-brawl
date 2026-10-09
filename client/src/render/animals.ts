@@ -108,7 +108,7 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0xf6a5b5, snout: 0xee8fa2 },
     { body: 0x2f2a2c, snout: 0xf0b9c4 },
     { body: 0xd2773a, snout: 0xe39a6b },
-    { body: 0xf6a5b5, snout: 0xee8fa2, spot: 0x3a3335 },
+    { body: 0xf6a5b5, snout: 0xee8fa2, spot: 0x2e2628 },
   ],
 };
 
@@ -359,8 +359,18 @@ function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0, undefined, true);
   // Spots (if spotted skin)
   if (s.spot) {
-    blob(g, s.spot, 0.22, [1, 0.8, 0.14], 0.2, 1.12, 0.44);
-    blob(g, s.spot, 0.2, [1, 0.85, 0.14], -0.28, 1.05, -0.44);
+    // Large prominent patch on top spine / back (clearly visible from top-down camera)
+    blob(g, s.spot, 0.32, [1.2, 0.16, 1.0], -0.15, 1.70, 0.08);
+    // Rear back / hindquarter patch
+    blob(g, s.spot, 0.28, [1.0, 0.18, 0.9], -0.58, 1.54, -0.12);
+    // Right flank / belly patch (clearly visible from 3D preview & right side)
+    blob(g, s.spot, 0.30, [1.0, 0.85, 0.16], 0.18, 1.15, 0.70);
+    // Left flank / hip patch (visible from left side)
+    blob(g, s.spot, 0.28, [1.0, 0.9, 0.16], -0.32, 1.08, -0.68);
+    // Front right shoulder patch
+    blob(g, s.spot, 0.24, [0.9, 0.9, 0.16], 0.52, 1.25, 0.50);
+    // Head / Eye patch over right eye
+    blob(g, s.spot, 0.22, [0.85, 0.95, 0.2], 0.96, 1.48, 0.38);
   }
   // Head
   g.add(part(new THREE.SphereGeometry(0.5, 18, 12), s.body, 0.85, 1.3, 0));
@@ -372,9 +382,10 @@ function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   for (const z of [-0.08, 0.08]) {
     g.add(part(new THREE.SphereGeometry(0.045, 8, 6), 0x5a2a35, 1.44, 1.24, z));
   }
-  // Ears (droopy cone)
+  // Ears (droopy cone) - right ear is black on spotted skin
   for (const z of [-0.27, 0.27]) {
-    const ear = part(new THREE.ConeGeometry(0.15, 0.28, 10), s.body, 0.72, 1.76, z);
+    const earColor = (z > 0 && s.spot) ? s.spot : s.body;
+    const ear = part(new THREE.ConeGeometry(0.15, 0.28, 10), earColor, 0.72, 1.76, z);
     ear.rotation.x = z > 0 ? 0.4 : -0.4;
     g.add(ear);
   }
