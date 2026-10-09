@@ -1045,7 +1045,7 @@ export class AnimalRenderer {
       vis.ringMat.opacity = 0.85;
     }
 
-    // Collar color reflects team (Foxwood Blue 0x2196f3, Pinchfield Red 0xf44336) or gold for King
+    // Collar color reflects team (A12 Blue 0x2196f3, WFM Red 0xf44336) or gold for King
     const collarColor = meta.team !== undefined
       ? (meta.team === 0 ? 0x2196f3 : 0xf44336)
       : (SPECIES_RING_COLOR[vis.species] ?? 0xff9800);
