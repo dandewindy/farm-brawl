@@ -63,6 +63,7 @@ export class HudManager {
   public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
   private currentFriendCode = '';
   private currentChoiceOptions: string[] = [];
+  private lastChoiceKey = '';
 
   private selectedSpecies: Species = 'pig';
   private floatingTexts: FloatingText[] = [];
@@ -387,23 +388,39 @@ export class HudManager {
     this.onPickRule?.(id);
     if (this.choiceEl) this.choiceEl.hidden = true;
     this.currentChoiceOptions = [];
+    this.lastChoiceKey = '';
   }
 
   public showChoice(c?: ChoiceWire | null): void {
     if (!c || !c.options || c.options.length === 0) {
       if (this.choiceEl) this.choiceEl.hidden = true;
       this.currentChoiceOptions = [];
+      this.lastChoiceKey = '';
       return;
     }
     this.currentChoiceOptions = c.options;
     if (this.choiceLeftEl) {
       this.choiceLeftEl.textContent = t('choiceLeft', { s: c.left });
     }
+
+    const key = c.options.join(',');
+    if (this.lastChoiceKey === key) {
+      // Options have not changed; avoid destroying DOM and losing click/focus
+      if (this.choiceEl && this.choiceEl.hidden) this.choiceEl.hidden = false;
+      return;
+    }
+    this.lastChoiceKey = key;
+
     if (this.choiceCardsEl) {
       this.choiceCardsEl.innerHTML = '';
+      let firstBtn: HTMLButtonElement | null = null;
       c.options.forEach((ruleId, idx) => {
         const b = document.createElement('button');
+        b.type = 'button';
+        b.tabIndex = 0;
         b.className = 'plank';
+        if (idx === 0) firstBtn = b;
+
         const kbd = document.createElement('kbd');
         kbd.textContent = String(idx + 1);
         const name = document.createElement('span');
@@ -413,14 +430,37 @@ export class HudManager {
         desc.className = 'd';
         desc.textContent = t(`d_${ruleId}`);
         b.append(kbd, name, desc);
-        b.onclick = (e) => {
+
+        // Prevent pointer/touch events from leaking to canvas/movement
+        b.addEventListener('pointerdown', (e) => e.stopPropagation());
+        b.addEventListener('mousedown', (e) => e.stopPropagation());
+        b.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+        // Reliable selection handlers for mouse click, mobile touch tap, and keyboard Tab + Enter/Space
+        const select = (e: Event) => {
+          e.preventDefault();
           e.stopPropagation();
           this.pickChoice(ruleId);
         };
+
+        b.addEventListener('click', select);
+        b.addEventListener('touchend', select);
+        b.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            select(e);
+          }
+        });
+
         this.choiceCardsEl!.appendChild(b);
       });
+      if (this.choiceEl) {
+        this.choiceEl.hidden = false;
+        // Auto-focus first option once so user can immediately Tab through or press Enter
+        setTimeout(() => firstBtn?.focus(), 50);
+      }
+    } else if (this.choiceEl) {
+      this.choiceEl.hidden = false;
     }
-    if (this.choiceEl) this.choiceEl.hidden = false;
   }
 
   public updateTeamBar(t0: number, t1: number, clockSec: number): void {

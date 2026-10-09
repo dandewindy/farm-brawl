@@ -98,10 +98,19 @@ export class World {
   ruleTimer = 0;
   kingChoice: { options: string[]; expireT: number } | null = null;
   hof: [string, Species, number][] = [
-    ['Napoleon', 'pig', 35],
+    ['Vua', 'pig', 35],
     ['Snowball', 'pig', 22],
     ['Boxer', 'horse', 16],
   ];
+  tillTruck = {
+    active: false,
+    x: 0,
+    z: 0,
+    vx: 0,
+    vz: 0,
+    angle: 0,
+    timer: 2.5,
+  };
 
   constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
@@ -464,6 +473,74 @@ export class World {
       }
     }
 
+    // Rule: "equal" (All animals are equal, non-kings converge to 30kg, King boosted)
+    if (this.currentRule === 'equal') {
+      for (const p of alive) {
+        if (p.id === this.napoleonId) {
+          p.mass = Math.max(p.mass, 65);
+        } else if (Math.abs(p.mass - 30) > 0.5) {
+          p.mass += (30 - p.mass) * 0.05 * DT;
+        }
+      }
+    }
+
+    // Rule: "till" (Farmer Till returns in his tractor, sweeps across the farm)
+    if (this.currentRule === 'till') {
+      if (!this.tillTruck.active) {
+        this.tillTruck.timer -= DT;
+        if (this.tillTruck.timer <= 0) {
+          // Spawn tractor at perimeter R = 52
+          const enterA = this.rnd() * Math.PI * 2;
+          const sx = Math.cos(enterA) * 52;
+          const sz = Math.sin(enterA) * 52;
+          const aimA = enterA + Math.PI + (this.rnd() - 0.5) * 0.5;
+          const speed = 25;
+          this.tillTruck.active = true;
+          this.tillTruck.x = sx;
+          this.tillTruck.z = sz;
+          this.tillTruck.vx = Math.cos(aimA) * speed;
+          this.tillTruck.vz = Math.sin(aimA) * speed;
+          this.tillTruck.angle = aimA;
+          this.events.push({ k: 'boom', id: 0, x: sx, z: sz });
+        }
+      } else {
+        this.tillTruck.x += this.tillTruck.vx * DT;
+        this.tillTruck.z += this.tillTruck.vz * DT;
+        const tx = this.tillTruck.x;
+        const tz = this.tillTruck.z;
+        const cosA = Math.cos(-this.tillTruck.angle);
+        const sinA = Math.sin(-this.tillTruck.angle);
+
+        // Check ram collision with every alive player
+        for (const p of alive) {
+          const dx = p.x - tx;
+          const dz = p.z - tz;
+          const rx = dx * cosA - dz * sinA;
+          const rz = dx * sinA + dz * cosA;
+          const pr = radiusOf(p.mass);
+          // Collision box: length 4.6 (rx: -2.3 to +2.3), width 2.8 (rz: -1.4 to +1.4)
+          if (Math.abs(rx) < 2.3 + pr && Math.abs(rz) < 1.4 + pr) {
+            // Massive tractor ram!
+            p.vx = Math.cos(this.tillTruck.angle) * 32;
+            p.vz = Math.sin(this.tillTruck.angle) * 32;
+            const loss = Math.min(18, Math.max(6, p.mass * 0.22));
+            p.mass = Math.max(CFG.MIN_MASS, p.mass - loss);
+            p.stunT = 1.5;
+            this.events.push({ k: 'hit', a: 0, v: p.id, x: p.x, z: p.z, s: 30, loss });
+          }
+        }
+
+        // Check if tractor reached opposite perimeter
+        if (Math.hypot(tx, tz) > 56) {
+          this.tillTruck.active = false;
+          this.tillTruck.timer = 3.5; // Next sweep in 3.5 seconds
+        }
+      }
+    } else {
+      this.tillTruck.active = false;
+      this.tillTruck.timer = 2.0;
+    }
+
     // King periodic reign harvest bonus (every 3 seconds)
     if (this.napoleonId > 0 && this.tick % 60 === 0) {
       const king = this.players.get(this.napoleonId);
@@ -491,7 +568,8 @@ export class World {
       p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false;
       return;
     }
-    p.cd = Math.max(0, p.cd - DT);
+    const cdRate = (this.currentRule === 'squealer' && p.id === this.napoleonId) ? 2 : 1;
+    p.cd = Math.max(0, p.cd - DT * cdRate);
     const down = (p.input.btn || p.btnLatch) && p.stunT <= 0;
     p.btnLatch = false;
     if (down && p.input.btn) {
@@ -579,7 +657,7 @@ export class World {
   }
 
   startKingChoice(): void {
-    const rules = ['twoleg', 'fourleg', 'corn', 'sunday', 'tax', 'squealer', 'snowball'];
+    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball', 'till'];
     const candidates = rules.filter((r) => r !== this.currentRule);
     const shuffled = [...candidates].sort(() => this.rnd() - 0.5);
     this.kingChoice = {
@@ -598,11 +676,33 @@ export class World {
     this.currentRule = ruleId;
     this.ruleTimer = 40;
     this.kingChoice = null;
+    if (ruleId === 'equal') {
+      for (const p of this.players.values()) {
+        if (p.alive) {
+          if (p.id === this.napoleonId) p.mass = Math.max(p.mass, 65);
+          else p.mass = 30;
+        }
+      }
+    } else if (ruleId === 'squealer') {
+      const king = this.players.get(this.napoleonId);
+      if (king && king.alive) {
+        king.cd = 0;
+        king.power = 1.35;
+      }
+    } else if (ruleId === 'till') {
+      this.tillTruck.timer = 1.0; // Quick initial entrance for Till's tractor
+    } else if (ruleId === 'corn') {
+      const [podX, podZ] = this.map.podium;
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2;
+        this.addFood(podX + Math.cos(ang) * 2.5, podZ + Math.sin(ang) * 2.5, 2, 6);
+      }
+    }
     this.events.push({ k: 'rule', id: ruleId });
   }
 
   private pickRule(): void {
-    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball'];
+    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball', 'till'];
     const candidates = rules.filter((r) => r !== this.currentRule);
     const pick = candidates[Math.floor(this.rnd() * candidates.length)] || 'twoleg';
     this.applyRule(pick);
@@ -625,6 +725,11 @@ export class World {
       } else if (isFourLeg) {
         k = Math.min(CFG.KNOCKBACK_MAX * 1.5, k * 1.5);
       }
+    }
+
+    // Rule: "squealer" (Propaganda empowers King with 1.8x ram force)
+    if (this.currentRule === 'squealer' && att.id === this.napoleonId) {
+      k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
     }
 
     // Weapon: Pitchfork (1.35x knockback)
@@ -884,6 +989,9 @@ export class World {
       reign: Math.round(this.napoleonReign),
       hof: this.hof,
     };
+    if (this.tillTruck.active) {
+      snap.truck = [r2(this.tillTruck.x), r2(this.tillTruck.z), r2(this.tillTruck.angle)];
+    }
     if (this.tick % 5 === 0) {
       snap.lb = this.ranked.slice(0, 10).map((o): LeaderRow => [
         o.id,

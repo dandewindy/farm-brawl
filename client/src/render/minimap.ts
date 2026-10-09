@@ -18,7 +18,8 @@ export class MinimapRenderer {
     myId: number,
     tools?: Map<number, ToolWire>,
     napoleonId = 0,
-    food?: Map<number, { k: number; x: number; z: number }>
+    food?: Map<number, { k: number; x: number; z: number }>,
+    truck?: [number, number, number]
   ): void {
     const { ctx, size } = this;
     const center = size / 2;
@@ -131,6 +132,21 @@ export class MinimapRenderer {
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
+    }
+
+    // Farmer Till's tractor (sweeping hazard)
+    if (truck) {
+      const tx = center + truck[0] * scale;
+      const tz = center + truck[1] * scale;
+      ctx.save();
+      ctx.translate(tx, tz);
+      ctx.rotate(-truck[2]);
+      ctx.fillStyle = '#ff3d00';
+      ctx.fillRect(-7, -4.5, 14, 9);
+      ctx.strokeStyle = '#ffd600';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-7, -4.5, 14, 9);
+      ctx.restore();
     }
   }
 }

@@ -57,6 +57,7 @@ export class GameState {
   rule = '';
   reign = 0;
   hof: HofRow[] = [];
+  truck?: [number, number, number];
 
   snapTick = 0;
   readonly clockWin: number[] = [];
@@ -156,6 +157,7 @@ export class GameState {
     if (s.rule !== undefined) this.rule = s.rule;
     if (s.reign !== undefined) this.reign = s.reign;
     if (s.hof) this.hof = s.hof;
+    this.truck = s.truck;
     this.hooks.onSnapshot(s);
   }
 

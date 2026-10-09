@@ -311,6 +311,202 @@ interface FlameInfo {
 
 const ARC_SEG = 48;
 
+function createMgmTextures(): { carpetTex: THREE.CanvasTexture; flagTex: THREE.CanvasTexture } {
+  const cCanvas = document.createElement('canvas');
+  cCanvas.width = 512;
+  cCanvas.height = 512;
+  const cCtx = cCanvas.getContext('2d')!;
+
+  const fCanvas = document.createElement('canvas');
+  fCanvas.width = 512;
+  fCanvas.height = 256;
+  const fCtx = fCanvas.getContext('2d')!;
+
+  const carpetTex = new THREE.CanvasTexture(cCanvas);
+  carpetTex.colorSpace = THREE.SRGBColorSpace;
+  carpetTex.anisotropy = 4;
+
+  const flagTex = new THREE.CanvasTexture(fCanvas);
+  flagTex.colorSpace = THREE.SRGBColorSpace;
+  flagTex.anisotropy = 4;
+
+  const render = (img?: HTMLImageElement) => {
+    // 1. Carpet texture: circular crimson emblem with concentric gold rings
+    cCtx.clearRect(0, 0, 512, 512);
+    cCtx.fillStyle = '#992218';
+    cCtx.beginPath();
+    cCtx.arc(256, 256, 254, 0, Math.PI * 2);
+    cCtx.fill();
+
+    cCtx.strokeStyle = '#ffd700';
+    cCtx.lineWidth = 10;
+    cCtx.beginPath();
+    cCtx.arc(256, 256, 240, 0, Math.PI * 2);
+    cCtx.stroke();
+
+    cCtx.strokeStyle = '#d4a017';
+    cCtx.lineWidth = 4;
+    cCtx.beginPath();
+    cCtx.arc(256, 256, 226, 0, Math.PI * 2);
+    cCtx.stroke();
+
+    // 2. Flag texture: deep red banner with gold fringe
+    fCtx.fillStyle = '#a5281b';
+    fCtx.fillRect(0, 0, 512, 256);
+    fCtx.fillStyle = '#ffd700';
+    fCtx.fillRect(0, 0, 512, 8);
+    fCtx.fillRect(0, 248, 512, 8);
+    fCtx.fillRect(504, 0, 8, 256);
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Create white tinted version of mgm logo
+      const tint = document.createElement('canvas');
+      tint.width = img.naturalWidth;
+      tint.height = img.naturalHeight;
+      const tCtx = tint.getContext('2d')!;
+      tCtx.drawImage(img, 0, 0);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = '#ffffff';
+      tCtx.fillRect(0, 0, tint.width, tint.height);
+
+      // Draw onto carpet emblem (centered)
+      const ratio = img.naturalHeight / img.naturalWidth;
+      const cW = 340;
+      const cH = cW * ratio;
+      cCtx.drawImage(tint, 256 - cW / 2, 256 - cH / 2, cW, cH);
+
+      // Draw onto flag (centered)
+      const fW = 320;
+      const fH = fW * ratio;
+      fCtx.drawImage(tint, 256 - fW / 2, 128 - fH / 2, fW, fH);
+    } else {
+      cCtx.fillStyle = '#ffffff';
+      cCtx.font = 'bold 110px sans-serif';
+      cCtx.textAlign = 'center';
+      cCtx.textBaseline = 'middle';
+      cCtx.fillText('mgm', 256, 256);
+
+      fCtx.fillStyle = '#ffffff';
+      fCtx.font = 'bold 90px sans-serif';
+      fCtx.textAlign = 'center';
+      fCtx.textBaseline = 'middle';
+      fCtx.fillText('mgm', 256, 128);
+    }
+
+    carpetTex.needsUpdate = true;
+    flagTex.needsUpdate = true;
+  };
+
+  render();
+
+  const logoImg = new Image();
+  logoImg.src = '/mgm-logo.png';
+  logoImg.onload = () => render(logoImg);
+
+  return { carpetTex, flagTex };
+}
+
+function buildTractor(): THREE.Group {
+  const g = new THREE.Group();
+  const matBody = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 }); // Classic tractor green
+  const matYellow = new THREE.MeshStandardMaterial({ color: 0xfbc02d, roughness: 0.5 }); // Yellow rims/trim
+  const matDark = new THREE.MeshStandardMaterial({ color: 0x212121, roughness: 0.8 }); // Tires
+  const matGlass = new THREE.MeshStandardMaterial({ color: 0xb0bec5, roughness: 0.2, metalness: 0.8 });
+  const matChrome = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.8, roughness: 0.2 });
+  const matHat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 }); // Farmer hat
+
+  // 1. Engine hood (front)
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 1.4), matBody);
+  hood.position.set(0.9, 1.1, 0);
+  hood.castShadow = true;
+  g.add(hood);
+
+  // Radiator grille
+  const grill = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 1.2), matYellow);
+  grill.position.set(2.02, 1.1, 0);
+  g.add(grill);
+
+  // Headlights
+  for (const z of [-0.5, 0.5]) {
+    const light = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.15, 12), matChrome);
+    light.rotation.z = Math.PI / 2;
+    light.position.set(2.0, 1.35, z);
+    g.add(light);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffeb3b }));
+    lens.position.set(2.08, 1.35, z);
+    g.add(lens);
+  }
+
+  // Vertical exhaust pipe
+  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 8), matDark);
+  exhaust.position.set(1.4, 2.0, 0.55);
+  g.add(exhaust);
+  const exhaustCap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.05, 0.2, 8), matDark);
+  exhaustCap.position.set(1.4, 2.65, 0.55);
+  g.add(exhaustCap);
+
+  // 2. Cabin / Cab (rear)
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.5), matBody);
+  cab.position.set(-0.8, 1.7, 0);
+  cab.castShadow = true;
+  g.add(cab);
+
+  // Cab roof
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 1.7), matYellow);
+  roof.position.set(-0.8, 2.55, 0);
+  roof.castShadow = true;
+  g.add(roof);
+
+  // Windshield & windows
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 1.3), matGlass);
+  windshield.position.set(0.02, 1.85, 0);
+  g.add(windshield);
+  for (const z of [-0.76, 0.76]) {
+    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.75, 0.05), matGlass);
+    sideWin.position.set(-0.7, 1.85, z);
+    g.add(sideWin);
+  }
+
+  // 3. Driver: Farmer Till!
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffcc80 }));
+  head.position.set(-0.7, 1.85, 0);
+  g.add(head);
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 16), matHat);
+  hatBrim.position.set(-0.7, 2.05, 0);
+  g.add(hatBrim);
+  const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.25, 16), matHat);
+  hatCrown.position.set(-0.7, 2.18, 0);
+  g.add(hatCrown);
+
+  // 4. Big rear wheels
+  for (const z of [-1.0, 1.0]) {
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.45, 18), matDark);
+    tire.rotation.x = Math.PI / 2;
+    tire.position.set(-0.75, 0.85, z);
+    tire.castShadow = true;
+    g.add(tire);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.48, 12), matYellow);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.set(-0.75, 0.85, z);
+    g.add(rim);
+  }
+
+  // Smaller front wheels
+  for (const z of [-0.85, 0.85]) {
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.32, 16), matDark);
+    tire.rotation.x = Math.PI / 2;
+    tire.position.set(1.1, 0.48, z);
+    tire.castShadow = true;
+    g.add(tire);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.34, 10), matYellow);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.set(1.1, 0.48, z);
+    g.add(rim);
+  }
+
+  return g;
+}
+
 export class WorldRenderer {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
@@ -322,6 +518,7 @@ export class WorldRenderer {
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
   private sun: THREE.DirectionalLight | null = null;
+  private tillTruckGroup: THREE.Group | null = null;
   readonly camTarget = { x: 0, z: 0 };
   private camH = 60;
   private readonly tex: WorldTextures;
@@ -388,6 +585,10 @@ export class WorldRenderer {
     this.buildFarmhouse();
     this.buildTrees();
     this.scene.add(this.hazardGroup);
+
+    this.tillTruckGroup = buildTractor();
+    this.tillTruckGroup.visible = false;
+    this.scene.add(this.tillTruckGroup);
 
     window.addEventListener('resize', () => this.resize());
   }
@@ -477,7 +678,6 @@ export class WorldRenderer {
       this.fenceRails.push(rail);
     }
   }
-
   private buildPodium(): void {
     const PR = CFG.PODIUM_R;
     const flatMat = (color: number, opts?: Partial<THREE.MeshStandardMaterialParameters>) =>
@@ -491,13 +691,33 @@ export class WorldRenderer {
     base.receiveShadow = true;
     this.podiumGroup.add(base);
 
+    // Create official mgm podium carpet and flag textures
+    const { carpetTex, flagTex } = createMgmTextures();
+
     const carpet = new THREE.Mesh(
       new THREE.CylinderGeometry(PR - 1.2, PR - 1.2, 0.06, 40),
-      flatMat(0xa5281b)
+      flatMat(0x992218)
     );
     carpet.position.y = 0.53;
     carpet.receiveShadow = true;
     this.podiumGroup.add(carpet);
+
+    // mgm logo circular decal on top of the carpet
+    const logoDiscGeo = new THREE.CircleGeometry(PR - 1.35, 48);
+    logoDiscGeo.rotateX(-Math.PI / 2);
+    const logoDisc = new THREE.Mesh(
+      logoDiscGeo,
+      new THREE.MeshStandardMaterial({
+        map: carpetTex,
+        roughness: 0.75,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      })
+    );
+    logoDisc.position.y = 0.562;
+    logoDisc.receiveShadow = true;
+    this.podiumGroup.add(logoDisc);
 
     // Podium border tiles (capture progress indicators)
     for (let i = 0; i < 48; i++) {
@@ -528,9 +748,15 @@ export class WorldRenderer {
     pole.castShadow = true;
     this.podiumGroup.add(pole);
 
+    // Red flag with mgm logo
+    const flagMat = new THREE.MeshStandardMaterial({
+      map: flagTex,
+      roughness: 0.7,
+      side: THREE.DoubleSide,
+    });
     const flag = new THREE.Mesh(
       new THREE.BoxGeometry(2.2, 1.3, 0.06),
-      flatMat(0xa5281b)
+      flagMat
     );
     flag.position.set(1.15, 5.8, -(PR - 1.6));
     flag.castShadow = true;
@@ -904,6 +1130,17 @@ export class WorldRenderer {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       }
+    }
+  }
+
+  updateTillTruck(truck?: [number, number, number]): void {
+    if (!this.tillTruckGroup) return;
+    if (truck) {
+      this.tillTruckGroup.visible = true;
+      this.tillTruckGroup.position.set(truck[0], 0, truck[1]);
+      this.tillTruckGroup.rotation.y = -truck[2];
+    } else {
+      this.tillTruckGroup.visible = false;
     }
   }
 

@@ -485,10 +485,17 @@ body.menu #hud { display: none; }
   cursor: pointer;
   transition: transform 0.12s, border-color 0.12s, background 0.12s;
 }
-#choiceCards .plank:hover {
+#choiceCards .plank:hover,
+#choiceCards .plank:focus-visible {
   transform: translateY(-4px) scale(1.02);
   border-color: var(--gold);
   background: #4a382c;
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+#choiceCards .plank:active {
+  transform: translateY(-1px) scale(0.98);
+  background: #2e221a;
 }
 #choiceCards .plank kbd {
   display: inline-block;

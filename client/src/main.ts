@@ -716,6 +716,7 @@ function animate(now: number): void {
         : (({ chicken: 0xffb74d, sheep: 0xf3f1ea, horse: 0x8b5a2b, cow: 0x4fc3f7, duck: 0xffd54f, pig: 0xf48fb1 } as Record<string, number>)[capMeta.species] ?? 0xffc928))
       : 0xffc928;
     world.updatePodiumRing(capProg, capContested, now, capColor);
+    world.updateTillTruck(gameState.truck);
 
   // Update player ground cooldown arc indicator
   if (me && gameState.alive) {
@@ -763,7 +764,7 @@ function animate(now: number): void {
   world.render();
 
   // 2D Minimap Render
-  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId, gameState.food);
+  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId, gameState.food, gameState.truck);
 }
 
 requestAnimationFrame(animate);

@@ -111,6 +111,8 @@ export interface Snapshot {
   hof?: HofRow[];
   /** per-recipient extras */
   me?: { kills: number; cd: number; rank: number; choice?: ChoiceWire | null };
+  /** Farmer Till tractor position and angle: [x, z, angle] */
+  truck?: [number, number, number];
 }
 
 export type ServerMsg =
