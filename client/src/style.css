@@ -264,6 +264,7 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #ram { position: absolute; left: 50%; bottom: 18px; width: 180px; height: 12px; transform: translateX(-50%); background: rgba(31, 26, 23, .7); border-radius: 6px; overflow: hidden; }
 #ramFill { height: 100%; width: 100%; background: #8fd16a; transition: background .1s; }
 #ram.cd #ramFill { background: #6c6258; }
+#ram.no-charge #ramFill { background: #d48834; }
 #ram.charging #ramFill { background: linear-gradient(90deg, var(--gold), var(--red-hi)); }
 #ramTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 9px; font-weight: 700; letter-spacing: .1em; color: rgba(255, 255, 255, .85); }
 

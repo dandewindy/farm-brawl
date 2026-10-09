@@ -13,7 +13,7 @@ export const CFG = {
   PODIUM_R: 7,
   START_MASS: 20,
   MIN_MASS: 10,
-  MAX_MASS: 600,
+  MAX_MASS: Infinity,
 
   MOVE_SPEED: 13,
   MOVE_ACCEL: 7,
@@ -58,8 +58,8 @@ export const CFG = {
   FOOD_TARGET: 260,
   FOOD_SPAWN_PER_TICK: 4,
   /** above this, mass slowly melts so giants don't stay forever */
-  DECAY_START: 80,
-  DECAY_RATE: 0.004,
+  DECAY_START: 120,
+  DECAY_RATE: 0.001,
 
   /** keep at least this many animals in a room (bots fill the gap) */
   BOT_FILL: 10,

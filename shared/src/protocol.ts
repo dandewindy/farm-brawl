@@ -80,7 +80,8 @@ export type GameEvent =
   | { k: 'boom'; id: number; x: number; z: number }
   | { k: 'superFood'; x: number; z: number }
   | { k: 'super'; id: number }
-  | { k: 'fly'; id: number; x: number; z: number };
+  | { k: 'fly'; id: number; x: number; z: number }
+  | { k: 'teamWin'; winner: number; s0: number; s1: number };
 
 /** [id, name, mass, kills, reign?] */
 export type LeaderRow = [id: number, name: string, mass: number, kills: number, reign?: number];
@@ -113,6 +114,8 @@ export interface Snapshot {
   me?: { kills: number; cd: number; rank: number; choice?: ChoiceWire | null };
   /** Farmer Till tractor position and angle: [x, z, angle] */
   truck?: [number, number, number];
+  /** team mode state: [scoreTeam0, scoreTeam1, remainingClockSeconds] */
+  team?: [number, number, number];
 }
 
 export type ServerMsg =

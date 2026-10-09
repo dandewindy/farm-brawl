@@ -111,6 +111,9 @@ export class World {
     angle: 0,
     timer: 2.5,
   };
+  teamScores: [number, number] = [0, 0];
+  matchClock = 300;
+  matchEnded = false;
 
   constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
@@ -221,6 +224,23 @@ export class World {
     this.tick++;
     this.time += DT;
     this.fillBots();
+
+    // Team mode match clock & scoring
+    const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
+    if (hasTeams && !this.matchEnded) {
+      this.matchClock = Math.max(0, this.matchClock - DT);
+      if (this.napoleonId > 0) {
+        const king = this.players.get(this.napoleonId);
+        if (king && king.alive && king.team !== undefined) {
+          this.teamScores[king.team] += DT * 1;
+        }
+      }
+      if (this.matchClock <= 0) {
+        this.matchEnded = true;
+        const winner = this.teamScores[0] > this.teamScores[1] ? 0 : this.teamScores[1] > this.teamScores[0] ? 1 : -1;
+        this.events.push({ k: 'teamWin', winner, s0: Math.round(this.teamScores[0]), s1: Math.round(this.teamScores[1]) });
+      }
+    }
 
     for (const p of this.players.values()) {
       if (!p.alive) {
@@ -468,7 +488,7 @@ export class World {
               taxSum += tax;
             }
           }
-          king.mass = Math.min(CFG.MAX_MASS, king.mass + taxSum);
+          king.mass += taxSum;
         }
       }
     }
@@ -545,7 +565,7 @@ export class World {
     if (this.napoleonId > 0 && this.tick % 60 === 0) {
       const king = this.players.get(this.napoleonId);
       if (king && king.alive) {
-        king.mass = Math.min(CFG.MAX_MASS, king.mass + 2);
+        king.mass += 2;
         // Spawn golden corn directly on podium
         this.addFood(podX + (this.rnd() - 0.5) * 4, podZ + (this.rnd() - 0.5) * 4, 2, 6);
       }
@@ -577,8 +597,14 @@ export class World {
         p.pressed = false; p.holdT = 0; p.charging = false;
       } else {
         p.pressed = true;
-        p.holdT = Math.min(CFG.CHARGE_MAX + 0.5, p.holdT + DT);
-        p.charging = p.holdT >= CFG.CHARGE_SLOW_AFTER;
+        // Under 20kg: cannot charge up to ram
+        if (p.mass >= 20) {
+          p.holdT = Math.min(CFG.CHARGE_MAX + 0.5, p.holdT + DT);
+          p.charging = p.holdT >= CFG.CHARGE_SLOW_AFTER;
+        } else {
+          p.holdT = 0;
+          p.charging = false;
+        }
       }
       return;
     }
@@ -636,8 +662,9 @@ export class World {
 
         const va = a.vx * nx + a.vz * nz; // a's speed towards b
         const vb = -(b.vx * nx + b.vz * nz); // b's speed towards a
-        const aHits = a.dashT > 0 && va > CFG.HIT_MIN_SPEED && !a.dashHit.has(b.id);
-        const bHits = b.dashT > 0 && vb > CFG.HIT_MIN_SPEED && !b.dashHit.has(a.id);
+        const sameTeam = a.team !== undefined && b.team !== undefined && a.team === b.team;
+        const aHits = !sameTeam && a.dashT > 0 && va > CFG.HIT_MIN_SPEED && !a.dashHit.has(b.id);
+        const bHits = !sameTeam && b.dashT > 0 && vb > CFG.HIT_MIN_SPEED && !b.dashHit.has(a.id);
         if (aHits && bHits) {
           // head-on: the bigger momentum wins
           if (va * ma * a.power >= vb * mb * b.power) this.hit(a, b, nx, nz, va);
@@ -820,9 +847,12 @@ export class World {
       const isSnowballTraitor = this.currentRule === 'snowball' && this.ranked.length > 1 && p.id === (this.ranked[0]?.id === this.napoleonId ? this.ranked[1]?.id : this.ranked[0]?.id);
       const mult = isSnowballTraitor ? 3.0 : isKingKill ? 1.5 : 1.0;
       spoils = Math.round(p.mass * CFG.KILL_SPOILS * mult);
-      killer.mass = Math.min(CFG.MAX_MASS, killer.mass + spoils);
+      killer.mass += spoils;
       killer.kills++;
       killer.streak++;
+      if (killer.team !== undefined && p.team !== undefined && killer.team !== p.team) {
+        this.teamScores[killer.team] += 5;
+      }
     }
     // what's left of it falls back inside the fence
     const d = Math.hypot(p.x, p.z), lim = CFG.R - 4;
@@ -860,7 +890,7 @@ export class World {
             gain = Math.max(0.5, gain / 3);
           }
         }
-        p.mass = Math.min(CFG.MAX_MASS, p.mass + gain);
+        p.mass += gain;
         this.food.delete(f.id);
         this.foodRemoved.push(f.id);
       }
@@ -1015,6 +1045,10 @@ export class World {
             }
           : null,
       };
+    }
+    const hasTeams = [...this.players.values()].some((o) => o.team !== undefined);
+    if (hasTeams) {
+      snap.team = [Math.round(this.teamScores[0]), Math.round(this.teamScores[1]), Math.ceil(this.matchClock)];
     }
     return snap;
   }

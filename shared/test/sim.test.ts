@@ -397,4 +397,41 @@ describe('bonus weapons and tools', () => {
     expect(w.players.get(p1)!.bot).toBe(false);
     expect(w.players.get(p2)!.bot).toBe(false);
   });
+
+  it('animals under 20kg cannot charge up ram', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Lightweight', 'pig');
+    const p = place(w, pid, 0, 0, 15); // mass 15kg (< 20kg)
+
+    p.input = { a: 0, mv: true, btn: true };
+    p.btnLatch = true;
+    for (let i = 0; i < 10; i++) {
+      w.step();
+    }
+
+    expect(p.charging).toBe(false);
+    expect(p.holdT).toBe(0);
+
+    // After eating and reaching >= 20kg, charging is enabled
+    p.mass = 25;
+    p.input = { a: 0, mv: true, btn: true };
+    p.btnLatch = true;
+    for (let i = 0; i < 10; i++) {
+      w.step();
+    }
+    expect(p.charging).toBe(true);
+    expect(p.holdT).toBeGreaterThan(0.3);
+  });
+
+  it('animals can grow past 600kg without limit', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Giant', 'cow');
+    const p = place(w, pid, 0, 0, 590);
+
+    // Eat high-value food
+    w.food.set(999, { id: 999, x: 0, z: 0, k: 4, v: 50 });
+    w.step();
+
+    expect(p.mass).toBeGreaterThan(600);
+  });
 });

@@ -52,6 +52,7 @@ let localStunTimer = 0;
 let lockedAimA = 0;
 let wasStunnedLastFrame = false;
 let wasInWater = false;
+let lastUnder20Toast = 0;
 
 const predictor = new ClientPredictor();
 let lastSentInput = { a: 0, mv: false, btn: false };
@@ -236,6 +237,9 @@ const gameState = new GameState({
     }
     if (gameState.hof.length) {
       hud.updateHof(gameState.hof);
+    }
+    if (s.team) {
+      hud.updateTeamBar(s.team[0], s.team[1], s.team[2]);
     }
   },
 });
@@ -446,6 +450,18 @@ function handleGameEvent(ev: GameEvent): void {
       animals.remove(ev.id);
       break;
     }
+    case 'teamWin': {
+      sfxReward();
+      const sub = t('teamScoreSub', { s0: ev.s0, s1: ev.s1 });
+      if (ev.winner === 0) {
+        hud.showBanner(t('teamWin0'), sub);
+      } else if (ev.winner === 1) {
+        hud.showBanner(t('teamWin1'), sub);
+      } else {
+        hud.showBanner(t('teamTie'), sub);
+      }
+      break;
+    }
   }
 }
 
@@ -640,14 +656,22 @@ function animate(now: number): void {
     }
     wasInWater = inWater;
 
+    const canCharge = myMass >= 20;
+
     const held = !isStunned && !inWater && input.holding ? (now - input.holdStart) / 1000 : 0;
-    const isCharging = !isStunned && !inWater && held >= CFG.CHARGE_MIN;
+    const isCharging = !isStunned && !inWater && canCharge && held >= CFG.CHARGE_MIN;
     const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;
-    hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel);
+    hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel, canCharge);
     if (isCharging) {
       chargeUpdate(chargeLevel);
     } else {
       chargeStop();
+    }
+
+    // Warn user when trying to charge under 20kg
+    if (input.holding && !canCharge && held > 0.25 && now - lastUnder20Toast > 3500) {
+      lastUnder20Toast = now;
+      hud.showToast(t('ramNeedMassToast'));
     }
   } else {
     chargeStop();

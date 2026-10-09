@@ -632,12 +632,16 @@ export class HudManager {
     this.koTxt.textContent = t('kos', { k: kills });
   }
 
-  updateRamMeter(cd: number, charging: boolean, chargeLevel: number): void {
+  updateRamMeter(cd: number, charging: boolean, chargeLevel: number, canCharge = true): void {
     if (cd > 0) {
       this.ramEl.className = 'cd';
       const pct = Math.max(0, 1 - cd / 1.3) * 100;
       this.ramFill.style.width = `${pct}%`;
       this.ramTxt.textContent = t('ramCd');
+    } else if (!canCharge) {
+      this.ramEl.className = 'no-charge';
+      this.ramFill.style.width = '100%';
+      this.ramTxt.textContent = t('ramNeedMass');
     } else if (charging) {
       this.ramEl.className = 'charging';
       this.ramFill.style.width = `${chargeLevel * 100}%`;

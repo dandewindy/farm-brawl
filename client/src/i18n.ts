@@ -18,6 +18,8 @@ const vi = {
   ramReady: 'SẴN SÀNG HÚC',
   ramCd: 'ĐANG HỒI',
   ramCharge: 'TÍCH LỰC {p}%',
+  ramNeedMass: 'CẦN 20KG ĐỂ GỒNG',
+  ramNeedMassToast: '⚠️ Dưới 20kg không thể gồng húc! Hãy ăn thêm để đạt 20kg.',
   stKg: 'kg cao nhất',
   stKo: 'hạ gục',
   stTime: 'sống sót',
@@ -138,6 +140,10 @@ const vi = {
   superSub: 'Bấm húc để bay vút như tên lửa trong 10 giây',
   superOther: '{name} ăn kẹo cầu vồng, hoá siêu thú! 🌈',
   superEnd: 'Hết sức mạnh cầu vồng rồi',
+  teamWin0: 'ĐỘI A12 CHIẾN THẮNG! 🏆',
+  teamWin1: 'ĐỘI WFM CHIẾN THẮNG! 🏆',
+  teamTie: 'TRẬN ĐẤU HOÀ! 🤝',
+  teamScoreSub: 'Tỷ số: A12 {s0} – {s1} WFM',
 } as const;
 
 export type TextKey = keyof typeof vi;
