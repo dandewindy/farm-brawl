@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
+import { AnimalPreviewRenderer } from '../render/preview';
 
 export interface FloatingText {
   el: HTMLDivElement;
@@ -86,6 +87,14 @@ export class HudManager {
   private readonly btnApplyCode: HTMLElement | null;
   private readonly roomStatusNotice: HTMLElement | null;
 
+  private previewRenderer: AnimalPreviewRenderer | null = null;
+  private readonly spPreviewTitle: HTMLElement | null;
+  private readonly spPreviewSkinName: HTMLElement | null;
+  private readonly spPreviewBadge: HTMLElement | null;
+  private readonly spSkinPalette: HTMLElement | null;
+  private readonly spSkinPrev: HTMLElement | null;
+  private readonly spSkinNext: HTMLElement | null;
+
   constructor(
     private readonly onStartPlay: (
       name: string,
@@ -146,13 +155,31 @@ export class HudManager {
     this.btnApplyCode = document.getElementById('btnApplyCode');
     this.roomStatusNotice = document.getElementById('roomStatusNotice');
 
+    this.spPreviewTitle = document.getElementById('spPreviewTitle');
+    this.spPreviewSkinName = document.getElementById('spPreviewSkinName');
+    this.spPreviewBadge = document.getElementById('spPreviewBadge');
+    this.spSkinPalette = document.getElementById('spSkinPalette');
+    this.spSkinPrev = document.getElementById('spSkinPrev');
+    this.spSkinNext = document.getElementById('spSkinNext');
+
+    const previewCanvas = document.getElementById('spPreviewCanvas') as HTMLCanvasElement | null;
+    if (previewCanvas) {
+      this.previewRenderer = new AnimalPreviewRenderer(previewCanvas);
+      this.previewRenderer.start();
+    }
+
     this.initSpeciesPicker();
     this.initEvents();
   }
 
   private initSpeciesPicker(): void {
-    const emojis: Record<Species, string> = {
-      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷',
+    const SKIN_COLORS: Record<Species, number[]> = {
+      chicken: [0xfaf6ee, 0xb5652b, 0x2e2c30, 0xd8c08a],
+      sheep: [0xf3f1ea, 0x4a4442, 0xe6d6b0, 0xf8f6f0],
+      horse: [0x8b5a2b, 0x2a2522, 0xd6d2ca, 0xd9a441],
+      cow: [0xffffff, 0x7a4320, 0xb8814a, 0x2a2624],
+      duck: [0xffd23f, 0xf7f4ec, 0x1f6b3a, 0x34343a],
+      pig: [0xf6a5b5, 0x2f2a2c, 0xd2773a, 0x3a3335],
     };
 
     SPECIES.forEach((sp) => {
@@ -164,29 +191,82 @@ export class HudManager {
     });
 
     const updateAllButtons = () => {
+      const activeSkin = this.mySkins[this.selectedSpecies] ?? 0;
+
+      // 1. Update 6 species buttons
       this.speciesContainer.querySelectorAll('button').forEach((b) => {
         const sp = b.dataset.species as Species;
         if (!sp) return;
         b.classList.toggle('on', sp === this.selectedSpecies);
-        const dots = b.querySelectorAll('.dot');
+
+        // Update 3D full-body thumbnail
+        const img = b.querySelector('.sp-thumb') as HTMLImageElement | null;
         const currentSkin = this.mySkins[sp] ?? 0;
+        if (img && this.previewRenderer) {
+          img.src = this.previewRenderer.getThumbnail(sp, currentSkin);
+        }
+
+        const dots = b.querySelectorAll('.dot');
         dots.forEach((d, idx) => {
           d.classList.toggle('on', idx === currentSkin);
         });
       });
-      const activeSkin = this.mySkins[this.selectedSpecies] ?? 0;
-      this.speciesHint.textContent = `${t(`sp_${this.selectedSpecies}`)} · Skin ${activeSkin + 1}/4`;
+
+      // 2. Update hint text
+      this.speciesHint.textContent = `${t(`sp_${this.selectedSpecies}`)}`;
+
+      // 3. Update 3D Preview Showcase
+      if (this.spPreviewTitle) {
+        this.spPreviewTitle.textContent = t(`name_${this.selectedSpecies}`);
+      }
+      if (this.spPreviewSkinName) {
+        this.spPreviewSkinName.textContent = t(`sk_${this.selectedSpecies}_${activeSkin}`);
+      }
+      if (this.spPreviewBadge) {
+        this.spPreviewBadge.textContent = `Skin ${activeSkin + 1}/4`;
+      }
+
+      // 4. Update preview 3D model
+      if (this.previewRenderer) {
+        this.previewRenderer.setAnimal(this.selectedSpecies, activeSkin);
+      }
+
+      // 5. Update skin palette swatches
+      if (this.spSkinPalette) {
+        this.spSkinPalette.innerHTML = '';
+        const colors = SKIN_COLORS[this.selectedSpecies] || [0xffffff, 0xcccccc, 0x888888, 0x333333];
+        colors.forEach((col, idx) => {
+          const sw = document.createElement('button');
+          sw.type = 'button';
+          sw.className = `sp-swatch${idx === activeSkin ? ' on' : ''}`;
+          sw.style.backgroundColor = '#' + col.toString(16).padStart(6, '0');
+          sw.title = `${t(`sk_${this.selectedSpecies}_${idx}`)}`;
+          sw.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.mySkins[this.selectedSpecies] = idx;
+            localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(idx));
+            updateAllButtons();
+          });
+          this.spSkinPalette!.appendChild(sw);
+        });
+      }
     };
 
+    // Build the 6 species buttons
+    this.speciesContainer.innerHTML = '';
     SPECIES.forEach((sp) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.species = sp;
 
-      const emojiSpan = document.createElement('span');
-      emojiSpan.className = 'emoji';
-      emojiSpan.textContent = emojis[sp];
-      btn.appendChild(emojiSpan);
+      // 3D Full-Body Thumbnail (replaces inconsistent emojis)
+      const thumb = document.createElement('img');
+      thumb.className = 'sp-thumb';
+      thumb.alt = sp;
+      if (this.previewRenderer) {
+        thumb.src = this.previewRenderer.getThumbnail(sp, this.mySkins[sp] ?? 0);
+      }
+      btn.appendChild(thumb);
 
       const dotsDiv = document.createElement('div');
       dotsDiv.className = 'dots';
@@ -209,6 +289,26 @@ export class HudManager {
       });
       this.speciesContainer.appendChild(btn);
     });
+
+    // Wire up navigation arrows for skin switching
+    if (this.spSkinPrev) {
+      this.spSkinPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = this.mySkins[this.selectedSpecies] ?? 0;
+        this.mySkins[this.selectedSpecies] = (cur - 1 + 4) % 4;
+        localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(this.mySkins[this.selectedSpecies]));
+        updateAllButtons();
+      });
+    }
+    if (this.spSkinNext) {
+      this.spSkinNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = this.mySkins[this.selectedSpecies] ?? 0;
+        this.mySkins[this.selectedSpecies] = (cur + 1) % 4;
+        localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(this.mySkins[this.selectedSpecies]));
+        updateAllButtons();
+      });
+    }
 
     updateAllButtons();
     this.nameInput.placeholder = t('namePh');
@@ -233,6 +333,7 @@ export class HudManager {
           if (this.createdRoomBox) this.createdRoomBox.hidden = false;
         }
       }
+      this.previewRenderer?.stop();
       this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin, this.currentFriendCode);
     };
 
@@ -250,6 +351,8 @@ export class HudManager {
       this.deathScreen.hidden = true;
       this.startScreen.hidden = false;
       document.body.classList.add('menu');
+      this.previewRenderer?.start();
+      this.previewRenderer?.resize();
     });
 
     if (this.muteBtn) {

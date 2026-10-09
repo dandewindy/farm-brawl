@@ -43,7 +43,18 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 }
 #species button:hover { transform: translateY(-2px); }
 #species button.on { border-color: var(--gold); background: #4a3b2a; }
-#species button .emoji { font-size: 26px; line-height: 1; }
+#species button .sp-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,.45));
+  pointer-events: none;
+  transition: transform .15s ease;
+}
+#species button:hover .sp-thumb {
+  transform: scale(1.1);
+}
+#species button .emoji { display: none; }
 #species button .dots { display: flex; gap: 3px; align-items: center; justify-content: center; }
 #species button .dot {
   display: inline-block;
@@ -57,6 +68,115 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   background: var(--gold);
   transform: scale(1.3);
   box-shadow: 0 0 4px var(--gold);
+}
+
+/* 3D Animal & Skin Preview Showcase */
+#spPreviewWrap {
+  margin: 12px 0 6px;
+  background: rgba(20, 16, 14, 0.65);
+  border: 2px solid #3d3128;
+  border-radius: 14px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sp-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+.sp-preview-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+#spPreviewTitle {
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--gold);
+}
+#spPreviewSkinName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--paper);
+}
+#spPreviewBadge {
+  font-size: 11px;
+  font-weight: 700;
+  background: #3d2f23;
+  color: var(--gold);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 182, 65, 0.3);
+}
+.sp-preview-stage {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at center, rgba(60, 48, 38, 0.5) 0%, rgba(20, 16, 14, 0.8) 70%);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: grab;
+}
+.sp-preview-stage:active {
+  cursor: grabbing;
+}
+#spPreviewCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sp-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(31, 26, 23, 0.7);
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.sp-nav-btn:hover {
+  background: rgba(232, 182, 65, 0.85);
+  color: #1f1a17;
+  transform: translateY(-50%) scale(1.1);
+}
+.sp-nav-btn.sp-prev { left: 8px; }
+.sp-nav-btn.sp-next { right: 8px; }
+.sp-palette {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 0;
+}
+.sp-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #5a483a;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.sp-swatch:hover {
+  transform: scale(1.15);
+}
+.sp-swatch.on {
+  border-color: var(--gold);
+  transform: scale(1.25);
+  box-shadow: 0 0 6px var(--gold);
 }
 .hint { min-height: 2.6em; margin: 8px 0 12px; font-size: 13px; color: #d8c9a8; }
 .btn-red { width: 100%; padding: 13px; font: 800 22px var(--f-display); letter-spacing: .06em; color: #fff; background: var(--red); border: 0; border-radius: 12px; box-shadow: 0 5px 0 #6e1a12; transition: transform .08s, box-shadow .08s, background .12s; }

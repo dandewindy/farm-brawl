@@ -103,6 +103,24 @@
       </div>
       <p class="label" data-i18n="pick"></p>
       <div id="species"></div>
+
+      <!-- Live 3D Animal & Skin Preview Showcase -->
+      <div id="spPreviewWrap">
+        <div class="sp-preview-header">
+          <div class="sp-preview-text">
+            <span id="spPreviewTitle">Lợn</span>
+            <span id="spPreviewSkinName">Heo hồng phấn</span>
+          </div>
+          <span id="spPreviewBadge">Skin 1/4</span>
+        </div>
+        <div class="sp-preview-stage">
+          <canvas id="spPreviewCanvas" width="280" height="160"></canvas>
+          <button type="button" id="spSkinPrev" class="sp-nav-btn sp-prev" title="Skin trước">‹</button>
+          <button type="button" id="spSkinNext" class="sp-nav-btn sp-next" title="Skin kế tiếp">›</button>
+        </div>
+        <div id="spSkinPalette" class="sp-palette"></div>
+      </div>
+
       <p id="speciesHint" class="hint"></p>
       <button id="play" class="btn-red" type="button" data-i18n="play"></button>
       <p id="bestLine"></p>

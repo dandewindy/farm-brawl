@@ -15,6 +15,7 @@ interface AnimalVisual {
   isCrowned: boolean;
   ring: THREE.Mesh;
   ringMat: THREE.MeshBasicMaterial;
+  collarMat: THREE.MeshStandardMaterial;
   stars: THREE.Group | null;
   phase: number;
   lastX: number;
@@ -310,14 +311,6 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   for (const z of [-0.34, 0.34]) {
     blob(g, s.body, 0.12, [0.6, 0.45, 1.4], 0.86, 1.62, z);
   }
-  // Cowbell on neck
-  const bellStrap = part(new THREE.TorusGeometry(0.2, 0.02, 8, 16), 0x5a3a22, 0.7, 1.35, 0);
-  bellStrap.rotation.y = Math.PI / 2;
-  g.add(bellStrap);
-  const bell = part(new THREE.SphereGeometry(0.1, 12, 8), 0xd4a017, 0.7, 1.12, 0, { metalness: 0.6, roughness: 0.3 });
-  g.add(bell);
-  const clapper = part(new THREE.SphereGeometry(0.035, 6, 4), 0x3a3a3a, 0.7, 1.04, 0);
-  g.add(clapper);
   // Cow tail hanging from rear - seamless connected group
   const tailGroup = new THREE.Group();
   tailGroup.position.set(-0.65, 1.35, 0);
@@ -401,6 +394,87 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   duck: buildDuck,
   pig: buildPig,
 };
+
+export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
+  const g = new THREE.Group();
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xffd700,
+    metalness: 0.85,
+    roughness: 0.25,
+  });
+
+  switch (species) {
+    case 'chicken': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.032, 8, 24), mat);
+      band.position.set(0.42, 1.34, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.45;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), goldMat);
+      medal.position.set(0.53, 1.25, 0);
+      g.add(medal);
+      break;
+    }
+    case 'sheep': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.038, 8, 24), mat);
+      band.position.set(0.55, 1.24, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.2;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), goldMat);
+      medal.position.set(0.68, 1.14, 0);
+      g.add(medal);
+      break;
+    }
+    case 'horse': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.036, 8, 24), mat);
+      band.position.set(0.84, 1.96, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.52;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 8), goldMat);
+      medal.position.set(0.96, 1.84, 0);
+      g.add(medal);
+      break;
+    }
+    case 'cow': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.038, 8, 24), mat);
+      band.position.set(0.70, 1.35, 0);
+      band.rotation.y = Math.PI / 2;
+      g.add(band);
+      const bell = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), goldMat);
+      bell.position.set(0.70, 1.12, 0);
+      g.add(bell);
+      const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshStandardMaterial({ color: 0x3a3a3a }));
+      clapper.position.set(0.70, 1.04, 0);
+      g.add(clapper);
+      break;
+    }
+    case 'duck': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.032, 8, 24), mat);
+      band.position.set(0.42, 1.22, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.38;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), goldMat);
+      medal.position.set(0.52, 1.13, 0);
+      g.add(medal);
+      break;
+    }
+    case 'pig': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.042, 8, 24), mat);
+      band.position.set(0.58, 1.18, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.15;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 8), goldMat);
+      medal.position.set(0.72, 1.06, 0);
+      g.add(medal);
+      break;
+    }
+  }
+  return g;
+}
 
 // Where the crown sits on each species
 const HEAD: Record<Species, [number, number]> = {
@@ -970,17 +1044,16 @@ export class AnimalRenderer {
       vis.ringMat.color.set(ringColor);
       vis.ringMat.opacity = 0.85;
     }
+
+    // Collar color reflects team (Foxwood Blue 0x2196f3, Pinchfield Red 0xf44336) or gold for King
+    const collarColor = meta.team !== undefined
+      ? (meta.team === 0 ? 0x2196f3 : 0xf44336)
+      : (SPECIES_RING_COLOR[vis.species] ?? 0xff9800);
+    vis.collarMat.color.setHex(isKing ? 0xffc928 : collarColor);
   }
 
   private buildAnimal(meta: PlayerMeta): AnimalVisual {
-    const root = new THREE.Group();
-    const body = new THREE.Group();
-    root.add(body);
-
-    const skinList = SKINS[meta.species] || SKINS.chicken;
-    const skin = skinList[meta.skin % skinList.length];
-    const builder = BUILDERS[meta.species] || BUILDERS.chicken;
-    const legs = builder(body, skin);
+    const { root, body, legs, collarMat } = buildFullAnimal(meta.species, meta.skin, meta.team);
 
     // Add King regalia (crown + cape)
     const regalia = buildRegalia(meta.species);
@@ -1015,6 +1088,7 @@ export class AnimalRenderer {
       isCrowned: false,
       ring,
       ringMat,
+      collarMat,
       stars: null,
       phase: 0,
       lastX: 0,
@@ -1029,7 +1103,12 @@ export class AnimalRenderer {
   }
 }
 
-export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false): { group: THREE.Group; regalia: THREE.Group | null } {
+export function buildFullAnimal(species: Species, skinIdx: number, team?: number): {
+  root: THREE.Group;
+  body: THREE.Group;
+  legs: THREE.Group[];
+  collarMat: THREE.MeshStandardMaterial;
+} {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -1037,12 +1116,30 @@ export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = f
   const skinList = SKINS[species] || SKINS.chicken;
   const skin = skinList[skinIdx % skinList.length];
   const builder = BUILDERS[species] || BUILDERS.chicken;
-  builder(body, skin);
+  const legs = builder(body, skin);
 
+  // Add team collar around neck
+  const collarColor = team !== undefined
+    ? (team === 0 ? 0x2196f3 : 0xf44336)
+    : (SPECIES_RING_COLOR[species] ?? 0xff9800);
+  const collarMat = new THREE.MeshStandardMaterial({
+    color: collarColor,
+    roughness: 0.45,
+    metalness: 0.15,
+  });
+  body.add(buildCollar(species, collarMat));
+
+  return { root, body, legs, collarMat };
+}
+
+export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false, team?: number): { group: THREE.Group; regalia: THREE.Group | null } {
+  const { root } = buildFullAnimal(species, skinIdx, team);
   const regalia = buildRegalia(species);
   regalia.visible = crowned;
   root.add(regalia);
 
   return { group: root, regalia };
 }
+
+export { SKINS, BUILDERS, SPECIES_RING_COLOR };
 

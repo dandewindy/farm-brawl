@@ -56,7 +56,7 @@ export class CorpseRenderer {
     // When drowning, the animal has already sunk completely underwater; do not pop back up!
     if (ev.cause === 'drown') return;
     const isKing = false; // King crown/regalia
-    const { group } = buildCorpseAnimal(meta.species, meta.skin, isKing);
+    const { group } = buildCorpseAnimal(meta.species, meta.skin, isKing, meta.team);
 
     const sc = radiusOf(ev.mass) * 1.35;
     group.position.set(ev.x, 0, ev.z);
