@@ -82,6 +82,8 @@ export type GameEvent =
   | { k: 'super'; id: number }
   | { k: 'fly'; id: number; x: number; z: number }
   | { k: 'teamWin'; winner: number; s0: number; s1: number }
+  | { k: 'podBlast'; x: number; z: number }
+  | { k: 'podWarn'; willShield: boolean; left: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };
 
 /** [id, name, mass, kills, reign?] */
@@ -117,6 +119,8 @@ export interface Snapshot {
   truck?: [number, number, number];
   /** team mode state: [scoreTeam0, scoreTeam1, remainingClockSeconds] */
   team?: [number, number, number];
+  /** podium shield state: [shieldActive: boolean, timerSeconds: number] */
+  podShield?: [boolean, number];
 }
 
 export type ServerMsg =

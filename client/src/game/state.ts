@@ -52,6 +52,7 @@ export class GameState {
   me = { kills: 0, cd: 0, rank: 0 };
   myMass = 0;
   pod: [number, number, boolean] = [0, 0, false];
+  podShield: [boolean, number] = [true, 30];
   tools = new Map<number, ToolWire>();
   napoleonId = 0;
   rule = '';
@@ -161,6 +162,7 @@ export class GameState {
     if (s.rule !== undefined) this.rule = s.rule;
     if (s.reign !== undefined) this.reign = s.reign;
     if (s.hof) this.hof = s.hof;
+    if (s.podShield) this.podShield = s.podShield;
     this.truck = s.truck;
     this.hooks.onSnapshot(s);
   }

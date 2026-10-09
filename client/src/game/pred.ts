@@ -31,6 +31,7 @@ export class ClientPredictor {
   stunned = false;
   stunT = 0;
   plow = false;
+  podShieldActive = true;
 
   reset(x = 0, z = 0): void {
     this.on = true;
@@ -283,6 +284,28 @@ export class ClientPredictor {
           const isDirectSlam = impactSpeed > 16;
           if (isDirectDash || isDirectSlam) {
             this.setStun(1.5);
+          }
+        }
+      }
+
+      // Podium shield barrier collision
+      if (this.podShieldActive && map.podium) {
+        const [podX, podZ] = map.podium;
+        const dx = this.x - podX, dz = this.z - podZ;
+        const d = Math.hypot(dx, dz);
+        const minD = CFG.PODIUM_R + 0.5 + r;
+        if (d < minD && d > 1e-6) {
+          const nx = dx / d, nz = dz / d;
+          this.x = podX + nx * minD;
+          this.z = podZ + nz * minD;
+          const vn = this.vx * nx + this.vz * nz;
+          if (vn < 0) {
+            this.vx -= 1.4 * vn * nx;
+            this.vz -= 1.4 * vn * nz;
+          }
+          if (this.dashT > 0) {
+            this.dashT = 0;
+            this.plow = false;
           }
         }
       }

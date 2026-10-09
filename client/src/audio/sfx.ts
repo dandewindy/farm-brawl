@@ -340,6 +340,21 @@ export function boom(): void {
 }
 export const sfxBoom = boom;
 
+export function podBlast(): void {
+  if (!ready()) return;
+  tone('sine', 180, 35, 0.65, 0.6, { attack: 0.005 });
+  tone('sawtooth', 360, 60, 0.45, 0.25, { attack: 0.01 });
+  noise('lowpass', 1400, 200, 1.2, 0.6, 0.45, { attack: 0.01 });
+}
+export const sfxPodBlast = podBlast;
+
+export function podWarning(): void {
+  if (!ready()) return;
+  tone('sine', 880, 880, 0.1, 0.15, { attack: 0.005 });
+  tone('sine', 1174, 1174, 0.12, 0.15, { delay: 0.12, attack: 0.005 });
+}
+export const sfxPodWarning = podWarning;
+
 export function song(): void {
   if (!ready()) return;
   [261, 329, 392, 523, 659].forEach((f, i) => {

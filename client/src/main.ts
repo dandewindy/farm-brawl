@@ -3,7 +3,7 @@ import { insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
 } from './audio/sfx';
@@ -241,6 +241,10 @@ const gameState = new GameState({
     if (s.team) {
       hud.updateTeamBar(s.team[0], s.team[1], s.team[2]);
     }
+    if (s.podShield) {
+      predictor.podShieldActive = s.podShield[0];
+      hud.updatePodiumTimerBadge(s.podShield[0], s.podShield[1], gameState.napoleonId > 0);
+    }
   },
 });
 
@@ -470,6 +474,27 @@ function handleGameEvent(ev: GameEvent): void {
       animals.clear();
       tools.clear();
       hud.showToast('🌾 Trận đấu mới! Bản đồ & thức ăn đã được làm mới!');
+      break;
+    }
+    case 'podBlast': {
+      sfxPodBlast();
+      foodParts.burst(ev.x, 1.2, ev.z, 0x00e5ff, 45, 24, 6, 1.2);
+      foodParts.burst(ev.x, 1.2, ev.z, 0xffffff, 25, 18, 5, 0.9);
+      hud.showToast('💥 Chưa có Vua! Bục phát sóng đẩy lùi mọi con vật!');
+      const me = gameState.ents.get(myId);
+      const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+      if (dist < 32) {
+        shake = Math.max(shake, 1.4 * (1 - dist / 32));
+      }
+      break;
+    }
+    case 'podWarn': {
+      sfxPodWarning();
+      if (ev.willShield) {
+        hud.showToast(`⚠️ Bục tranh Vua sẽ đóng sau ${ev.left}s!`);
+      } else {
+        hud.showToast(`⚠️ Bục tranh Vua sẽ mở sau ${ev.left}s!`);
+      }
       break;
     }
   }
@@ -750,6 +775,7 @@ function animate(now: number): void {
         : (({ chicken: 0xffb74d, sheep: 0xf3f1ea, horse: 0x8b5a2b, cow: 0x4fc3f7, duck: 0xffd54f, pig: 0xf48fb1 } as Record<string, number>)[capMeta.species] ?? 0xffc928))
       : 0xffc928;
     world.updatePodiumRing(capProg, capContested, now, capColor);
+    world.updatePodiumShield(gameState.podShield[0], gameState.podShield[1], now);
     world.updateTillTruck(gameState.truck);
 
   // Update player ground cooldown arc indicator
@@ -798,7 +824,16 @@ function animate(now: number): void {
   world.render();
 
   // 2D Minimap Render
-  minimap.draw(gameState.map, gameState.ents, gameState.myId, gameState.tools, gameState.napoleonId, gameState.food, gameState.truck);
+  minimap.draw(
+    gameState.map,
+    gameState.ents,
+    gameState.myId,
+    gameState.tools,
+    gameState.napoleonId,
+    gameState.food,
+    gameState.truck,
+    gameState.podShield[0]
+  );
 }
 
 requestAnimationFrame(animate);

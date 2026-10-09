@@ -249,6 +249,48 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   font-weight: 700;
 }
 
+#podiumTimerBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-family: var(--f-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  backdrop-filter: blur(8px);
+  user-select: none;
+  transition: all 0.25s ease-out;
+  pointer-events: auto;
+}
+#podiumTimerBadge.shield-on {
+  background: rgba(10, 36, 50, 0.85);
+  border: 1.5px solid #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
+}
+#podiumTimerBadge.shield-off {
+  background: rgba(45, 30, 8, 0.85);
+  border: 1.5px solid #ffb300;
+  color: #ffd54f;
+  box-shadow: 0 0 12px rgba(255, 179, 0, 0.45);
+}
+#podiumTimerBadge.has-king {
+  background: rgba(45, 12, 12, 0.85);
+  border: 1.5px solid #ff5252;
+  color: #ffcdd2;
+  box-shadow: 0 0 12px rgba(255, 82, 82, 0.45);
+}
+#podiumTimerBadge.warn {
+  animation: badgeWarnPulse 0.5s infinite alternate;
+}
+@keyframes badgeWarnPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.08); filter: brightness(1.4); }
+}
+
 #mapWrap { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; z-index: 6; pointer-events: auto; }
 #minimap { width: 140px; height: 140px; border-radius: 50%; background: rgba(31, 26, 23, .55); border: 2px solid rgba(255, 255, 255, .25); display: block; }
 #roomTag { font-size: 11px; color: #b9a98a; background: rgba(31, 26, 23, 0.7); padding: 2px 6px; border-radius: 4px; margin-top: 4px; pointer-events: auto; }

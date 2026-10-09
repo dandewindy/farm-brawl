@@ -19,7 +19,8 @@ export class MinimapRenderer {
     tools?: Map<number, ToolWire>,
     napoleonId = 0,
     food?: Map<number, { k: number; x: number; z: number }>,
-    truck?: [number, number, number]
+    truck?: [number, number, number],
+    podShieldActive = false
   ): void {
     const { ctx, size } = this;
     const center = size / 2;
@@ -79,6 +80,15 @@ export class MinimapRenderer {
     ctx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);
     ctx.fillStyle = '#a5281b';
     ctx.fill();
+
+    // Protective energy barrier indicator on minimap
+    if (podShieldActive) {
+      ctx.beginPath();
+      ctx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, (CFG.PODIUM_R + 1.2) * scale, 0, Math.PI * 2);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
 
     // Rainbow Candy (flashing rainbow beacon on minimap)
     if (food) {

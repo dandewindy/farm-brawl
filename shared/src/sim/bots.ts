@@ -273,7 +273,7 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     }
   }
 
-  if (w.napoleonId === 0 || w.podiumContested) {
+  if ((w.napoleonId === 0 || w.podiumContested) && !w.podiumShield) {
     if (p.mass >= 20 && distToPod < 42 && w.rand() < 0.65) {
       p.input.a = aimAt(p.x, p.z, podX, podZ);
       return;

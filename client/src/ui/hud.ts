@@ -57,6 +57,9 @@ export class HudManager {
   private readonly muteBtn: HTMLElement | null;
   private readonly modesContainer: HTMLElement | null;
   private readonly roomTagEl: HTMLElement | null;
+  private readonly podiumBadgeEl: HTMLElement | null;
+  private readonly ptIconEl: HTMLElement | null;
+  private readonly ptTxtEl: HTMLElement | null;
 
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
@@ -144,6 +147,9 @@ export class HudManager {
     this.muteBtn = document.getElementById('mute');
     this.modesContainer = document.getElementById('modes');
     this.roomTagEl = document.getElementById('roomTag');
+    this.podiumBadgeEl = document.getElementById('podiumTimerBadge');
+    this.ptIconEl = document.getElementById('ptIcon');
+    this.ptTxtEl = document.getElementById('ptTxt');
 
     this.friendPanel = document.getElementById('friendPanel');
     this.btnCreateRoom = document.getElementById('btnCreateRoom');
@@ -671,6 +677,27 @@ export class HudManager {
       }
     } else {
       this.captureEl.hidden = true;
+    }
+  }
+
+  updatePodiumTimerBadge(shieldActive: boolean, timerSec: number, hasKing: boolean): void {
+    if (!this.podiumBadgeEl || !this.ptIconEl || !this.ptTxtEl) return;
+    this.podiumBadgeEl.classList.remove('shield-on', 'shield-off', 'has-king', 'warn');
+
+    if (shieldActive) {
+      this.podiumBadgeEl.classList.add('shield-on');
+      this.ptIconEl.textContent = '🛡️';
+      this.ptTxtEl.textContent = `Khóa: ${timerSec}s`;
+      if (timerSec <= 5) this.podiumBadgeEl.classList.add('warn');
+    } else if (hasKing) {
+      this.podiumBadgeEl.classList.add('has-king');
+      this.ptIconEl.textContent = '👑';
+      this.ptTxtEl.textContent = 'Vua tại vị';
+    } else {
+      this.podiumBadgeEl.classList.add('shield-off');
+      this.ptIconEl.textContent = '⚔️';
+      this.ptTxtEl.textContent = `Tranh Vua: ${timerSec}s`;
+      if (timerSec <= 5) this.podiumBadgeEl.classList.add('warn');
     }
   }
 

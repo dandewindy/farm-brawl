@@ -89,10 +89,13 @@ export class World {
   /** fill empty seats with bots */
   botsEnabled: boolean;
 
-  /** Podium capture system */
+  /** Podium capture & protective shield system */
   podiumCaptor = 0;
   podiumProgress = 0;
   podiumContested = false;
+  podiumShield = true;
+  podiumPhaseTimer = 30;
+  podiumWarned5s = false;
   napoleonId = 0;
   napoleonReign = 0;
   currentRule = '';
@@ -160,6 +163,15 @@ export class World {
 
   removePlayer(id: number): void {
     if (!this.players.delete(id)) return;
+    if (id === this.napoleonId) {
+      this.napoleonId = 0;
+      this.napoleonReign = 0;
+      this.currentRule = '';
+      this.kingChoice = null;
+      this.podiumPhaseTimer = 30;
+      this.podiumWarned5s = false;
+      this.events.push({ k: 'napoleon', id: 0 });
+    }
     this.events.push({ k: 'leave', id });
   }
 
@@ -290,6 +302,30 @@ export class World {
           p.btnLatch = false;
           this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 3 });
         }
+
+        // Podium protective shield barrier: blocks all animals from entering the podium area
+        if (this.podiumShield) {
+          const [podX, podZ] = this.map.podium;
+          const dx = p.x - podX, dz = p.z - podZ;
+          const d = Math.hypot(dx, dz);
+          const pr = radiusOf(p.mass);
+          const minD = CFG.PODIUM_R + 0.5 + pr;
+          if (d < minD && d > 1e-6) {
+            const nx = dx / d, nz = dz / d;
+            p.x = podX + nx * minD;
+            p.z = podZ + nz * minD;
+            const vn = p.vx * nx + p.vz * nz;
+            if (vn < 0) {
+              p.vx -= 1.4 * vn * nx;
+              p.vz -= 1.4 * vn * nz;
+            }
+            if (p.dashT > 0) {
+              p.dashT = 0;
+              p.plow = false;
+              this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 2 });
+            }
+          }
+        }
       }
       this.collidePlayers(alive);
     }
@@ -414,46 +450,107 @@ export class World {
       }
     }
 
-    // Podium capture logic
+    // Podium shield & cyclical battle logic
     const [podX, podZ] = this.map.podium;
     const PR = CFG.PODIUM_R;
-    const onPodium = alive.filter((p) => Math.hypot(p.x - podX, p.z - podZ) <= PR);
 
-    if (onPodium.length === 0) {
+    if (this.podiumShield) {
       this.podiumContested = false;
-      this.podiumProgress = Math.max(0, this.podiumProgress - DT * 0.25);
-      if (this.podiumProgress === 0) this.podiumCaptor = 0;
-    } else if (onPodium.length === 1) {
-      const c = onPodium[0];
-      this.podiumContested = false;
-      if (c.id === this.podiumCaptor) {
-        const speed = Math.min(0.25, Math.max(0.08, 0.08 + c.mass / 600));
-        this.podiumProgress = Math.min(1.0, this.podiumProgress + speed * DT);
-        if (this.podiumProgress >= 1.0 && this.napoleonId !== c.id) {
-          if (this.napoleonId > 0) {
-            const prevKing = this.players.get(this.napoleonId);
-            const dur = Math.round(this.napoleonReign);
-            if (dur >= 5 && prevKing) {
-              this.hof.push([prevKing.name, prevKing.species, dur]);
-              this.hof.sort((a, b) => b[2] - a[2]);
-              this.hof = this.hof.slice(0, 3);
-            }
-          }
-          this.napoleonId = c.id;
-          this.napoleonReign = 0;
-          this.events.push({ k: 'napoleon', id: c.id });
-          this.startKingChoice();
-        }
-      } else {
-        if (this.podiumProgress > 0) {
-          this.podiumProgress = Math.max(0, this.podiumProgress - DT * 0.35);
-        } else {
-          this.podiumCaptor = c.id;
-          this.podiumProgress = 0.01;
-        }
+      this.podiumProgress = 0;
+      this.podiumCaptor = 0;
+      this.podiumPhaseTimer = Math.max(0, this.podiumPhaseTimer - DT);
+      if (this.podiumPhaseTimer <= 5 && !this.podiumWarned5s) {
+        this.podiumWarned5s = true;
+        this.events.push({ k: 'podWarn', willShield: false, left: 5 });
+      }
+      if (this.podiumPhaseTimer <= 0) {
+        // 30s elapsed: shield opens! Animals can now enter and fight for King
+        this.podiumShield = false;
+        this.podiumPhaseTimer = 30;
+        this.podiumWarned5s = false;
       }
     } else {
-      this.podiumContested = true;
+      // Shield is OPEN
+      const onPodium = alive.filter((p) => Math.hypot(p.x - podX, p.z - podZ) <= PR);
+
+      if (onPodium.length === 0) {
+        this.podiumContested = false;
+        this.podiumProgress = Math.max(0, this.podiumProgress - DT * 0.25);
+        if (this.podiumProgress === 0) this.podiumCaptor = 0;
+      } else if (onPodium.length === 1) {
+        const c = onPodium[0];
+        this.podiumContested = false;
+        if (c.id === this.podiumCaptor) {
+          const speed = Math.min(0.25, Math.max(0.08, 0.08 + c.mass / 600));
+          this.podiumProgress = Math.min(1.0, this.podiumProgress + speed * DT);
+          if (this.podiumProgress >= 1.0 && this.napoleonId !== c.id) {
+            if (this.napoleonId > 0) {
+              const prevKing = this.players.get(this.napoleonId);
+              const dur = Math.round(this.napoleonReign);
+              if (dur >= 5 && prevKing) {
+                this.hof.push([prevKing.name, prevKing.species, dur]);
+                this.hof.sort((a, b) => b[2] - a[2]);
+                this.hof = this.hof.slice(0, 3);
+              }
+            }
+            this.napoleonId = c.id;
+            this.napoleonReign = 0;
+            this.podiumPhaseTimer = 30;
+            this.podiumWarned5s = false;
+            this.events.push({ k: 'napoleon', id: c.id });
+            this.startKingChoice();
+          }
+        } else {
+          if (this.podiumProgress > 0) {
+            this.podiumProgress = Math.max(0, this.podiumProgress - DT * 0.35);
+          } else {
+            this.podiumCaptor = c.id;
+            this.podiumProgress = 0.01;
+          }
+        }
+      } else {
+        this.podiumContested = true;
+      }
+
+      // Check battle phase countdown if no King is currently crowned
+      if (this.napoleonId === 0) {
+        this.podiumPhaseTimer = Math.max(0, this.podiumPhaseTimer - DT);
+        if (this.podiumPhaseTimer <= 5 && !this.podiumWarned5s) {
+          this.podiumWarned5s = true;
+          this.events.push({ k: 'podWarn', willShield: true, left: 5 });
+        }
+        if (this.podiumPhaseTimer <= 0) {
+          // 30s elapsed with NO King: blast all animals out & reactivate protective shield
+          const blastR = CFG.PODIUM_R + 3.5;
+          for (const p of alive) {
+            if (!p.alive) continue;
+            const dx = p.x - podX, dz = p.z - podZ;
+            const dist = Math.hypot(dx, dz);
+            if (dist < blastR) {
+              const nx = dist > 1e-4 ? dx / dist : Math.cos(this.rnd() * Math.PI * 2);
+              const nz = dist > 1e-4 ? dz / dist : Math.sin(this.rnd() * Math.PI * 2);
+              p.vx = nx * 38;
+              p.vz = nz * 38;
+              p.stunT = Math.max(p.stunT, 0.8);
+              p.dashT = 0;
+              p.plow = false;
+              p.charging = false;
+              p.holdT = 0;
+            }
+          }
+          this.podiumProgress = 0;
+          this.podiumCaptor = 0;
+          this.podiumContested = false;
+          this.podiumShield = true;
+          this.podiumPhaseTimer = 30;
+          this.podiumWarned5s = false;
+          this.events.push({ k: 'podBlast', x: podX, z: podZ });
+        }
+      } else {
+        // While there is a King, the throne remains open for rivals to challenge
+        this.podiumPhaseTimer = 30;
+        this.podiumWarned5s = false;
+      }
     }
 
     // Sunday meeting rule: pull non-king animals gently towards podium
@@ -863,6 +960,8 @@ export class World {
       this.napoleonReign = 0;
       this.currentRule = '';
       this.kingChoice = null;
+      this.podiumPhaseTimer = 30;
+      this.podiumWarned5s = false;
       this.events.push({ k: 'napoleon', id: 0 });
     }
     const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
@@ -1073,6 +1172,7 @@ export class World {
       rule: this.currentRule,
       reign: Math.round(this.napoleonReign),
       hof: this.hof,
+      podShield: [this.podiumShield, Math.ceil(this.podiumPhaseTimer)],
     };
     if (this.tillTruck.active) {
       snap.truck = [r2(this.tillTruck.x), r2(this.tillTruck.z), r2(this.tillTruck.angle)];
@@ -1126,6 +1226,9 @@ export class World {
     this.podiumProgress = 0;
     this.podiumCaptor = 0;
     this.podiumContested = false;
+    this.podiumShield = true;
+    this.podiumPhaseTimer = 30;
+    this.podiumWarned5s = false;
 
     // Respawns all existing players at new free spots on the new map
     for (const p of this.players.values()) {

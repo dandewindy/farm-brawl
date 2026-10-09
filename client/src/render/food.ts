@@ -116,7 +116,11 @@ export class FoodAndParticleRenderer {
     const rainbowCandyGeo = new THREE.OctahedronGeometry(1.5, 0);
 
     // 7: Watermelon (Dưa hấu) - large oblong sphere, visibly larger than pumpkin
-    const watermelonGeo = new THREE.SphereGeometry(1.05, 18, 14).scale(1.26, 0.94, 0.94);
+    // Rotate geometry 90 degrees around Z so poles align with horizontal ends (-X and +X)
+    // and striped texture converges organically at the tips rather than the belly!
+    const watermelonGeo = new THREE.SphereGeometry(1.05, 18, 14);
+    watermelonGeo.rotateZ(Math.PI / 2);
+    watermelonGeo.scale(1.26, 0.94, 0.94);
 
     const geos = [
       cornCobGeo,
@@ -226,9 +230,10 @@ export class FoodAndParticleRenderer {
     this.scene.add(pumpkinStemMesh);
     this.foodTops[4] = pumpkinStemMesh;
 
-    // 7: Watermelon stem (Cuống dưa hấu)
-    const melonStemGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.35, 6).translate(0, 0.98, 0);
-    melonStemGeo.rotateZ(0.25);
+    // 7: Watermelon stem (Cuống dưa hấu mọc từ đầu quả dưa)
+    const melonStemGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.32, 6);
+    melonStemGeo.rotateZ(-Math.PI / 2 + 0.28);
+    melonStemGeo.translate(1.28, 0.08, 0);
     const melonStemMat = new THREE.MeshStandardMaterial({ color: 0x335522, roughness: 0.8 });
     const melonStemMesh = new THREE.InstancedMesh(melonStemGeo, melonStemMat, this.maxFoodPerKind);
     melonStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

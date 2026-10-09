@@ -13,6 +13,7 @@ function emptyWorld(): World {
   w.map.hay.length = 0;
   w.map.pond.length = 0;
   w.map.mud.length = 0;
+  w.map.podium = [45, 45];
   return w;
 }
 
@@ -559,6 +560,89 @@ describe('bonus weapons and tools', () => {
     expect(w.tools.size).toBe(3);
     expect(w.matchClock).toBe(300);
     expect(w.teamScores).toEqual([0, 0]);
+  });
+
+  it('podium shield is active for first 30s and physically blocks animals', () => {
+    const w = emptyWorld();
+    w.map.podium = [0, 0];
+    w.podiumShield = true;
+    w.podiumPhaseTimer = 30;
+
+    const pid = w.addPlayer('BlockedTest', 'pig');
+    const p = place(w, pid, 12, 0, 25);
+    const r = radiusOf(25);
+    const minD = CFG.PODIUM_R + 0.5 + r;
+
+    // Animal runs toward center (0, 0)
+    w.setInput(pid, { a: Math.PI, mv: true, btn: false });
+    for (let i = 0; i < 40; i++) {
+      w.step();
+    }
+    // Animal is physically blocked outside the shield barrier
+    expect(p.x).toBeGreaterThanOrEqual(minD - 0.05);
+
+    // Snapshot includes podShield state
+    const snap = w.snapshotFor(pid);
+    expect(snap.podShield).toBeDefined();
+    expect(snap.podShield![0]).toBe(true);
+  });
+
+  it('podium shield opens after 30s with 5s warning, and blasts if no King after 30s', () => {
+    const w = emptyWorld();
+    w.map.podium = [0, 0];
+    w.podiumShield = true;
+    w.podiumPhaseTimer = 6; // 6s left in shield phase
+
+    let warnedOpen = false;
+    for (let i = 0; i < 40; i++) {
+      w.step();
+      const snap = w.snapshotFor(1);
+      if (snap.ev.some((e) => e.k === 'podWarn' && !e.willShield)) {
+        warnedOpen = true;
+      }
+    }
+    // 5s warning was triggered
+    expect(warnedOpen).toBe(true);
+
+    // Step until shield phase ends and opens
+    while (w.podiumShield) {
+      w.step();
+    }
+    // Shield is now OPEN!
+    expect(w.podiumShield).toBe(false);
+    expect(w.podiumPhaseTimer).toBeCloseTo(30, 0);
+
+    // Animal enters podium to fight
+    const pid = w.addPlayer('Contender', 'pig');
+    const p = place(w, pid, 2, 0, 30);
+
+    // Fast-forward open phase until 5s warning
+    w.podiumPhaseTimer = 6;
+    let warnedClose = false;
+    for (let i = 0; i < 40; i++) {
+      w.step();
+      const snap = w.snapshotFor(pid);
+      if (snap.ev.some((e) => e.k === 'podWarn' && e.willShield)) {
+        warnedClose = true;
+      }
+    }
+    expect(warnedClose).toBe(true);
+
+    // Step until open phase expires without a King crowned
+    let blastFired = false;
+    for (let i = 0; i < 100; i++) {
+      w.step();
+      const snap = w.snapshotFor(pid);
+      if (snap.ev.some((e) => e.k === 'podBlast')) {
+        blastFired = true;
+        break;
+      }
+    }
+    // Blast knocked contender outward and shield re-armed
+    expect(blastFired).toBe(true);
+    expect(p.vx).toBeGreaterThan(15);
+    expect(w.podiumShield).toBe(true);
+    expect(w.podiumPhaseTimer).toBeCloseTo(30, 0);
   });
 });
 

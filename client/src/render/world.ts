@@ -406,6 +406,42 @@ function createMgmTextures(): { carpetTex: THREE.CanvasTexture; flagTex: THREE.C
   return { carpetTex, flagTex };
 }
 
+function createShieldTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, 256, 128);
+
+  const grad = ctx.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, 'rgba(0, 229, 255, 0.65)');
+  grad.addColorStop(0.3, 'rgba(0, 200, 255, 0.22)');
+  grad.addColorStop(0.7, 'rgba(0, 229, 255, 0.32)');
+  grad.addColorStop(1, 'rgba(0, 240, 255, 0.9)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 128);
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 1.5;
+  for (let x = 0; x < 256; x += 16) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 128);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= 128; y += 32) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(256, y);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 function buildTractor(): THREE.Group {
   const g = new THREE.Group();
   const matBody = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 }); // Classic tractor green
@@ -514,6 +550,10 @@ export class WorldRenderer {
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
   private readonly podiumTileMats: THREE.MeshStandardMaterial[] = [];
+  private shieldGroup: THREE.Group | null = null;
+  private shieldMat: THREE.MeshBasicMaterial | null = null;
+  private shieldRingMat: THREE.MeshBasicMaterial | null = null;
+  private shieldTex: THREE.CanvasTexture | null = null;
   private readonly fenceRails: THREE.Mesh[] = [];
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
@@ -761,6 +801,54 @@ export class WorldRenderer {
     flag.position.set(1.15, 5.8, -(PR - 1.6));
     flag.castShadow = true;
     this.podiumGroup.add(flag);
+
+    // Glowing protective energy barrier around the podium
+    const shieldR = PR + 0.5;
+    this.shieldGroup = new THREE.Group();
+
+    this.shieldTex = createShieldTexture();
+    this.shieldMat = new THREE.MeshBasicMaterial({
+      map: this.shieldTex,
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const shieldCylinder = new THREE.Mesh(
+      new THREE.CylinderGeometry(shieldR, shieldR, 3.4, 48, 1, true),
+      this.shieldMat
+    );
+    shieldCylinder.position.y = 1.7;
+    this.shieldGroup.add(shieldCylinder);
+
+    this.shieldRingMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const groundRing = new THREE.Mesh(
+      new THREE.RingGeometry(shieldR - 0.35, shieldR + 0.35, 48),
+      this.shieldRingMat
+    );
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = 0.55;
+    this.shieldGroup.add(groundRing);
+
+    const topRim = new THREE.Mesh(
+      new THREE.RingGeometry(shieldR - 0.2, shieldR + 0.2, 48),
+      this.shieldRingMat
+    );
+    topRim.rotation.x = -Math.PI / 2;
+    topRim.position.y = 3.4;
+    this.shieldGroup.add(topRim);
+
+    this.shieldGroup.visible = true;
+    this.podiumGroup.add(this.shieldGroup);
 
     this.scene.add(this.podiumGroup);
   }
@@ -1130,6 +1218,21 @@ export class WorldRenderer {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       }
+    }
+  }
+
+  updatePodiumShield(active: boolean, timer: number, now: number): void {
+    if (!this.shieldGroup || !this.shieldMat || !this.shieldRingMat) return;
+    this.shieldGroup.visible = active;
+    if (!active) return;
+    const pulseSpeed = timer <= 5 ? 0.015 : 0.005;
+    this.shieldGroup.rotation.y = (now * 0.0006) % (Math.PI * 2);
+    const pulse = 0.45 + (timer <= 5 ? 0.28 : 0.18) * Math.sin(now * pulseSpeed);
+    this.shieldMat.opacity = pulse;
+    this.shieldRingMat.opacity = Math.min(1.0, pulse * 1.25);
+    if (this.shieldTex) {
+      this.shieldTex.offset.x = (now * 0.0002) % 1;
+      this.shieldTex.offset.y = (now * 0.0004) % 1;
     }
   }
 
