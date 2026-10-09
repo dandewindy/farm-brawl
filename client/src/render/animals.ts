@@ -272,8 +272,24 @@ function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const mane = part(new THREE.CapsuleGeometry(0.05, 0.55, 4, 8), s.mane, 0.55, 2.0, 0);
   mane.rotation.z = -0.5;
   g.add(mane);
-  // Tail
-  blob(g, s.mane, 0.14, [1, 3, 1], -0.86, 1.22, 0, [0, 0, 0.4]);
+  // Tail: flowing horse tail slanting from top-rear downwards (từ trên chéo xuống)
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.68, 1.52, 0);
+  tailGroup.rotation.z = -0.42;
+
+  const tailGeo1 = new THREE.CapsuleGeometry(0.11, 0.45, 6, 12);
+  const tailMesh1 = part(tailGeo1, s.mane, 0, -0.28, 0, undefined, true);
+  tailGroup.add(tailMesh1);
+
+  const tailGeo2 = new THREE.ConeGeometry(0.16, 0.55, 10);
+  const tailMesh2 = part(tailGeo2, s.mane, 0, -0.62, 0, undefined, true);
+  tailMesh2.rotation.z = Math.PI;
+  tailGroup.add(tailMesh2);
+
+  const tailTip = part(new THREE.SphereGeometry(0.13, 8, 6), s.mane, 0, -0.85, 0, undefined, true);
+  tailGroup.add(tailTip);
+
+  g.add(tailGroup);
   // Ears
   for (const z of [-0.1, 0.1]) {
     g.add(part(new THREE.ConeGeometry(0.06, 0.2, 10), s.body, 0.95, 2.45, z));
