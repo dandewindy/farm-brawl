@@ -314,7 +314,6 @@ const ARC_SEG = 48;
 export class WorldRenderer {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
-  zoomBias = 0;
   readonly renderer: THREE.WebGLRenderer;
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
@@ -910,7 +909,7 @@ export class WorldRenderer {
 
   updateCamera(targetX: number, targetZ: number, mass: number, dt: number, shake = 0): void {
     const r = radiusOf(mass);
-    let h = 30 + r * 6 + this.zoomBias;
+    let h = 30 + r * 6;
     if (this.camera.aspect < 1) h *= 1 + (1 - this.camera.aspect) * 0.9;
 
     const k = 1 - Math.exp(-dt * 7);

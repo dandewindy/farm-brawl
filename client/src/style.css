@@ -129,7 +129,9 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   font-weight: 700;
 }
 
-#minimap { position: absolute; right: 12px; bottom: 12px; width: 160px; height: 160px; border-radius: 50%; background: rgba(31, 26, 23, .55); }
+#mapWrap { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; z-index: 6; pointer-events: auto; }
+#minimap { width: 140px; height: 140px; border-radius: 50%; background: rgba(31, 26, 23, .55); border: 2px solid rgba(255, 255, 255, .25); display: block; }
+#roomTag { font-size: 11px; color: #b9a98a; background: rgba(31, 26, 23, 0.7); padding: 2px 6px; border-radius: 4px; margin-top: 4px; pointer-events: auto; }
 #feed { position: absolute; left: 12px; bottom: 12px; display: grid; gap: 4px; font-size: 13px; }
 #feed div { padding: 3px 10px; background: rgba(31, 26, 23, .7); border-radius: 8px; animation: fadeIn .2s; }
 #feed div.mine { color: var(--gold); }
@@ -145,14 +147,15 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #ram.charging #ramFill { background: linear-gradient(90deg, var(--gold), var(--red-hi)); }
 #ramTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 9px; font-weight: 700; letter-spacing: .1em; color: rgba(255, 255, 255, .85); }
 
-#dashBtn { display: none; position: absolute; right: 22px; bottom: 190px; width: 86px; height: 86px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .5); background: rgba(165, 40, 27, .75); color: #fff; font: 800 16px var(--f-display); pointer-events: auto; touch-action: none; }
-#stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(31, 26, 23, .25); }
+#dashBtn { display: none; position: absolute; right: 24px; bottom: 70px; width: 82px; height: 82px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .5); background: rgba(165, 40, 27, .8); color: #fff; font: 800 16px var(--f-display); pointer-events: auto; touch-action: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .4); z-index: 10; }
+#stick { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(31, 26, 23, .25); z-index: 9; }
 #stickKnob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(255, 255, 255, .6); }
 body.touch #dashBtn { display: block; }
 
-#gameControls { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 8; }
-#gameControls button { width: 40px; height: 40px; border-radius: 8px; border: 2px solid rgba(255,255,255,.35); background: rgba(31,26,23,.65); color: #fff; font-size: 18px; cursor: pointer; backdrop-filter: blur(4px); display: grid; place-items: center; touch-action: manipulation; }
-#gameControls button:active { background: rgba(31,26,23,.9); }
+#gameControls { position: absolute; top: 12px; right: 242px; display: flex; gap: 6px; z-index: 8; pointer-events: auto; }
+#gameControls button { width: 38px; height: 38px; border-radius: 8px; border: 2px solid rgba(255,255,255,.35); background: rgba(31,26,23,.75); color: #fff; font-size: 16px; cursor: pointer; backdrop-filter: blur(4px); display: grid; place-items: center; touch-action: manipulation; transition: transform .1s, background .15s; }
+#gameControls button:hover { background: rgba(50,42,37,.9); transform: scale(1.05); }
+#gameControls button:active { background: rgba(20,16,14,.95); transform: scale(0.95); }
 
 #floats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
 .float {
@@ -293,24 +296,155 @@ body.menu #hud { display: none; }
 @keyframes fadeOut { to { opacity: 0; } }
 @keyframes bannerIn { from { opacity: 0; transform: scale(.7); } }
 
-@media (max-width: 640px) {
-  h1 { font-size: 50px; }
-  #lb { width: 150px; font-size: 12px; }
-  #lbList { font-size: 11px; }
-  #minimap { width: 110px; height: 110px; bottom: auto; top: 150px; right: 12px; }
-  #stats .weight b { font-size: 26px; }
+@media (max-width: 768px) {
+  h1 { font-size: 46px; }
+
+  /* Top-left: Compact stats badge */
+  #stats {
+    left: 8px;
+    top: 8px;
+    padding: 4px 8px;
+  }
+  #stats .weight b { font-size: 20px; }
+  #stats .weight span { font-size: 11px; }
+  #stats .sub { font-size: 10px; }
+
+  /* Top-center: Game controls (fullscreen + mute) adjacent to leaderboard */
+  #gameControls {
+    top: 8px;
+    right: 136px;
+    gap: 4px;
+    flex-direction: row;
+  }
+  #gameControls button {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+
+  /* Top-right: Compact Leaderboard (Top 3 only, HOF hidden during play) */
+  #lb {
+    right: 8px;
+    top: 8px;
+    width: 122px;
+    padding: 4px 6px;
+    max-height: 85px;
+  }
+  #lb h3 {
+    margin: 0 0 2px;
+    font-size: 9px;
+    letter-spacing: .08em;
+  }
+  #lbList {
+    padding-left: 14px;
+    font-size: 10px;
+  }
+  #lbList li { padding: 0; }
+  #hof { display: none !important; }
+
+  /* Sub-top: Rule / Commandment board (floats in upper-center below top row) */
+  #board {
+    top: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    max-width: min(240px, 68vw);
+    min-width: 0;
+    padding: 2px 10px;
+  }
+  #board .eyebrow {
+    font-size: 8px;
+    letter-spacing: .12em;
+  }
+  #board .paint { margin-top: 0; }
+  #ruleName {
+    font-size: 12px;
+    line-height: 1.1;
+  }
+  #board small {
+    font-size: 9px;
+    line-height: 1.1;
+    margin-top: 1px;
+  }
+  #reign {
+    font-size: 10px;
+    padding: 1px 6px;
+    margin-top: 2px;
+  }
+
+  /* Right-side: Minimap & Room tag below leaderboard */
+  #mapWrap {
+    top: 96px;
+    right: 8px;
+    bottom: auto;
+    align-items: flex-end;
+  }
+  #minimap {
+    position: static;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .25);
+  }
+  #roomTag {
+    font-size: 9px;
+    padding: 2px 5px;
+    margin-top: 3px;
+    max-width: 85px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Bottom: Charge bar and Capture bar */
+  #ram {
+    left: 50%;
+    bottom: 16px;
+    width: 150px;
+    height: 10px;
+  }
+  #ramTxt { font-size: 8px; }
+  #capture {
+    left: 50%;
+    bottom: 30px;
+    width: 160px;
+    height: 16px;
+  }
+  #capTxt { font-size: 9px; }
+
+  /* Touch Dash Button */
+  #dashBtn {
+    right: 18px;
+    bottom: 60px;
+    width: 76px;
+    height: 76px;
+    font-size: 16px;
+  }
+
+  /* Team mode bar */
+  #teamBar {
+    top: 6px;
+    padding: 2px 10px;
+    gap: 8px;
+    font-size: 11px;
+  }
+  #teamBar #tClock {
+    font-size: 13px;
+    padding: 0 4px;
+  }
+
   #feed { display: none; }
-  #banner .h { font-size: 28px; }
+  #banner .h { font-size: 24px; }
 }
 
-@media (min-width: 641px) and (max-width: 1100px) {
+@media (min-width: 769px) and (max-width: 1100px) {
   #lb { width: 170px; font-size: 12px; }
   #stats .weight b { font-size: 28px; }
-  #board { max-width: 260px; }
+  #board { max-width: 300px; }
+  #gameControls { right: 190px; }
+  #dashBtn { right: 28px; bottom: 75px; width: 84px; height: 84px; }
 }
-
-body.touch #gameControls { top: auto; bottom: 80px; right: 12px; flex-direction: column; }
-body.touch #gameControls button { width: 44px; height: 44px; }
 
 /* Choice cards overlay */
 #choice {
@@ -591,21 +725,5 @@ body.touch #gameControls button { width: 44px; height: 44px; }
   font-size: 11px;
   color: #52c41a;
   min-height: 14px;
-}
-#mapWrap {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-#roomTag {
-  font-size: 11px;
-  color: #b9a98a;
-  background: rgba(31, 26, 23, 0.7);
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-top: 4px;
 }
 

@@ -318,13 +318,26 @@ function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   g.add(bell);
   const clapper = part(new THREE.SphereGeometry(0.035, 6, 4), 0x3a3a3a, 0.7, 1.04, 0);
   g.add(clapper);
-  // Cow tail hanging from rear (tilts away from body)
-  const tailStem = part(new THREE.CylinderGeometry(0.03, 0.022, 0.52, 6), s.body, -0.68, 1.15, 0);
-  tailStem.rotation.z = -0.28;
-  g.add(tailStem);
-  const tailTuft = part(new THREE.ConeGeometry(0.065, 0.22, 8), s.spot || 0x2a2624, -0.82, 0.88, 0);
-  tailTuft.rotation.z = Math.PI + 0.28;
-  g.add(tailTuft);
+  // Cow tail hanging from rear - seamless connected group
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.65, 1.35, 0);
+  tailGroup.rotation.z = -0.25;
+
+  const stemLen = 0.46;
+  const tailStem = part(new THREE.CylinderGeometry(0.026, 0.02, stemLen, 8), s.body, 0, -stemLen / 2, 0);
+  tailGroup.add(tailStem);
+
+  const tuftLen = 0.22;
+  // Cone apex points up and nests inside the stem bottom tip (-0.548 + 0.11 = -0.438 > -0.46)
+  const tailTuft = part(new THREE.ConeGeometry(0.065, tuftLen, 8), s.spot || 0x2a2624, 0, -stemLen - tuftLen * 0.4, 0);
+  tailGroup.add(tailTuft);
+
+  // Bushy end tuft to form a fluffy, lush tassel
+  const tuftEnd = part(new THREE.SphereGeometry(0.062, 8, 6), s.spot || 0x2a2624, 0, -stemLen - tuftLen * 0.8, 0);
+  tuftEnd.scale.set(0.9, 1.25, 0.9);
+  tailGroup.add(tuftEnd);
+
+  g.add(tailGroup);
   addEyes(g, 1.2, 1.58, 0.16, 0.07);
   return addLegs(g, s.legs ?? s.body, [[0.5, 0.28], [0.5, -0.28], [-0.5, 0.28], [-0.5, -0.28]], 0.8, 0.11, 0x3a3330);
 }

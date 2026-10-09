@@ -97,20 +97,53 @@ hud.onToggleMute = () => {
   const next = !isMuted();
   setMuted(next);
   hud.setMuteState(next);
+  if (muteInGameBtn) muteInGameBtn.textContent = next ? '🔇' : '🔊';
 };
 
-// In-game zoom and mute controls
-const zoomInBtn = document.getElementById('zoomIn');
-const zoomOutBtn = document.getElementById('zoomOut');
-const muteInGameBtn = document.getElementById('muteInGame');
+// In-game fullscreen and mute controls
+const fsBtn = document.getElementById('fsBtn') as HTMLButtonElement | null;
+const muteInGameBtn = document.getElementById('muteInGame') as HTMLButtonElement | null;
 
-if (zoomInBtn) zoomInBtn.addEventListener('click', () => {
-  world.zoomBias = Math.max(-20, world.zoomBias - 5);
-});
-if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => {
-  world.zoomBias = Math.min(30, world.zoomBias + 5);
-});
+function updateFsIcon(): void {
+  const doc = document as any;
+  const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+  if (fsBtn) {
+    fsBtn.textContent = isFs ? '🗗' : '⛶';
+    fsBtn.title = isFs ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+  }
+}
+
+if (fsBtn) {
+  fsBtn.addEventListener('click', () => {
+    const doc = document as any;
+    const docEl = document.documentElement as any;
+    const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+    if (!isFs) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+    } else {
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen().catch(() => {});
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+    }
+  });
+}
+
+document.addEventListener('fullscreenchange', updateFsIcon);
+document.addEventListener('webkitfullscreenchange', updateFsIcon);
+updateFsIcon();
+
 if (muteInGameBtn) {
+  muteInGameBtn.textContent = isMuted() ? '🔇' : '🔊';
   muteInGameBtn.addEventListener('click', () => {
     const next = !isMuted();
     setMuted(next);
