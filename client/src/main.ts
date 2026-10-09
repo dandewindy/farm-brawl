@@ -316,6 +316,8 @@ function handleGameEvent(ev: GameEvent): void {
       } else if (ev.cause === 'fire') {
         foodParts.burst(ev.x, 1.2, ev.z, 0xff7043, 26, 10);
         sfxBurn(isMine ? 1 : 0.5);
+      } else if (ev.cause === 'starve') {
+        foodParts.puff(ev.x, 0.4, ev.z, 0xaaaaaa, 0.8, 1.0, 1.2);
       } else {
         foodParts.burst(ev.x, 1.6, ev.z, 0xfff35c, 18, 10, 9, 0.5);
         sfxZap(isMine ? 1 : 0.5);
@@ -460,6 +462,14 @@ function handleGameEvent(ev: GameEvent): void {
       } else {
         hud.showBanner(t('teamTie'), sub);
       }
+      break;
+    }
+    case 'map': {
+      world.buildMap(ev.map);
+      corpses.setMap(ev.map);
+      animals.clear();
+      tools.clear();
+      hud.showToast('🌾 Trận đấu mới! Bản đồ & thức ăn đã được làm mới!');
       break;
     }
   }

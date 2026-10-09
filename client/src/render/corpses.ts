@@ -162,6 +162,17 @@ export class CorpseRenderer {
         }
         g.scale.set(c.sc, c.sc * Math.max(0.05, 1 - a * 0.7), c.sc);
         done = a > 1.4;
+      } else if (c.cause === 'starve') {
+        // Starved: collapses onto side on ground (hiệu ứng nằm) and blinks/flashes (nhấp nháy)
+        const fallT = Math.min(1, a / 0.35);
+        g.rotation.z = fallT * (Math.PI / 2);
+        g.position.set(c.x, Math.max(0.1, 0.45 - fallT * 0.35), c.z);
+        // Rapid blinking/flashing effect (nhấp nháy)
+        g.visible = Math.floor(now / 90) % 2 === 0;
+        if (a > 1.2) {
+          g.scale.setScalar(c.sc * Math.max(0.01, 1 - (a - 1.2) / 0.4));
+        }
+        done = a > 1.6;
       } else {
         done = true;
       }

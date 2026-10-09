@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CFG, DT, radiusOf } from '../src/constants';
+import { CFG, DT, TRAITS, radiusOf } from '../src/constants';
 import { generateMap } from '../src/map';
 import { blobOutline, insideBlob, type Blob } from '../src/math';
 import { dashParams, outsideFence, stepMove } from '../src/physics';
@@ -493,5 +493,73 @@ describe('bonus weapons and tools', () => {
 
     expect(p.mass).toBe(31);
   });
+
+  it('sheep has 30% stronger ram power trait', () => {
+    expect(TRAITS.sheep.ram).toBe(1.3);
+    expect(TRAITS.pig.ram).toBe(1.0);
+    expect(TRAITS.chicken.ram).toBe(1.0);
+
+    const w = emptyWorld();
+    const sheepId = w.addPlayer('RammerSheep', 'sheep');
+    const sheep = place(w, sheepId, 0, 0, 50);
+    const pigId = w.addPlayer('TargetPig', 'pig');
+    const target = place(w, pigId, 2.5, 0, 50);
+
+    // Sheep dashes into pig
+    sheep.vx = 20;
+    sheep.dashT = 0.2;
+    w.step();
+
+    // Target pig was rammed with extra knockback force
+    expect(target.vx).toBeGreaterThan(15);
+  });
+
+  it('mud puddles have enlarged sizes including x2 and x3', () => {
+    const m = generateMap(42);
+    expect(m.mud.length).toBeGreaterThan(0);
+    // At least one mud puddle has radius >= 8 (scaled x2)
+    const hasX2 = m.mud.some((blob) => blob[2] >= 8);
+    expect(hasX2).toBe(true);
+    // At least one mud puddle has radius >= 12 (scaled x3)
+    const hasX3 = m.mud.some((blob) => blob[2] >= 12);
+    expect(hasX3).toBe(true);
+  });
+
+  it('hunger decay reduces mass over time, and drops below 10kg causes starvation death', () => {
+    const w = emptyWorld();
+    const pId = w.addPlayer('HungryAnimal', 'cow');
+    const p = place(w, pId, 0, 0, 20);
+
+    // After 2.5s grace period (at 60fps = 150 ticks), mass should slowly decrease
+    for (let i = 0; i < 240; i++) {
+      w.step();
+    }
+    expect(p.mass).toBeLessThan(20);
+
+    // Force mass to 10.2kg
+    p.mass = 10.2;
+    for (let i = 0; i < 60; i++) {
+      w.step();
+      if (!p.alive) break;
+    }
+    // Starvation death occurs below 10kg
+    expect(p.alive).toBe(false);
+    const dieEv = w.flush; // events were pushed
+  });
+
+  it('renewGame generates a new map layout, items, and resets game state', () => {
+    const w = new World(123);
+    const oldPodium = [...w.map.podium];
+    const oldSeed = w.map.seed;
+
+    w.renewGame(999);
+
+    expect(w.map.seed).toBe(999);
+    expect(w.food.size).toBe(CFG.FOOD_TARGET);
+    expect(w.tools.size).toBe(3);
+    expect(w.matchClock).toBe(300);
+    expect(w.teamScores).toEqual([0, 0]);
+  });
 });
+
 

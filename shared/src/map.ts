@@ -23,11 +23,11 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
 
   /** find a free spot for something of radius `r`, at least `margin` from the fence */
   const place = (r: number, margin: number): [number, number] | null => {
-    for (let tries = 0; tries < 60; tries++) {
+    for (let tries = 0; tries < 120; tries++) {
       const a = between(0, Math.PI * 2);
-      const d = Math.sqrt(rnd()) * (R - margin - r);
+      const d = Math.sqrt(rnd()) * Math.max(1, R - margin - r);
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 4)) {
+      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 2.0)) {
         taken.push([x, z, r]);
         return [x, z];
       }
@@ -38,7 +38,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   const pond: Blob[] = [];
   const nPond = 2 + Math.floor(rnd() * 2);
   for (let i = 0; i < nPond; i++) {
-    const r = between(5, 8);
+    const r = between(5, 7.5);
     const p = place(r * 1.3, 8);
     if (p) pond.push([p[0], p[1], r, between(0, 100)]);
   }
@@ -46,7 +46,10 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   const mud: Blob[] = [];
   const nMud = 2 + Math.floor(rnd() * 2);
   for (let i = 0; i < nMud; i++) {
-    const r = between(4, 6.5);
+    // Large mud puddles: some scaled x2, some scaled x3
+    const scale = i === 0 ? 2 : i === 1 ? 3 : (rnd() < 0.5 ? 2 : 3);
+    const baseR = between(4.2, 5.0);
+    const r = baseR * scale;
     const p = place(r * 1.3, 6);
     if (p) mud.push([p[0], p[1], r, between(0, 100)]);
   }

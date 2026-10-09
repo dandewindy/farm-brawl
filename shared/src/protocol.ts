@@ -43,7 +43,7 @@ export const FLAG = {
   FLYING: 65536,
 } as const;
 
-export type DeathCause = 'fence' | 'drown' | 'well' | 'fire';
+export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve';
 
 export type ToolKind = 'pitchfork' | 'dynamite' | 'song';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
@@ -81,7 +81,8 @@ export type GameEvent =
   | { k: 'superFood'; x: number; z: number }
   | { k: 'super'; id: number }
   | { k: 'fly'; id: number; x: number; z: number }
-  | { k: 'teamWin'; winner: number; s0: number; s1: number };
+  | { k: 'teamWin'; winner: number; s0: number; s1: number }
+  | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };
 
 /** [id, name, mass, kills, reign?] */
 export type LeaderRow = [id: number, name: string, mass: number, kills: number, reign?: number];

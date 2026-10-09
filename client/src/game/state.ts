@@ -115,6 +115,10 @@ export class GameState {
       } else if (ev.k === 'die') {
         this.ents.delete(ev.id);
         if (ev.id === this.myId) this.alive = false;
+      } else if (ev.k === 'map') {
+        this.map = ev.map;
+        this.food.clear();
+        for (const f of ev.food) this.addFood(f);
       }
       this.hooks.onEvent(ev);
     }

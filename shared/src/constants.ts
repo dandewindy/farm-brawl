@@ -85,15 +85,17 @@ export interface SpeciesTraits {
   water: number;
   /** speed multiplier in mud */
   mud: number;
+  /** ram knockback power multiplier */
+  ram: number;
 }
 
 export const TRAITS: Record<Species, SpeciesTraits> = {
-  chicken: { speed: 1.0, dash: 1.12, weight: 0.9, water: 0.45, mud: 0.5 },
-  sheep: { speed: 0.97, dash: 1.0, weight: 1.15, water: 0.45, mud: 0.5 },
-  horse: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.45, mud: 0.5 },
-  cow: { speed: 0.95, dash: 0.97, weight: 1.25, water: 0.45, mud: 0.5 },
-  duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.5 },
-  pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1 },
+  chicken: { speed: 1.0, dash: 1.12, weight: 0.9, water: 0.45, mud: 0.5, ram: 1.0 },
+  sheep: { speed: 0.97, dash: 1.0, weight: 1.15, water: 0.45, mud: 0.5, ram: 1.3 },
+  horse: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.45, mud: 0.5, ram: 1.0 },
+  cow: { speed: 0.95, dash: 0.97, weight: 1.25, water: 0.45, mud: 0.5, ram: 1.0 },
+  duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.5, ram: 1.0 },
+  pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1, ram: 1.0 },
 };
 
 export const SKIN_COUNT = 4;

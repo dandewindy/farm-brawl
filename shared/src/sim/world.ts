@@ -45,6 +45,7 @@ export interface Player extends Body {
   slowT: number;
   superT: number;
   flyT: number;
+  lastEatT: number;
   team?: number;
   ai: BotBrain | null;
 }
@@ -67,7 +68,7 @@ export interface Food {
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 export class World {
-  readonly map: MapData;
+  map: MapData;
   readonly players = new Map<number, Player>();
   readonly food = new Map<number, Food>();
   readonly tools = new Map<number, ToolItem>();
@@ -81,7 +82,7 @@ export class World {
   private nextTool = 1;
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
-  private readonly rnd: () => number;
+  private rnd: () => number;
   private events: GameEvent[] = [];
   private foodAdded: FoodWire[] = [];
   private foodRemoved: number[] = [];
@@ -114,6 +115,7 @@ export class World {
   teamScores: [number, number] = [0, 0];
   matchClock = 300;
   matchEnded = false;
+  matchEndTimer = 0;
 
   constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
@@ -139,7 +141,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -180,7 +182,7 @@ export class World {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false, inWaterT: 0,
-      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0,
+      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -229,18 +231,27 @@ export class World {
 
     // Team mode match clock & scoring
     const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
-    if (hasTeams && !this.matchEnded) {
-      this.matchClock = Math.max(0, this.matchClock - DT);
-      if (this.napoleonId > 0) {
-        const king = this.players.get(this.napoleonId);
-        if (king && king.alive && king.team !== undefined) {
-          this.teamScores[king.team] += DT * 1;
+    if (hasTeams) {
+      if (!this.matchEnded) {
+        this.matchClock = Math.max(0, this.matchClock - DT);
+        if (this.napoleonId > 0) {
+          const king = this.players.get(this.napoleonId);
+          if (king && king.alive && king.team !== undefined) {
+            this.teamScores[king.team] += DT * 1;
+          }
         }
-      }
-      if (this.matchClock <= 0) {
-        this.matchEnded = true;
-        const winner = this.teamScores[0] > this.teamScores[1] ? 0 : this.teamScores[1] > this.teamScores[0] ? 1 : -1;
-        this.events.push({ k: 'teamWin', winner, s0: Math.round(this.teamScores[0]), s1: Math.round(this.teamScores[1]) });
+        if (this.matchClock <= 0) {
+          this.matchEnded = true;
+          this.matchEndTimer = 0;
+          const winner = this.teamScores[0] > this.teamScores[1] ? 0 : this.teamScores[1] > this.teamScores[0] ? 1 : -1;
+          this.events.push({ k: 'teamWin', winner, s0: Math.round(this.teamScores[0]), s1: Math.round(this.teamScores[1]) });
+        }
+      } else {
+        // After 6s celebration, renew game with brand new map layout and items
+        this.matchEndTimer += DT;
+        if (this.matchEndTimer >= 6.0) {
+          this.renewGame();
+        }
       }
     }
 
@@ -575,7 +586,17 @@ export class World {
 
     for (const p of alive) {
       if (!p.alive) continue;
+      // High mass melts slowly
       if (p.mass > CFG.DECAY_START) p.mass -= (p.mass - CFG.DECAY_START) * CFG.DECAY_RATE * DT;
+      // Hunger decay: slowly lose kg over time if not eating (grace period 2.5s)
+      if (this.time - p.lastEatT > 2.5) {
+        p.mass -= 0.35 * DT;
+      }
+      // Starvation: dies if mass drops below 10kg
+      if (p.mass < 10) {
+        this.kill(p, 'starve');
+        continue;
+      }
       if (p.mass > p.best) p.best = p.mass;
     }
 
@@ -668,8 +689,10 @@ export class World {
         const aHits = !sameTeam && a.dashT > 0 && va > CFG.HIT_MIN_SPEED && !a.dashHit.has(b.id);
         const bHits = !sameTeam && b.dashT > 0 && vb > CFG.HIT_MIN_SPEED && !b.dashHit.has(a.id);
         if (aHits && bHits) {
-          // head-on: the bigger momentum wins
-          if (va * ma * a.power >= vb * mb * b.power) this.hit(a, b, nx, nz, va);
+          // head-on: the bigger momentum wins (taking ram strength factor into account)
+          const ramA = TRAITS[a.species].ram ?? 1.0;
+          const ramB = TRAITS[b.species].ram ?? 1.0;
+          if (va * ma * a.power * ramA >= vb * mb * b.power * ramB) this.hit(a, b, nx, nz, va);
           else this.hit(b, a, -nx, -nz, vb);
         } else if (aHits) this.hit(a, b, nx, nz, va);
         else if (bHits) this.hit(b, a, -nx, -nz, vb);
@@ -739,7 +762,8 @@ export class World {
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
-    let k = clamp(speed * att.power * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX);
+    const ramFactor = TRAITS[att.species].ram ?? 1.0;
+    let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX * 1.3);
 
     // Rule: "twoleg" (Two legs bad - chickens and ducks fly twice as far when hit)
     if (this.currentRule === 'twoleg' && (vic.species === 'chicken' || vic.species === 'duck')) {
@@ -893,6 +917,7 @@ export class World {
           }
         }
         p.mass += gain;
+        p.lastEatT = this.time;
         this.food.delete(f.id);
         this.foodRemoved.push(f.id);
       }
@@ -1081,6 +1106,39 @@ export class World {
       snap.team = [Math.round(this.teamScores[0]), Math.round(this.teamScores[1]), Math.ceil(this.matchClock)];
     }
     return snap;
+  }
+
+  /** Renew entire game world: new map layout, newly placed items, reset scores & clock, respawn players */
+  renewGame(newSeed?: number): void {
+    const seed = newSeed ?? ((Math.random() * 2 ** 31) | 0);
+    this.rnd = mulberry32(seed ^ 0x9e3779b9);
+    this.map = generateMap(seed);
+    this.food.clear();
+    this.tools.clear();
+    for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
+    for (let i = 0; i < 3; i++) this.spawnTool();
+    this.matchClock = 300;
+    this.teamScores = [0, 0];
+    this.matchEnded = false;
+    this.matchEndTimer = 0;
+    this.napoleonId = 0;
+    this.napoleonReign = 0;
+    this.podiumProgress = 0;
+    this.podiumCaptor = 0;
+    this.podiumContested = false;
+
+    // Respawns all existing players at new free spots on the new map
+    for (const p of this.players.values()) {
+      this.spawn(p);
+    }
+
+    // Broadcast map event to all clients so they rebuild 3D world and food/items
+    this.events.push({
+      k: 'map',
+      map: this.map,
+      food: [...this.food.values()].map((f) => [f.id, r2(f.x), r2(f.z), f.k, Math.round(f.v * 10) / 10]),
+      tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
+    });
   }
 
   /** call once per tick after every recipient got its snapshot */
