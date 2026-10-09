@@ -30,10 +30,50 @@ export interface BotBrain {
   goalT: number;
 }
 
-export const BOT_NAMES = [
-  'Ủn Ỉn', 'Bé Mập', 'Gà Mờ', 'Bò Sữa', 'Vịt Bầu', 'Cừu Non', 'Ngựa Ô', 'Heo Hồng', 'Tí Nị', 'Heo Lì',
-  'Bò Tót', 'Gà Chiến', 'Vịt Xiêm', 'Cừu Bông', 'Ngựa Vằn', 'Mập Ú', 'Boxer', 'Clover', 'Muriel', 'Benjamin',
-];
+export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
+  pig: [
+    'Ủn Ỉn', 'Bé Mập', 'Heo Hồng', 'Heo Lì', 'Heo Rừng',
+    'Mập Ú', 'Bụng Bự', 'Trư Bát Giới', 'Ủn Ủn', 'Heo Sữa',
+    'Heo Mọi', 'Bạch Trư', 'Heo Cưng', 'Heo Còi',
+  ],
+  cow: [
+    'Bò Sữa', 'Bò Tót', 'Bò Vàng', 'Bò Angus', 'Bò Mộng',
+    'Ngưu Ma Vương', 'Bò Chăm', 'Bê Vàng', 'Bê Con', 'Bò Khoẻ',
+    'Bò Tía', 'Bò Rừng',
+  ],
+  chicken: [
+    'Gà Mờ', 'Gà Chiến', 'Gà Trống', 'Gà Mái', 'Gà Con',
+    'Gà Tre', 'Kê Đại Hiệp', 'Gà Nòi', 'Gà Chọi', 'Gà Rừng',
+    'Gà Bông', 'Gà Nhép',
+  ],
+  duck: [
+    'Vịt Bầu', 'Vịt Xiêm', 'Vịt Cỏ', 'Vịt Con', 'Vịt Donald',
+    'Vịt Bơi', 'Vịt Quác', 'Vịt Hoa', 'Vịt Trời', 'Vịt Béo',
+    'Vịt Lạch Bạch', 'Vịt Lon Ton',
+  ],
+  sheep: [
+    'Cừu Non', 'Cừu Bông', 'Cừu Vui Vẻ', 'Cừu Tuyết', 'Dương Con',
+    'Cừu Xoăn', 'Bạch Dương', 'Cừu Vàng', 'Cừu Nhỏ', 'Cừu Béo',
+    'Cừu Đáng Yêu', 'Cừu Thong Thả',
+  ],
+  horse: [
+    'Ngựa Ô', 'Ngựa Vằn', 'Bạch Mã', 'Xích Thố', 'Ngựa Gió',
+    'Hắc Mã', 'Boxer', 'Clover', 'Tuấn Mã', 'Ngựa Hoang',
+    'Thiên Mã', 'Ngựa Phi',
+  ],
+};
+
+export const SPECIES_NAMES_VI: Record<Species, string> = {
+  pig: 'Heo',
+  cow: 'Bò',
+  chicken: 'Gà',
+  duck: 'Vịt',
+  sheep: 'Cừu',
+  horse: 'Ngựa',
+};
+
+export const BOT_NAMES = Object.values(SPECIES_BOT_NAMES).flat();
+
 
 export function newBrain(rnd: () => number): BotBrain {
   return {

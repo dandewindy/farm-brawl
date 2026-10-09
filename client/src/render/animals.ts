@@ -354,26 +354,110 @@ function buildDuck(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   return addLegs(g, s.bill, [[0, 0.2], [0, -0.2]], 0.45, 0.06);
 }
 
+let spottedPigBodyTex: THREE.CanvasTexture | null = null;
+let spottedPigHeadTex: THREE.CanvasTexture | null = null;
+
+function getSpottedPigBodyTexture(): THREE.CanvasTexture {
+  if (spottedPigBodyTex) return spottedPigBodyTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  // Base pink coat
+  ctx.fillStyle = '#f6a5b5';
+  ctx.fillRect(0, 0, 512, 256);
+
+  // Black spots (smooth, organic round patches painted directly on surface)
+  ctx.fillStyle = '#2e2628';
+
+  // Spot 1: Large back / spine saddle patch (visible from top-down)
+  ctx.beginPath();
+  ctx.ellipse(230, 55, 68, 38, 0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spot 2: Right flank / shoulder (X=128 is right side)
+  ctx.beginPath();
+  ctx.ellipse(135, 95, 52, 40, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spot 3: Left flank / hip (X=384 is left side)
+  ctx.beginPath();
+  ctx.ellipse(385, 105, 56, 42, 0.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spot 4: Rump / rear patch across edge boundary
+  ctx.beginPath();
+  ctx.ellipse(0, 75, 42, 34, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(512, 75, 42, 34, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spot 5: Small cute patch on front shoulder
+  ctx.beginPath();
+  ctx.ellipse(275, 110, 26, 22, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  spottedPigBodyTex = new THREE.CanvasTexture(canvas);
+  spottedPigBodyTex.wrapS = THREE.RepeatWrapping;
+  spottedPigBodyTex.wrapT = THREE.ClampToEdgeWrapping;
+  return spottedPigBodyTex;
+}
+
+function getSpottedPigHeadTexture(): THREE.CanvasTexture {
+  if (spottedPigHeadTex) return spottedPigHeadTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  // Base pink coat
+  ctx.fillStyle = '#f6a5b5';
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Dark eye patch over right eye / temple (X=64 is right side)
+  ctx.fillStyle = '#2e2628';
+  ctx.beginPath();
+  ctx.ellipse(70, 85, 38, 44, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  spottedPigHeadTex = new THREE.CanvasTexture(canvas);
+  return spottedPigHeadTex;
+}
+
 function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Round plump body (casts shadow)
-  blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0, undefined, true);
-  // Spots (if spotted skin)
   if (s.spot) {
-    // Large prominent patch on top spine / back (clearly visible from top-down camera)
-    blob(g, s.spot, 0.32, [1.2, 0.16, 1.0], -0.15, 1.70, 0.08);
-    // Rear back / hindquarter patch
-    blob(g, s.spot, 0.28, [1.0, 0.18, 0.9], -0.58, 1.54, -0.12);
-    // Right flank / belly patch (clearly visible from 3D preview & right side)
-    blob(g, s.spot, 0.30, [1.0, 0.85, 0.16], 0.18, 1.15, 0.70);
-    // Left flank / hip patch (visible from left side)
-    blob(g, s.spot, 0.28, [1.0, 0.9, 0.16], -0.32, 1.08, -0.68);
-    // Front right shoulder patch
-    blob(g, s.spot, 0.24, [0.9, 0.9, 0.16], 0.52, 1.25, 0.50);
-    // Head / Eye patch over right eye
-    blob(g, s.spot, 0.22, [0.85, 0.95, 0.2], 0.96, 1.48, 0.38);
+    // Smooth, perfectly rounded body with painted spots texture (zero protruding lumps)
+    const bodyGeo = new THREE.SphereGeometry(0.72, 28, 20);
+    const bodyMat = new THREE.MeshStandardMaterial({
+      map: getSpottedPigBodyTexture(),
+      roughness: 0.72,
+      flatShading: false,
+    });
+    const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+    bodyMesh.scale.set(1.35, 1, 1);
+    bodyMesh.position.set(0, 1.0, 0);
+    bodyMesh.castShadow = true;
+    g.add(bodyMesh);
+
+    // Smooth, perfectly rounded head with painted eye patch texture
+    const headGeo = new THREE.SphereGeometry(0.5, 24, 18);
+    const headMat = new THREE.MeshStandardMaterial({
+      map: getSpottedPigHeadTexture(),
+      roughness: 0.72,
+      flatShading: false,
+    });
+    const headMesh = new THREE.Mesh(headGeo, headMat);
+    headMesh.position.set(0.85, 1.3, 0);
+    headMesh.castShadow = true;
+    g.add(headMesh);
+  } else {
+    // Round plump body (casts shadow)
+    blob(g, s.body, 0.72, [1.35, 1, 1], 0, 1.0, 0, undefined, true);
+    // Head
+    g.add(part(new THREE.SphereGeometry(0.5, 18, 12), s.body, 0.85, 1.3, 0));
   }
-  // Head
-  g.add(part(new THREE.SphereGeometry(0.5, 18, 12), s.body, 0.85, 1.3, 0));
   // Snout cylinder
   const snout = part(new THREE.CylinderGeometry(0.22, 0.23, 0.2, 20), s.snout, 1.33, 1.22, 0);
   snout.rotation.z = Math.PI / 2;

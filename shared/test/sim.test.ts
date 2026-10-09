@@ -434,4 +434,64 @@ describe('bonus weapons and tools', () => {
 
     expect(p.mass).toBeGreaterThan(600);
   });
+
+  it('bots are always named matching their species', () => {
+    for (let seed = 1; seed <= 5; seed++) {
+      const w = new World(seed * 100);
+      w.step(); // fillBots runs
+      for (const p of w.players.values()) {
+        if (!p.bot) continue;
+        const validPrefixes: Record<string, string[]> = {
+          pig: ['Ủn', 'Bé', 'Heo', 'Mập', 'Bụng', 'Trư', 'Bạch', 'Lợn'],
+          cow: ['Bò', 'Bê', 'Ngưu'],
+          chicken: ['Gà', 'Kê'],
+          duck: ['Vịt'],
+          sheep: ['Cừu', 'Dương', 'Bạch'],
+          horse: ['Ngựa', 'Bạch', 'Xích', 'Hắc', 'Boxer', 'Clover', 'Tuấn', 'Thiên'],
+        };
+        const prefixes = validPrefixes[p.species] || [];
+        const matches = prefixes.some((pre) => p.name.includes(pre));
+        expect(matches).toBe(true);
+      }
+    }
+  });
+
+  it('food scatter and food spawn never land inside well mouth', () => {
+    for (let seed = 10; seed <= 15; seed++) {
+      const w = new World(seed);
+      // Check initially spawned food
+      for (const [, f] of w.food) {
+        for (const [wx, wz, wr] of (w.map.well || [])) {
+          const dist = Math.hypot(f.x - wx, f.z - wz);
+          expect(dist).toBeGreaterThanOrEqual(wr);
+        }
+      }
+
+      // Simulate deaths over well mouth and check scattered food
+      if (w.map.well && w.map.well.length > 0) {
+        const [wx, wz, wr] = w.map.well[0];
+        const pId = w.addPlayer('Faller', 'pig');
+        const p = place(w, pId, wx, wz, 100);
+        // Force kill over well
+        w.kill(p, 'well');
+
+        for (const [, f] of w.food) {
+          const dist = Math.hypot(f.x - wx, f.z - wz);
+          expect(dist).toBeGreaterThanOrEqual(wr);
+        }
+      }
+    }
+  });
+
+  it('watermelon food kind exists and gives 11kg', () => {
+    const w = emptyWorld();
+    const pId = w.addPlayer('MelonEater', 'pig');
+    const p = place(w, pId, 0, 0, 20);
+
+    w.food.set(1001, { id: 1001, x: 0, z: 0, k: 7, v: 11 });
+    w.step();
+
+    expect(p.mass).toBe(31);
+  });
 });
+

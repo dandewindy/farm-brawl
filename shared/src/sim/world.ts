@@ -1,6 +1,6 @@
 // The authoritative farm simulation. Phase 1 runs it inside the page; phase 2 runs the very same class in a
 // Cloudflare Durable Object. It knows nothing about rendering or networking: inputs in, snapshots out.
-import { thinkBot, newBrain, BOT_NAMES, type BotBrain } from './bots';
+import { thinkBot, newBrain, SPECIES_BOT_NAMES, SPECIES_NAMES_VI, type BotBrain } from './bots';
 import {
   CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SPECIES, SUBSTEPS, TRAITS, radiusOf,
   type FoodKind, type Species,
@@ -206,10 +206,12 @@ export class World {
   private fillBots(): void {
     if (!this.botsEnabled) return;
     if (this.players.size < CFG.BOT_FILL) {
+      const sp = SPECIES[Math.floor(this.rnd() * SPECIES.length)];
       const used = new Set([...this.players.values()].map((p) => p.name));
-      const free = BOT_NAMES.filter((n) => !used.has(n));
-      const name = free.length ? free[Math.floor(this.rnd() * free.length)] : `Bot ${this.nextId}`;
-      this.addPlayer(name, SPECIES[Math.floor(this.rnd() * SPECIES.length)], true);
+      const pool = SPECIES_BOT_NAMES[sp] || [];
+      const free = pool.filter((n) => !used.has(n));
+      const name = free.length ? free[Math.floor(this.rnd() * free.length)] : `${SPECIES_NAMES_VI[sp]} ${this.nextId}`;
+      this.addPlayer(name, sp, true);
     } else if (this.players.size > CFG.BOT_FILL) {
       // a human joined a full room: retire a bot (a dead one if possible)
       let pick: Player | null = null;
@@ -905,10 +907,13 @@ export class World {
 
   private spawnFood(): void {
     let x = 0, z = 0;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 16; i++) {
       const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 3);
       x = Math.cos(a) * d; z = Math.sin(a) * d;
-      if (!this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) break;
+      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) continue;
+      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 1.8)) continue;
+      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 1.8)) continue;
+      break;
     }
     let roll = this.rnd() * (FOOD_WEIGHT as readonly number[]).reduce((s, w) => s + w, 0);
     let k = 0 as FoodKind;
@@ -923,14 +928,39 @@ export class World {
   private scatter(x: number, z: number, kg: number, rad: number, dx = 0, dz = 0): void {
     const n = clamp(Math.ceil(kg / 2.5), 1, 14);
     const v = kg / n;
-    const k: FoodKind = v >= 5 ? 4 : v >= 2 ? 1 : 0;
+    const k: FoodKind = v >= 9 ? 7 : v >= 5 ? 4 : v >= 2 ? 1 : 0;
     const base = Math.atan2(dz, dx), aimed = dx !== 0 || dz !== 0;
     for (let i = 0; i < n; i++) {
       const a = aimed ? base + (this.rnd() - 0.5) * 2.4 : this.rnd() * Math.PI * 2;
       const d = rad + this.rnd() * 3;
       let fx = x + Math.cos(a) * d, fz = z + Math.sin(a) * d;
+
+      // Avoid stone wells: push radially outside well rim so food never floats over the pit
+      for (const [wx, wz, wr] of (this.map.well || [])) {
+        const dist = Math.hypot(fx - wx, fz - wz);
+        const safeR = wr + 1.8;
+        if (dist < safeR) {
+          const ang = dist > 0.01 ? Math.atan2(fz - wz, fx - wx) : a;
+          fx = wx + Math.cos(ang) * safeR;
+          fz = wz + Math.sin(ang) * safeR;
+        }
+      }
+
+      // Keep within fence
       const fd = Math.hypot(fx, fz), lim = CFG.R - 2;
       if (fd > lim) { fx = (fx / fd) * lim; fz = (fz / fd) * lim; }
+
+      // Extra check: ensure safe from wells even after fence clamp
+      for (const [wx, wz, wr] of (this.map.well || [])) {
+        const dist = Math.hypot(fx - wx, fz - wz);
+        const safeR = wr + 1.5;
+        if (dist < safeR) {
+          const ang = dist > 0.01 ? Math.atan2(fz - wz, fx - wx) : a;
+          fx = wx + Math.cos(ang) * safeR;
+          fz = wz + Math.sin(ang) * safeR;
+        }
+      }
+
       this.addFood(fx, fz, k, v);
     }
   }

@@ -16,7 +16,40 @@ interface Particle {
   g: number;
 }
 
+function createWatermelonTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+
+  // Base bright/rich green
+  ctx.fillStyle = '#2e7d32';
+  ctx.fillRect(0, 0, 256, 128);
+
+  // Wavy dark forest green stripes
+  ctx.fillStyle = '#143c16';
+  for (let x = 6; x < 256; x += 32) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    for (let y = 0; y <= 128; y += 16) {
+      const wobble = Math.sin((y / 128) * Math.PI * 4) * 5;
+      ctx.lineTo(x + wobble, y);
+    }
+    for (let y = 128; y >= 0; y -= 16) {
+      const wobble = Math.sin((y / 128) * Math.PI * 4) * 5;
+      ctx.lineTo(x + 14 + wobble, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
 export class FoodAndParticleRenderer {
+
   private readonly foodMeshes: THREE.InstancedMesh[] = [];
   private readonly foodTops: Partial<Record<FoodKind, THREE.InstancedMesh>> = {};
   private readonly foodShadow: THREE.InstancedMesh;
@@ -82,6 +115,9 @@ export class FoodAndParticleRenderer {
     // 6: Rainbow Candy (Kẹo cầu vồng siêu thú) - sparkling octahedron
     const rainbowCandyGeo = new THREE.OctahedronGeometry(1.5, 0);
 
+    // 7: Watermelon (Dưa hấu) - large oblong sphere, visibly larger than pumpkin
+    const watermelonGeo = new THREE.SphereGeometry(1.05, 18, 14).scale(1.26, 0.94, 0.94);
+
     const geos = [
       cornCobGeo,
       appleGeo,
@@ -90,6 +126,7 @@ export class FoodAndParticleRenderer {
       pumpkinGeo,
       turnipGeo,
       rainbowCandyGeo,
+      watermelonGeo,
     ];
 
     const mats = [
@@ -107,9 +144,11 @@ export class FoodAndParticleRenderer {
       new THREE.MeshStandardMaterial({ color: 0xf5f5f0, emissive: 0x222222, roughness: 0.6 }),
       // 6: Rainbow Candy - sparkling crystalline
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.2, metalness: 0.25, flatShading: true }),
+      // 7: Watermelon - striped green
+      new THREE.MeshStandardMaterial({ map: createWatermelonTexture(), roughness: 0.45 }),
     ];
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) {
       const cap = i === 6 ? 8 : this.maxFoodPerKind;
       const mesh = new THREE.InstancedMesh(geos[i], mats[i], cap);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -187,6 +226,18 @@ export class FoodAndParticleRenderer {
     this.scene.add(pumpkinStemMesh);
     this.foodTops[4] = pumpkinStemMesh;
 
+    // 7: Watermelon stem (Cuống dưa hấu)
+    const melonStemGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.35, 6).translate(0, 0.98, 0);
+    melonStemGeo.rotateZ(0.25);
+    const melonStemMat = new THREE.MeshStandardMaterial({ color: 0x335522, roughness: 0.8 });
+    const melonStemMesh = new THREE.InstancedMesh(melonStemGeo, melonStemMat, this.maxFoodPerKind);
+    melonStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    melonStemMesh.frustumCulled = false;
+    melonStemMesh.count = 0;
+    this.scene.add(melonStemMesh);
+    this.foodTops[7] = melonStemMesh;
+
+
     // Soft dark circular shadows under all food items
     const shadowGeo = new THREE.CircleGeometry(0.42, 12).rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({
@@ -216,7 +267,7 @@ export class FoodAndParticleRenderer {
   }
 
   updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {
-    const counts = [0, 0, 0, 0, 0, 0, 0];
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0];
     let nShadow = 0;
     const tt = now / 1000;
     const podX = podiumPos ? podiumPos[0] : 0;
@@ -224,7 +275,7 @@ export class FoodAndParticleRenderer {
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
-      if (k < 0 || k > 6) continue;
+      if (k < 0 || k > 7) continue;
       const maxForThis = k === 6 ? 8 : this.maxFoodPerKind;
       if (counts[k] >= maxForThis) continue;
 
@@ -256,6 +307,10 @@ export class FoodAndParticleRenderer {
             g: 0,
           });
         }
+      } else if (k === 7) {
+        // Watermelon: large melon sits on ground, gently rocks & turns slowly
+        this.dummy.position.set(f.x, onPod + 0.62 * sz, f.z);
+        this.dummy.rotation.set(0, seed + tt * 0.25, 0);
       } else if (k === 4) {
         // Pumpkin sits on the ground and turns slowly (0.3 rad/s)
         this.dummy.position.set(f.x, onPod + 0.5 * sz, f.z);
@@ -284,14 +339,14 @@ export class FoodAndParticleRenderer {
 
       // Render ground shadow disc under food item
       if (nShadow < this.maxFoodTotal) {
-        const shadowScale = grow * sz * (k === 6 ? 3.4 : k === 4 ? 2.0 : 1.0);
+        const shadowScale = grow * sz * (k === 6 ? 3.4 : k === 7 ? 2.6 : k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
         this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);
       }
     }
 
-    for (let k = 0; k < 7; k++) {
+    for (let k = 0; k < 8; k++) {
       this.foodMeshes[k].count = counts[k];
       this.foodMeshes[k].instanceMatrix.needsUpdate = true;
       if (this.foodTops[k as FoodKind]) {

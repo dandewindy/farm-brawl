@@ -98,8 +98,9 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
 
 export const SKIN_COUNT = 4;
 
-/** food kinds: 0 corn, 1 apple, 2 golden corn, 3 carrot, 4 pumpkin, 5 turnip, 6 rainbow candy */
-export const FOOD_KG = [1, 2.5, 6, 1.6, 7, 2.5, 3] as const;
+/** food kinds: 0 corn, 1 apple, 2 golden corn, 3 carrot, 4 pumpkin, 5 turnip, 6 rainbow candy, 7 watermelon */
+export const FOOD_KG = [1, 2.5, 6, 1.6, 7, 2.5, 3, 11] as const;
 /** spawn weights for each food kind */
-export const FOOD_WEIGHT = [50, 18, 3, 24, 5, 0, 0] as const;
-export type FoodKind = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export const FOOD_WEIGHT = [47, 17, 3, 23, 5, 0, 0, 5] as const;
+export type FoodKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
