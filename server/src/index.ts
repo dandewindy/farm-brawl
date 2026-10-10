@@ -12,11 +12,11 @@ function getTargetLocationHint(request: Request): string {
   const continent = cf?.continent;
   const country = cf?.country;
   if (country === 'VN' || continent === 'AS') {
-    return 'apac';
+    return 'apac-se'; // Southeast Asia (Singapore) for lowest latency in Vietnam (~30ms)
   }
   if (continent === 'EU') return 'weur';
   if (continent === 'NA') return 'enam';
-  return 'apac';
+  return 'apac-se';
 }
 
 export default {
@@ -27,12 +27,12 @@ export default {
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const roomParam = url.searchParams.get('room') || 'pub-1';
       const hint = getTargetLocationHint(request);
-      // Route default rooms to fresh regional APAC / SEA Durable Objects for optimal latency
+      // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = `pub-${hint}-1`;
+        targetRoomKey = 'pub-sea-2';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = `team-${hint}-1`;
+        targetRoomKey = 'team-sea-2';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
@@ -61,9 +61,9 @@ export default {
       const hint = getTargetLocationHint(request);
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = `pub-${hint}-1`;
+        targetRoomKey = 'pub-sea-2';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = `team-${hint}-1`;
+        targetRoomKey = 'team-sea-2';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);

@@ -12,7 +12,7 @@ export class WsClient implements Transport {
   public rtt = 0;
   public rttMin = 0;
   public colo = '';
-  private hasAutoRerouted = false;
+  private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
 
   constructor(
@@ -84,14 +84,6 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             // Rolling median: resilient against single-frame render hitches / GC pauses
             this.rtt = sorted[Math.floor(sorted.length / 2)];
-
-            // Auto-reroute check: if initial connection landed on distant high-latency node (NRT/LAX >= 90ms)
-            // attempt one fresh reconnect to hit an optimal APAC edge node (SIN/HKG)
-            if (!this.hasAutoRerouted && this.rttWin.length >= 3 && this.rttMin >= 90) {
-              this.hasAutoRerouted = true;
-              console.log(`[WS] High latency detected (${this.rttMin}ms via ${this.colo}). Retrying for optimal low-latency node...`);
-              this.forceReconnect();
-            }
           }
         } else {
           if (msg.t === 'joined') {
@@ -142,7 +134,11 @@ export class WsClient implements Transport {
 
   private scheduleReconnect(): void {
     if (this.closed) return;
-    setTimeout(() => {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+    }
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
       if (!this.closed) this.connect();
     }, 800);
   }
@@ -168,13 +164,19 @@ export class WsClient implements Transport {
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.rttWin.length = 0;
     this.isReconnecting = true;
     if (this.ws) {
-      try {
-        this.ws.close();
-      } catch (_) {}
+      const oldWs = this.ws;
       this.ws = null;
+      try {
+        oldWs.onclose = null;
+        oldWs.close();
+      } catch (_) {}
     }
     this.connect();
   }
@@ -182,10 +184,17 @@ export class WsClient implements Transport {
   close(): void {
     this.closed = true;
     this.stopPing();
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.lastJoinMsg = null;
     this.sessionToken = null;
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch (_) {}
       this.ws = null;
     }
   }

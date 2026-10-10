@@ -763,13 +763,10 @@ connectToRoom(initialRoom);
 // Optional Debug status bar (shows RTT, jitter, prediction error, and FPS)
 const showDebug = params.has('debug') || window.location.hostname === 'localhost';
 let debugEl: HTMLDivElement | null = null;
+// FPS tracking & high-refresh display throttling
 let fpsFrames = 0;
 let lastFpsTime = performance.now();
 let currentFps = 60;
-
-// Strict 60 FPS Frame Rate Limiter (prevents runaway 300+ FPS on high-refresh displays)
-const TARGET_FPS = 60;
-const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~16.6667ms
 let lastRenderTime = 0;
 
 if (showDebug) {
@@ -787,17 +784,20 @@ function animate(now: number): void {
     lastRenderTime = now;
   }
 
-  // Throttle frame execution strictly to 60 FPS
+  // High-refresh display throttling: prevent runaway 300+ FPS on 240Hz/360Hz displays
+  // Using 11.0ms (~90 FPS cap) guarantees that standard 60Hz (16.6ms) and 75Hz (13.3ms) monitors NEVER drop a single frame,
+  // while capping 144Hz/240Hz/360Hz monitors from wasting GPU cycles.
   const elapsed = now - lastRenderTime;
-  if (elapsed < FRAME_INTERVAL - 1.5) {
+  if (elapsed < 11.0) {
     return;
   }
 
-  lastRenderTime = now - (elapsed % FRAME_INTERVAL);
   const dt = Math.min(0.05, Math.max(0.001, elapsed / 1000));
+  lastRenderTime = now;
 
   fpsFrames++;
   if (now - lastFpsTime >= 500) {
+    // Smoothly clamp HUD display to 60 FPS so it never displays runaway numbers
     currentFps = Math.min(60, Math.round((fpsFrames * 1000) / (now - lastFpsTime)));
     fpsFrames = 0;
     lastFpsTime = now;
