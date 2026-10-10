@@ -602,6 +602,8 @@ function animate(now: number): void {
     currentFps = Math.round((fpsFrames * 1000) / (now - lastFpsTime));
     fpsFrames = 0;
     lastFpsTime = now;
+    const currentPing = transport ? Math.round(transport.rtt) : 0;
+    hud.updatePerf(currentFps, currentPing);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
       debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;

@@ -569,7 +569,7 @@ export class WorldRenderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -640,15 +640,15 @@ export class WorldRenderer {
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
     sun.position.set(30, 65, 22);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     const d = 60;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
     sun.shadow.camera.top = d;
     sun.shadow.camera.bottom = -d;
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 200;
-    sun.shadow.bias = -0.0006;
+    sun.shadow.camera.near = 10;
+    sun.shadow.camera.far = 160;
+    sun.shadow.bias = -0.0004;
     sun.shadow.camera.updateProjectionMatrix(); // Essential for shadow camera bounds to apply!
 
     this.sun = sun;
@@ -1278,6 +1278,7 @@ export class WorldRenderer {
   resize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 

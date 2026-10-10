@@ -203,6 +203,49 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #stats .weight b { font: 800 34px var(--f-display); color: var(--gold); }
 #stats .weight span { margin-left: 4px; font-weight: 700; color: var(--paper); }
 #stats .sub { font-size: 13px; color: #d8c9a8; }
+#netPerf {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font: 600 12px/1 'Be Vietnam Pro', monospace;
+  color: #c4b598;
+}
+#netPerf .perf-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+#netPerf b {
+  font-family: monospace;
+  font-weight: 800;
+  font-size: 12px;
+  color: #fff;
+}
+#netPerf .perf-sep {
+  opacity: 0.35;
+}
+.perf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.perf-dot.good {
+  background-color: #4caf50;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.8);
+}
+.perf-dot.warn {
+  background-color: #ffb300;
+  box-shadow: 0 0 6px rgba(255, 179, 0, 0.8);
+}
+.perf-dot.bad {
+  background-color: #f44336;
+  box-shadow: 0 0 6px rgba(244, 67, 54, 0.8);
+}
 #lb { position: absolute; right: 12px; top: 12px; width: 220px; padding: 8px 10px; }
 #lb h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #b9a98a; }
 #lbList { margin: 0; padding: 0 0 0 20px; font-size: 13px; }
@@ -471,6 +514,8 @@ body.menu #hud { display: none; }
   #stats .weight b { font-size: 20px; }
   #stats .weight span { font-size: 11px; }
   #stats .sub { font-size: 10px; }
+  #netPerf { font-size: 10px; gap: 4px; margin-top: 3px; padding-top: 3px; }
+  #netPerf b { font-size: 10px; }
 
   /* Top-center: Game controls (fullscreen + mute) adjacent to leaderboard */
   #gameControls {

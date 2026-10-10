@@ -6,10 +6,77 @@ import type { Ent } from '../game/state';
 export class MinimapRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly size: number;
+  private bgCanvas: HTMLCanvasElement | null = null;
+  private lastMapRef: MapData | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
     this.size = canvas.width;
+  }
+
+  private renderStaticBg(map: MapData): void {
+    if (!this.bgCanvas) {
+      this.bgCanvas = document.createElement('canvas');
+      this.bgCanvas.width = this.size;
+      this.bgCanvas.height = this.size;
+    }
+    const bCtx = this.bgCanvas.getContext('2d')!;
+    const size = this.size;
+    const center = size / 2;
+    const scale = (center - 8) / CFG.R;
+
+    bCtx.clearRect(0, 0, size, size);
+
+    // Arena circular background
+    bCtx.beginPath();
+    bCtx.arc(center, center, center - 6, 0, Math.PI * 2);
+    bCtx.fillStyle = 'rgba(40, 32, 26, 0.75)';
+    bCtx.fill();
+
+    // Electric fence perimeter
+    bCtx.beginPath();
+    bCtx.arc(center, center, CFG.R * scale, 0, Math.PI * 2);
+    bCtx.strokeStyle = '#e8b641';
+    bCtx.lineWidth = 2.5;
+    bCtx.stroke();
+
+    // Hazards: Ponds (blue)
+    bCtx.fillStyle = '#3a8fd4';
+    for (const [px, pz, pr] of map.pond) {
+      bCtx.beginPath();
+      bCtx.arc(center + px * scale, center + pz * scale, Math.max(2, pr * scale), 0, Math.PI * 2);
+      bCtx.fill();
+    }
+
+    // Hazards: Mud (brown)
+    bCtx.fillStyle = '#6e4627';
+    for (const [mx, mz, mr] of map.mud) {
+      bCtx.beginPath();
+      bCtx.arc(center + mx * scale, center + mz * scale, Math.max(2, mr * scale), 0, Math.PI * 2);
+      bCtx.fill();
+    }
+
+    // Hazards: Wells / Pits (dark void)
+    bCtx.fillStyle = '#0f0c0a';
+    for (const [wx, wz, wr] of (map.well || [])) {
+      bCtx.beginPath();
+      bCtx.arc(center + wx * scale, center + wz * scale, Math.max(2, wr * scale * 1.2), 0, Math.PI * 2);
+      bCtx.fill();
+    }
+
+    // Hazards: Fire pits (orange / red)
+    bCtx.fillStyle = '#ff5511';
+    for (const [fx, fz, fr] of (map.fire || [])) {
+      bCtx.beginPath();
+      bCtx.arc(center + fx * scale, center + fz * scale, Math.max(2, fr * scale), 0, Math.PI * 2);
+      bCtx.fill();
+    }
+
+    // Podium (red carpet)
+    bCtx.beginPath();
+    bCtx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);
+    bCtx.fillStyle = '#a5281b';
+    bCtx.fill();
   }
 
   draw(
@@ -28,58 +95,15 @@ export class MinimapRenderer {
 
     ctx.clearRect(0, 0, size, size);
 
-    // Arena circular background
-    ctx.beginPath();
-    ctx.arc(center, center, center - 6, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(40, 32, 26, 0.75)';
-    ctx.fill();
-
-    // Electric fence perimeter
-    ctx.beginPath();
-    ctx.arc(center, center, CFG.R * scale, 0, Math.PI * 2);
-    ctx.strokeStyle = '#e8b641';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    if (!map) return;
-
-    // Hazards: Ponds (blue)
-    ctx.fillStyle = '#3a8fd4';
-    for (const [px, pz, pr] of map.pond) {
-      ctx.beginPath();
-      ctx.arc(center + px * scale, center + pz * scale, Math.max(2, pr * scale), 0, Math.PI * 2);
-      ctx.fill();
+    if (map) {
+      if (map !== this.lastMapRef || !this.bgCanvas) {
+        this.lastMapRef = map;
+        this.renderStaticBg(map);
+      }
+      ctx.drawImage(this.bgCanvas!, 0, 0);
+    } else {
+      return;
     }
-
-    // Hazards: Mud (brown)
-    ctx.fillStyle = '#6e4627';
-    for (const [mx, mz, mr] of map.mud) {
-      ctx.beginPath();
-      ctx.arc(center + mx * scale, center + mz * scale, Math.max(2, mr * scale), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Hazards: Wells / Pits (dark void)
-    ctx.fillStyle = '#0f0c0a';
-    for (const [wx, wz, wr] of (map.well || [])) {
-      ctx.beginPath();
-      ctx.arc(center + wx * scale, center + wz * scale, Math.max(2, wr * scale * 1.2), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Hazards: Fire pits (orange / red)
-    ctx.fillStyle = '#ff5511';
-    for (const [fx, fz, fr] of (map.fire || [])) {
-      ctx.beginPath();
-      ctx.arc(center + fx * scale, center + fz * scale, Math.max(2, fr * scale), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Podium (red carpet)
-    ctx.beginPath();
-    ctx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);
-    ctx.fillStyle = '#a5281b';
-    ctx.fill();
 
     // Protective energy barrier indicator on minimap
     if (podShieldActive) {

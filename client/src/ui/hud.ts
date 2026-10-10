@@ -60,6 +60,10 @@ export class HudManager {
   private readonly podiumBadgeEl: HTMLElement | null;
   private readonly ptIconEl: HTMLElement | null;
   private readonly ptTxtEl: HTMLElement | null;
+  private readonly fpsVal: HTMLElement | null;
+  private readonly pingVal: HTMLElement | null;
+  private readonly fpsDot: HTMLElement | null;
+  private readonly pingDot: HTMLElement | null;
 
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
@@ -150,6 +154,10 @@ export class HudManager {
     this.podiumBadgeEl = document.getElementById('podiumTimerBadge');
     this.ptIconEl = document.getElementById('ptIcon');
     this.ptTxtEl = document.getElementById('ptTxt');
+    this.fpsVal = document.getElementById('fpsVal');
+    this.pingVal = document.getElementById('pingVal');
+    this.fpsDot = document.getElementById('fpsDot');
+    this.pingDot = document.getElementById('pingDot');
 
     this.friendPanel = document.getElementById('friendPanel');
     this.btnCreateRoom = document.getElementById('btnCreateRoom');
@@ -636,6 +644,21 @@ export class HudManager {
     this.massEl.textContent = String(Math.round(mass));
     this.rankTxt.textContent = t('rank', { r: rank || '–', n: total || '–' });
     this.koTxt.textContent = t('kos', { k: kills });
+  }
+
+  updatePerf(fps: number, ping: number): void {
+    if (this.fpsVal) {
+      this.fpsVal.textContent = String(fps);
+      if (this.fpsDot) {
+        this.fpsDot.className = `perf-dot ${fps >= 55 ? 'good' : fps >= 30 ? 'warn' : 'bad'}`;
+      }
+    }
+    if (this.pingVal) {
+      this.pingVal.textContent = ping > 0 ? String(ping) : (ping === 0 ? '<1' : '--');
+      if (this.pingDot) {
+        this.pingDot.className = `perf-dot ${ping <= 60 ? 'good' : ping <= 120 ? 'warn' : 'bad'}`;
+      }
+    }
   }
 
   updateRamMeter(cd: number, charging: boolean, chargeLevel: number, canCharge = true): void {

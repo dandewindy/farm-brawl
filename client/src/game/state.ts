@@ -203,7 +203,7 @@ function sample(e: Ent, rt: number): void {
   if (rt >= last[0] || n === 1) {
     // late packet: coast a little along the last movement
     if (n >= 2 && rt > last[0]) {
-      const p = h[n - 2], k = Math.min(rt - last[0], 1.5) / (last[0] - p[0]);
+      const p = h[n - 2], k = Math.min(rt - last[0], 1.5) / Math.max(1, last[0] - p[0]);
       e.x = last[1] + (last[1] - p[1]) * k;
       e.z = last[2] + (last[2] - p[2]) * k;
     } else { e.x = last[1]; e.z = last[2]; }
@@ -213,7 +213,7 @@ function sample(e: Ent, rt: number): void {
   for (let i = n - 2; i >= 0; i--) {
     const a = h[i];
     if (a[0] <= rt) {
-      const b = h[i + 1], k = (rt - a[0]) / (b[0] - a[0]);
+      const b = h[i + 1], k = (rt - a[0]) / Math.max(1e-4, b[0] - a[0]);
       e.x = a[1] + (b[1] - a[1]) * k;
       e.z = a[2] + (b[2] - a[2]) * k;
       e.a = a[3] + wrapAngle(b[3] - a[3]) * k;

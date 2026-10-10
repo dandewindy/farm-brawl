@@ -344,8 +344,12 @@ export class ClientPredictor {
     }
 
     this.hist.push({ t: now, x: this.x, z: this.z, vx: this.vx, vz: this.vz });
-    while (this.hist.length > 2 && this.hist[0].t < now - 1500) {
-      this.hist.shift();
+    if (this.hist.length > 2 && this.hist[0].t < now - 1500) {
+      let cut = 0;
+      while (cut < this.hist.length - 2 && this.hist[cut].t < now - 1500) {
+        cut++;
+      }
+      if (cut > 0) this.hist.splice(0, cut);
     }
   }
 }

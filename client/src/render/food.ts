@@ -58,7 +58,9 @@ export class FoodAndParticleRenderer {
   private readonly dummy = new THREE.Object3D();
   private readonly shadowM = new THREE.Matrix4();
   private readonly hueCol = new THREE.Color();
-  private readonly rainbowColors = [0xff3b30, 0xff9500, 0xffcc00, 0x34c759, 0x007aff, 0xaf52de];
+  private readonly rainbowColObjects = [0xff3b30, 0xff9500, 0xffcc00, 0x34c759, 0x007aff, 0xaf52de].map(
+    (c) => new THREE.Color(c)
+  );
   private readonly maxFoodPerKind = 800;
   private readonly maxFoodTotal = 1500;
   private readonly maxParticles = 1200;
@@ -297,7 +299,7 @@ export class FoodAndParticleRenderer {
         this.dummy.rotation.set(tt * 1.3, tt * 2.1, 0);
         this.foodMeshes[6].setColorAt(idx, this.hueCol.setHSL((tt * 0.6) % 1, 1, 0.55));
         if (Math.random() < 0.35 && this.particles.length < this.maxParticles) {
-          const c = this.rainbowColors[Math.floor(Math.random() * this.rainbowColors.length)];
+          const cIdx = Math.floor(Math.random() * this.rainbowColObjects.length);
           this.particles.push({
             x: f.x + (Math.random() - 0.5) * 3.2,
             y: onPod + 0.6 + Math.random() * 2.2,
@@ -307,7 +309,7 @@ export class FoodAndParticleRenderer {
             vz: 0,
             life: 0.9,
             maxLife: 0.9,
-            color: new THREE.Color(c),
+            color: this.rainbowColObjects[cIdx],
             size: 0.65,
             g: 0,
           });
@@ -440,14 +442,14 @@ export class FoodAndParticleRenderer {
           vz: (Math.random() - 0.5) * 0.4,
           life: 0.65,
           maxLife: 0.65,
-          color: new THREE.Color(this.rainbowColors[i]),
+          color: this.rainbowColObjects[i],
           size: 0.75 * r,
           g: -0.2,
         });
       }
     } else {
       // Walking trail: cycling vibrant sparkles
-      const col = this.rainbowColors[Math.floor(Math.random() * this.rainbowColors.length)];
+      const col = this.rainbowColObjects[Math.floor(Math.random() * this.rainbowColObjects.length)];
       if (this.particles.length < this.maxParticles) {
         this.particles.push({
           x: tx + (Math.random() - 0.5) * 0.3 * r,
@@ -458,7 +460,7 @@ export class FoodAndParticleRenderer {
           vz: (Math.random() - 0.5) * 0.6,
           life: 0.5,
           maxLife: 0.5,
-          color: new THREE.Color(col),
+          color: col,
           size: 0.6 * r,
           g: 0,
         });
@@ -492,7 +494,10 @@ export class FoodAndParticleRenderer {
       const p = this.particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        this.particles.splice(i, 1);
+        const last = this.particles.pop()!;
+        if (i < this.particles.length) {
+          this.particles[i] = last;
+        }
         continue;
       }
 
