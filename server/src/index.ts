@@ -37,7 +37,14 @@ export default {
 
     // Health check endpoint
     if (url.pathname === '/api/health') {
-      return new Response(JSON.stringify({ status: 'ok', time: Date.now() }), {
+      const cf = (request as any).cf;
+      return new Response(JSON.stringify({
+        status: 'ok',
+        time: Date.now(),
+        colo: cf?.colo ?? 'unknown',
+        country: cf?.country ?? 'unknown',
+        city: cf?.city ?? 'unknown',
+      }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }

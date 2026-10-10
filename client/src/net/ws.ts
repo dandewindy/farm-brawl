@@ -54,11 +54,15 @@ export class WsClient implements Transport {
         this.send(msg);
       }
 
-      // Send immediate first ping to measure baseline RTT instantly
-      const now = Math.round(performance.now());
-      this.send({ t: 'ping', c: now });
+      // Delay initial ping by 500ms so map/scene initial creation completes first without skewing RTT
+      setTimeout(() => {
+        if (!this.closed && this.ws?.readyState === WebSocket.OPEN) {
+          const now = Math.round(performance.now());
+          this.send({ t: 'ping', c: now });
+        }
+      }, 500);
 
-      // Start ping loop (every 1.2s)
+      // Start ping loop (every 1.0s)
       this.startPing();
     });
 
@@ -67,12 +71,16 @@ export class WsClient implements Transport {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'pong') {
+          // Ignore samples collected while tab is inactive/throttled
+          if (typeof document !== 'undefined' && document.hidden) return;
           const s = performance.now() - msg.c;
-          if (s >= 0 && s < 3000) {
-            this.rtt = this.rtt === 0 ? s : this.rtt + (s - this.rtt) * 0.25;
+          if (s >= 0 && s < 2000) {
             this.rttWin.push(s);
             if (this.rttWin.length > 5) this.rttWin.shift();
-            this.rttMin = Math.min(...this.rttWin);
+            const sorted = [...this.rttWin].sort((a, b) => a - b);
+            this.rttMin = sorted[0];
+            // Rolling median: resilient against single-frame render hitches / GC pauses
+            this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
         } else {
           if (msg.t === 'joined' && msg.token) {
@@ -103,11 +111,12 @@ export class WsClient implements Transport {
   private startPing(): void {
     this.stopPing();
     this.pingInterval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const now = Math.round(performance.now());
         this.send({ t: 'ping', c: now });
       }
-    }, 1200);
+    }, 1000);
   }
 
   private stopPing(): void {

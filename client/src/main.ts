@@ -656,7 +656,7 @@ function animate(now: number): void {
     currentFps = Math.round((fpsFrames * 1000) / (now - lastFpsTime));
     fpsFrames = 0;
     lastFpsTime = now;
-    const currentPing = transport ? Math.round(transport.rtt) : 0;
+    const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
     hud.updatePerf(currentFps, currentPing);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
