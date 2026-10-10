@@ -170,14 +170,17 @@ export class AnimalPreviewRenderer {
   public start(): void {
     if (this.isRunning) return;
     this.isRunning = true;
+    let lastT = 0;
 
-    const loop = () => {
+    const loop = (now: number) => {
       if (!this.isRunning) return;
+      this.animId = requestAnimationFrame(loop);
+      if (now - lastT < 15) return; // 60 FPS cap
+      lastT = now;
       if (this.autoRotate) {
         this.turntable.rotation.y += this.rotSpeed;
       }
       this.renderer.render(this.scene, this.camera);
-      this.animId = requestAnimationFrame(loop);
     };
 
     this.animId = requestAnimationFrame(loop);

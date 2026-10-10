@@ -40,7 +40,6 @@ const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
 let transport: Transport | null = null;
-let lastTime = performance.now();
 let shake = 0;
 let prevMass = 0;
 let gainAcc = 0;
@@ -761,6 +760,11 @@ let fpsFrames = 0;
 let lastFpsTime = performance.now();
 let currentFps = 60;
 
+// Strict 60 FPS Frame Rate Limiter (prevents runaway 300+ FPS on high-refresh displays)
+const TARGET_FPS = 60;
+const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~16.6667ms
+let lastRenderTime = 0;
+
 if (showDebug) {
   debugEl = document.createElement('div');
   debugEl.style.cssText =
@@ -772,12 +776,22 @@ if (showDebug) {
 function animate(now: number): void {
   requestAnimationFrame(animate);
 
-  const dt = Math.min(0.1, (now - lastTime) / 1000);
-  lastTime = now;
+  if (lastRenderTime === 0) {
+    lastRenderTime = now;
+  }
+
+  // Throttle frame execution strictly to 60 FPS
+  const elapsed = now - lastRenderTime;
+  if (elapsed < FRAME_INTERVAL - 1.5) {
+    return;
+  }
+
+  lastRenderTime = now - (elapsed % FRAME_INTERVAL);
+  const dt = Math.min(0.05, Math.max(0.001, elapsed / 1000));
 
   fpsFrames++;
   if (now - lastFpsTime >= 500) {
-    currentFps = Math.round((fpsFrames * 1000) / (now - lastFpsTime));
+    currentFps = Math.min(60, Math.round((fpsFrames * 1000) / (now - lastFpsTime)));
     fpsFrames = 0;
     lastFpsTime = now;
     const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
