@@ -9,8 +9,8 @@ export class WsClient implements Transport {
   private lastJoinMsg: (ClientMsg & { t: 'join' }) | null = null;
   private sessionToken: string | null = null;
   private pingInterval: number | null = null;
-  public rtt = 100;
-  public rttMin = 100;
+  public rtt = 0;
+  public rttMin = 0;
   private readonly rttWin: number[] = [];
 
   constructor(
@@ -53,6 +53,11 @@ export class WsClient implements Transport {
         const msg = this.queue.shift()!;
         this.send(msg);
       }
+
+      // Send immediate first ping to measure baseline RTT instantly
+      const now = Math.round(performance.now());
+      this.send({ t: 'ping', c: now });
+
       // Start ping loop (every 1.2s)
       this.startPing();
     });
@@ -64,7 +69,7 @@ export class WsClient implements Transport {
         if (msg.t === 'pong') {
           const s = performance.now() - msg.c;
           if (s >= 0 && s < 3000) {
-            this.rtt += (s - this.rtt) * 0.25;
+            this.rtt = this.rtt === 0 ? s : this.rtt + (s - this.rtt) * 0.25;
             this.rttWin.push(s);
             if (this.rttWin.length > 5) this.rttWin.shift();
             this.rttMin = Math.min(...this.rttWin);

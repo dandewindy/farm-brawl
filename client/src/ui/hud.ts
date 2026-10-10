@@ -656,7 +656,7 @@ export class HudManager {
     if (this.pingVal) {
       this.pingVal.textContent = ping > 0 ? String(ping) : (ping === 0 ? '<1' : '--');
       if (this.pingDot) {
-        this.pingDot.className = `perf-dot ${ping <= 60 ? 'good' : ping <= 120 ? 'warn' : 'bad'}`;
+        this.pingDot.className = `perf-dot ${ping <= 70 ? 'good' : ping <= 140 ? 'warn' : 'bad'}`;
       }
     }
   }
