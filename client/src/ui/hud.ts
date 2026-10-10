@@ -64,10 +64,12 @@ export class HudManager {
   private readonly pingVal: HTMLElement | null;
   private readonly fpsDot: HTMLElement | null;
   private readonly pingDot: HTMLElement | null;
+  private readonly coloVal: HTMLElement | null;
 
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
   public onSelectMode?: (mode: 'ffa' | 'team' | 'friend') => void;
+  public onReconnect?: () => void;
   public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
   public selectedTeam: number = 0;
   public isSpectating = false;
@@ -195,6 +197,14 @@ export class HudManager {
     this.pingVal = document.getElementById('pingVal');
     this.fpsDot = document.getElementById('fpsDot');
     this.pingDot = document.getElementById('pingDot');
+    this.coloVal = document.getElementById('coloVal');
+
+    const netPerfEl = document.getElementById('netPerf');
+    if (netPerfEl) {
+      netPerfEl.addEventListener('click', () => {
+        this.onReconnect?.();
+      });
+    }
 
     this.friendPanel = document.getElementById('friendPanel');
     this.btnCreateRoom = document.getElementById('btnCreateRoom');
@@ -1009,7 +1019,7 @@ export class HudManager {
     this.koTxt.textContent = t('kos', { k: kills });
   }
 
-  updatePerf(fps: number, ping: number): void {
+  updatePerf(fps: number, ping: number, colo?: string): void {
     if (this.fpsVal) {
       this.fpsVal.textContent = String(fps);
       if (this.fpsDot) {
@@ -1021,6 +1031,11 @@ export class HudManager {
       if (this.pingDot) {
         this.pingDot.className = `perf-dot ${ping <= 70 ? 'good' : ping <= 140 ? 'warn' : 'bad'}`;
       }
+    }
+    if (this.coloVal && colo) {
+      this.coloVal.textContent = colo;
+      this.coloVal.hidden = false;
+      this.coloVal.title = `Trạm Cloudflare: ${colo} (Nhấp để đổi tuyến nếu ping cao)`;
     }
   }
 

@@ -261,6 +261,23 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   font: 600 12px/1 'Be Vietnam Pro', monospace;
   color: #c4b598;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  transition: opacity 0.15s;
+}
+#netPerf:hover {
+  opacity: 0.85;
+}
+.perf-colo {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f2ead7;
+  letter-spacing: 0.04em;
+  margin-left: 2px;
 }
 #netPerf .perf-item {
   display: inline-flex;

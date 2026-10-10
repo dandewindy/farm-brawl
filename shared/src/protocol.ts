@@ -141,8 +141,8 @@ export interface Snapshot {
 
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[] }
-  | { t: 'joined'; id: number; token?: string }
-  | { t: 'pong'; c: number }
+  | { t: 'joined'; id: number; token?: string; colo?: string }
+  | { t: 'pong'; c: number; colo?: string }
   | Snapshot;
 
 export type ClientMsg =

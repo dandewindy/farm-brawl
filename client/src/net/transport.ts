@@ -9,6 +9,8 @@ export interface Transport {
   close(): void;
   readonly rtt: number;
   readonly rttMin: number;
+  readonly colo?: string;
+  forceReconnect?(): void;
 }
 
 export type Handler = (m: ServerMsg) => void;
@@ -17,6 +19,7 @@ export type Handler = (m: ServerMsg) => void;
 export class LocalServer implements Transport {
   public readonly rtt = 0;
   public readonly rttMin = 0;
+  public readonly colo = 'LOCAL';
   private readonly world = new World();
   private myId = 0;
   private last = performance.now();

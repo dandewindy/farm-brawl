@@ -39,7 +39,9 @@ export class GameRoom extends DurableObject {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      this.handleWebSocket(server);
+      const cfRay = request.headers.get('cf-ray') || '';
+      const edgeColo = cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
+      this.handleWebSocket(server, edgeColo);
 
       return new Response(null, {
         status: 101,
@@ -48,6 +50,8 @@ export class GameRoom extends DurableObject {
     }
 
     if (url.pathname === '/info') {
+      const cfRay = request.headers.get('cf-ray') || '';
+      const edgeColo = cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
       return new Response(
         JSON.stringify({
           room: roomParam,
@@ -56,6 +60,7 @@ export class GameRoom extends DurableObject {
           bots: this.world.players.size - this.sockets.size,
           tick: this.world.tick,
           king: this.world.napoleonId,
+          edgeColo,
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -64,14 +69,14 @@ export class GameRoom extends DurableObject {
     return new Response('Not found', { status: 404 });
   }
 
-  private handleWebSocket(ws: WebSocket): void {
+  private handleWebSocket(ws: WebSocket, edgeColo: string): void {
     ws.accept();
 
     ws.addEventListener('message', (event) => {
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
         const msg = JSON.parse(raw) as ClientMsg;
-        this.onMessage(ws, msg);
+        this.onMessage(ws, msg, edgeColo);
       } catch (err) {
         console.error('Invalid WS message:', err);
       }
@@ -104,7 +109,7 @@ export class GameRoom extends DurableObject {
     ws.addEventListener('error', onCloseOrError);
   }
 
-  private onMessage(ws: WebSocket, msg: ClientMsg): void {
+  private onMessage(ws: WebSocket, msg: ClientMsg, edgeColo: string): void {
     if (msg.t === 'join') {
       let playerId = this.sockets.get(ws);
       let sessionToken = msg.token;
@@ -154,8 +159,8 @@ export class GameRoom extends DurableObject {
       const initMsg: ServerMsg = this.world.init();
       ws.send(JSON.stringify(initMsg));
 
-      // Send joined confirmation with session token
-      const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken };
+      // Send joined confirmation with session token and edge colo
+      const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken, colo: edgeColo };
       ws.send(JSON.stringify(joinedMsg));
 
       this.startLoop();
@@ -165,7 +170,7 @@ export class GameRoom extends DurableObject {
         this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn });
       }
     } else if (msg.t === 'ping') {
-      ws.send(`{"t":"pong","c":${msg.c}}`);
+      ws.send(JSON.stringify({ t: 'pong', c: msg.c, colo: edgeColo }));
     } else if (msg.t === 'rule') {
       const playerId = this.sockets.get(ws);
       if (playerId) {

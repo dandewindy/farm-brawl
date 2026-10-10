@@ -11,6 +11,8 @@ export class WsClient implements Transport {
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
+  public colo = '';
+  private hasAutoRerouted = false;
   private readonly rttWin: number[] = [];
 
   constructor(
@@ -71,6 +73,7 @@ export class WsClient implements Transport {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'pong') {
+          if (msg.colo) this.colo = msg.colo;
           // Ignore samples collected while tab is inactive/throttled
           if (typeof document !== 'undefined' && document.hidden) return;
           const s = performance.now() - msg.c;
@@ -81,12 +84,23 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             // Rolling median: resilient against single-frame render hitches / GC pauses
             this.rtt = sorted[Math.floor(sorted.length / 2)];
+
+            // Auto-reroute check: if initial connection landed on distant high-latency node (NRT/LAX >= 90ms)
+            // attempt one fresh reconnect to hit an optimal APAC edge node (SIN/HKG)
+            if (!this.hasAutoRerouted && this.rttWin.length >= 3 && this.rttMin >= 90) {
+              this.hasAutoRerouted = true;
+              console.log(`[WS] High latency detected (${this.rttMin}ms via ${this.colo}). Retrying for optimal low-latency node...`);
+              this.forceReconnect();
+            }
           }
         } else {
-          if (msg.t === 'joined' && msg.token) {
-            this.sessionToken = msg.token;
-            if (this.lastJoinMsg) {
-              this.lastJoinMsg.token = msg.token;
+          if (msg.t === 'joined') {
+            if (msg.colo) this.colo = msg.colo;
+            if (msg.token) {
+              this.sessionToken = msg.token;
+              if (this.lastJoinMsg) {
+                this.lastJoinMsg.token = msg.token;
+              }
             }
           }
           this.onMsg(msg);
@@ -149,6 +163,20 @@ export class WsClient implements Transport {
       return;
     }
     this.ws.send(JSON.stringify(m));
+  }
+
+  public forceReconnect(): void {
+    if (this.closed) return;
+    this.stopPing();
+    this.rttWin.length = 0;
+    this.isReconnecting = true;
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (_) {}
+      this.ws = null;
+    }
+    this.connect();
   }
 
   close(): void {

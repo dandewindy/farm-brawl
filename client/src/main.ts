@@ -101,6 +101,13 @@ hud.onSelectMode = (mode) => {
   }
 };
 
+hud.onReconnect = () => {
+  if (transport?.forceReconnect) {
+    hud.showToast('🔄 Đang đổi tuyến mạng đến trạm máy chủ gần nhất...');
+    transport.forceReconnect();
+  }
+};
+
 let isSpectating = false;
 let spectateTargetId: number | null = null;
 
@@ -795,7 +802,7 @@ function animate(now: number): void {
     fpsFrames = 0;
     lastFpsTime = now;
     const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
-    hud.updatePerf(currentFps, currentPing);
+    hud.updatePerf(currentFps, currentPing, transport?.colo);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
       debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;
