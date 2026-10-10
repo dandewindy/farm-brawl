@@ -88,6 +88,7 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     connectToRoom('pub-1');
   }
   if (transport) {
+    transport.inGame = true;
     const team = mode === 'team' ? hud.selectedTeam : undefined;
     transport.send({ t: 'join', name, species, skin, team });
   }
@@ -103,7 +104,7 @@ hud.onSelectMode = (mode) => {
 
 hud.onReconnect = () => {
   if (transport?.forceReconnect) {
-    hud.showToast('🔄 Đang đổi tuyến mạng đến trạm máy chủ gần nhất...');
+    hud.showToast('🔄 Đang chuyển sang tuyến mạng Singapore (SIN)...');
     transport.forceReconnect();
   }
 };
@@ -516,6 +517,7 @@ function handleGameEvent(ev: GameEvent): void {
         deathCamTarget = { x: ev.x, z: ev.z };
         setTimeout(() => {
           deathCamTarget = null;
+          if (transport) transport.inGame = false;
           hud.showDeath(ev, killerName);
         }, 1500);
       } else if (ev.by === myId) {

@@ -12,6 +12,8 @@ export class WsClient implements Transport {
   public rtt = 0;
   public rttMin = 0;
   public colo = '';
+  public inGame = false;
+  private hasAutoSteered = false;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
 
@@ -25,10 +27,16 @@ export class WsClient implements Transport {
 
   private connect(): void {
     if (this.closed) return;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.onStatus?.('connecting');
 
+    let socket: WebSocket;
     try {
-      this.ws = new WebSocket(this.url);
+      socket = new WebSocket(this.url);
+      this.ws = socket;
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
       this.onStatus?.('error');
@@ -36,45 +44,41 @@ export class WsClient implements Transport {
       return;
     }
 
-    this.ws.addEventListener('open', () => {
+    socket.onopen = () => {
+      if (this.ws !== socket) return; // Stale socket guard
       const wasReconnecting = this.isReconnecting;
       this.isReconnecting = false;
       this.onStatus?.(wasReconnecting ? 'reconnected' : 'open');
 
-      // If reconnecting, re-send join message first with cached session token
       if (this.lastJoinMsg) {
-        const joinMsg: ClientMsg = {
+        this.send({
           ...this.lastJoinMsg,
           token: this.sessionToken || undefined,
-        };
-        this.send(joinMsg);
+        });
       }
 
-      // Flush queued messages
       while (this.queue.length > 0) {
         const msg = this.queue.shift()!;
         this.send(msg);
       }
 
-      // Delay initial ping by 500ms so map/scene initial creation completes first without skewing RTT
       setTimeout(() => {
-        if (!this.closed && this.ws?.readyState === WebSocket.OPEN) {
+        if (!this.closed && this.ws === socket && socket.readyState === WebSocket.OPEN) {
           const now = Math.round(performance.now());
           this.send({ t: 'ping', c: now });
         }
-      }, 500);
+      }, 300);
 
-      // Start ping loop (every 1.0s)
       this.startPing();
-    });
+    };
 
-    this.ws.addEventListener('message', (event) => {
+    socket.onmessage = (event) => {
+      if (this.ws !== socket) return;
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'pong') {
           if (msg.colo) this.colo = msg.colo;
-          // Ignore samples collected while tab is inactive/throttled
           if (typeof document !== 'undefined' && document.hidden) return;
           const s = performance.now() - msg.c;
           if (s >= 0 && s < 2000) {
@@ -82,7 +86,6 @@ export class WsClient implements Transport {
             if (this.rttWin.length > 5) this.rttWin.shift();
             const sorted = [...this.rttWin].sort((a, b) => a - b);
             this.rttMin = sorted[0];
-            // Rolling median: resilient against single-frame render hitches / GC pauses
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
         } else {
@@ -94,24 +97,37 @@ export class WsClient implements Transport {
                 this.lastJoinMsg.token = msg.token;
               }
             }
+            // Auto-steer to Singapore while in the lobby before clicking Play:
+            // If the browser initially landed on HKG/NRT, retry once in the lobby to hit SIN (104.21.32.122)
+            if (this.colo && this.colo !== 'SIN' && !this.inGame && !this.hasAutoSteered) {
+              this.hasAutoSteered = true;
+              console.log(`[WS] Initial connection landed on ${this.colo}. Auto-steering to Singapore (SIN) in lobby...`);
+              setTimeout(() => {
+                if (!this.closed && !this.inGame && this.ws === socket) {
+                  this.forceReconnect();
+                }
+              }, 400);
+            }
           }
           this.onMsg(msg);
         }
       } catch (err) {
         console.error('Failed to parse server message:', err);
       }
-    });
+    };
 
-    this.ws.addEventListener('close', () => {
+    socket.onclose = () => {
+      if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally by forceReconnect()
       this.stopPing();
       this.isReconnecting = true;
       this.onStatus?.('closed');
       this.scheduleReconnect();
-    });
+    };
 
-    this.ws.addEventListener('error', () => {
+    socket.onerror = () => {
+      if (this.ws !== socket) return;
       this.onStatus?.('error');
-    });
+    };
   }
 
   private startPing(): void {
@@ -148,13 +164,11 @@ export class WsClient implements Transport {
       this.lastJoinMsg = { ...m, token: this.sessionToken || m.token };
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      // Keep last join or non-input messages queued
       if (m.t !== 'input') {
         this.queue.push(m);
       }
       return;
     }
-    // Prevent bufferbloat on congested or jittery connections
     if (m.t === 'input' && this.ws.bufferedAmount > 65536) {
       return;
     }
@@ -173,12 +187,19 @@ export class WsClient implements Transport {
     if (this.ws) {
       const oldWs = this.ws;
       this.ws = null;
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onclose = null;
+      oldWs.onerror = null;
       try {
-        oldWs.onclose = null;
         oldWs.close();
       } catch (_) {}
     }
-    this.connect();
+    setTimeout(() => {
+      if (!this.closed) {
+        this.connect();
+      }
+    }, 120);
   }
 
   close(): void {
@@ -191,11 +212,15 @@ export class WsClient implements Transport {
     this.lastJoinMsg = null;
     this.sessionToken = null;
     if (this.ws) {
-      try {
-        this.ws.onclose = null;
-        this.ws.close();
-      } catch (_) {}
+      const oldWs = this.ws;
       this.ws = null;
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onclose = null;
+      oldWs.onerror = null;
+      try {
+        oldWs.close();
+      } catch (_) {}
     }
   }
 }

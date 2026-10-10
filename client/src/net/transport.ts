@@ -10,6 +10,7 @@ export interface Transport {
   readonly rtt: number;
   readonly rttMin: number;
   readonly colo?: string;
+  inGame?: boolean;
   forceReconnect?(): void;
 }
 
