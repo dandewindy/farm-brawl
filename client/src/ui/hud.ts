@@ -3,6 +3,7 @@ import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t } from '../i18n';
 import { AnimalPreviewRenderer } from '../render/preview';
+import type { AudioMode } from '../audio/sfx';
 
 export interface FloatingText {
   el: HTMLDivElement;
@@ -20,7 +21,11 @@ export class HudManager {
   private readonly rankTxt: HTMLElement;
   private readonly koTxt: HTMLElement;
   private readonly lbList: HTMLElement;
+  private readonly drawerLbList: HTMLElement | null;
   private readonly hofList: HTMLElement | null;
+  private readonly drawerHofList: HTMLElement | null;
+  private readonly boardEl: HTMLElement | null;
+  private readonly statsEl: HTMLElement | null;
   private readonly reignEl: HTMLElement | null;
   private readonly ruleNameEl: HTMLElement | null;
   private readonly ruleDescEl: HTMLElement | null;
@@ -154,7 +159,11 @@ export class HudManager {
     this.rankTxt = document.getElementById('rankTxt')!;
     this.koTxt = document.getElementById('koTxt')!;
     this.lbList = document.getElementById('lbList')!;
+    this.drawerLbList = document.getElementById('drawerLbList');
     this.hofList = document.getElementById('hofList');
+    this.drawerHofList = document.getElementById('drawerHofList');
+    this.boardEl = document.getElementById('board');
+    this.statsEl = document.getElementById('stats');
     this.reignEl = document.getElementById('reign');
     this.ruleNameEl = document.getElementById('ruleName');
     this.ruleDescEl = document.getElementById('ruleDesc');
@@ -867,11 +876,35 @@ export class HudManager {
     }
   }
 
-  public setMuteState(muted: boolean): void {
+  public setMuteState(mutedOrMode: boolean | AudioMode): void {
+    const mode: AudioMode = typeof mutedOrMode === 'number' ? mutedOrMode : (mutedOrMode ? 2 : 0);
     if (this.muteBtn) {
-      this.muteBtn.innerHTML = muted
-        ? `<span class="ico">🔇</span> <span>${t('sound')}</span>`
-        : `<span class="ico">🔊</span> <span>${t('sound')}</span>`;
+      if (mode === 0) {
+        this.muteBtn.innerHTML = `<span class="ico">🔊</span> <span>${t('sound')}</span>`;
+      } else if (mode === 1) {
+        this.muteBtn.innerHTML = `<span class="ico">🔈</span> <span>Tắt nhạc</span>`;
+      } else {
+        this.muteBtn.innerHTML = `<span class="ico">🔇</span> <span>${t('sound')}</span>`;
+      }
+    }
+  }
+
+  public setBoardVisible(visible: boolean): void {
+    if (this.boardEl) {
+      this.boardEl.style.display = visible ? '' : 'none';
+    }
+  }
+
+  public setStatsVisible(visible: boolean): void {
+    if (this.statsEl) {
+      this.statsEl.classList.toggle('hidden', !visible);
+    }
+  }
+
+  public setLbVisible(visible: boolean): void {
+    const lb = document.getElementById('lb');
+    if (lb) {
+      lb.style.display = visible ? '' : 'none';
     }
   }
 
@@ -1117,54 +1150,69 @@ export class HudManager {
 
   updateLeaderboard(lb: LeaderRow[], myId: number, napoleonId = 0): void {
     this.lbList.innerHTML = '';
+    if (this.drawerLbList) this.drawerLbList.innerHTML = '';
+
     lb.forEach(([id, name, mass, kills, reign]) => {
-      const li = document.createElement('li');
-      if (id === myId) li.classList.add('me');
-      const isKing = id === napoleonId && id > 0;
-      if (isKing) li.classList.add('nap');
+      const createRow = () => {
+        const li = document.createElement('li');
+        if (id === myId) li.classList.add('me');
+        const isKing = id === napoleonId && id > 0;
+        if (isKing) li.classList.add('nap');
 
-      const row = document.createElement('div');
-      row.className = 'r';
+        const row = document.createElement('div');
+        row.className = 'r';
 
-      const n = document.createElement('span');
-      n.className = 'n';
-      n.textContent = name;
+        const n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = name;
 
-      const k = document.createElement('span');
-      k.className = 'k';
-      k.textContent = kills > 0 ? `💥${kills}` : '';
+        const k = document.createElement('span');
+        k.className = 'k';
+        k.textContent = kills > 0 ? `💥${kills}` : '';
 
-      const v = document.createElement('span');
-      v.className = 'v';
-      v.textContent = (isKing && reign && reign > 0) ? `👑 ${this.fmtTime(reign)} · ${mass} kg` : `${mass} kg`;
+        const v = document.createElement('span');
+        v.className = 'v';
+        v.textContent = (isKing && reign && reign > 0) ? `👑 ${this.fmtTime(reign)} · ${mass} kg` : `${mass} kg`;
 
-      row.append(n, k, v);
-      li.appendChild(row);
-      li.title = `Bấm để xem góc nhìn của ${name}`;
-      li.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.onSelectSpectateTarget?.(id);
-      });
-      this.lbList.appendChild(li);
+        row.append(n, k, v);
+        li.appendChild(row);
+        li.title = `Bấm để xem góc nhìn của ${name}`;
+        li.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onSelectSpectateTarget?.(id);
+        });
+        return li;
+      };
+
+      this.lbList.appendChild(createRow());
+      if (this.drawerLbList) {
+        this.drawerLbList.appendChild(createRow());
+      }
     });
   }
 
   updateHof(hof: HofRow[]): void {
-    if (!this.hofList) return;
     const emojis: Record<Species, string> = {
       chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷',
     };
-    this.hofList.innerHTML = '';
+    if (this.hofList) this.hofList.innerHTML = '';
+    if (this.drawerHofList) this.drawerHofList.innerHTML = '';
+
     for (const [name, sp, dur] of hof) {
-      const li = document.createElement('li');
-      const n = document.createElement('span');
-      n.className = 'n';
-      n.textContent = `${emojis[sp] || ''} ${name}`;
-      const v = document.createElement('span');
-      v.className = 'v';
-      v.textContent = this.fmtTime(dur);
-      li.append(n, v);
-      this.hofList.appendChild(li);
+      const createHofRow = () => {
+        const li = document.createElement('li');
+        const n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = `${emojis[sp] || ''} ${name}`;
+        const v = document.createElement('span');
+        v.className = 'v';
+        v.textContent = this.fmtTime(dur);
+        li.append(n, v);
+        return li;
+      };
+
+      if (this.hofList) this.hofList.appendChild(createHofRow());
+      if (this.drawerHofList) this.drawerHofList.appendChild(createHofRow());
     }
   }
 

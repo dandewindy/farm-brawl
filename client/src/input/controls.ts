@@ -142,7 +142,11 @@ export class InputManager {
       document.body.classList.add('touch');
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        // Only create stick for touches on the left half that aren't already tracked
+        // Only create stick for touches on the left half that aren't already tracked and not on UI elements
+        const target = t.target as HTMLElement | null;
+        if (target && target.closest('button, input, select, textarea, a, #gameDrawerModal, #pcSettingsMenu, #netPerf, .drawer-modal, .card, .dialog')) {
+          continue;
+        }
         if (t.clientX < window.innerWidth * 0.5 && stickTouchId === null) {
           stickTouchId = t.identifier;
           touchStartX = t.clientX;

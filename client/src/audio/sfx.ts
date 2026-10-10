@@ -8,10 +8,50 @@ let master: GainNode | null = null;
 let sfxBus: GainNode | null = null;
 let ambBus: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
-let muted = false;
 let held = false; // paused on purpose (offline / hidden tab)
 let chargeNode: { o: OscillatorNode; g: GainNode; f: BiquadFilterNode } | null = null;
 let ambienceTimer: number | null = null;
+
+export type AudioMode = 0 | 1 | 2; // 0: All On, 1: SFX Only (BGM Off), 2: All Muted
+
+let audioMode: AudioMode = (() => {
+  try {
+    const saved = localStorage.getItem('fb_audio_mode');
+    if (saved === '1') return 1;
+    if (saved === '2') return 2;
+  } catch (_) {}
+  return 0;
+})();
+
+let muted = audioMode === 2;
+
+export function getAudioMode(): AudioMode {
+  return audioMode;
+}
+
+export function setAudioMode(mode: AudioMode): void {
+  audioMode = mode;
+  try {
+    localStorage.setItem('fb_audio_mode', String(mode));
+  } catch (_) {}
+
+  if (mode === 0) {
+    setMuted(false);
+    setMusic(true);
+  } else if (mode === 1) {
+    setMuted(false);
+    setMusic(false);
+  } else {
+    setMusic(false);
+    setMuted(true);
+  }
+}
+
+export function cycleAudioMode(): AudioMode {
+  const next = ((audioMode + 1) % 3) as AudioMode;
+  setAudioMode(next);
+  return next;
+}
 
 export function unlock(): void {
   if (!ctx) {
@@ -423,7 +463,7 @@ const EIGHTH = 60 / BPM / 2;
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
 let musicBus: GainNode | null = null;
-let musicOn = true;
+let musicOn = audioMode === 0;
 let musicTimer: number | null = null;
 let nextNoteTime = 0;
 let step = 0;

@@ -40,9 +40,14 @@
       <span id="reign" hidden>♛ 0:00</span>
     </header>
 
-    <div id="stats" class="panel">
-      <div class="weight"><b id="mass">20</b><span>kg</span></div>
-      <div class="sub"><span id="rankTxt"></span> · <span id="koTxt"></span></div>
+    <div id="stats">
+      <div class="stats-row">
+        <span class="weight"><b id="mass">20</b><span>kg</span></span>
+        <span class="stats-sep">·</span>
+        <span id="rankTxt"></span>
+        <span class="stats-sep">·</span>
+        <span id="koTxt"></span>
+      </div>
       <div id="netPerf" class="perf" title="Nhấp để đổi tuyến máy chủ nếu bị ping cao">
         <span class="perf-item"><span class="perf-dot good" id="fpsDot"></span><b id="fpsVal">60</b> FPS</span>
         <span class="perf-sep">·</span>
@@ -57,9 +62,56 @@
         <ol id="hofList"></ol>
       </div>
     </aside>
+    <!-- Burger Menu Button for Touch / Mobile / iPad -->
+    <button id="burgerBtn" type="button" aria-label="Menu" title="Bảng xếp hạng & Cài đặt">
+      <span class="burger-icon">☰</span>
+    </button>
     <div id="gameControls">
-      <button id="fsBtn" type="button" title="Toàn màn hình">⛶</button>
-      <button id="muteInGame" type="button" title="Tắt/Bật âm">🔊</button>
+      <button id="fsBtn" type="button" title="Toàn màn hình">
+        <span class="fs-icon-enter">⛶</span>
+        <span class="fs-icon-exit" style="display:none;">⤢</span>
+      </button>
+      <button id="muteInGame" type="button" title="Âm thanh (Bật/Tắt)">🔊</button>
+      <button id="pcSettingsBtn" type="button" title="Cài đặt giao diện">⚙️</button>
+      <div id="pcSettingsMenu" class="pc-settings-dropdown panel" hidden>
+        <div class="settings-title">CÀI ĐẶT GIAO DIỆN</div>
+        <label class="settings-item">
+          <input type="checkbox" id="pcToggleBoard" checked>
+          <span>Bảng Điều Răn</span>
+        </label>
+        <label class="settings-item">
+          <input type="checkbox" id="pcToggleStats" checked>
+          <span>Bảng chỉ số (Kg, Hạng)</span>
+        </label>
+        <label class="settings-item">
+          <input type="checkbox" id="pcToggleLb" checked>
+          <span>Bảng xếp hạng</span>
+        </label>
+      </div>
+    </div>
+    <!-- Drawer Overlay Modal for Touch / Mobile / iPad -->
+    <div id="gameDrawerModal" class="drawer-modal" hidden>
+      <div class="drawer-backdrop" id="drawerBackdrop"></div>
+      <div class="drawer-content panel">
+        <div class="drawer-header">
+          <h3>BẢNG XẾP HẠNG & CÀI ĐẶT</h3>
+          <button id="drawerCloseBtn" type="button" class="drawer-close" title="Đóng">✕</button>
+        </div>
+        <div class="drawer-actions">
+          <button id="drawerAudioBtn" type="button" class="drawer-btn"><span class="ico">🔊</span> <span class="lbl">Âm thanh: Bật tất cả</span></button>
+          <button id="drawerBoardToggle" type="button" class="drawer-btn"><span class="ico">📜</span> <span class="lbl">Bảng Điều Răn: BẬT</span></button>
+          <button id="drawerStatsToggle" type="button" class="drawer-btn"><span class="ico">📊</span> <span class="lbl">Bảng chỉ số: BẬT</span></button>
+          <button id="drawerFsBtn" type="button" class="drawer-btn"><span class="ico">⛶</span> <span class="lbl">Toàn màn hình</span></button>
+        </div>
+        <div class="drawer-lb-wrap">
+          <h4 data-i18n="lbTitle">Bảng xếp hạng</h4>
+          <ol id="drawerLbList" class="drawer-list"></ol>
+          <div id="drawerHof" class="drawer-hof">
+            <h4 class="gold" data-i18n="hofTitle">Kỷ lục của trại</h4>
+            <ol id="drawerHofList" class="drawer-list"></ol>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="mapWrap">
       <div id="podiumTimerBadge" class="shield-on">

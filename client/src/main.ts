@@ -2,10 +2,11 @@ import { CFG, type Species } from '@shared/constants';
 import { insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
-  chargeStop, chargeUpdate, isMuted, repaint, setMood, setMuted,
+  chargeStop, chargeUpdate, repaint, setMood,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
+  cycleAudioMode, getAudioMode,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
@@ -103,7 +104,7 @@ hud.onSelectMode = (mode) => {
 };
 
 hud.onReconnect = () => {
-  if (gameState.inGame) {
+  if (transport?.inGame) {
     if (transport?.colo === 'SIN') {
       hud.showToast('✅ Bạn đang ở trạm Singapore (SIN) tối ưu nhất (~35ms)!');
       return;
@@ -189,11 +190,31 @@ hud.onStopSpectating = () => {
 hud.onPickRule = (ruleId) => {
   transport?.send({ t: 'rule', id: ruleId });
 };
+// 3-State Audio Synchronization
+function syncAudioUi(): void {
+  const mode = getAudioMode();
+  hud.setMuteState(mode);
+  if (muteInGameBtn) {
+    muteInGameBtn.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+    muteInGameBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng (Tắt nhạc)' : 'Âm thanh: Tắt tất cả');
+  }
+  const drawerAudioBtn = document.getElementById('drawerAudioBtn');
+  if (drawerAudioBtn) {
+    const ico = drawerAudioBtn.querySelector('.ico');
+    const lbl = drawerAudioBtn.querySelector('.lbl');
+    if (ico) ico.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+    if (lbl) lbl.textContent = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
+  }
+  const startMuteBtn = document.getElementById('mute');
+  if (startMuteBtn) {
+    const ico = startMuteBtn.querySelector('.ico');
+    if (ico) ico.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+  }
+}
+
 hud.onToggleMute = () => {
-  const next = !isMuted();
-  setMuted(next);
-  hud.setMuteState(next);
-  if (muteInGameBtn) muteInGameBtn.textContent = next ? '🔇' : '🔊';
+  cycleAudioMode();
+  syncAudioUi();
 };
 
 // Fullscreen & anti-zoom management for desktop, mobile & iPad Chrome/Safari
@@ -215,13 +236,27 @@ function isFsActive(): boolean {
 function updateFsIcon(): void {
   const active = isFsActive();
   if (fsBtn) {
-    fsBtn.textContent = active ? '🗗' : '⛶';
+    const enterEl = fsBtn.querySelector('.fs-icon-enter') as HTMLElement | null;
+    const exitEl = fsBtn.querySelector('.fs-icon-exit') as HTMLElement | null;
+    if (enterEl && exitEl) {
+      enterEl.style.display = active ? 'none' : '';
+      exitEl.style.display = active ? '' : 'none';
+    } else {
+      fsBtn.textContent = active ? '⤢' : '⛶';
+    }
     fsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
   }
   if (startFsBtn) {
     const ico = startFsBtn.querySelector('.ico');
-    if (ico) ico.textContent = active ? '🗗' : '⛶';
+    if (ico) ico.textContent = active ? '⤢' : '⛶';
     startFsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+  }
+  const drawerFsBtn = document.getElementById('drawerFsBtn');
+  if (drawerFsBtn) {
+    const ico = drawerFsBtn.querySelector('.ico');
+    const lbl = drawerFsBtn.querySelector('.lbl');
+    if (ico) ico.textContent = active ? '⤢' : '⛶';
+    if (lbl) lbl.textContent = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
   }
 }
 
@@ -254,11 +289,9 @@ function toggleFs(): void {
                 (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
     if (req && typeof req.catch === 'function') {
       req.catch(() => {
-        // Fallback for browsers rejecting native fullscreen
         enablePseudoFs();
       });
     } else if (!req) {
-      // iOS / iPadOS WebKit has no Fullscreen API on document/canvas
       enablePseudoFs();
     }
   } else {
@@ -308,33 +341,164 @@ document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: 
 document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
 
+// Prevent double-tap zoom natively without swallowing button clicks
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+
+// Prevent multi-touch pinch to zoom
 window.addEventListener('touchmove', (e) => {
   if (e.touches.length > 1) {
     e.preventDefault();
   }
 }, { passive: false });
 
-let lastTouchEndTs = 0;
-document.addEventListener('touchend', (e) => {
-  const now = Date.now();
-  if (now - lastTouchEndTs <= 300) {
-    const target = e.target as HTMLElement | null;
-    if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) {
-      e.preventDefault();
-    }
+// Prevent accidental scroll drifts on iPad Chrome
+window.addEventListener('scroll', () => {
+  if (window.scrollX !== 0 || window.scrollY !== 0) {
+    window.scrollTo(0, 0);
   }
-  lastTouchEndTs = now;
-}, { passive: false });
+});
 
-if (muteInGameBtn) {
-  muteInGameBtn.textContent = isMuted() ? '🔇' : '🔊';
-  muteInGameBtn.addEventListener('click', () => {
-    const next = !isMuted();
-    setMuted(next);
-    hud.setMuteState(next);
-    muteInGameBtn.textContent = next ? '🔇' : '🔊';
+// Mobile & iPad Burger Drawer Modal
+const burgerBtn = document.getElementById('burgerBtn');
+const gameDrawerModal = document.getElementById('gameDrawerModal');
+const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+const drawerBackdrop = document.getElementById('drawerBackdrop');
+const drawerAudioBtn = document.getElementById('drawerAudioBtn');
+const drawerBoardToggle = document.getElementById('drawerBoardToggle');
+const drawerStatsToggle = document.getElementById('drawerStatsToggle');
+const drawerFsBtn = document.getElementById('drawerFsBtn');
+
+// PC Settings Menu
+const pcSettingsBtn = document.getElementById('pcSettingsBtn');
+const pcSettingsMenu = document.getElementById('pcSettingsMenu');
+const pcToggleBoard = document.getElementById('pcToggleBoard') as HTMLInputElement | null;
+const pcToggleStats = document.getElementById('pcToggleStats') as HTMLInputElement | null;
+const pcToggleLb = document.getElementById('pcToggleLb') as HTMLInputElement | null;
+
+let showBoard = localStorage.getItem('fb_show_board') !== '0';
+let showStats = localStorage.getItem('fb_show_stats') !== '0';
+let showLb = localStorage.getItem('fb_show_lb') !== '0';
+
+function syncBoardUi(): void {
+  hud.setBoardVisible(showBoard);
+  if (drawerBoardToggle) {
+    const lbl = drawerBoardToggle.querySelector('.lbl');
+    if (lbl) lbl.textContent = `Bảng Điều Răn: ${showBoard ? 'BẬT' : 'TẮT'}`;
+  }
+  if (pcToggleBoard) pcToggleBoard.checked = showBoard;
+}
+
+function syncStatsUi(): void {
+  hud.setStatsVisible(showStats);
+  if (drawerStatsToggle) {
+    const lbl = drawerStatsToggle.querySelector('.lbl');
+    if (lbl) lbl.textContent = `Bảng chỉ số: ${showStats ? 'BẬT' : 'TẮT'}`;
+  }
+  if (pcToggleStats) pcToggleStats.checked = showStats;
+}
+
+function syncLbUi(): void {
+  hud.setLbVisible(showLb);
+  if (pcToggleLb) pcToggleLb.checked = showLb;
+}
+
+if (burgerBtn && gameDrawerModal) {
+  burgerBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    gameDrawerModal.hidden = false;
+    syncAudioUi();
+    syncBoardUi();
+    syncStatsUi();
+    updateFsIcon();
   });
 }
+
+function closeDrawer(): void {
+  if (gameDrawerModal) gameDrawerModal.hidden = true;
+}
+
+if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', closeDrawer);
+if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
+
+if (drawerAudioBtn) {
+  drawerAudioBtn.addEventListener('click', () => {
+    cycleAudioMode();
+    syncAudioUi();
+  });
+}
+
+if (drawerBoardToggle) {
+  drawerBoardToggle.addEventListener('click', () => {
+    showBoard = !showBoard;
+    try { localStorage.setItem('fb_show_board', showBoard ? '1' : '0'); } catch (_) {}
+    syncBoardUi();
+  });
+}
+
+if (drawerStatsToggle) {
+  drawerStatsToggle.addEventListener('click', () => {
+    showStats = !showStats;
+    try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
+    syncStatsUi();
+  });
+}
+
+if (drawerFsBtn) {
+  drawerFsBtn.addEventListener('click', () => {
+    toggleFs();
+    setTimeout(updateFsIcon, 120);
+  });
+}
+
+// PC Settings controls
+if (pcSettingsBtn && pcSettingsMenu) {
+  pcSettingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pcSettingsMenu.hidden = !pcSettingsMenu.hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!pcSettingsMenu.hidden && !pcSettingsMenu.contains(e.target as Node) && e.target !== pcSettingsBtn) {
+      pcSettingsMenu.hidden = true;
+    }
+  });
+}
+
+if (pcToggleBoard) {
+  pcToggleBoard.addEventListener('change', () => {
+    showBoard = pcToggleBoard.checked;
+    try { localStorage.setItem('fb_show_board', showBoard ? '1' : '0'); } catch (_) {}
+    syncBoardUi();
+  });
+}
+
+if (pcToggleStats) {
+  pcToggleStats.addEventListener('change', () => {
+    showStats = pcToggleStats.checked;
+    try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
+    syncStatsUi();
+  });
+}
+
+if (pcToggleLb) {
+  pcToggleLb.addEventListener('change', () => {
+    showLb = pcToggleLb.checked;
+    try { localStorage.setItem('fb_show_lb', showLb ? '1' : '0'); } catch (_) {}
+    syncLbUi();
+  });
+}
+
+if (muteInGameBtn) {
+  muteInGameBtn.addEventListener('click', () => {
+    cycleAudioMode();
+    syncAudioUi();
+  });
+}
+
+// Initialize audio and UI state
+syncAudioUi();
+syncBoardUi();
+syncStatsUi();
+syncLbUi();
 
 let firstSpawn = true;
 
