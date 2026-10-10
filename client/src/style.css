@@ -278,7 +278,11 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   color: #f2ead7;
   letter-spacing: 0.04em;
   margin-left: 2px;
+  transition: all 0.2s ease;
 }
+.perf-colo.good { background: rgba(76, 175, 80, 0.22); color: #81c784; border: 1px solid rgba(76, 175, 80, 0.45); }
+.perf-colo.warn { background: rgba(255, 179, 0, 0.22); color: #ffca28; border: 1px solid rgba(255, 179, 0, 0.45); }
+.perf-colo.bad { background: rgba(244, 67, 54, 0.22); color: #ef5350; border: 1px solid rgba(244, 67, 54, 0.45); }
 #netPerf .perf-item {
   display: inline-flex;
   align-items: center;

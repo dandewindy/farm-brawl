@@ -1035,7 +1035,12 @@ export class HudManager {
     if (this.coloVal && colo) {
       this.coloVal.textContent = colo;
       this.coloVal.hidden = false;
-      this.coloVal.title = `Trạm Cloudflare: ${colo} (Nhấp để đổi tuyến nếu ping cao)`;
+      const isSin = colo === 'SIN';
+      const isHkg = colo === 'HKG';
+      this.coloVal.className = `perf-colo ${isSin ? 'good' : isHkg ? 'warn' : 'bad'}`;
+      this.coloVal.title = isSin
+        ? 'Trạm Singapore (SIN) tối ưu - Ping cực thấp ~30ms'
+        : `Trạm ${colo} (Nhấp để kết nối lại trạm Singapore)`;
     }
   }
 
