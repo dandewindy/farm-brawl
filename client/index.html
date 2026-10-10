@@ -25,9 +25,9 @@
   <!-- Spectator Bar HUD -->
   <div id="spectateBar" hidden>
     <div class="spectate-pill">
-      <span class="spectate-badge">👁️ ĐANG XEM</span>
+      <span class="spectate-badge">ĐANG XEM</span>
       <span id="spectateName" class="spectate-target">--</span>
-      <button type="button" id="specNextBtn" class="spec-btn" title="Xem người khác">🎲 Đổi người</button>
+      <button type="button" id="specNextBtn" class="spec-btn" title="Xem người khác (ngẫu nhiên)">🎲</button>
       <button type="button" id="specPlayBtn" class="spec-btn spec-play" title="Tham gia trận đấu">⚔️ Chơi lại</button>
     </div>
   </div>
@@ -180,9 +180,9 @@
           <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="deathCount1">(0 người)</span></button>
         </div>
       </div>
-      <div id="deathCountdown" class="tw-countdown" hidden>Hồi sinh trong <b id="deathTimer">5</b>s...</div>
+      <div id="deathCountdown" class="tw-countdown" hidden>Hồi sinh trong <b id="deathTimer">3</b>s...</div>
       <button id="again" class="btn-red" type="button" data-i18n="again"></button>
-      <button id="spectateBtn" class="btn-blue" type="button">👁️ Xem</button>
+      <button id="spectateBtn" class="btn-ghost" type="button">Xem</button>
       <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
     </div>
   </div>
@@ -205,6 +205,15 @@
       </div>
       <p id="twSub" class="tw-sub">Thời gian thống trị nông trại vượt trội!</p>
       
+      <!-- MVP Showcase Section -->
+      <div id="twMvpBox" class="tw-mvp-box" hidden>
+        <div class="tw-mvp-header">⭐ CHIẾN BINH MVP XUẤT SẮC NHẤT ⭐</div>
+        <div class="tw-mvp-card">
+          <span id="twMvpName" class="tw-mvp-name">--</span>
+          <span id="twMvpStats" class="tw-mvp-stats">0 điểm · 0 hạ gục</span>
+        </div>
+      </div>
+
       <div class="tw-next-section">
         <span class="team-pick-label">CHỌN ĐỘI CHO TRẬN KẾ TIẾP:</span>
         <div class="team-pick-btns">
@@ -214,7 +223,7 @@
       </div>
       
       <button id="twContinueBtn" class="btn-red tw-btn" type="button">TIẾP TỤC</button>
-      <div id="twCountdown" class="tw-countdown" hidden>Vào trận sau <b id="twTimer">5</b>s...</div>
+      <div id="twCountdown" class="tw-countdown" hidden>Vào trận sau <b id="twTimer">3</b>s...</div>
     </div>
   </div>
 

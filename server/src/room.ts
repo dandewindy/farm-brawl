@@ -22,7 +22,8 @@ export class GameRoom extends DurableObject {
     const url = new URL(request.url);
     const roomParam = url.searchParams.get('room') || 'pub-1';
     const isPrivate = roomParam.startsWith('priv-') || roomParam.startsWith('friend-');
-    if (isPrivate) {
+    const isTeam = roomParam.startsWith('team-') || roomParam === 'team-1' || roomParam === 'team-sea-1';
+    if (isPrivate || isTeam) {
       this.world.botsEnabled = false;
       for (const [id, p] of this.world.players.entries()) {
         if (p.bot) this.world.removePlayer(id);

@@ -27,7 +27,7 @@ export default {
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const roomParam = url.searchParams.get('room') || 'pub-1';
       // Route default room to fresh Southeast-Asia located Durable Object for low ping in Vietnam/APAC
-      const targetRoomKey = roomParam === 'pub-1' ? 'pub-sea-1' : roomParam;
+      const targetRoomKey = roomParam === 'pub-1' ? 'pub-sea-1' : roomParam === 'team-1' ? 'team-sea-1' : roomParam;
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const hint = getTargetLocationHint(request);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
@@ -52,7 +52,7 @@ export default {
     // Room info endpoint for lobby / checking private room status
     if (url.pathname === '/api/room-info') {
       const roomParam = url.searchParams.get('room') || 'pub-1';
-      const targetRoomKey = roomParam === 'pub-1' ? 'pub-sea-1' : roomParam;
+      const targetRoomKey = roomParam === 'pub-1' ? 'pub-sea-1' : roomParam === 'team-1' ? 'team-sea-1' : roomParam;
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const hint = getTargetLocationHint(request);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });

@@ -95,9 +95,12 @@ export class HudManager {
   private readonly twCount1El: HTMLElement | null;
   private readonly twContinueBtn: HTMLButtonElement | null;
   private readonly twCountdownEl: HTMLElement | null;
-  private readonly twTimerEl: HTMLElement | null;
+  private readonly twMvpBoxEl: HTMLElement | null;
+  private readonly twMvpNameEl: HTMLElement | null;
+  private readonly twMvpStatsEl: HTMLElement | null;
   private readonly deathCountdownEl: HTMLElement | null;
-  private readonly deathTimerEl: HTMLElement | null;
+  public lastCount0 = 0;
+  public lastCount1 = 0;
 
   public onStartSpectating?: () => void;
   public onNextSpectating?: () => void;
@@ -239,9 +242,10 @@ export class HudManager {
     this.twCount1El = document.getElementById('twCount1');
     this.twContinueBtn = document.getElementById('twContinueBtn') as HTMLButtonElement | null;
     this.twCountdownEl = document.getElementById('twCountdown');
-    this.twTimerEl = document.getElementById('twTimer');
+    this.twMvpBoxEl = document.getElementById('twMvpBox');
+    this.twMvpNameEl = document.getElementById('twMvpName');
+    this.twMvpStatsEl = document.getElementById('twMvpStats');
     this.deathCountdownEl = document.getElementById('deathCountdown');
-    this.deathTimerEl = document.getElementById('deathTimer');
 
     this.initSpeciesPicker();
     this.initEvents();
@@ -412,13 +416,58 @@ export class HudManager {
       this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin, this.currentFriendCode);
     };
 
-    this.playBtn.addEventListener('click', play);
+    let playCountdownTimer: any = null;
+    let playCountdownSec = 3;
+
+    const stopPlayCountdown = () => {
+      if (playCountdownTimer) {
+        clearInterval(playCountdownTimer);
+        playCountdownTimer = null;
+      }
+      if (this.playBtn) {
+        this.playBtn.disabled = false;
+        this.playBtn.innerHTML = t('play');
+      }
+    };
+
+    const handlePlayClick = () => {
+      if (this.selectedMode === 'team') {
+        const myTeam = this.selectedTeam;
+        const otherTeam = myTeam === 0 ? 1 : 0;
+        const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
+        if (otherCount < 1) {
+          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          return;
+        }
+
+        if (playCountdownTimer) return;
+        playCountdownSec = 3;
+        this.playBtn.disabled = true;
+        this.playBtn.innerHTML = `VÀO NÔNG TRẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
+
+        playCountdownTimer = setInterval(() => {
+          playCountdownSec--;
+          if (this.playBtn) {
+            this.playBtn.innerHTML = `VÀO NÔNG TRẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
+          }
+          if (playCountdownSec <= 0) {
+            stopPlayCountdown();
+            play();
+          }
+        }, 1000);
+        return;
+      }
+
+      play();
+    };
+
+    this.playBtn.addEventListener('click', handlePlayClick);
     this.nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') play();
+      if (e.key === 'Enter') handlePlayClick();
     });
 
     let deathCountdownTimer: any = null;
-    let deathCountdownSec = 5;
+    let deathCountdownSec = 3;
 
     const stopDeathCountdown = () => {
       if (deathCountdownTimer) {
@@ -428,21 +477,33 @@ export class HudManager {
       if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
       if (this.againBtn) {
         this.againBtn.disabled = false;
+        this.againBtn.innerHTML = t('again');
         this.againBtn.style.opacity = '1';
       }
     };
 
     const startDeathCountdown = () => {
       if (deathCountdownTimer) return;
-      deathCountdownSec = 5;
-      if (this.deathCountdownEl) this.deathCountdownEl.hidden = false;
-      if (this.deathTimerEl) this.deathTimerEl.textContent = '5';
+      if (this.selectedMode === 'team') {
+        const myTeam = this.selectedTeam;
+        const otherTeam = myTeam === 0 ? 1 : 0;
+        const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
+        if (otherCount < 1) {
+          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          return;
+        }
+      }
+
+      deathCountdownSec = 3;
+      if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
       this.againBtn.disabled = true;
-      this.againBtn.style.opacity = '0.5';
+      this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
 
       deathCountdownTimer = setInterval(() => {
         deathCountdownSec--;
-        if (this.deathTimerEl) this.deathTimerEl.textContent = String(deathCountdownSec);
+        if (this.againBtn) {
+          this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
+        }
         if (deathCountdownSec <= 0) {
           stopDeathCountdown();
           this.deathScreen.hidden = true;
@@ -465,6 +526,7 @@ export class HudManager {
       this.deathScreen.hidden = true;
       this.startScreen.hidden = false;
       document.body.classList.add('menu');
+      document.body.classList.remove('spectating');
       this.previewRenderer?.start();
       this.previewRenderer?.resize();
     });
@@ -474,6 +536,8 @@ export class HudManager {
         stopDeathCountdown();
         this.deathScreen.hidden = true;
         document.body.classList.remove('menu');
+        document.body.classList.add('spectating');
+        this.hudEl.hidden = false;
         if (this.spectateBarEl) this.spectateBarEl.hidden = false;
         this.isSpectating = true;
         this.onStartSpectating?.();
@@ -489,10 +553,12 @@ export class HudManager {
     if (this.specPlayBtn) {
       this.specPlayBtn.addEventListener('click', () => {
         this.isSpectating = false;
+        document.body.classList.remove('spectating');
         if (this.spectateBarEl) this.spectateBarEl.hidden = true;
         this.onStopSpectating?.();
         if (this.selectedMode === 'team') {
           this.deathScreen.hidden = false;
+          this.hudEl.hidden = true;
           document.body.classList.add('menu');
           startDeathCountdown();
         } else {
@@ -503,26 +569,32 @@ export class HudManager {
     }
 
     let twCountdownTimer: any = null;
-    let twCountdownSec = 5;
+    let twCountdownSec = 3;
 
     if (this.twContinueBtn) {
       const continueBtn = this.twContinueBtn;
       continueBtn.addEventListener('click', () => {
         if (twCountdownTimer) return;
-        twCountdownSec = 5;
-        if (this.twCountdownEl) this.twCountdownEl.hidden = false;
-        if (this.twTimerEl) this.twTimerEl.textContent = '5';
+        const myTeam = this.selectedTeam;
+        const otherTeam = myTeam === 0 ? 1 : 0;
+        const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
+        if (otherCount < 1) {
+          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          return;
+        }
+
+        twCountdownSec = 3;
         continueBtn.disabled = true;
-        continueBtn.style.opacity = '0.5';
+        continueBtn.innerHTML = `TIẾP TỤC (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
 
         twCountdownTimer = setInterval(() => {
           twCountdownSec--;
-          if (this.twTimerEl) this.twTimerEl.textContent = String(twCountdownSec);
+          continueBtn.innerHTML = `TIẾP TỤC (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
           if (twCountdownSec <= 0) {
             clearInterval(twCountdownTimer);
             twCountdownTimer = null;
             continueBtn.disabled = false;
-            continueBtn.style.opacity = '1';
+            continueBtn.innerHTML = 'TIẾP TỤC';
             if (this.twCountdownEl) this.twCountdownEl.hidden = true;
             if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
             play();
@@ -799,6 +871,7 @@ export class HudManager {
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
+    document.body.classList.remove('spectating');
     this.hudEl.hidden = false;
     document.body.classList.remove('menu');
   }
@@ -809,6 +882,7 @@ export class HudManager {
     this.hudEl.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
+    document.body.classList.remove('spectating');
     document.body.classList.add('menu');
 
     if (this.deathTeamPickEl) {
@@ -817,6 +891,7 @@ export class HudManager {
     if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
     if (this.againBtn) {
       this.againBtn.disabled = false;
+      this.againBtn.innerHTML = t('again');
       this.againBtn.style.opacity = '1';
     }
 
@@ -839,7 +914,7 @@ export class HudManager {
   public setSelectedTeam(team: number): void {
     this.selectedTeam = team;
     document.querySelectorAll('.btn-team').forEach((btn) => {
-      const t = parseInt((btn as HTMLElement).dataset.team ?? '-1', 10);
+      const t = parseInt((btn as HTMLElement).dataset.team ?? '0', 10);
       btn.classList.toggle('on', t === team);
     });
     if (this.selectedMode === 'team' && this.previewRenderer) {
@@ -848,6 +923,8 @@ export class HudManager {
   }
 
   public updateTeamCounts(count0: number, count1: number): void {
+    this.lastCount0 = count0;
+    this.lastCount1 = count1;
     if (this.startCount0El) this.startCount0El.textContent = `(${count0} người)`;
     if (this.startCount1El) this.startCount1El.textContent = `(${count1} người)`;
     if (this.deathCount0El) this.deathCount0El.textContent = `(${count0} người)`;
@@ -864,10 +941,25 @@ export class HudManager {
     }
   }
 
-  public showTeamWinModal(winner: number, s0: number, s1: number): void {
+  public showTeamWinModal(
+    winner: number,
+    s0: number,
+    s1: number,
+    mvp?: {
+      id: number;
+      name: string;
+      team: number;
+      species: Species;
+      skin: number;
+      score: number;
+      kills: number;
+      mass: number;
+    }
+  ): void {
     this.deathScreen.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
+    document.body.classList.remove('spectating');
     document.body.classList.add('menu');
 
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = false;
@@ -885,9 +977,27 @@ export class HudManager {
     }
     if (this.twScore0El) this.twScore0El.textContent = String(s0);
     if (this.twScore1El) this.twScore1El.textContent = String(s1);
+
+    if (this.twMvpBoxEl) {
+      if (mvp) {
+        this.twMvpBoxEl.hidden = false;
+        if (this.twMvpNameEl) {
+          const teamLabel = mvp.team === 0 ? 'Đội A12' : 'Đội WFM';
+          this.twMvpNameEl.textContent = `${mvp.name} (${teamLabel})`;
+          this.twMvpNameEl.style.color = mvp.team === 0 ? '#4fc3f7' : '#f44336';
+        }
+        if (this.twMvpStatsEl) {
+          this.twMvpStatsEl.textContent = `${mvp.score} điểm · 💥 ${mvp.kills} hạ gục · ⚖️ ${mvp.mass} kg`;
+        }
+      } else {
+        this.twMvpBoxEl.hidden = true;
+      }
+    }
+
     if (this.twCountdownEl) this.twCountdownEl.hidden = true;
     if (this.twContinueBtn) {
       this.twContinueBtn.disabled = false;
+      this.twContinueBtn.innerHTML = 'TIẾP TỤC';
       this.twContinueBtn.style.opacity = '1';
     }
     this.setSelectedTeam(this.selectedTeam);

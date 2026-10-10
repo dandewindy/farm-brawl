@@ -81,7 +81,22 @@ export type GameEvent =
   | { k: 'superFood'; x: number; z: number }
   | { k: 'super'; id: number }
   | { k: 'fly'; id: number; x: number; z: number }
-  | { k: 'teamWin'; winner: number; s0: number; s1: number }
+  | {
+      k: 'teamWin';
+      winner: number;
+      s0: number;
+      s1: number;
+      mvp?: {
+        id: number;
+        name: string;
+        team: number;
+        species: Species;
+        skin: number;
+        score: number;
+        kills: number;
+        mass: number;
+      };
+    }
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };

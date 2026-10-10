@@ -83,6 +83,8 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     const privRoom = `priv-${code}`;
     connectToRoom(privRoom);
     registerFriendRoom(code, name, 1);
+  } else if (mode === 'team') {
+    connectToRoom('team-1');
   } else {
     connectToRoom('pub-1');
   }
@@ -91,6 +93,14 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     transport.send({ t: 'join', name, species, skin, team });
   }
 });
+
+hud.onSelectMode = (mode) => {
+  if (mode === 'team') {
+    connectToRoom('team-1');
+  } else if (mode === 'ffa') {
+    connectToRoom('pub-1');
+  }
+};
 
 let isSpectating = false;
 let spectateTargetId: number | null = null;
@@ -121,6 +131,9 @@ function pickRandomSpectateTarget(): void {
 
 hud.onStartSpectating = () => {
   isSpectating = true;
+  document.body.classList.add('spectating');
+  const hudEl = document.getElementById('hud');
+  if (hudEl) hudEl.hidden = false;
   pickRandomSpectateTarget();
 };
 
@@ -132,6 +145,9 @@ hud.onSelectSpectateTarget = (id: number) => {
   isSpectating = true;
   spectateTargetId = id;
   hud.isSpectating = true;
+  document.body.classList.add('spectating');
+  const hudEl = document.getElementById('hud');
+  if (hudEl) hudEl.hidden = false;
   const specBar = document.getElementById('spectateBar');
   if (specBar) specBar.hidden = false;
   const deathEl = document.getElementById('death');
@@ -147,6 +163,7 @@ hud.onSelectSpectateTarget = (id: number) => {
 hud.onStopSpectating = () => {
   isSpectating = false;
   spectateTargetId = null;
+  document.body.classList.remove('spectating');
 };
 
 hud.onPickRule = (ruleId) => {
@@ -513,13 +530,28 @@ function handleGameEvent(ev: GameEvent): void {
       }
       break;
     }
+    case 'join': {
+      gameState.metas.set(ev.id, {
+        id: ev.id,
+        name: ev.name,
+        species: ev.species,
+        skin: ev.skin,
+        bot: ev.bot,
+        team: ev.team,
+      });
+      if (!ev.bot && ev.id !== myId) {
+        const teamTag = ev.team !== undefined ? ` [${ev.team === 0 ? 'A12' : 'WFM'}]` : '';
+        hud.addFeed(`👋 ${ev.name}${teamTag} đã vào nông trại!`, false);
+      }
+      break;
+    }
     case 'leave': {
       animals.remove(ev.id);
       break;
     }
     case 'teamWin': {
       sfxReward();
-      hud.showTeamWinModal(ev.winner, ev.s0, ev.s1);
+      hud.showTeamWinModal(ev.winner, ev.s0, ev.s1, ev.mvp);
       break;
     }
     case 'map': {

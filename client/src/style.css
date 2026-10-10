@@ -1183,3 +1183,73 @@ body.menu #hud { display: none; }
   color: #fff;
 }
 
+#specNextBtn {
+  font-size: 16px;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+/* Spectator view HUD adjustments */
+body.spectating #stats,
+body.spectating #board,
+body.spectating #ram,
+body.spectating #dashBtn,
+body.spectating #stick,
+body.spectating #capture {
+  display: none !important;
+}
+body.spectating #lb {
+  display: block !important;
+  pointer-events: auto !important;
+  z-index: 15;
+}
+body.spectating #hof {
+  display: block !important;
+}
+body.spectating #lbList li {
+  cursor: pointer !important;
+}
+body.spectating #lbList li:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* MVP Showcase Card */
+.tw-mvp-box {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 152, 0, 0.1));
+  border: 2px solid var(--gold);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 15px rgba(232, 182, 65, 0.25);
+  animation: mvpGlow 2s infinite alternate ease-in-out;
+}
+@keyframes mvpGlow {
+  0% { box-shadow: 0 0 8px rgba(232, 182, 65, 0.2); }
+  100% { box-shadow: 0 0 18px rgba(232, 182, 65, 0.6); }
+}
+.tw-mvp-header {
+  font: 800 11px var(--f-display);
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.tw-mvp-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.tw-mvp-name {
+  font: 800 18px var(--f-display);
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+.tw-mvp-stats {
+  font: 700 13px var(--f-body);
+  color: #ffe082;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+

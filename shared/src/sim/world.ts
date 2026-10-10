@@ -35,6 +35,8 @@ export interface Player extends Body {
   lastHitBy: number;
   lastHitT: number;
   kills: number;
+  totalKills: number;
+  score: number;
   streak: number;
   bornT: number;
   best: number;
@@ -143,7 +145,7 @@ export class World {
       bot, alive: false,
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
-      terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, streak: 0, bornT: 0, best: 0,
+      terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
       respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
@@ -194,7 +196,8 @@ export class World {
     Object.assign(p, {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
-      kills: 0, streak: 0, bornT: this.time, best: CFG.START_MASS, btnLatch: false, inWaterT: 0,
+      kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
+      best: Math.max(CFG.START_MASS, p.best || 0), btnLatch: false, inWaterT: 0,
       pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time,
     });
     p.input.btn = false;
@@ -220,23 +223,16 @@ export class World {
 
   private fillBots(): void {
     if (!this.botsEnabled) return;
+    const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
+    if (hasTeams) return; // Team mode temporarily has no bots
+
     if (this.players.size < CFG.BOT_FILL) {
       const sp = SPECIES[Math.floor(this.rnd() * SPECIES.length)];
       const used = new Set([...this.players.values()].map((p) => p.name));
       const pool = SPECIES_BOT_NAMES[sp] || [];
       const free = pool.filter((n) => !used.has(n));
       const name = free.length ? free[Math.floor(this.rnd() * free.length)] : `${SPECIES_NAMES_VI[sp]} ${this.nextId}`;
-      let botTeam: number | undefined;
-      const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
-      if (hasTeams) {
-        let t0 = 0, t1 = 0;
-        for (const p of this.players.values()) {
-          if (p.team === 0) t0++;
-          else if (p.team === 1) t1++;
-        }
-        botTeam = t0 <= t1 ? 0 : 1;
-      }
-      this.addPlayer(name, sp, true, botTeam);
+      this.addPlayer(name, sp, true);
     } else if (this.players.size > CFG.BOT_FILL) {
       // a human joined a full room: retire a bot (a dead one if possible)
       let pick: Player | null = null;
@@ -255,19 +251,66 @@ export class World {
     // Team mode match clock & scoring
     const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
     if (hasTeams) {
+      // Clean up any remaining bots in team mode
+      for (const [id, p] of this.players.entries()) {
+        if (p.bot) this.removePlayer(id);
+      }
+
+      let team0Count = 0;
+      let team1Count = 0;
+      for (const p of this.players.values()) {
+        if (!p.bot) {
+          if (p.team === 0) team0Count++;
+          else if (p.team === 1) team1Count++;
+        }
+      }
+      const canStartMatch = team0Count >= 1 && team1Count >= 1;
+
       if (!this.matchEnded) {
-        this.matchClock = Math.max(0, this.matchClock - DT);
-        if (this.napoleonId > 0) {
-          const king = this.players.get(this.napoleonId);
-          if (king && king.alive && king.team !== undefined) {
-            this.teamScores[king.team] += DT * 1;
+        if (canStartMatch) {
+          this.matchClock = Math.max(0, this.matchClock - DT);
+          if (this.napoleonId > 0) {
+            const king = this.players.get(this.napoleonId);
+            if (king && king.alive && king.team !== undefined) {
+              this.teamScores[king.team] += DT * 1;
+              king.score = (king.score || 0) + DT * 10;
+            }
           }
         }
         if (this.matchClock <= 0) {
           this.matchEnded = true;
           this.matchEndTimer = 0;
           const winner = this.teamScores[0] > this.teamScores[1] ? 0 : this.teamScores[1] > this.teamScores[0] ? 1 : -1;
-          this.events.push({ k: 'teamWin', winner, s0: Math.round(this.teamScores[0]), s1: Math.round(this.teamScores[1]) });
+
+          // Determine match MVP
+          let mvpPlayer: Player | null = null;
+          let bestScore = -1;
+          for (const p of this.players.values()) {
+            if (p.bot) continue;
+            const pScore = p.score || 0;
+            if (pScore > bestScore || !mvpPlayer) {
+              bestScore = pScore;
+              mvpPlayer = p;
+            }
+          }
+          const mvp = mvpPlayer ? {
+            id: mvpPlayer.id,
+            name: mvpPlayer.name,
+            team: mvpPlayer.team ?? 0,
+            species: mvpPlayer.species,
+            skin: mvpPlayer.skin,
+            score: Math.round(mvpPlayer.score || 0),
+            kills: mvpPlayer.totalKills ?? mvpPlayer.kills,
+            mass: Math.round(mvpPlayer.best ?? mvpPlayer.mass),
+          } : undefined;
+
+          this.events.push({
+            k: 'teamWin',
+            winner,
+            s0: Math.round(this.teamScores[0]),
+            s1: Math.round(this.teamScores[1]),
+            mvp,
+          });
         }
       } else {
         // After 6s celebration, renew game with brand new map layout and items
@@ -508,6 +551,11 @@ export class World {
             this.napoleonReign = 0;
             this.podiumPhaseTimer = 30;
             this.podiumWarned5s = false;
+            // King capture bonus
+            if (c.team !== undefined) {
+              this.teamScores[c.team] += 5; // +5 points for team when becoming King
+            }
+            c.score = (c.score || 0) + 250; // +250 personal score
             this.events.push({ k: 'napoleon', id: c.id });
             this.startKingChoice();
           }
@@ -985,9 +1033,18 @@ export class World {
       spoils = Math.round(p.mass * CFG.KILL_SPOILS * mult);
       killer.mass += spoils;
       killer.kills++;
+      killer.totalKills = (killer.totalKills || 0) + 1;
       killer.streak++;
       if (killer.team !== undefined && p.team !== undefined && killer.team !== p.team) {
-        this.teamScores[killer.team] += 5;
+        if (isKingKill) {
+          this.teamScores[killer.team] += 5; // +5 points for team when defeating enemy King
+          killer.score = (killer.score || 0) + 300; // +300 personal score
+        } else {
+          this.teamScores[killer.team] += 1; // +1 point for regular enemy KO
+          killer.score = (killer.score || 0) + 100; // +100 personal score
+        }
+      } else {
+        killer.score = (killer.score || 0) + (isKingKill ? 300 : 100);
       }
     }
     // what's left of it falls back inside the fence
@@ -1016,6 +1073,10 @@ export class World {
         if (f.k === 6) {
           p.superT = 10;
           p.flyT = 0;
+          p.score = (p.score || 0) + 150;
+          if (p.team !== undefined) {
+            this.teamScores[p.team] += 3;
+          }
           this.events.push({ k: 'super', id: p.id });
         }
         // Rule: "corn" (Corn is for pigs and Napoleon: 3x value, 1/3 for others)
@@ -1027,6 +1088,8 @@ export class World {
           }
         }
         p.mass += gain;
+        p.best = Math.max(p.best, p.mass);
+        p.score = (p.score || 0) + Math.round(gain * 2);
         p.lastEatT = this.time;
         this.food.delete(f.id);
         this.foodRemoved.push(f.id);
@@ -1249,6 +1312,9 @@ export class World {
 
     // Respawns bots at new free spots; human players respawn when clicking Continue on team victory modal
     for (const p of this.players.values()) {
+      p.score = 0;
+      p.kills = 0;
+      p.totalKills = 0;
       if (p.bot) {
         this.spawn(p);
       } else {
