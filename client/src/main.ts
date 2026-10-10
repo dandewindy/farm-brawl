@@ -103,8 +103,12 @@ hud.onSelectMode = (mode) => {
 };
 
 hud.onReconnect = () => {
+  if (gameState.inGame) {
+    hud.showToast('⚠️ Đang trong trận đấu, không thể đổi trạm để tránh ngắt kết nối!');
+    return;
+  }
   if (transport?.forceReconnect) {
-    hud.showToast('🔄 Đang chuyển sang tuyến mạng Singapore (SIN)...');
+    hud.showToast('🔄 Đang đổi sang tuyến mạng tối ưu (SIN/HKG)...');
     transport.forceReconnect();
   }
 };

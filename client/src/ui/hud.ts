@@ -1037,10 +1037,12 @@ export class HudManager {
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
       const isHkg = colo === 'HKG';
-      this.coloVal.className = `perf-colo ${isSin ? 'good' : isHkg ? 'warn' : 'bad'}`;
+      this.coloVal.className = `perf-colo ${isSin ? 'good' : isHkg ? 'good' : 'bad'}`;
       this.coloVal.title = isSin
-        ? 'Trạm Singapore (SIN) tối ưu - Ping cực thấp ~30ms'
-        : `Trạm ${colo} (Nhấp để kết nối lại trạm Singapore)`;
+        ? 'Trạm Singapore (SIN) tối ưu - Ping cực thấp ~35ms'
+        : isHkg
+        ? 'Trạm Hồng Kông (HKG) nhanh - Ping ổn định ~75ms'
+        : `Trạm ${colo} (Độ trễ cao - Đang tự động đổi tuyến)`;
     }
   }
 

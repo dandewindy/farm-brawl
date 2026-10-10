@@ -13,7 +13,7 @@ export class WsClient implements Transport {
   public rttMin = 0;
   public colo = '';
   public inGame = false;
-  private hasAutoSteered = false;
+  private autoSteerAttempts = 0;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
 
@@ -97,16 +97,17 @@ export class WsClient implements Transport {
                 this.lastJoinMsg.token = msg.token;
               }
             }
-            // Auto-steer to Singapore while in the lobby before clicking Play:
-            // If the browser initially landed on HKG/NRT, retry once in the lobby to hit SIN (104.21.32.122)
-            if (this.colo && this.colo !== 'SIN' && !this.inGame && !this.hasAutoSteered) {
-              this.hasAutoSteered = true;
-              console.log(`[WS] Initial connection landed on ${this.colo}. Auto-steering to Singapore (SIN) in lobby...`);
+            // Auto-steer away from high-latency edge nodes (NRT) in lobby:
+            // SIN (~35ms) and HKG (~75ms) are both fast low-latency APAC routes for Vietnam.
+            // Only NRT (~460ms cross-colo) causes high ping and should be steered away from.
+            if (this.colo === 'NRT' && !this.inGame && this.autoSteerAttempts < 3) {
+              this.autoSteerAttempts++;
+              console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/3)...`);
               setTimeout(() => {
                 if (!this.closed && !this.inGame && this.ws === socket) {
                   this.forceReconnect();
                 }
-              }, 400);
+              }, 450);
             }
           }
           this.onMsg(msg);
@@ -199,7 +200,7 @@ export class WsClient implements Transport {
       if (!this.closed) {
         this.connect();
       }
-    }, 120);
+    }, 250);
   }
 
   close(): void {
