@@ -151,13 +151,14 @@ export class World {
     return id;
   }
 
-  /** bring a (dead) animal back, optionally as a different species and skin */
-  respawn(id: number, name?: string, species?: Species, skin?: number): void {
+  /** bring a (dead) animal back, optionally as a different species, skin, and team */
+  respawn(id: number, name?: string, species?: Species, skin?: number, team?: number): void {
     const p = this.players.get(id);
     if (!p || p.alive) return;
     if (name !== undefined) p.name = name.slice(0, 16);
     if (species) p.species = species;
     if (skin !== undefined) p.skin = skin % SKIN_COUNT;
+    if (team !== undefined) p.team = team;
     this.spawn(p);
   }
 
@@ -225,7 +226,17 @@ export class World {
       const pool = SPECIES_BOT_NAMES[sp] || [];
       const free = pool.filter((n) => !used.has(n));
       const name = free.length ? free[Math.floor(this.rnd() * free.length)] : `${SPECIES_NAMES_VI[sp]} ${this.nextId}`;
-      this.addPlayer(name, sp, true);
+      let botTeam: number | undefined;
+      const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
+      if (hasTeams) {
+        let t0 = 0, t1 = 0;
+        for (const p of this.players.values()) {
+          if (p.team === 0) t0++;
+          else if (p.team === 1) t1++;
+        }
+        botTeam = t0 <= t1 ? 0 : 1;
+      }
+      this.addPlayer(name, sp, true, botTeam);
     } else if (this.players.size > CFG.BOT_FILL) {
       // a human joined a full room: retire a bot (a dead one if possible)
       let pick: Player | null = null;
@@ -1203,7 +1214,13 @@ export class World {
     }
     const hasTeams = [...this.players.values()].some((o) => o.team !== undefined);
     if (hasTeams) {
-      snap.team = [Math.round(this.teamScores[0]), Math.round(this.teamScores[1]), Math.ceil(this.matchClock)];
+      let count0 = 0;
+      let count1 = 0;
+      for (const o of this.players.values()) {
+        if (o.team === 0) count0++;
+        else if (o.team === 1) count1++;
+      }
+      snap.team = [Math.round(this.teamScores[0]), Math.round(this.teamScores[1]), Math.ceil(this.matchClock), count0, count1];
     }
     return snap;
   }
@@ -1230,9 +1247,13 @@ export class World {
     this.podiumPhaseTimer = 30;
     this.podiumWarned5s = false;
 
-    // Respawns all existing players at new free spots on the new map
+    // Respawns bots at new free spots; human players respawn when clicking Continue on team victory modal
     for (const p of this.players.values()) {
-      this.spawn(p);
+      if (p.bot) {
+        this.spawn(p);
+      } else {
+        p.alive = false;
+      }
     }
 
     // Broadcast map event to all clients so they rebuild 3D world and food/items

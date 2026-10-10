@@ -17,9 +17,19 @@
 
   <!-- Team mode: reign time per farm and match clock -->
   <div id="teamBar" hidden>
-    <span class="tb tb0"><b data-i18n="team0">A12</b><i id="ts0">0</i></span>
+    <span class="tb tb0"><b data-i18n="team0">A12</b><span class="tb-count" id="tbCount0">(0)</span><i id="ts0">0</i></span>
     <span id="tClock">5:00</span>
-    <span class="tb tb1"><i id="ts1">0</i><b data-i18n="team1">WFM</b></span>
+    <span class="tb tb1"><i id="ts1">0</i><b data-i18n="team1">WFM</b><span class="tb-count" id="tbCount1">(0)</span></span>
+  </div>
+
+  <!-- Spectator Bar HUD -->
+  <div id="spectateBar" hidden>
+    <div class="spectate-pill">
+      <span class="spectate-badge">👁️ ĐANG XEM</span>
+      <span id="spectateName" class="spectate-target">--</span>
+      <button type="button" id="specNextBtn" class="spec-btn" title="Xem người khác">🎲 Đổi người</button>
+      <button type="button" id="specPlayBtn" class="spec-btn spec-play" title="Tham gia trận đấu">⚔️ Chơi lại</button>
+    </div>
   </div>
 
   <div id="hud" hidden>
@@ -91,6 +101,15 @@
         <button type="button" data-mode="friend"><span class="n">Bạn bè 👥</span><span class="p">Phòng riêng không bot</span></button>
       </div>
 
+      <!-- Team Pick on Start Screen (visible when mode === 'team') -->
+      <div id="startTeamPick" class="team-pick-wrap" hidden>
+        <span class="team-pick-label">CHỌN ĐỘI CỦA BẠN:</span>
+        <div class="team-pick-btns">
+          <button type="button" class="btn-team btn-team-0 on" data-team="0">A12 <span class="t-count" id="startCount0">(0 người)</span></button>
+          <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="startCount1">(0 người)</span></button>
+        </div>
+      </div>
+
       <!-- Friend Mode Panel (Private Room with Code) -->
       <div id="friendPanel" class="friend-panel" hidden>
         <div class="fp-section">
@@ -153,8 +172,49 @@
         <div><b id="dTime">0:00</b><span data-i18n="stTime"></span></div>
       </div>
       <p id="deathBest"></p>
+      <!-- Team Pick on Death Screen (visible in team mode) -->
+      <div id="deathTeamPick" class="team-pick-wrap" hidden>
+        <span class="team-pick-label">CHỌN ĐỘI KẾ TIẾP:</span>
+        <div class="team-pick-btns">
+          <button type="button" class="btn-team btn-team-0 on" data-team="0">A12 <span class="t-count" id="deathCount0">(0 người)</span></button>
+          <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="deathCount1">(0 người)</span></button>
+        </div>
+      </div>
+      <div id="deathCountdown" class="tw-countdown" hidden>Hồi sinh trong <b id="deathTimer">5</b>s...</div>
       <button id="again" class="btn-red" type="button" data-i18n="again"></button>
+      <button id="spectateBtn" class="btn-blue" type="button">👁️ Xem</button>
       <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
+    </div>
+  </div>
+
+  <!-- Big Team Win Announcement Modal -->
+  <div id="teamWinModal" class="screen" hidden>
+    <div class="card team-win-card">
+      <div id="twTrophy" class="tw-trophy">🏆</div>
+      <h2 id="twTitle" class="tw-title">ĐỘI A12 CHIẾN THẮNG!</h2>
+      <div class="tw-score-box">
+        <div class="tw-side tw0">
+          <span class="tw-team-name">A12</span>
+          <span id="twScore0" class="tw-score">0</span>
+        </div>
+        <div class="tw-vs">vs</div>
+        <div class="tw-side tw1">
+          <span id="twScore1" class="tw-score">0</span>
+          <span class="tw-team-name">WFM</span>
+        </div>
+      </div>
+      <p id="twSub" class="tw-sub">Thời gian thống trị nông trại vượt trội!</p>
+      
+      <div class="tw-next-section">
+        <span class="team-pick-label">CHỌN ĐỘI CHO TRẬN KẾ TIẾP:</span>
+        <div class="team-pick-btns">
+          <button type="button" class="btn-team btn-team-0 on" id="twPick0" data-team="0">A12 <span class="t-count" id="twCount0">(0 người)</span></button>
+          <button type="button" class="btn-team btn-team-1" id="twPick1" data-team="1">WFM <span class="t-count" id="twCount1">(0 người)</span></button>
+        </div>
+      </div>
+      
+      <button id="twContinueBtn" class="btn-red tw-btn" type="button">TIẾP TỤC</button>
+      <div id="twCountdown" class="tw-countdown" hidden>Vào trận sau <b id="twTimer">5</b>s...</div>
     </div>
   </div>
 

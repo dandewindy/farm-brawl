@@ -117,8 +117,8 @@ export interface Snapshot {
   me?: { kills: number; cd: number; rank: number; choice?: ChoiceWire | null };
   /** Farmer Till tractor position and angle: [x, z, angle] */
   truck?: [number, number, number];
-  /** team mode state: [scoreTeam0, scoreTeam1, remainingClockSeconds] */
-  team?: [number, number, number];
+  /** team mode state: [scoreTeam0, scoreTeam1, remainingClockSeconds, countTeam0?, countTeam1?] */
+  team?: [number, number, number] | [number, number, number, number, number];
   /** podium shield state: [shieldActive: boolean, timerSeconds: number] */
   podShield?: [boolean, number];
 }

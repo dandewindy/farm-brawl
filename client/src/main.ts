@@ -87,10 +87,68 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     connectToRoom('pub-1');
   }
   if (transport) {
-    const team = mode === 'team' ? Math.floor(Math.random() * 2) : undefined;
+    const team = mode === 'team' ? hud.selectedTeam : undefined;
     transport.send({ t: 'join', name, species, skin, team });
   }
 });
+
+let isSpectating = false;
+let spectateTargetId: number | null = null;
+
+function pickRandomSpectateTarget(): void {
+  const living = Array.from(gameState.ents.entries())
+    .filter(([id, ent]) => id !== gameState.myId && ent.mass >= 10);
+  if (living.length === 0) {
+    const anyEnts = Array.from(gameState.ents.entries()).filter(([id]) => id !== gameState.myId);
+    if (anyEnts.length > 0) {
+      const [targetId, ent] = anyEnts[Math.floor(Math.random() * anyEnts.length)];
+      spectateTargetId = targetId;
+      const meta = gameState.metas.get(targetId);
+      hud.updateSpectatorTarget(meta ? meta.name : 'Người chơi', Math.round(ent.mass));
+      return;
+    }
+    spectateTargetId = null;
+    hud.updateSpectatorTarget('Chưa có người chơi', 0);
+    return;
+  }
+  const pool = living.filter(([id]) => id !== spectateTargetId);
+  const candidates = pool.length > 0 ? pool : living;
+  const [chosenId, ent] = candidates[Math.floor(Math.random() * candidates.length)];
+  spectateTargetId = chosenId;
+  const meta = gameState.metas.get(chosenId);
+  hud.updateSpectatorTarget(meta ? meta.name : 'Người chơi', Math.round(ent.mass));
+}
+
+hud.onStartSpectating = () => {
+  isSpectating = true;
+  pickRandomSpectateTarget();
+};
+
+hud.onNextSpectating = () => {
+  pickRandomSpectateTarget();
+};
+
+hud.onSelectSpectateTarget = (id: number) => {
+  isSpectating = true;
+  spectateTargetId = id;
+  hud.isSpectating = true;
+  const specBar = document.getElementById('spectateBar');
+  if (specBar) specBar.hidden = false;
+  const deathEl = document.getElementById('death');
+  if (deathEl) deathEl.hidden = true;
+  document.body.classList.remove('menu');
+  const targetEnt = gameState.ents.get(id);
+  const targetMeta = gameState.metas.get(id);
+  if (targetEnt) {
+    hud.updateSpectatorTarget(targetMeta ? targetMeta.name : 'Người chơi', Math.round(targetEnt.mass));
+  }
+};
+
+hud.onStopSpectating = () => {
+  isSpectating = false;
+  spectateTargetId = null;
+};
+
 hud.onPickRule = (ruleId) => {
   transport?.send({ t: 'rule', id: ruleId });
 };
@@ -163,6 +221,9 @@ const gameState = new GameState({
     tools.clear();
   },
   onJoined(_id) {
+    deathCamTarget = null;
+    isSpectating = false;
+    spectateTargetId = null;
     hud.showInGame();
     hud.showBanner(t('welcome'), t('welcomeSub'));
     prevMass = CFG.START_MASS;
@@ -239,7 +300,7 @@ const gameState = new GameState({
       hud.updateHof(gameState.hof);
     }
     if (s.team) {
-      hud.updateTeamBar(s.team[0], s.team[1], s.team[2]);
+      hud.updateTeamBar(s.team[0], s.team[1], s.team[2], s.team[3], s.team[4]);
     }
     if (s.podShield) {
       predictor.podShieldActive = s.podShield[0];
@@ -458,14 +519,7 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'teamWin': {
       sfxReward();
-      const sub = t('teamScoreSub', { s0: ev.s0, s1: ev.s1 });
-      if (ev.winner === 0) {
-        hud.showBanner(t('teamWin0'), sub);
-      } else if (ev.winner === 1) {
-        hud.showBanner(t('teamWin1'), sub);
-      } else {
-        hud.showBanner(t('teamTie'), sub);
-      }
+      hud.showTeamWinModal(ev.winner, ev.s0, ev.s1);
       break;
     }
     case 'map': {
@@ -759,10 +813,37 @@ function animate(now: number): void {
   // Update hazard death corpses
   corpses.update(now, dt, foodParts);
 
-  // Camera follow local animal with zero latency & exponential smoothing
-  const targetX = deathCamTarget ? deathCamTarget.x : me ? (predictor.on ? predictor.x : me.x) : 0;
-  const targetZ = deathCamTarget ? deathCamTarget.z : me ? (predictor.on ? predictor.z : me.z) : 0;
-  const targetMass = me ? me.mass : CFG.START_MASS;
+  // Camera follow local animal (or spectated animal in spectator mode)
+  let targetX = 0;
+  let targetZ = 0;
+  let targetMass: number = CFG.START_MASS;
+
+  if (isSpectating && spectateTargetId !== null) {
+    const targetEnt = gameState.ents.get(spectateTargetId);
+    if (targetEnt) {
+      targetX = targetEnt.x;
+      targetZ = targetEnt.z;
+      targetMass = targetEnt.mass;
+      const targetMeta = gameState.metas.get(spectateTargetId);
+      if (targetMeta) {
+        hud.updateSpectatorTarget(targetMeta.name, Math.round(targetEnt.mass));
+      }
+    } else {
+      pickRandomSpectateTarget();
+      if (spectateTargetId !== null) {
+        const nextEnt = gameState.ents.get(spectateTargetId);
+        if (nextEnt) {
+          targetX = nextEnt.x;
+          targetZ = nextEnt.z;
+          targetMass = nextEnt.mass;
+        }
+      }
+    }
+  } else {
+    targetX = deathCamTarget ? deathCamTarget.x : me ? (predictor.on ? predictor.x : me.x) : 0;
+    targetZ = deathCamTarget ? deathCamTarget.z : me ? (predictor.on ? predictor.z : me.z) : 0;
+    targetMass = me ? me.mass : CFG.START_MASS;
+  }
   world.updateCamera(targetX, targetZ, targetMass, dt, shake);
   shake = Math.max(0, shake - dt * 2.5);
 

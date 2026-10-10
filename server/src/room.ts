@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { World } from '@shared/sim/world';
-import { TICK_MS } from '@shared/constants';
+import { TICK_MS, SKIN_COUNT } from '@shared/constants';
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 
 const GRACE_PERIOD_MS = 8000;
@@ -118,7 +118,7 @@ export class GameRoom extends DurableObject {
           this.sockets.set(ws, playerId);
           // If the player died while disconnected, respawn them
           if (!existingPlayer.alive) {
-            this.world.respawn(playerId, msg.name, msg.species, msg.skin);
+            this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
           }
         }
       }
@@ -129,11 +129,24 @@ export class GameRoom extends DurableObject {
         playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
         this.sockets.set(ws, playerId);
         this.playerTokens.set(playerId, sessionToken);
-      } else if (!this.playerTokens.has(playerId)) {
-        if (!sessionToken) sessionToken = crypto.randomUUID();
-        this.playerTokens.set(playerId, sessionToken);
       } else {
-        sessionToken = this.playerTokens.get(playerId)!;
+        if (!this.playerTokens.has(playerId)) {
+          if (!sessionToken) sessionToken = crypto.randomUUID();
+          this.playerTokens.set(playerId, sessionToken);
+        } else {
+          sessionToken = this.playerTokens.get(playerId)!;
+        }
+        const existingPlayer = this.world.players.get(playerId);
+        if (existingPlayer) {
+          if (!existingPlayer.alive) {
+            this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
+          } else {
+            if (msg.name) existingPlayer.name = msg.name.slice(0, 16);
+            if (msg.species) existingPlayer.species = msg.species;
+            if (msg.skin !== undefined) existingPlayer.skin = msg.skin % SKIN_COUNT;
+            if (msg.team !== undefined) existingPlayer.team = msg.team;
+          }
+        }
       }
 
       // Send initial world configuration & map

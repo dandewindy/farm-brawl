@@ -69,6 +69,40 @@ export class HudManager {
   public onToggleMute?: () => void;
   public onSelectMode?: (mode: 'ffa' | 'team' | 'friend') => void;
   public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
+  public selectedTeam: number = 0;
+  public isSpectating = false;
+
+  private readonly startTeamPickEl: HTMLElement | null;
+  private readonly deathTeamPickEl: HTMLElement | null;
+  private readonly startCount0El: HTMLElement | null;
+  private readonly startCount1El: HTMLElement | null;
+  private readonly deathCount0El: HTMLElement | null;
+  private readonly deathCount1El: HTMLElement | null;
+  private readonly tbCount0El: HTMLElement | null;
+  private readonly tbCount1El: HTMLElement | null;
+
+  private readonly spectateBtn: HTMLElement | null;
+  private readonly spectateBarEl: HTMLElement | null;
+  private readonly spectateNameEl: HTMLElement | null;
+  private readonly specNextBtn: HTMLElement | null;
+  private readonly specPlayBtn: HTMLElement | null;
+
+  private readonly teamWinModalEl: HTMLElement | null;
+  private readonly twTitleEl: HTMLElement | null;
+  private readonly twScore0El: HTMLElement | null;
+  private readonly twScore1El: HTMLElement | null;
+  private readonly twCount0El: HTMLElement | null;
+  private readonly twCount1El: HTMLElement | null;
+  private readonly twContinueBtn: HTMLButtonElement | null;
+  private readonly twCountdownEl: HTMLElement | null;
+  private readonly twTimerEl: HTMLElement | null;
+  private readonly deathCountdownEl: HTMLElement | null;
+  private readonly deathTimerEl: HTMLElement | null;
+
+  public onStartSpectating?: () => void;
+  public onNextSpectating?: () => void;
+  public onSelectSpectateTarget?: (id: number) => void;
+  public onStopSpectating?: () => void;
   private currentFriendCode = '';
   private currentChoiceOptions: string[] = [];
   private lastChoiceKey = '';
@@ -181,6 +215,33 @@ export class HudManager {
       this.previewRenderer = new AnimalPreviewRenderer(previewCanvas);
       this.previewRenderer.start();
     }
+
+    this.startTeamPickEl = document.getElementById('startTeamPick');
+    this.deathTeamPickEl = document.getElementById('deathTeamPick');
+    this.startCount0El = document.getElementById('startCount0');
+    this.startCount1El = document.getElementById('startCount1');
+    this.deathCount0El = document.getElementById('deathCount0');
+    this.deathCount1El = document.getElementById('deathCount1');
+    this.tbCount0El = document.getElementById('tbCount0');
+    this.tbCount1El = document.getElementById('tbCount1');
+
+    this.spectateBtn = document.getElementById('spectateBtn');
+    this.spectateBarEl = document.getElementById('spectateBar');
+    this.spectateNameEl = document.getElementById('spectateName');
+    this.specNextBtn = document.getElementById('specNextBtn');
+    this.specPlayBtn = document.getElementById('specPlayBtn');
+
+    this.teamWinModalEl = document.getElementById('teamWinModal');
+    this.twTitleEl = document.getElementById('twTitle');
+    this.twScore0El = document.getElementById('twScore0');
+    this.twScore1El = document.getElementById('twScore1');
+    this.twCount0El = document.getElementById('twCount0');
+    this.twCount1El = document.getElementById('twCount1');
+    this.twContinueBtn = document.getElementById('twContinueBtn') as HTMLButtonElement | null;
+    this.twCountdownEl = document.getElementById('twCountdown');
+    this.twTimerEl = document.getElementById('twTimer');
+    this.deathCountdownEl = document.getElementById('deathCountdown');
+    this.deathTimerEl = document.getElementById('deathTimer');
 
     this.initSpeciesPicker();
     this.initEvents();
@@ -356,17 +417,125 @@ export class HudManager {
       if (e.key === 'Enter') play();
     });
 
+    let deathCountdownTimer: any = null;
+    let deathCountdownSec = 5;
+
+    const stopDeathCountdown = () => {
+      if (deathCountdownTimer) {
+        clearInterval(deathCountdownTimer);
+        deathCountdownTimer = null;
+      }
+      if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
+      if (this.againBtn) {
+        this.againBtn.disabled = false;
+        this.againBtn.style.opacity = '1';
+      }
+    };
+
+    const startDeathCountdown = () => {
+      if (deathCountdownTimer) return;
+      deathCountdownSec = 5;
+      if (this.deathCountdownEl) this.deathCountdownEl.hidden = false;
+      if (this.deathTimerEl) this.deathTimerEl.textContent = '5';
+      this.againBtn.disabled = true;
+      this.againBtn.style.opacity = '0.5';
+
+      deathCountdownTimer = setInterval(() => {
+        deathCountdownSec--;
+        if (this.deathTimerEl) this.deathTimerEl.textContent = String(deathCountdownSec);
+        if (deathCountdownSec <= 0) {
+          stopDeathCountdown();
+          this.deathScreen.hidden = true;
+          play();
+        }
+      }, 1000);
+    };
+
     this.againBtn.addEventListener('click', () => {
-      this.deathScreen.hidden = true;
-      play();
+      if (this.selectedMode === 'team') {
+        startDeathCountdown();
+      } else {
+        this.deathScreen.hidden = true;
+        play();
+      }
     });
 
     this.changeBtn.addEventListener('click', () => {
+      stopDeathCountdown();
       this.deathScreen.hidden = true;
       this.startScreen.hidden = false;
       document.body.classList.add('menu');
       this.previewRenderer?.start();
       this.previewRenderer?.resize();
+    });
+
+    if (this.spectateBtn) {
+      this.spectateBtn.addEventListener('click', () => {
+        stopDeathCountdown();
+        this.deathScreen.hidden = true;
+        document.body.classList.remove('menu');
+        if (this.spectateBarEl) this.spectateBarEl.hidden = false;
+        this.isSpectating = true;
+        this.onStartSpectating?.();
+      });
+    }
+
+    if (this.specNextBtn) {
+      this.specNextBtn.addEventListener('click', () => {
+        this.onNextSpectating?.();
+      });
+    }
+
+    if (this.specPlayBtn) {
+      this.specPlayBtn.addEventListener('click', () => {
+        this.isSpectating = false;
+        if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+        this.onStopSpectating?.();
+        if (this.selectedMode === 'team') {
+          this.deathScreen.hidden = false;
+          document.body.classList.add('menu');
+          startDeathCountdown();
+        } else {
+          this.deathScreen.hidden = true;
+          play();
+        }
+      });
+    }
+
+    let twCountdownTimer: any = null;
+    let twCountdownSec = 5;
+
+    if (this.twContinueBtn) {
+      const continueBtn = this.twContinueBtn;
+      continueBtn.addEventListener('click', () => {
+        if (twCountdownTimer) return;
+        twCountdownSec = 5;
+        if (this.twCountdownEl) this.twCountdownEl.hidden = false;
+        if (this.twTimerEl) this.twTimerEl.textContent = '5';
+        continueBtn.disabled = true;
+        continueBtn.style.opacity = '0.5';
+
+        twCountdownTimer = setInterval(() => {
+          twCountdownSec--;
+          if (this.twTimerEl) this.twTimerEl.textContent = String(twCountdownSec);
+          if (twCountdownSec <= 0) {
+            clearInterval(twCountdownTimer);
+            twCountdownTimer = null;
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            if (this.twCountdownEl) this.twCountdownEl.hidden = true;
+            if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
+            play();
+          }
+        }, 1000);
+      });
+    }
+
+    document.querySelectorAll('.btn-team').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const team = parseInt((btn as HTMLElement).dataset.team ?? '0', 10);
+        this.setSelectedTeam(team);
+      });
     });
 
     if (this.muteBtn) {
@@ -462,6 +631,11 @@ export class HudManager {
             if (this.friendPanel) {
               this.friendPanel.hidden = mode !== 'friend';
             }
+            if (this.startTeamPickEl) {
+              this.startTeamPickEl.hidden = mode !== 'team';
+            }
+            document.body.classList.toggle('mode-team', mode === 'team');
+            this.setSelectedTeam(this.selectedTeam);
             this.onSelectMode?.(mode);
           }
         });
@@ -580,11 +754,17 @@ export class HudManager {
     }
   }
 
-  public updateTeamBar(t0: number, t1: number, clockSec: number): void {
-    if (this.teamBarEl) this.teamBarEl.hidden = false;
+  public updateTeamBar(t0: number, t1: number, clockSec: number, count0?: number, count1?: number): void {
+    if (this.teamBarEl) {
+      this.teamBarEl.hidden = false;
+      document.body.classList.add('mode-team');
+    }
     if (this.ts0El) this.ts0El.textContent = String(t0);
     if (this.ts1El) this.ts1El.textContent = String(t1);
     if (this.tClockEl) this.tClockEl.textContent = this.fmtTime(clockSec);
+    if (count0 !== undefined && count1 !== undefined) {
+      this.updateTeamCounts(count0, count1);
+    }
   }
 
   public setRoomTag(name: string, inviteUrl?: string): void {
@@ -616,14 +796,29 @@ export class HudManager {
   showInGame(): void {
     this.startScreen.hidden = true;
     this.deathScreen.hidden = true;
+    if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
+    if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+    this.isSpectating = false;
     this.hudEl.hidden = false;
     document.body.classList.remove('menu');
   }
 
   showDeath(ev: Extract<GameEvent, { k: 'die' }>, killerName?: string): void {
+    if (this.teamWinModalEl && !this.teamWinModalEl.hidden) return;
     this.deathScreen.hidden = false;
     this.hudEl.hidden = true;
+    if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+    this.isSpectating = false;
     document.body.classList.add('menu');
+
+    if (this.deathTeamPickEl) {
+      this.deathTeamPickEl.hidden = this.selectedMode !== 'team';
+    }
+    if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
+    if (this.againBtn) {
+      this.againBtn.disabled = false;
+      this.againBtn.style.opacity = '1';
+    }
 
     const titleEl = document.getElementById('deathTitle')!;
     const causeEl = document.getElementById('deathCause')!;
@@ -638,6 +833,64 @@ export class HudManager {
     const mins = Math.floor(ev.alive / 60);
     const secs = String(ev.alive % 60).padStart(2, '0');
     dTime.textContent = `${mins}:${secs}`;
+    this.setSelectedTeam(this.selectedTeam);
+  }
+
+  public setSelectedTeam(team: number): void {
+    this.selectedTeam = team;
+    document.querySelectorAll('.btn-team').forEach((btn) => {
+      const t = parseInt((btn as HTMLElement).dataset.team ?? '-1', 10);
+      btn.classList.toggle('on', t === team);
+    });
+    if (this.selectedMode === 'team' && this.previewRenderer) {
+      this.previewRenderer.setAnimal(this.selectedSpecies, this.mySkins[this.selectedSpecies] ?? 0, team);
+    }
+  }
+
+  public updateTeamCounts(count0: number, count1: number): void {
+    if (this.startCount0El) this.startCount0El.textContent = `(${count0} người)`;
+    if (this.startCount1El) this.startCount1El.textContent = `(${count1} người)`;
+    if (this.deathCount0El) this.deathCount0El.textContent = `(${count0} người)`;
+    if (this.deathCount1El) this.deathCount1El.textContent = `(${count1} người)`;
+    if (this.twCount0El) this.twCount0El.textContent = `(${count0} người)`;
+    if (this.twCount1El) this.twCount1El.textContent = `(${count1} người)`;
+    if (this.tbCount0El) this.tbCount0El.textContent = `(${count0})`;
+    if (this.tbCount1El) this.tbCount1El.textContent = `(${count1})`;
+  }
+
+  public updateSpectatorTarget(name: string, mass: number): void {
+    if (this.spectateNameEl) {
+      this.spectateNameEl.textContent = `${name} (${mass} kg)`;
+    }
+  }
+
+  public showTeamWinModal(winner: number, s0: number, s1: number): void {
+    this.deathScreen.hidden = true;
+    if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+    this.isSpectating = false;
+    document.body.classList.add('menu');
+
+    if (this.teamWinModalEl) this.teamWinModalEl.hidden = false;
+    if (this.twTitleEl) {
+      if (winner === 0) {
+        this.twTitleEl.textContent = '🏆 ĐỘI A12 CHIẾN THẮNG!';
+        this.twTitleEl.style.color = '#4fc3f7';
+      } else if (winner === 1) {
+        this.twTitleEl.textContent = '🏆 ĐỘI WFM CHIẾN THẮNG!';
+        this.twTitleEl.style.color = '#f44336';
+      } else {
+        this.twTitleEl.textContent = '🤝 TRẬN ĐẤU HOÀ!';
+        this.twTitleEl.style.color = 'var(--gold)';
+      }
+    }
+    if (this.twScore0El) this.twScore0El.textContent = String(s0);
+    if (this.twScore1El) this.twScore1El.textContent = String(s1);
+    if (this.twCountdownEl) this.twCountdownEl.hidden = true;
+    if (this.twContinueBtn) {
+      this.twContinueBtn.disabled = false;
+      this.twContinueBtn.style.opacity = '1';
+    }
+    this.setSelectedTeam(this.selectedTeam);
   }
 
   updateStats(mass: number, rank: number, total: number, kills: number): void {
@@ -755,6 +1008,11 @@ export class HudManager {
 
       row.append(n, k, v);
       li.appendChild(row);
+      li.title = `Bấm để xem góc nhìn của ${name}`;
+      li.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onSelectSpectateTarget?.(id);
+      });
       this.lbList.appendChild(li);
     });
   }

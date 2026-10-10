@@ -246,10 +246,11 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   background-color: #f44336;
   box-shadow: 0 0 6px rgba(244, 67, 54, 0.8);
 }
-#lb { position: absolute; right: 12px; top: 12px; width: 220px; padding: 8px 10px; }
+#lb { position: absolute; right: 12px; top: 12px; width: 220px; padding: 8px 10px; pointer-events: auto; }
 #lb h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #b9a98a; }
 #lbList { margin: 0; padding: 0 0 0 20px; font-size: 13px; }
-#lbList li { padding: 1px 0; }
+#lbList li { padding: 1px 4px; border-radius: 4px; cursor: pointer; transition: background 0.15s ease; }
+#lbList li:hover { background: rgba(255, 255, 255, 0.15); }
 #lbList li > div { display: flex; gap: 6px; }
 #lbList .n { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #lbList .k { color: #ff9b7a; }
@@ -451,6 +452,11 @@ body.touch #dashBtn { display: block; }
   text-align: center;
   pointer-events: none;
   border-radius: 4px;
+  transition: top 0.25s ease;
+}
+#teamBar:not([hidden]) ~ #hud #board,
+body.mode-team #board {
+  top: 62px;
 }
 #board .eyebrow {
   display: block;
@@ -641,6 +647,10 @@ body.menu #hud { display: none; }
     font-size: 13px;
     padding: 0 4px;
   }
+  #teamBar:not([hidden]) ~ #hud #board,
+  body.mode-team #board {
+    top: 42px;
+  }
 
   #feed { display: none; }
   #banner .h { font-size: 24px; }
@@ -752,8 +762,15 @@ body.menu #hud { display: none; }
   align-items: center;
   gap: 8px;
 }
-#teamBar .tb0 b { color: #52c41a; }
-#teamBar .tb1 b { color: #1890ff; }
+#teamBar .tb0 b { color: #4fc3f7; }
+#teamBar .tb1 b { color: #f44336; }
+#teamBar .tb-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d8c9a8;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  margin-left: 2px;
+}
 #teamBar #tClock {
   font-family: var(--f-display);
   font-size: 18px;
@@ -940,5 +957,229 @@ body.menu #hud { display: none; }
   font-size: 11px;
   color: #52c41a;
   min-height: 14px;
+}
+
+/* Blue spectator button */
+.btn-blue {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  font: 800 20px var(--f-display);
+  color: #fff;
+  background: linear-gradient(180deg, #1890ff, #096dd9);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 0 #0050b3;
+  cursor: pointer;
+  transition: transform .1s, filter .15s;
+  margin-bottom: 8px;
+}
+.btn-blue:hover { filter: brightness(1.1); }
+.btn-blue:active { transform: translateY(2px); box-shadow: 0 2px 0 #0050b3; }
+
+/* Team Pick Styles */
+.team-pick-wrap {
+  margin: 10px 0 12px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.team-pick-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 6px;
+  text-align: center;
+}
+.team-pick-btns {
+  display: flex;
+  gap: 10px;
+}
+.btn-team {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: #2b2420;
+  color: #fff;
+  font: 700 14px var(--f-display);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-team-0 {
+  border-color: rgba(79, 195, 247, 0.4);
+}
+.btn-team-0.on {
+  background: rgba(33, 150, 243, 0.25);
+  border-color: #2196f3;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+  color: #4fc3f7;
+}
+.btn-team-1 {
+  border-color: rgba(244, 67, 54, 0.4);
+}
+.btn-team-1.on {
+  background: rgba(244, 67, 54, 0.25);
+  border-color: #f44336;
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+  color: #ef5350;
+}
+.btn-team .t-count {
+  font-size: 11px;
+  opacity: 0.85;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-weight: 500;
+}
+
+/* Spectator Mode Pill */
+#spectateBar {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: auto;
+}
+.spectate-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(20, 20, 24, 0.9);
+  border: 2px solid #1890ff;
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(24, 144, 255, 0.35);
+  backdrop-filter: blur(8px);
+}
+.spectate-badge {
+  font: 800 11px var(--f-display);
+  color: #1890ff;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.spectate-target {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spec-btn {
+  border: none;
+  background: #2e2622;
+  color: #f2ead7;
+  padding: 5px 12px;
+  border-radius: 14px;
+  font: 700 12px var(--f-display);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.spec-btn:hover { background: #4a3e36; }
+.spec-btn:active { transform: scale(0.96); }
+.spec-btn.spec-play {
+  background: #52c41a;
+  color: #fff;
+}
+.spec-btn.spec-play:hover { background: #73d13d; }
+
+/* Team Win Modal */
+#teamWinModal {
+  display: grid;
+  place-items: center;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+}
+.team-win-card {
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+  padding: 24px 28px;
+  border: 3px solid var(--gold);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(232, 182, 65, 0.35);
+  animation: twPop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+@keyframes twPop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.tw-trophy {
+  font-size: 54px;
+  line-height: 1;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 10px rgba(232, 182, 65, 0.5));
+}
+.tw-title {
+  font: 800 28px var(--f-display);
+  margin: 0 0 12px;
+  color: var(--gold);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.tw-score-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #251f1b;
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 12px;
+  border: 2px solid #4a3e36;
+}
+.tw-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.tw-side.tw0 .tw-team-name { color: #4fc3f7; }
+.tw-side.tw0 .tw-score { color: #4fc3f7; }
+.tw-side.tw1 .tw-team-name { color: #f44336; }
+.tw-side.tw1 .tw-score { color: #f44336; }
+.tw-team-name {
+  font: 800 16px var(--f-display);
+  letter-spacing: 0.1em;
+}
+.tw-score {
+  font: 800 38px var(--f-display);
+  line-height: 1.1;
+}
+.tw-vs {
+  font: 800 20px var(--f-display);
+  color: #8c7b6c;
+}
+.tw-sub {
+  font-size: 14px;
+  color: #d8c9a8;
+  margin: 0 0 16px;
+}
+.tw-next-section {
+  margin-bottom: 16px;
+  text-align: left;
+}
+.tw-btn {
+  font-size: 22px;
+  padding: 14px;
+}
+.tw-countdown {
+  margin-top: 10px;
+  font: 700 15px var(--f-display);
+  color: var(--gold);
+  text-align: center;
+}
+.tw-countdown b {
+  font-size: 20px;
+  color: #fff;
 }
 
