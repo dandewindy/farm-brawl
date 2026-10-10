@@ -5,6 +5,9 @@ export class WsClient implements Transport {
   private ws: WebSocket | null = null;
   private readonly queue: ClientMsg[] = [];
   private closed = false;
+  private isReconnecting = false;
+  private lastJoinMsg: (ClientMsg & { t: 'join' }) | null = null;
+  private sessionToken: string | null = null;
   private pingInterval: number | null = null;
   public rtt = 100;
   public rttMin = 100;
@@ -13,7 +16,7 @@ export class WsClient implements Transport {
   constructor(
     private readonly url: string,
     private readonly onMsg: Handler,
-    private readonly onStatus?: (status: 'connecting' | 'open' | 'closed' | 'error') => void
+    private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void
   ) {
     this.connect();
   }
@@ -32,13 +35,25 @@ export class WsClient implements Transport {
     }
 
     this.ws.addEventListener('open', () => {
-      this.onStatus?.('open');
+      const wasReconnecting = this.isReconnecting;
+      this.isReconnecting = false;
+      this.onStatus?.(wasReconnecting ? 'reconnected' : 'open');
+
+      // If reconnecting, re-send join message first with cached session token
+      if (this.lastJoinMsg) {
+        const joinMsg: ClientMsg = {
+          ...this.lastJoinMsg,
+          token: this.sessionToken || undefined,
+        };
+        this.send(joinMsg);
+      }
+
       // Flush queued messages
       while (this.queue.length > 0) {
         const msg = this.queue.shift()!;
         this.send(msg);
       }
-      // Start ping loop (every 1s)
+      // Start ping loop (every 1.2s)
       this.startPing();
     });
 
@@ -55,6 +70,12 @@ export class WsClient implements Transport {
             this.rttMin = Math.min(...this.rttWin);
           }
         } else {
+          if (msg.t === 'joined' && msg.token) {
+            this.sessionToken = msg.token;
+            if (this.lastJoinMsg) {
+              this.lastJoinMsg.token = msg.token;
+            }
+          }
           this.onMsg(msg);
         }
       } catch (err) {
@@ -64,6 +85,7 @@ export class WsClient implements Transport {
 
     this.ws.addEventListener('close', () => {
       this.stopPing();
+      this.isReconnecting = true;
       this.onStatus?.('closed');
       this.scheduleReconnect();
     });
@@ -80,7 +102,7 @@ export class WsClient implements Transport {
         const now = Math.round(performance.now());
         this.send({ t: 'ping', c: now });
       }
-    }, 400);
+    }, 1200);
   }
 
   private stopPing(): void {
@@ -94,15 +116,22 @@ export class WsClient implements Transport {
     if (this.closed) return;
     setTimeout(() => {
       if (!this.closed) this.connect();
-    }, 1500);
+    }, 800);
   }
 
   send(m: ClientMsg): void {
+    if (m.t === 'join') {
+      this.lastJoinMsg = { ...m, token: this.sessionToken || m.token };
+    }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       // Keep last join or non-input messages queued
       if (m.t !== 'input') {
         this.queue.push(m);
       }
+      return;
+    }
+    // Prevent bufferbloat on congested or jittery connections
+    if (m.t === 'input' && this.ws.bufferedAmount > 65536) {
       return;
     }
     this.ws.send(JSON.stringify(m));
@@ -111,6 +140,8 @@ export class WsClient implements Transport {
   close(): void {
     this.closed = true;
     this.stopPing();
+    this.lastJoinMsg = null;
+    this.sessionToken = null;
     if (this.ws) {
       this.ws.close();
       this.ws = null;

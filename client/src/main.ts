@@ -548,6 +548,12 @@ function connectToRoom(targetRoom: string): void {
           ? `Đã vào phòng bạn bè: ${displayCode} (Không có bot) 👥`
           : `Đã vào phòng trực tuyến: ${displayCode} 🌐`;
         hud.showToast(msg);
+      } else if (status === 'reconnected') {
+        hud.showToast('⚡ Đã kết nối lại thành công!');
+      } else if (status === 'closed') {
+        if (gameState.alive) {
+          hud.showToast('⚠️ Mất kết nối, đang tự động kết nối lại...');
+        }
       } else if (status === 'error' && isViteDev && !fallbackLocal) {
         console.warn('Worker server not detected at port 8787. Falling back to LocalServer.');
         fallbackLocal = true;
@@ -676,7 +682,7 @@ function animate(now: number): void {
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
 
-    if (btnChanged || (timeSinceLast >= 25 && (angleDiff > 0.008 || mvChanged))) {
+    if (btnChanged || (timeSinceLast >= 50 && (angleDiff > 0.008 || mvChanged))) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;

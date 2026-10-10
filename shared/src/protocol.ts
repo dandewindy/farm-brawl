@@ -125,12 +125,12 @@ export interface Snapshot {
 
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[] }
-  | { t: 'joined'; id: number }
+  | { t: 'joined'; id: number; token?: string }
   | { t: 'pong'; c: number }
   | Snapshot;
 
 export type ClientMsg =
-  | { t: 'join'; name: string; species: Species; skin?: number; team?: number }
+  | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }
   | ({ t: 'input' } & Input);

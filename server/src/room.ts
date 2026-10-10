@@ -3,9 +3,13 @@ import { World } from '@shared/sim/world';
 import { TICK_MS } from '@shared/constants';
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 
+const GRACE_PERIOD_MS = 8000;
+
 export class GameRoom extends DurableObject {
   private readonly world: World;
   private readonly sockets = new Map<WebSocket, number>();
+  private readonly playerTokens = new Map<number, string>();
+  private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private nextTickTime = 0;
 
@@ -75,10 +79,22 @@ export class GameRoom extends DurableObject {
     const onCloseOrError = () => {
       const playerId = this.sockets.get(ws);
       if (playerId) {
-        this.world.removePlayer(playerId);
         this.sockets.delete(ws);
+        const token = this.playerTokens.get(playerId);
+        const player = this.world.players.get(playerId);
+        if (token && player) {
+          // Keep player in world during grace period, but stop their motion
+          this.world.setInput(playerId, { a: 0, mv: false, btn: false });
+          this.disconnectedPlayers.set(token, {
+            playerId,
+            disconnectTime: performance.now(),
+          });
+        } else {
+          this.world.removePlayer(playerId);
+          if (token) this.playerTokens.delete(playerId);
+        }
       }
-      if (this.sockets.size === 0) {
+      if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
         this.stopLoop();
       }
     };
@@ -90,19 +106,42 @@ export class GameRoom extends DurableObject {
   private onMessage(ws: WebSocket, msg: ClientMsg): void {
     if (msg.t === 'join') {
       let playerId = this.sockets.get(ws);
+      let sessionToken = msg.token;
+
+      // Check if reconnecting within grace period with an existing session token
+      if (sessionToken && this.disconnectedPlayers.has(sessionToken)) {
+        const entry = this.disconnectedPlayers.get(sessionToken)!;
+        this.disconnectedPlayers.delete(sessionToken);
+        const existingPlayer = this.world.players.get(entry.playerId);
+        if (existingPlayer) {
+          playerId = entry.playerId;
+          this.sockets.set(ws, playerId);
+          // If the player died while disconnected, respawn them
+          if (!existingPlayer.alive) {
+            this.world.respawn(playerId, msg.name, msg.species, msg.skin);
+          }
+        }
+      }
+
       if (!playerId) {
+        // Brand new player or grace period expired
+        sessionToken = crypto.randomUUID();
         playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
         this.sockets.set(ws, playerId);
+        this.playerTokens.set(playerId, sessionToken);
+      } else if (!this.playerTokens.has(playerId)) {
+        if (!sessionToken) sessionToken = crypto.randomUUID();
+        this.playerTokens.set(playerId, sessionToken);
       } else {
-        this.world.respawn(playerId, msg.name, msg.species, msg.skin);
+        sessionToken = this.playerTokens.get(playerId)!;
       }
 
       // Send initial world configuration & map
       const initMsg: ServerMsg = this.world.init();
       ws.send(JSON.stringify(initMsg));
 
-      // Send joined confirmation
-      const joinedMsg: ServerMsg = { t: 'joined', id: playerId };
+      // Send joined confirmation with session token
+      const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken };
       ws.send(JSON.stringify(joinedMsg));
 
       this.startLoop();
@@ -136,7 +175,7 @@ export class GameRoom extends DurableObject {
   }
 
   private scheduleNextTick(): void {
-    if (this.sockets.size === 0) {
+    if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
       this.stopLoop();
       return;
     }
@@ -153,6 +192,18 @@ export class GameRoom extends DurableObject {
   }
 
   private tick(): void {
+    // Clean up expired disconnected sessions
+    if (this.disconnectedPlayers.size > 0) {
+      const now = performance.now();
+      for (const [token, entry] of this.disconnectedPlayers.entries()) {
+        if (now - entry.disconnectTime > GRACE_PERIOD_MS) {
+          this.disconnectedPlayers.delete(token);
+          this.playerTokens.delete(entry.playerId);
+          this.world.removePlayer(entry.playerId);
+        }
+      }
+    }
+
     this.world.step();
 
     // Broadcast authoritative snapshot to all human players
