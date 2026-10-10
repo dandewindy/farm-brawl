@@ -6,7 +6,7 @@ import {
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
-  cycleAudioMode, getAudioMode,
+  cycleAudioMode, getAudioMode, type AudioMode,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
@@ -190,20 +190,38 @@ hud.onStopSpectating = () => {
 hud.onPickRule = (ruleId) => {
   transport?.send({ t: 'rule', id: ruleId });
 };
-// 3-State Audio Synchronization
+// 3-State Audio Synchronization & 1-Second Notification Toast
+let audioToastTimer: any = null;
+function showAudioToast(mode: AudioMode): void {
+  const titles: Record<AudioMode, string> = {
+    0: '🔊 Âm thanh: Bật tất cả',
+    1: '🔈 Âm thanh: Chỉ hiệu ứng (Tắt nhạc)',
+    2: '🔇 Âm thanh: Tắt tất cả',
+  };
+  let toast = document.getElementById('audioToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'audioToast';
+    toast.className = 'audio-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = titles[mode];
+  toast.classList.remove('fade-out');
+  toast.classList.add('show');
+
+  clearTimeout(audioToastTimer);
+  audioToastTimer = setTimeout(() => {
+    toast?.classList.remove('show');
+    toast?.classList.add('fade-out');
+  }, 1000);
+}
+
 function syncAudioUi(): void {
   const mode = getAudioMode();
   hud.setMuteState(mode);
   if (muteInGameBtn) {
     muteInGameBtn.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
     muteInGameBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng (Tắt nhạc)' : 'Âm thanh: Tắt tất cả');
-  }
-  const drawerAudioBtn = document.getElementById('drawerAudioBtn');
-  if (drawerAudioBtn) {
-    const ico = drawerAudioBtn.querySelector('.ico');
-    const lbl = drawerAudioBtn.querySelector('.lbl');
-    if (ico) ico.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
-    if (lbl) lbl.textContent = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
   }
   const startMuteBtn = document.getElementById('mute');
   if (startMuteBtn) {
@@ -212,10 +230,13 @@ function syncAudioUi(): void {
   }
 }
 
-hud.onToggleMute = () => {
-  cycleAudioMode();
+function handleAudioToggle(): void {
+  const next = cycleAudioMode();
   syncAudioUi();
-};
+  showAudioToast(next);
+}
+
+hud.onToggleMute = handleAudioToggle;
 
 // Fullscreen & anti-zoom management for desktop, mobile & iPad Chrome/Safari
 const fsBtn = document.getElementById('fsBtn') as HTMLButtonElement | null;
@@ -250,13 +271,6 @@ function updateFsIcon(): void {
     const ico = startFsBtn.querySelector('.ico');
     if (ico) ico.textContent = active ? '⤢' : '⛶';
     startFsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
-  }
-  const drawerFsBtn = document.getElementById('drawerFsBtn');
-  if (drawerFsBtn) {
-    const ico = drawerFsBtn.querySelector('.ico');
-    const lbl = drawerFsBtn.querySelector('.lbl');
-    if (ico) ico.textContent = active ? '⤢' : '⛶';
-    if (lbl) lbl.textContent = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
   }
 }
 
@@ -363,10 +377,8 @@ const burgerBtn = document.getElementById('burgerBtn');
 const gameDrawerModal = document.getElementById('gameDrawerModal');
 const drawerCloseBtn = document.getElementById('drawerCloseBtn');
 const drawerBackdrop = document.getElementById('drawerBackdrop');
-const drawerAudioBtn = document.getElementById('drawerAudioBtn');
 const drawerBoardToggle = document.getElementById('drawerBoardToggle');
 const drawerStatsToggle = document.getElementById('drawerStatsToggle');
-const drawerFsBtn = document.getElementById('drawerFsBtn');
 
 // PC Settings Menu
 const pcSettingsBtn = document.getElementById('pcSettingsBtn');
@@ -382,8 +394,9 @@ let showLb = localStorage.getItem('fb_show_lb') !== '0';
 function syncBoardUi(): void {
   hud.setBoardVisible(showBoard);
   if (drawerBoardToggle) {
-    const lbl = drawerBoardToggle.querySelector('.lbl');
-    if (lbl) lbl.textContent = `Bảng Điều Răn: ${showBoard ? 'BẬT' : 'TẮT'}`;
+    const lbl = drawerBoardToggle.querySelector('.lbl') || drawerBoardToggle;
+    lbl.textContent = `Điều Răn: ${showBoard ? 'BẬT' : 'TẮT'}`;
+    drawerBoardToggle.classList.toggle('off', !showBoard);
   }
   if (pcToggleBoard) pcToggleBoard.checked = showBoard;
 }
@@ -391,8 +404,9 @@ function syncBoardUi(): void {
 function syncStatsUi(): void {
   hud.setStatsVisible(showStats);
   if (drawerStatsToggle) {
-    const lbl = drawerStatsToggle.querySelector('.lbl');
-    if (lbl) lbl.textContent = `Bảng chỉ số: ${showStats ? 'BẬT' : 'TẮT'}`;
+    const lbl = drawerStatsToggle.querySelector('.lbl') || drawerStatsToggle;
+    lbl.textContent = `Chỉ số: ${showStats ? 'BẬT' : 'TẮT'}`;
+    drawerStatsToggle.classList.toggle('off', !showStats);
   }
   if (pcToggleStats) pcToggleStats.checked = showStats;
 }
@@ -406,10 +420,8 @@ if (burgerBtn && gameDrawerModal) {
   burgerBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     gameDrawerModal.hidden = false;
-    syncAudioUi();
     syncBoardUi();
     syncStatsUi();
-    updateFsIcon();
   });
 }
 
@@ -419,13 +431,6 @@ function closeDrawer(): void {
 
 if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', closeDrawer);
 if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
-
-if (drawerAudioBtn) {
-  drawerAudioBtn.addEventListener('click', () => {
-    cycleAudioMode();
-    syncAudioUi();
-  });
-}
 
 if (drawerBoardToggle) {
   drawerBoardToggle.addEventListener('click', () => {
@@ -440,13 +445,6 @@ if (drawerStatsToggle) {
     showStats = !showStats;
     try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
     syncStatsUi();
-  });
-}
-
-if (drawerFsBtn) {
-  drawerFsBtn.addEventListener('click', () => {
-    toggleFs();
-    setTimeout(updateFsIcon, 120);
   });
 }
 
@@ -488,10 +486,7 @@ if (pcToggleLb) {
 }
 
 if (muteInGameBtn) {
-  muteInGameBtn.addEventListener('click', () => {
-    cycleAudioMode();
-    syncAudioUi();
-  });
+  muteInGameBtn.addEventListener('click', handleAudioToggle);
 }
 
 // Initialize audio and UI state

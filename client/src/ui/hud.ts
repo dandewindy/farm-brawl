@@ -1201,13 +1201,19 @@ export class HudManager {
     for (const [name, sp, dur] of hof) {
       const createHofRow = () => {
         const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'r';
+
         const n = document.createElement('span');
         n.className = 'n';
         n.textContent = `${emojis[sp] || ''} ${name}`;
+
         const v = document.createElement('span');
         v.className = 'v';
         v.textContent = this.fmtTime(dur);
-        li.append(n, v);
+
+        row.append(n, v);
+        li.appendChild(row);
         return li;
       };
 

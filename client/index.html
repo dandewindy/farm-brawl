@@ -62,26 +62,26 @@
         <ol id="hofList"></ol>
       </div>
     </aside>
-    <!-- Burger Menu Button for Touch / Mobile / iPad -->
-    <button id="burgerBtn" type="button" aria-label="Menu" title="Bảng xếp hạng & Cài đặt">
-      <span class="burger-icon">☰</span>
-    </button>
     <div id="gameControls">
       <button id="fsBtn" type="button" title="Toàn màn hình">
         <span class="fs-icon-enter">⛶</span>
         <span class="fs-icon-exit" style="display:none;">⤢</span>
       </button>
-      <button id="muteInGame" type="button" title="Âm thanh (Bật/Tắt)">🔊</button>
+      <button id="muteInGame" type="button" title="Âm thanh">🔊</button>
+      <!-- Burger Menu Button for Touch / Mobile / iPad -->
+      <button id="burgerBtn" type="button" aria-label="Menu" title="Bảng xếp hạng & Cài đặt">
+        <span class="burger-icon">☰</span>
+      </button>
       <button id="pcSettingsBtn" type="button" title="Cài đặt giao diện">⚙️</button>
       <div id="pcSettingsMenu" class="pc-settings-dropdown panel" hidden>
         <div class="settings-title">CÀI ĐẶT GIAO DIỆN</div>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleBoard" checked>
-          <span>Bảng Điều Răn</span>
+          <span>Điều Răn</span>
         </label>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleStats" checked>
-          <span>Bảng chỉ số (Kg, Hạng)</span>
+          <span>Chỉ số (Kg, Hạng)</span>
         </label>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleLb" checked>
@@ -93,22 +93,21 @@
     <div id="gameDrawerModal" class="drawer-modal" hidden>
       <div class="drawer-backdrop" id="drawerBackdrop"></div>
       <div class="drawer-content panel">
-        <div class="drawer-header">
-          <h3>BẢNG XẾP HẠNG & CÀI ĐẶT</h3>
+        <div class="drawer-top-bar">
+          <div class="drawer-actions">
+            <button id="drawerBoardToggle" type="button" class="drawer-btn"><span class="lbl">Điều Răn: BẬT</span></button>
+            <button id="drawerStatsToggle" type="button" class="drawer-btn"><span class="lbl">Chỉ số: BẬT</span></button>
+          </div>
           <button id="drawerCloseBtn" type="button" class="drawer-close" title="Đóng">✕</button>
         </div>
-        <div class="drawer-actions">
-          <button id="drawerAudioBtn" type="button" class="drawer-btn"><span class="ico">🔊</span> <span class="lbl">Âm thanh: Bật tất cả</span></button>
-          <button id="drawerBoardToggle" type="button" class="drawer-btn"><span class="ico">📜</span> <span class="lbl">Bảng Điều Răn: BẬT</span></button>
-          <button id="drawerStatsToggle" type="button" class="drawer-btn"><span class="ico">📊</span> <span class="lbl">Bảng chỉ số: BẬT</span></button>
-          <button id="drawerFsBtn" type="button" class="drawer-btn"><span class="ico">⛶</span> <span class="lbl">Toàn màn hình</span></button>
-        </div>
-        <div class="drawer-lb-wrap">
-          <h4 data-i18n="lbTitle">Bảng xếp hạng</h4>
-          <ol id="drawerLbList" class="drawer-list"></ol>
-          <div id="drawerHof" class="drawer-hof">
-            <h4 class="gold" data-i18n="hofTitle">Kỷ lục của trại</h4>
-            <ol id="drawerHofList" class="drawer-list"></ol>
+        <div class="drawer-cols">
+          <div class="drawer-col">
+            <h4 data-i18n="lbTitle">XẾP HẠNG</h4>
+            <ol id="drawerLbList" class="drawer-list"></ol>
+          </div>
+          <div class="drawer-col">
+            <h4 class="gold" data-i18n="hofTitle">KỶ LỤC CỦA TRẠI</h4>
+            <ol id="drawerHofList" class="drawer-list drawer-hof-list"></ol>
           </div>
         </div>
       </div>

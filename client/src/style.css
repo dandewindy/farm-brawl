@@ -366,37 +366,7 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 /* Burger Menu Button (Mobile & iPad) */
 #burgerBtn {
   display: none;
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  background: rgba(31, 26, 23, 0.85);
   color: var(--gold);
-  font-size: 24px;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  z-index: 25;
-  pointer-events: auto;
-  touch-action: manipulation;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.1s, background 0.15s;
-}
-#burgerBtn:active {
-  transform: scale(0.92);
-  background: rgba(15, 12, 10, 0.95);
-}
-body.touch #burgerBtn {
-  display: flex;
-}
-@media (max-width: 1024px) {
-  #burgerBtn {
-    display: flex;
-  }
 }
 
 /* PC Settings Dropdown */
@@ -441,7 +411,39 @@ body.touch #burgerBtn {
   accent-color: var(--gold);
 }
 
-/* Game Drawer Modal for Mobile & iPad */
+/* Quick 1s notification for Audio Mode changes */
+.audio-toast {
+  position: fixed;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px) scale(0.96);
+  padding: 6px 16px;
+  background: rgba(22, 17, 14, 0.94);
+  border: 1.5px solid var(--gold);
+  border-radius: 18px;
+  color: var(--paper);
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.audio-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.audio-toast.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-4px) scale(0.98);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* Game Drawer Modal for Mobile & iPad (Streamlined 2-Column Scoreboard) */
 .drawer-modal {
   position: fixed;
   inset: 0;
@@ -463,109 +465,112 @@ body.touch #burgerBtn {
 }
 .drawer-content {
   position: relative;
-  width: min(92vw, 420px);
-  max-height: min(90vh, 600px);
-  background: rgba(31, 26, 23, 0.95);
+  width: min(94vw, 560px);
+  max-height: min(90vh, 520px);
+  background: rgba(27, 22, 19, 0.96);
   border: 2px solid #5a452a;
-  border-radius: 16px;
-  box-shadow: 0 12px 36px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.15);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: drawerPop 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  animation: drawerPop 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 @keyframes drawerPop {
-  from { opacity: 0; transform: scale(0.92); }
+  from { opacity: 0; transform: scale(0.94); }
   to { opacity: 1; transform: scale(1); }
 }
-.drawer-header {
+.drawer-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  background: rgba(20, 16, 14, 0.5);
+  padding: 8px 12px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 14, 12, 0.6);
+  gap: 10px;
 }
-.drawer-header h3 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--gold);
+.drawer-actions {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+.drawer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(232, 182, 65, 0.4);
+  background: rgba(45, 36, 30, 0.85);
+  color: var(--paper);
+  font-family: var(--f-body);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
+}
+.drawer-btn.off {
+  background: rgba(28, 22, 18, 0.75);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #9e8e7c;
+}
+.drawer-btn:active {
+  transform: scale(0.96);
 }
 .drawer-close {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.08);
   color: var(--paper);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 .drawer-close:active {
   background: rgba(255, 255, 255, 0.2);
 }
-.drawer-actions {
+.drawer-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 10px 14px;
-  background: rgba(20, 16, 14, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.drawer-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  background: rgba(50, 40, 34, 0.85);
-  color: var(--paper);
-  font-family: var(--f-body);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  touch-action: manipulation;
-}
-.drawer-btn:active {
-  background: rgba(80, 64, 52, 0.95);
-  border-color: var(--gold);
-}
-.drawer-btn .ico {
-  font-size: 15px;
-}
-.drawer-lb-wrap {
-  padding: 12px 16px 16px;
+  gap: 12px;
+  padding: 10px 14px 14px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1;
 }
-.drawer-lb-wrap h4 {
+.drawer-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.drawer-col h4 {
   margin: 0 0 6px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #b9a98a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 3px;
 }
-.drawer-lb-wrap h4.gold {
+.drawer-col h4.gold {
   color: var(--gold);
+  border-bottom-color: rgba(232, 182, 65, 0.25);
 }
 .drawer-list {
-  margin: 0 0 10px;
-  padding: 0 0 0 18px;
-  font-size: 13px;
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 11px;
 }
 .drawer-list li {
-  padding: 3px 6px;
-  border-radius: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
   margin-bottom: 2px;
 }
 .drawer-list li.me {
@@ -578,25 +583,33 @@ body.touch #burgerBtn {
 }
 .drawer-list .r {
   display: flex;
+  align-items: center;
+  width: 100%;
   gap: 8px;
 }
 .drawer-list .n {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .drawer-list .k {
   color: #ff9b7a;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 .drawer-list .v {
   color: #d8c9a8;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 10px;
+  font-variant-numeric: tabular-nums;
 }
-.drawer-hof {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+.drawer-hof-list .v {
+  color: var(--gold);
 }
 
 #lb { position: absolute; right: 12px; top: 12px; width: 220px; padding: 8px 10px; pointer-events: auto; }
@@ -724,14 +737,14 @@ body.touch #dashBtn {
 }
 body.touch #mapWrap {
   position: absolute;
-  top: 60px;
-  right: 12px;
+  top: 50px;
+  right: 10px;
   bottom: auto;
   align-items: flex-end;
 }
 body.touch #minimap {
-  width: 80px;
-  height: 80px;
+  width: 76px;
+  height: 76px;
 }
 body.touch #podiumTimerBadge {
   font-size: 10px;
@@ -741,14 +754,76 @@ body.touch #podiumTimerBadge {
 body.touch #lb {
   display: none !important;
 }
-body.touch #gameControls {
-  display: none !important;
+
+#gameControls {
+  position: absolute;
+  top: 10px;
+  right: 242px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 25;
+  pointer-events: auto;
+}
+#gameControls button {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255,255,255,.35);
+  background: rgba(31,26,23,.85);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  touch-action: manipulation;
+  transition: transform .1s, background .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#gameControls button:hover {
+  background: rgba(50,42,37,.95);
+  transform: scale(1.05);
+}
+#gameControls button:active {
+  background: rgba(20,16,14,.98);
+  transform: scale(0.95);
 }
 
-#gameControls { position: absolute; top: 12px; right: 242px; display: flex; gap: 6px; z-index: 8; pointer-events: auto; }
-#gameControls button { width: 38px; height: 38px; border-radius: 8px; border: 2px solid rgba(255,255,255,.35); background: rgba(31,26,23,.75); color: #fff; font-size: 16px; cursor: pointer; backdrop-filter: blur(4px); display: grid; place-items: center; touch-action: manipulation; transition: transform .1s, background .15s; }
-#gameControls button:hover { background: rgba(50,42,37,.9); transform: scale(1.05); }
-#gameControls button:active { background: rgba(20,16,14,.95); transform: scale(0.95); }
+/* PC default: Burger hidden, settings button shown */
+#burgerBtn { display: none; }
+#pcSettingsBtn { display: grid; }
+
+/* Mobile & Touch: Burger shown, settings button hidden, gameControls placed at top-right */
+body.touch #gameControls {
+  top: 8px;
+  right: 10px;
+  gap: 5px;
+}
+body.touch #gameControls button {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+body.touch #burgerBtn { display: grid !important; }
+body.touch #pcSettingsBtn { display: none !important; }
+body.touch #lb { display: none !important; }
+
+@media (max-width: 1024px) {
+  #gameControls {
+    top: 8px;
+    right: 10px;
+    gap: 5px;
+  }
+  #gameControls button {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  #burgerBtn { display: grid !important; }
+  #pcSettingsBtn { display: none !important; }
+  #lb { display: none !important; }
+}
 
 #floats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
 .float {
@@ -829,63 +904,76 @@ body.touch #gameControls {
 
 #board {
   position: absolute;
-  top: 10px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 260px;
-  max-width: min(520px, 60vw);
-  padding: 4px 18px 6px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  min-height: unset;
+  max-width: min(540px, calc(100vw - 240px));
+  padding: 2px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
-  border-radius: 4px;
+  border-radius: 6px;
+  z-index: 7;
   transition: top 0.25s ease;
 }
 #teamBar:not([hidden]) ~ #hud #board,
 body.mode-team #board {
-  top: 62px;
+  top: 42px;
 }
 #board .eyebrow {
-  display: block;
+  display: inline-block;
   color: var(--red-hi);
   font-family: var(--f-display);
   font-weight: 800;
-  font-size: 11px;
-  letter-spacing: .25em;
+  font-size: 10px;
+  letter-spacing: .15em;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 #board .paint {
   position: relative;
-  display: inline-block;
-  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 #ruleName {
   display: inline-block;
   font-family: var(--f-display);
   font-weight: 800;
-  font-size: 21px;
-  line-height: 1.1;
+  font-size: 13px;
+  line-height: 1;
   color: var(--paper);
-  text-shadow: 0 2px 0 rgba(0,0,0,.7);
-  letter-spacing: .03em;
+  text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  letter-spacing: .02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 #board small {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  color: #b9b09b;
-  line-height: 1.2;
-  margin-top: 2px;
+  display: none !important;
 }
 #reign {
   display: inline-block;
-  margin-top: 4px;
-  padding: 1px 10px;
+  margin-top: 0;
+  padding: 1px 6px;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 11px;
   background: var(--red);
   border-radius: 4px;
   color: #fff;
   letter-spacing: .02em;
+  flex-shrink: 0;
 }
 
 body.menu #hud { display: none; }
@@ -910,57 +998,55 @@ body.menu #hud { display: none; }
   #netPerf { font-size: 10px; gap: 4px; margin-top: 2px; }
   #netPerf b { font-size: 10px; }
 
-  /* Mobile: Hide desktop floating gameControls and LB (moved into burger drawer) */
+  /* Mobile: Game controls at top-right (Fullscreen, Sound, Burger) */
   #gameControls {
-    display: none !important;
-  }
-  #lb {
-    display: none !important;
-  }
-
-  /* Top-right: Burger Menu button */
-  #burgerBtn {
-    display: flex;
+    display: flex !important;
     top: 8px;
     right: 8px;
-    width: 40px;
-    height: 40px;
-    font-size: 20px;
+    gap: 5px;
+    z-index: 25;
   }
+  #gameControls button {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  #burgerBtn { display: grid !important; }
+  #pcSettingsBtn { display: none !important; }
+  #lb { display: none !important; }
 
-  /* Sub-top: Rule / Commandment board */
+  /* Sub-top: Rule / Commandment board (compact 1 row) */
   #board {
-    top: 48px;
+    top: 8px;
     left: 50%;
     transform: translateX(-50%);
-    width: auto;
-    max-width: min(240px, 68vw);
+    height: 26px;
+    max-width: min(260px, calc(100vw - 220px));
     min-width: 0;
-    padding: 2px 10px;
+    padding: 2px 8px;
+    gap: 4px;
   }
   #board .eyebrow {
     font-size: 8px;
-    letter-spacing: .12em;
+    letter-spacing: .1em;
   }
   #board .paint { margin-top: 0; }
   #ruleName {
-    font-size: 12px;
-    line-height: 1.1;
+    font-size: 11px;
+    line-height: 1;
   }
   #board small {
-    font-size: 9px;
-    line-height: 1.1;
-    margin-top: 1px;
+    display: none !important;
   }
   #reign {
-    font-size: 10px;
-    padding: 1px 6px;
-    margin-top: 2px;
+    font-size: 9px;
+    padding: 1px 4px;
+    margin-top: 0;
   }
 
-  /* Right-side: Minimap safely below burger button */
+  /* Right-side: Minimap safely below game controls */
   #mapWrap {
-    top: 54px;
+    top: 50px;
     right: 8px;
     bottom: auto;
     align-items: flex-end;
@@ -1029,31 +1115,42 @@ body.menu #hud { display: none; }
 
 @media (min-width: 769px) and (max-width: 1100px) {
   #lb { width: 170px; font-size: 12px; }
-  #board { max-width: 300px; }
+  #board {
+    top: 8px;
+    height: 28px;
+    max-width: min(360px, calc(100vw - 260px));
+  }
   #gameControls { right: 190px; }
   #dashBtn { right: 24px; bottom: 24px; width: 86px; height: 86px; }
 
   body.touch #lb { display: none !important; }
-  body.touch #burgerBtn { display: flex; top: 10px; right: 12px; }
-  body.touch #gameControls { display: none !important; }
-  body.touch #mapWrap { top: 62px; right: 12px; bottom: auto; }
+  body.touch #gameControls {
+    display: flex !important;
+    top: 8px;
+    right: 10px;
+    gap: 6px;
+  }
+  body.touch #burgerBtn { display: grid !important; }
+  body.touch #pcSettingsBtn { display: none !important; }
+  body.touch #mapWrap { top: 52px; right: 10px; bottom: auto; }
   body.touch #minimap { width: 84px; height: 84px; }
 }
 
-/* Portrait orientation layout adjustments */
+/* Portrait orientation layout adjustments (Mobile & iPad) */
 @media (orientation: portrait) {
   #board {
-    top: 52px;
-    max-width: min(240px, 64vw);
+    top: 48px;
+    max-width: min(300px, 86vw);
+    height: 26px;
   }
   #mapWrap {
-    top: 54px;
+    top: 78px;
     right: 8px;
     bottom: auto;
   }
   #minimap {
-    width: 70px;
-    height: 70px;
+    width: 72px;
+    height: 72px;
   }
   #dashBtn {
     right: 18px;
