@@ -39,11 +39,12 @@ export const FLAG = {
   PITCHFORK: 256,
   DYNAMITE: 512,
   TRAITOR: 1024,
+  SQUISHED: 2048,
   SUPER: 32768,
   FLYING: 65536,
 } as const;
 
-export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve';
+export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till';
 
 export type ToolKind = 'pitchfork' | 'dynamite' | 'song';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];

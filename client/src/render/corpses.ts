@@ -59,8 +59,12 @@ export class CorpseRenderer {
     const { group } = buildCorpseAnimal(meta.species, meta.skin, isKing, meta.team);
 
     const sc = radiusOf(ev.mass) * 1.35;
-    group.position.set(ev.x, 0, ev.z);
-    group.scale.setScalar(sc);
+    group.position.set(ev.x, ev.cause === 'till' ? 0.04 : 0, ev.z);
+    if (ev.cause === 'till') {
+      group.scale.set(sc * 1.55, sc * 0.08, sc * 1.55);
+    } else {
+      group.scale.setScalar(sc);
+    }
 
     const cause = ev.cause;
     let target: [number, number] | null = null;
@@ -171,6 +175,20 @@ export class CorpseRenderer {
         g.visible = Math.floor(now / 90) % 2 === 0;
         if (a > 1.2) {
           g.scale.setScalar(c.sc * Math.max(0.01, 1 - (a - 1.2) / 0.4));
+        }
+        done = a > 1.6;
+      } else if (c.cause === 'till') {
+        // Run over by Farmer Till's tractor: squished pancake flat on ground
+        g.position.set(c.x, 0.04, c.z);
+        if (a < 0.35 && c.fx <= 0) {
+          c.fx = 0.08;
+          parts?.puff(c.x + rand(-0.5, 0.5), 0.1, c.z + rand(-0.5, 0.5), 0x795548, 1.1, 0.7, 1.5);
+        }
+        if (a > 1.2) {
+          const fade = Math.max(0.01, 1 - (a - 1.2) / 0.4);
+          g.scale.set(c.sc * 1.55 * fade, c.sc * 0.08 * fade, c.sc * 1.55 * fade);
+        } else {
+          g.scale.set(c.sc * 1.55, c.sc * 0.08, c.sc * 1.55);
         }
         done = a > 1.6;
       } else {

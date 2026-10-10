@@ -48,6 +48,7 @@ export interface Player extends Body {
   superT: number;
   flyT: number;
   lastEatT: number;
+  squishT: number;
   team?: number;
   ai: BotBrain | null;
 }
@@ -146,7 +147,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -198,7 +199,7 @@ export class World {
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(CFG.START_MASS, p.best || 0), btnLatch: false, inWaterT: 0,
-      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time,
+      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -477,6 +478,7 @@ export class World {
       if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
       if (p.superT > 0) p.superT = Math.max(0, p.superT - DT);
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
+      if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
 
       const pr = radiusOf(p.mass) + 1.2;
       for (const t of this.tools.values()) {
@@ -673,61 +675,129 @@ export class World {
       }
     }
 
-    // Rule: "till" (Farmer Till returns in his tractor, sweeps across the farm)
+    // Rule: "till" (Farmer Till returns in his giant tractor, circling & actively chasing animals)
     if (this.currentRule === 'till') {
       if (!this.tillTruck.active) {
         this.tillTruck.timer -= DT;
         if (this.tillTruck.timer <= 0) {
-          // Spawn tractor at perimeter R = 52
+          // Spawn tractor at perimeter R = 54 facing inward
           const enterA = this.rnd() * Math.PI * 2;
-          const sx = Math.cos(enterA) * 52;
-          const sz = Math.sin(enterA) * 52;
-          const aimA = enterA + Math.PI + (this.rnd() - 0.5) * 0.5;
-          const speed = 25;
+          const sx = Math.cos(enterA) * 54;
+          const sz = Math.sin(enterA) * 54;
+          const aimA = enterA + Math.PI;
+          const speed = 18;
           this.tillTruck.active = true;
           this.tillTruck.x = sx;
           this.tillTruck.z = sz;
           this.tillTruck.vx = Math.cos(aimA) * speed;
           this.tillTruck.vz = Math.sin(aimA) * speed;
           this.tillTruck.angle = aimA;
-          this.events.push({ k: 'boom', id: 0, x: sx, z: sz });
+          this.events.push({ k: 'boom', id: 0, x: r2(sx), z: r2(sz) });
         }
       } else {
-        this.tillTruck.x += this.tillTruck.vx * DT;
-        this.tillTruck.z += this.tillTruck.vz * DT;
         const tx = this.tillTruck.x;
         const tz = this.tillTruck.z;
+        const distFromCenter = Math.hypot(tx, tz);
+
+        // Desired angle calculation: perimeter avoidance + animal hunting
+        let desiredAngle = this.tillTruck.angle;
+        if (distFromCenter > 48) {
+          // Near the outer electric fence: steer strongly back toward center
+          desiredAngle = Math.atan2(-tz, -tx);
+        } else {
+          // Actively hunt and chase nearest living animal
+          let bestDist = Infinity;
+          let targetP: Player | null = null;
+          for (const p of alive) {
+            const d = Math.hypot(p.x - tx, p.z - tz);
+            if (d < bestDist) {
+              bestDist = d;
+              targetP = p;
+            }
+          }
+          if (targetP) {
+            desiredAngle = Math.atan2(targetP.z - tz, targetP.x - tx);
+          } else {
+            // Idle circle: curve smoothly around the center
+            desiredAngle = this.tillTruck.angle + 0.4 * DT;
+          }
+        }
+
+        // Smooth steering with realistic turn rate limit
+        let diff = desiredAngle - this.tillTruck.angle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const maxTurn = 2.4 * DT;
+        const turn = Math.max(-maxTurn, Math.min(maxTurn, diff));
+        this.tillTruck.angle += turn;
+
+        const speed = 19;
+        this.tillTruck.vx = Math.cos(this.tillTruck.angle) * speed;
+        this.tillTruck.vz = Math.sin(this.tillTruck.angle) * speed;
+        this.tillTruck.x += this.tillTruck.vx * DT;
+        this.tillTruck.z += this.tillTruck.vz * DT;
+
         const cosA = Math.cos(-this.tillTruck.angle);
         const sinA = Math.sin(-this.tillTruck.angle);
 
         // Check ram collision with every alive player
         for (const p of alive) {
-          const dx = p.x - tx;
-          const dz = p.z - tz;
+          const dx = p.x - this.tillTruck.x;
+          const dz = p.z - this.tillTruck.z;
           const rx = dx * cosA - dz * sinA;
           const rz = dx * sinA + dz * cosA;
           const pr = radiusOf(p.mass);
-          // Collision box: length 4.6 (rx: -2.3 to +2.3), width 2.8 (rz: -1.4 to +1.4)
-          if (Math.abs(rx) < 2.3 + pr && Math.abs(rz) < 1.4 + pr) {
-            // Massive tractor ram!
-            p.vx = Math.cos(this.tillTruck.angle) * 32;
-            p.vz = Math.sin(this.tillTruck.angle) * 32;
-            const loss = Math.min(18, Math.max(6, p.mass * 0.22));
-            p.mass = Math.max(CFG.MIN_MASS, p.mass - loss);
-            p.stunT = 1.5;
-            this.events.push({ k: 'hit', a: 0, v: p.id, x: p.x, z: p.z, s: 30, loss });
-          }
-        }
+          // Collision box matching giant 2.4x model: front cutter blades (7.0) to rear cab/tires (-4.2)
+          if (rx >= -4.2 - pr && rx <= 7.0 + pr && Math.abs(rz) <= 3.3 + pr) {
+            if (p.squishT <= 1.8) {
+              p.squishT = 2.8; // Squished flat pancake!
+              p.stunT = 2.0;   // Stunned
+              p.charging = false;
+              p.dashT = 0;
+              p.plow = false;
 
-        // Check if tractor reached opposite perimeter
-        if (Math.hypot(tx, tz) > 56) {
-          this.tillTruck.active = false;
-          this.tillTruck.timer = 3.5; // Next sweep in 3.5 seconds
+              // Knockback impulse flung forward along tractor heading
+              const hitA = this.tillTruck.angle;
+              p.vx = Math.cos(hitA) * 34 + (this.rnd() - 0.5) * 6;
+              p.vz = Math.sin(hitA) * 34 + (this.rnd() - 0.5) * 6;
+
+              const loss = Math.min(24, Math.max(8, p.mass * 0.28));
+              this.scatter(p.x, p.z, loss, radiusOf(p.mass) + 0.8, Math.cos(hitA), Math.sin(hitA));
+
+              if (p.mass - loss < CFG.MIN_MASS) {
+                this.kill(p, 'till');
+              } else {
+                p.mass -= loss;
+                this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 34, loss });
+              }
+            }
+          }
         }
       }
     } else {
-      this.tillTruck.active = false;
-      this.tillTruck.timer = 2.0;
+      // Rule ended: if tractor was active, steer towards edge and leave farm
+      if (this.tillTruck.active) {
+        const tx = this.tillTruck.x;
+        const tz = this.tillTruck.z;
+        const exitA = Math.atan2(tz, tx);
+        let diff = exitA - this.tillTruck.angle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.tillTruck.angle += Math.max(-2.4 * DT, Math.min(2.4 * DT, diff));
+        const speed = 22;
+        this.tillTruck.vx = Math.cos(this.tillTruck.angle) * speed;
+        this.tillTruck.vz = Math.sin(this.tillTruck.angle) * speed;
+        this.tillTruck.x += this.tillTruck.vx * DT;
+        this.tillTruck.z += this.tillTruck.vz * DT;
+
+        if (Math.hypot(this.tillTruck.x, this.tillTruck.z) > 66) {
+          this.tillTruck.active = false;
+          this.tillTruck.timer = 1.0;
+        }
+      } else {
+        this.tillTruck.active = false;
+        this.tillTruck.timer = 1.0;
+      }
     }
 
     // King periodic reign harvest bonus (every 3 seconds)
@@ -1229,6 +1299,7 @@ export class World {
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)
         | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0)
+        | (o.squishT > 0 ? FLAG.SQUISHED : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
         | (o.flyT > 0 ? FLAG.FLYING : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);

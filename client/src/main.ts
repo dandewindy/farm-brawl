@@ -400,6 +400,10 @@ function handleGameEvent(ev: GameEvent): void {
         sfxBurn(isMine ? 1 : 0.5);
       } else if (ev.cause === 'starve') {
         foodParts.puff(ev.x, 0.4, ev.z, 0xaaaaaa, 0.8, 1.0, 1.2);
+      } else if (ev.cause === 'till') {
+        foodParts.burst(ev.x, 0.4, ev.z, 0x795548, 22, 6, 6, 0.4);
+        foodParts.puff(ev.x, 0.3, ev.z, 0x5d4037, 1.2, 1.0, 1.8);
+        sfxZap(isMine ? 0.7 : 0.35);
       } else {
         foodParts.burst(ev.x, 1.6, ev.z, 0xfff35c, 18, 10, 9, 0.5);
         sfxZap(isMine ? 1 : 0.5);
@@ -897,7 +901,7 @@ function animate(now: number): void {
       : 0xffc928;
     world.updatePodiumRing(capProg, capContested, now, capColor);
     world.updatePodiumShield(gameState.podShield[0], gameState.podShield[1], now);
-    world.updateTillTruck(gameState.truck);
+    world.updateTillTruck(gameState.truck, now, foodParts);
 
   // Update player ground cooldown arc indicator
   if (me && gameState.alive) {

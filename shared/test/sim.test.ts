@@ -3,6 +3,7 @@ import { CFG, DT, TRAITS, radiusOf } from '../src/constants';
 import { generateMap } from '../src/map';
 import { blobOutline, insideBlob, type Blob } from '../src/math';
 import { dashParams, outsideFence, stepMove } from '../src/physics';
+import { FLAG } from '../src/protocol';
 import { World, type Player } from '../src/sim/world';
 
 /** a world with no bots and no food, so tests control everything */
@@ -643,6 +644,58 @@ describe('bonus weapons and tools', () => {
     expect(p.vx).toBeGreaterThan(15);
     expect(w.podiumShield).toBe(true);
     expect(w.podiumPhaseTimer).toBeCloseTo(30, 0);
+  });
+
+  it('Farmer Till rule spawns tractor that chases animals, squishes them flat and can kill with cause till', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('TargetAnimal', 'cow');
+    const p = place(w, pid, 10, 0, 40);
+
+    w.applyRule('till');
+    expect(w.currentRule).toBe('till');
+    expect(w.tillTruck.timer).toBe(1.0);
+
+    // Step until tractor spawns
+    for (let i = 0; i < 70; i++) {
+      w.step();
+    }
+    expect(w.tillTruck.active).toBe(true);
+
+    // Tractor steers towards animal at (10, 0)
+    // Place tractor directly approaching the animal to test collision
+    w.tillTruck.x = 6.0;
+    w.tillTruck.z = 0;
+    w.tillTruck.angle = 0; // heading +X straight at animal
+    w.tillTruck.vx = 19;
+    w.tillTruck.vz = 0;
+
+    w.step();
+
+    // Animal is squished flat, stunned, and knocked back
+    expect(p.squishT).toBeGreaterThan(2.0);
+    expect(p.stunT).toBeGreaterThan(1.5);
+    expect(p.vx).toBeGreaterThan(20);
+
+    const snap = w.snapshotFor(pid);
+    const pWire = snap.p.find(([id]) => id === pid);
+    expect(pWire).toBeDefined();
+    // Flags contain SQUISHED and STUN
+    expect((pWire![5] & FLAG.SQUISHED)).not.toBe(0);
+    expect((pWire![5] & FLAG.STUN)).not.toBe(0);
+
+    // Test lethal run-over when mass is low
+    const lowId = w.addPlayer('LowMassVictim', 'chicken');
+    const lowP = place(w, lowId, 15, 0, 11); // 11kg mass (near min mass 10kg)
+    w.tillTruck.x = 12.0;
+    w.tillTruck.z = 0;
+    w.tillTruck.angle = 0;
+    w.step();
+
+    // Player dies from till
+    expect(lowP.alive).toBe(false);
+    const dieEv = w.snapshotFor(lowId).ev.find((e) => e.k === 'die' && e.id === lowId);
+    expect(dieEv).toBeDefined();
+    expect((dieEv as any).cause).toBe('till');
   });
 });
 

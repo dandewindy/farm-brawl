@@ -29,6 +29,7 @@ interface AnimalVisual {
   shockwaveTimer?: number;
   rainbowTimer?: number;
   waterT?: number;
+  squishFactor?: number;
 }
 
 function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
@@ -866,7 +867,14 @@ export class AnimalRenderer {
     const isDrowning = (flags & 64) !== 0;
     const isSuper = (flags & FLAG.SUPER) !== 0;
     const isFlying = (flags & FLAG.FLYING) !== 0;
+    const isSquished = (flags & FLAG.SQUISHED) !== 0;
     const lvl = (charge || 0) / 10;
+
+    // Smooth squish factor transition: fast flatten on impact (dt * 16), gentle cartoon pop back up (dt * 5)
+    vis.squishFactor = isSquished
+      ? Math.min(1, (vis.squishFactor || 0) + dt * 16)
+      : Math.max(0, (vis.squishFactor || 0) - dt * 5);
+    const sq = vis.squishFactor || 0;
 
     setRainbow(vis, isSuper, now);
 
@@ -923,11 +931,14 @@ export class AnimalRenderer {
     // Body hopping & positioning
     let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r);
     if (isFlying) bodyY += 1.1 * r;
+    if (sq > 0) bodyY = (y + 0.05) * sq + bodyY * (1 - sq);
     vis.root.position.set(x, bodyY, z);
-    vis.root.rotation.y = -angle + (isStunned ? Math.sin(now / 50) * 0.5 : 0);
+    vis.root.rotation.y = -angle + (isStunned && sq <= 0.4 ? Math.sin(now / 50) * 0.5 : 0);
 
     // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water, dazed sway when stunned
-    vis.root.rotation.z = isStunned
+    vis.root.rotation.z = sq > 0.4
+      ? Math.sin(now / 120) * 0.05
+      : isStunned
       ? Math.sin(now / 90) * 0.15
       : isFlying
       ? -0.5
@@ -943,7 +954,7 @@ export class AnimalRenderer {
       ? 0.15 + lvl * 0.15
       : 0;
 
-    if (isDrowning) {
+    if (isDrowning && sq <= 0.4) {
       // Gentle side-to-side flailing
       vis.root.rotation.x = Math.sin(now / 200) * 0.2;
     }
@@ -956,14 +967,21 @@ export class AnimalRenderer {
 
     // Squash & stretch & water shrinking
     const squash = isCharging ? 1 - 0.18 * lvl : 1;
-    vis.root.scale.set(
-      sc * inWaterShrink * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl),
-      sc * inWaterShrink * (isDashing ? 0.9 : squash),
-      sc * inWaterShrink
-    );
+    let baseSx = sc * inWaterShrink * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl);
+    let baseSy = sc * inWaterShrink * (isDashing ? 0.9 : squash);
+    let baseSz = sc * inWaterShrink;
+
+    if (sq > 0) {
+      // Flattened like a pancake by Farmer Till's tractor!
+      baseSx *= 1 + 0.55 * sq;
+      baseSy *= 1 - 0.90 * sq;
+      baseSz *= 1 + 0.55 * sq;
+    }
+
+    vis.root.scale.set(baseSx, baseSy, baseSz);
 
     // Hit knockback tumble (seen in original game when rammed)
-    if (vis.hitT && now - vis.hitT < 450) {
+    if (vis.hitT && now - vis.hitT < 450 && sq <= 0.4) {
       const hk = Math.sin(((now - vis.hitT) / 450) * Math.PI);
       vis.root.rotation.x = hk * 0.9 * (id % 2 ? 1 : -1);
       vis.root.scale.y *= 1 - 0.3 * hk;
@@ -976,7 +994,11 @@ export class AnimalRenderer {
     // Dynamic leg swinging with amplitude 0.7
     vis.legs.forEach((leg, idx) => {
       const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
-      if (isDrowning || (isWater && vis.species !== 'duck')) {
+      if (sq > 0.4) {
+        // Flattened pancake: legs splayed flat horizontally to the sides
+        leg.rotation.z = (Math.PI / 2.2) * (idx % 2 === 0 ? 1 : -1);
+        leg.rotation.x = 0;
+      } else if (isDrowning || (isWater && vis.species !== 'duck')) {
         // Slow paddling motion, slowing as it sinks deeper
         const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
         leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
@@ -991,7 +1013,7 @@ export class AnimalRenderer {
     });
 
     // Stunned spinning stars above head
-    if (isStunned) {
+    if (isStunned || sq > 0.2) {
       if (!vis.stars) {
         vis.stars = new THREE.Group();
         const starGeo = new THREE.OctahedronGeometry(0.22, 0);
@@ -1004,7 +1026,8 @@ export class AnimalRenderer {
         this.scene.add(vis.stars);
       }
       vis.stars.visible = true;
-      vis.stars.position.set(x, y + sc * 2.3, z);
+      const starY = sq > 0.3 ? y + 0.45 : y + sc * 2.3;
+      vis.stars.position.set(x, starY, z);
       vis.stars.rotation.y = now / 150;
     } else if (vis.stars) {
       vis.stars.visible = false;
@@ -1104,7 +1127,8 @@ export class AnimalRenderer {
       if (!isHiddenInWater) {
         const lh = 1.3 + r * 0.25;
         const labelY = (LABEL_Y[vis.species] || 2.1) + 0.6;
-        vis.label.position.set(x, y + labelY * sc * inWaterShrink, z);
+        const targetLabelY = sq > 0.3 ? y + 0.65 : y + labelY * sc * inWaterShrink;
+        vis.label.position.set(x, targetLabelY, z);
         vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
       }
     }
@@ -1112,7 +1136,7 @@ export class AnimalRenderer {
     // Ground indicator ring
     vis.ring.visible = !isWater;
     vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
-    vis.ring.scale.setScalar(r);
+    vis.ring.scale.setScalar(sq > 0.3 ? r * (1 + 0.45 * sq) : r);
     if (isSuper) {
       vis.ring.scale.setScalar(r * 1.25);
       vis.ringMat.color.setHSL((now / 500) % 1, 1, 0.6);

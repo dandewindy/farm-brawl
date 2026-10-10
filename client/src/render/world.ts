@@ -442,105 +442,199 @@ function createShieldTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function buildTractor(): THREE.Group {
-  const g = new THREE.Group();
-  const matBody = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 }); // Classic tractor green
-  const matYellow = new THREE.MeshStandardMaterial({ color: 0xfbc02d, roughness: 0.5 }); // Yellow rims/trim
-  const matDark = new THREE.MeshStandardMaterial({ color: 0x212121, roughness: 0.8 }); // Tires
-  const matGlass = new THREE.MeshStandardMaterial({ color: 0xb0bec5, roughness: 0.2, metalness: 0.8 });
-  const matChrome = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.8, roughness: 0.2 });
-  const matHat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 }); // Farmer hat
+interface TractorData {
+  group: THREE.Group;
+  wheels: THREE.Group[];
+  cutterDrum: THREE.Group;
+  exhaustPos: THREE.Vector3;
+}
 
-  // 1. Engine hood (front)
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 1.4), matBody);
-  hood.position.set(0.9, 1.1, 0);
+function buildTractor(): TractorData {
+  const g = new THREE.Group();
+  const S = 2.4; // 2.4x scale - giant combine harvester!
+
+  const matBody = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.55 }); // Classic farm tractor green
+  const matYellow = new THREE.MeshStandardMaterial({ color: 0xfbc02d, roughness: 0.45 }); // Farm yellow trim
+  const matDark = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.85 }); // Rubber tires / chassis
+  const matGlass = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.15, metalness: 0.85 }); // Tinted glass
+  const matChrome = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.85, roughness: 0.2 }); // Exhaust / trims
+  const matHat = new THREE.MeshStandardMaterial({ color: 0xd7ccc8, roughness: 0.9 }); // Farmer straw hat
+  const matBlade = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.15 }); // Cutter blades
+  const matHazard = new THREE.MeshStandardMaterial({ color: 0xffb300, roughness: 0.5 }); // Bumper hazard
+
+  // 1. Heavy Chassis (base frame)
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(3.6 * S, 0.4 * S, 1.6 * S), matDark);
+  chassis.position.set(0.1 * S, 0.5 * S, 0);
+  chassis.castShadow = true;
+  g.add(chassis);
+
+  // 2. Engine hood (front)
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.3 * S, 1.25 * S, 1.5 * S), matBody);
+  hood.position.set(0.95 * S, 1.15 * S, 0);
   hood.castShadow = true;
   g.add(hood);
 
-  // Radiator grille
-  const grill = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 1.2), matYellow);
-  grill.position.set(2.02, 1.1, 0);
-  g.add(grill);
+  // Radiator grille with yellow surround
+  const grillFrame = new THREE.Mesh(new THREE.BoxGeometry(0.12 * S, 1.05 * S, 1.35 * S), matYellow);
+  grillFrame.position.set(2.1 * S, 1.15 * S, 0);
+  g.add(grillFrame);
+  const grillCore = new THREE.Mesh(new THREE.BoxGeometry(0.14 * S, 0.9 * S, 1.15 * S), matDark);
+  grillCore.position.set(2.11 * S, 1.15 * S, 0);
+  g.add(grillCore);
 
-  // Headlights
-  for (const z of [-0.5, 0.5]) {
-    const light = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.15, 12), matChrome);
+  // Twin massive glowing headlights
+  for (const z of [-0.55 * S, 0.55 * S]) {
+    const light = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * S, 0.16 * S, 0.18 * S, 14), matChrome);
     light.rotation.z = Math.PI / 2;
-    light.position.set(2.0, 1.35, z);
+    light.position.set(2.1 * S, 1.4 * S, z);
     g.add(light);
-    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffeb3b }));
-    lens.position.set(2.08, 1.35, z);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.14 * S, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffea00 }));
+    lens.position.set(2.18 * S, 1.4 * S, z);
     g.add(lens);
   }
 
-  // Vertical exhaust pipe
-  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 8), matDark);
-  exhaust.position.set(1.4, 2.0, 0.55);
+  // Tall vertical smokestack exhaust pipe
+  const exhaustPos = new THREE.Vector3(1.35 * S, 2.85 * S, 0.65 * S);
+  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * S, 0.08 * S, 1.5 * S, 10), matChrome);
+  exhaust.position.set(1.35 * S, 2.1 * S, 0.65 * S);
   g.add(exhaust);
-  const exhaustCap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.05, 0.2, 8), matDark);
-  exhaustCap.position.set(1.4, 2.65, 0.55);
+  const exhaustCap = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.06 * S, 0.3 * S, 10), matDark);
+  exhaustCap.position.set(1.35 * S, 2.85 * S, 0.65 * S);
   g.add(exhaustCap);
 
-  // 2. Cabin / Cab (rear)
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.5), matBody);
-  cab.position.set(-0.8, 1.7, 0);
+  // 3. Cabin / Cab (rear)
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.65 * S, 1.7 * S, 1.55 * S), matBody);
+  cab.position.set(-0.85 * S, 1.8 * S, 0);
   cab.castShadow = true;
   g.add(cab);
 
-  // Cab roof
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 1.7), matYellow);
-  roof.position.set(-0.8, 2.55, 0);
+  // Cab yellow overhanging sun roof
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.9 * S, 0.18 * S, 1.8 * S), matYellow);
+  roof.position.set(-0.85 * S, 2.68 * S, 0);
   roof.castShadow = true;
   g.add(roof);
 
-  // Windshield & windows
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 1.3), matGlass);
-  windshield.position.set(0.02, 1.85, 0);
+  // Windshield & side windows
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.06 * S, 1.0 * S, 1.35 * S), matGlass);
+  windshield.position.set(-0.02 * S, 1.95 * S, 0);
   g.add(windshield);
-  for (const z of [-0.76, 0.76]) {
-    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.75, 0.05), matGlass);
-    sideWin.position.set(-0.7, 1.85, z);
+  for (const z of [-0.78 * S, 0.78 * S]) {
+    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(1.15 * S, 0.85 * S, 0.06 * S), matGlass);
+    sideWin.position.set(-0.75 * S, 1.95 * S, z);
     g.add(sideWin);
   }
 
-  // 3. Driver: Farmer Till!
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffcc80 }));
-  head.position.set(-0.7, 1.85, 0);
+  // 4. Driver: Farmer Till!
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26 * S, 14, 12), new THREE.MeshStandardMaterial({ color: 0xffcc80 }));
+  head.position.set(-0.75 * S, 1.95 * S, 0);
   g.add(head);
-  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 16), matHat);
-  hatBrim.position.set(-0.7, 2.05, 0);
+  // Farmer body / blue overalls
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.32 * S, 0.5 * S, 10), new THREE.MeshStandardMaterial({ color: 0x1565c0 }));
+  torso.position.set(-0.75 * S, 1.55 * S, 0);
+  g.add(torso);
+  // Wide straw hat
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.48 * S, 0.48 * S, 0.06 * S, 18), matHat);
+  hatBrim.position.set(-0.75 * S, 2.18 * S, 0);
   g.add(hatBrim);
-  const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.25, 16), matHat);
-  hatCrown.position.set(-0.7, 2.18, 0);
+  const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.32 * S, 0.28 * S, 16), matHat);
+  hatCrown.position.set(-0.75 * S, 2.32 * S, 0);
   g.add(hatCrown);
 
-  // 4. Big rear wheels
-  for (const z of [-1.0, 1.0]) {
-    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.45, 18), matDark);
+  // 5. Huge Rolling Wheels inside pivot groups
+  const wheels: THREE.Group[] = [];
+
+  // Rear massive drive wheels
+  for (const z of [-1.08 * S, 1.08 * S]) {
+    const wheelPivot = new THREE.Group();
+    wheelPivot.position.set(-0.8 * S, 0.95 * S, z);
+
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.95 * S, 0.95 * S, 0.52 * S, 22), matDark);
     tire.rotation.x = Math.PI / 2;
-    tire.position.set(-0.75, 0.85, z);
     tire.castShadow = true;
-    g.add(tire);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.48, 12), matYellow);
+    wheelPivot.add(tire);
+
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.56 * S, 0.56 * S, 0.55 * S, 14), matYellow);
     rim.rotation.x = Math.PI / 2;
-    rim.position.set(-0.75, 0.85, z);
-    g.add(rim);
+    wheelPivot.add(rim);
+
+    // Tread ridges on big tires
+    for (let t = 0; t < 12; t++) {
+      const ta = (t / 12) * Math.PI * 2;
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.12 * S, 0.08 * S, 0.52 * S), matDark);
+      ridge.position.set(Math.cos(ta) * 0.96 * S, Math.sin(ta) * 0.96 * S, 0);
+      ridge.rotation.z = ta;
+      wheelPivot.add(ridge);
+    }
+
+    g.add(wheelPivot);
+    wheels.push(wheelPivot);
   }
 
-  // Smaller front wheels
-  for (const z of [-0.85, 0.85]) {
-    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.32, 16), matDark);
+  // Front steering wheels
+  for (const z of [-0.92 * S, 0.92 * S]) {
+    const wheelPivot = new THREE.Group();
+    wheelPivot.position.set(1.15 * S, 0.55 * S, z);
+
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.54 * S, 0.54 * S, 0.38 * S, 18), matDark);
     tire.rotation.x = Math.PI / 2;
-    tire.position.set(1.1, 0.48, z);
     tire.castShadow = true;
-    g.add(tire);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.34, 10), matYellow);
+    wheelPivot.add(tire);
+
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * S, 0.32 * S, 0.40 * S, 12), matYellow);
     rim.rotation.x = Math.PI / 2;
-    rim.position.set(1.1, 0.48, z);
-    g.add(rim);
+    wheelPivot.add(rim);
+
+    g.add(wheelPivot);
+    wheels.push(wheelPivot);
   }
 
-  return g;
+  // 6. Giant Combine Harvester Header / Front Cutter Drum!
+  // Steel mounting arms connecting from frame to front drum
+  for (const z of [-1.0 * S, 1.0 * S]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 0.16 * S, 0.14 * S), matDark);
+    arm.position.set(2.45 * S, 0.65 * S, z);
+    g.add(arm);
+  }
+
+  // Cutter drum pivot group (rotates around Z axis as combine moves)
+  const cutterDrum = new THREE.Group();
+  cutterDrum.position.set(2.85 * S, 0.65 * S, 0);
+
+  // Central cylindrical drum shaft
+  const drumShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * S, 0.28 * S, 2.4 * S, 16), matChrome);
+  drumShaft.rotation.x = Math.PI / 2;
+  cutterDrum.add(drumShaft);
+
+  // 6 rows of sharp revolving steel combine harvester blades/teeth
+  for (let b = 0; b < 6; b++) {
+    const ba = (b / 6) * Math.PI * 2;
+    const bladeRow = new THREE.Mesh(new THREE.BoxGeometry(0.06 * S, 0.32 * S, 2.36 * S), matBlade);
+    bladeRow.position.set(Math.cos(ba) * 0.38 * S, Math.sin(ba) * 0.38 * S, 0);
+    bladeRow.rotation.z = ba;
+    cutterDrum.add(bladeRow);
+  }
+
+  g.add(cutterDrum);
+
+  // Outer crop dividers / pointed end shoes (fixed to chassis on left & right of drum)
+  for (const z of [-1.25 * S, 1.25 * S]) {
+    const divider = new THREE.Mesh(new THREE.ConeGeometry(0.22 * S, 0.7 * S, 8), matYellow);
+    divider.rotation.z = -Math.PI / 2;
+    divider.position.set(3.0 * S, 0.65 * S, z);
+    g.add(divider);
+  }
+
+  // Lower safety bumper with hazard warning stripes
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.18 * S, 0.22 * S, 2.6 * S), matHazard);
+  bumper.position.set(2.85 * S, 0.25 * S, 0);
+  g.add(bumper);
+
+  return {
+    group: g,
+    wheels,
+    cutterDrum,
+    exhaustPos,
+  };
 }
 
 export class WorldRenderer {
@@ -558,7 +652,8 @@ export class WorldRenderer {
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
   private sun: THREE.DirectionalLight | null = null;
-  private tillTruckGroup: THREE.Group | null = null;
+  private tillTruck: TractorData | null = null;
+  private tillSmokeT = 0;
   readonly camTarget = { x: 0, z: 0 };
   private camH = 60;
   private readonly tex: WorldTextures;
@@ -626,9 +721,9 @@ export class WorldRenderer {
     this.buildTrees();
     this.scene.add(this.hazardGroup);
 
-    this.tillTruckGroup = buildTractor();
-    this.tillTruckGroup.visible = false;
-    this.scene.add(this.tillTruckGroup);
+    this.tillTruck = buildTractor();
+    this.tillTruck.group.visible = false;
+    this.scene.add(this.tillTruck.group);
 
     window.addEventListener('resize', () => this.resize());
   }
@@ -1236,14 +1331,37 @@ export class WorldRenderer {
     }
   }
 
-  updateTillTruck(truck?: [number, number, number]): void {
-    if (!this.tillTruckGroup) return;
+  updateTillTruck(
+    truck?: [number, number, number],
+    now = 0,
+    parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void }
+  ): void {
+    if (!this.tillTruck) return;
     if (truck) {
-      this.tillTruckGroup.visible = true;
-      this.tillTruckGroup.position.set(truck[0], 0, truck[1]);
-      this.tillTruckGroup.rotation.y = -truck[2];
+      this.tillTruck.group.visible = true;
+      this.tillTruck.group.position.set(truck[0], 0, truck[1]);
+      this.tillTruck.group.rotation.y = -truck[2];
+
+      // Rotate wheels & front harvester cutter drum
+      const rollAngle = now * 0.015;
+      for (const w of this.tillTruck.wheels) {
+        w.rotation.z = -rollAngle;
+      }
+      this.tillTruck.cutterDrum.rotation.z = -now * 0.035;
+
+      // Exhaust diesel smoke puffs
+      if (parts && now - this.tillSmokeT > 75) {
+        this.tillSmokeT = now;
+        const cosA = Math.cos(-truck[2]);
+        const sinA = Math.sin(-truck[2]);
+        const off = this.tillTruck.exhaustPos;
+        const ex = truck[0] + (off.x * cosA - off.z * sinA);
+        const ey = off.y;
+        const ez = truck[1] + (off.x * sinA + off.z * cosA);
+        parts.puff(ex, ey, ez, 0x222222, 1.3, 0.75, 1.8);
+      }
     } else {
-      this.tillTruckGroup.visible = false;
+      this.tillTruck.group.visible = false;
     }
   }
 
