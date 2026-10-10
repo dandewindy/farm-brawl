@@ -129,6 +129,26 @@ export class GameRoom extends DurableObject {
         }
       }
 
+      // Hot handover: another active socket transferring connection for the same session token
+      if (!playerId && sessionToken) {
+        for (const [existingPid, token] of this.playerTokens.entries()) {
+          if (token === sessionToken && this.world.players.has(existingPid)) {
+            playerId = existingPid;
+            // Detach and cleanly close previous socket(s) for this player
+            for (const [oldWs, pid] of this.sockets.entries()) {
+              if (pid === playerId && oldWs !== ws) {
+                this.sockets.delete(oldWs);
+                try {
+                  oldWs.close(1000, 'Handover');
+                } catch (_) {}
+              }
+            }
+            this.sockets.set(ws, playerId);
+            break;
+          }
+        }
+      }
+
       if (!playerId) {
         // Brand new player or grace period expired
         sessionToken = crypto.randomUUID();

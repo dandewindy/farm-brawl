@@ -12,6 +12,8 @@ export interface Transport {
   readonly colo?: string;
   inGame?: boolean;
   forceReconnect?(): void;
+  triggerHotMigration?(): void;
+  onMigrationSuccess?: (newColo: string) => void;
 }
 
 export type Handler = (m: ServerMsg) => void;

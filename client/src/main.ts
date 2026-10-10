@@ -104,7 +104,16 @@ hud.onSelectMode = (mode) => {
 
 hud.onReconnect = () => {
   if (gameState.inGame) {
-    hud.showToast('⚠️ Đang trong trận đấu, không thể đổi trạm để tránh ngắt kết nối!');
+    if (transport?.colo === 'SIN') {
+      hud.showToast('✅ Bạn đang ở trạm Singapore (SIN) tối ưu nhất (~35ms)!');
+      return;
+    }
+    if (transport?.colo === 'HKG') {
+      hud.showToast('✅ Bạn đang ở trạm Hồng Kông (HKG) nhanh và ổn định (~75ms)!');
+      return;
+    }
+    hud.showToast('🔍 Đang dò tìm tuyến mạng Singapore/HKG tối ưu trong nền...');
+    transport?.triggerHotMigration?.();
     return;
   }
   if (transport?.forceReconnect) {
@@ -751,6 +760,9 @@ function connectToRoom(targetRoom: string): void {
       }
     }
   );
+  transport.onMigrationSuccess = (newColo) => {
+    hud.showToast(`🚀 Đã tự động chuyển mượt sang trạm ${newColo} (Ping thấp)!`);
+  };
 }
 
 const roomParam = params.get('room') || params.get('code');

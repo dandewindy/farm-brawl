@@ -17,6 +17,11 @@ export class WsClient implements Transport {
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
 
+  // In-Game Zero-Downtime Hot Migration
+  private migrationWs: WebSocket | null = null;
+  private lastMigrationProbeTime = 0;
+  public onMigrationSuccess?: (newColo: string) => void;
+
   constructor(
     private readonly url: string,
     private readonly onMsg: Handler,
@@ -44,6 +49,10 @@ export class WsClient implements Transport {
       return;
     }
 
+    this.bindActiveSocket(socket);
+  }
+
+  private bindActiveSocket(socket: WebSocket): void {
     socket.onopen = () => {
       if (this.ws !== socket) return; // Stale socket guard
       const wasReconnecting = this.isReconnecting;
@@ -88,6 +97,10 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
+          // In-game auto-detection: if playing on high-latency NRT, trigger seamless background migration
+          if (this.inGame && this.colo === 'NRT') {
+            this.triggerHotMigration();
+          }
         } else {
           if (msg.t === 'joined') {
             if (msg.colo) this.colo = msg.colo;
@@ -108,6 +121,8 @@ export class WsClient implements Transport {
                   this.forceReconnect();
                 }
               }, 450);
+            } else if (this.inGame && this.colo === 'NRT') {
+              this.triggerHotMigration();
             }
           }
           this.onMsg(msg);
@@ -118,7 +133,7 @@ export class WsClient implements Transport {
     };
 
     socket.onclose = () => {
-      if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally by forceReconnect()
+      if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally
       this.stopPing();
       this.isReconnecting = true;
       this.onStatus?.('closed');
@@ -129,6 +144,89 @@ export class WsClient implements Transport {
       if (this.ws !== socket) return;
       this.onStatus?.('error');
     };
+  }
+
+  public triggerHotMigration(): void {
+    if (!this.inGame || this.colo !== 'NRT' || this.closed || !this.sessionToken) return;
+    const now = performance.now();
+    // Throttle attempts: probe at most once every 12 seconds to prevent spam
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 12000) return;
+    this.lastMigrationProbeTime = now;
+    console.log('[WS] In-game NRT detected. Starting zero-downtime hot migration probe...');
+
+    let probeSocket: WebSocket;
+    try {
+      probeSocket = new WebSocket(this.url);
+      this.migrationWs = probeSocket;
+    } catch (e) {
+      console.warn('[WS] Failed to create hot migration socket:', e);
+      return;
+    }
+
+    probeSocket.onopen = () => {
+      if (this.migrationWs !== probeSocket || this.closed) {
+        probeSocket.close();
+        return;
+      }
+      probeSocket.send(JSON.stringify({ t: 'ping', c: Math.round(performance.now()) }));
+    };
+
+    probeSocket.onmessage = (event) => {
+      if (this.migrationWs !== probeSocket || this.closed) return;
+      try {
+        const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
+        const msg = JSON.parse(raw) as ServerMsg;
+        if (msg.t === 'pong') {
+          const probeColo = msg.colo;
+          console.log(`[WS] Hot migration probe response colo: ${probeColo}`);
+          if (probeColo === 'SIN' || probeColo === 'HKG') {
+            // Optimal edge node found! Hand over existing session token
+            if (this.lastJoinMsg && this.sessionToken) {
+              probeSocket.send(JSON.stringify({
+                ...this.lastJoinMsg,
+                token: this.sessionToken,
+              }));
+            } else {
+              probeSocket.close();
+              this.migrationWs = null;
+            }
+          } else {
+            // Still NRT, quietly discard probe and continue playing on current socket
+            probeSocket.close();
+            this.migrationWs = null;
+          }
+        } else if (msg.t === 'joined') {
+          // Handover acknowledged by server! Seamlessly swap active socket
+          console.log(`[WS] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'}`);
+          const oldWs = this.ws;
+          this.ws = probeSocket;
+          this.migrationWs = null;
+          if (msg.colo) this.colo = msg.colo;
+          this.rttWin.length = 0;
+
+          if (oldWs) {
+            oldWs.onopen = null;
+            oldWs.onmessage = null;
+            oldWs.onclose = null;
+            oldWs.onerror = null;
+            try { oldWs.close(); } catch (_) {}
+          }
+
+          this.bindActiveSocket(probeSocket);
+          this.onMigrationSuccess?.(this.colo);
+        }
+      } catch (err) {
+        console.error('[WS] Error during hot migration:', err);
+      }
+    };
+
+    const cleanupProbe = () => {
+      if (this.migrationWs === probeSocket) {
+        this.migrationWs = null;
+      }
+    };
+    probeSocket.onclose = cleanupProbe;
+    probeSocket.onerror = cleanupProbe;
   }
 
   private startPing(): void {
@@ -179,6 +277,10 @@ export class WsClient implements Transport {
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();
+    if (this.migrationWs) {
+      try { this.migrationWs.close(); } catch (_) {}
+      this.migrationWs = null;
+    }
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -206,6 +308,10 @@ export class WsClient implements Transport {
   close(): void {
     this.closed = true;
     this.stopPing();
+    if (this.migrationWs) {
+      try { this.migrationWs.close(); } catch (_) {}
+      this.migrationWs = null;
+    }
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
