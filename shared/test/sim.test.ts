@@ -671,31 +671,26 @@ describe('bonus weapons and tools', () => {
 
     w.step();
 
-    // Animal is squished flat, stunned, and knocked back
-    expect(p.squishT).toBeGreaterThan(2.0);
-    expect(p.stunT).toBeGreaterThan(1.5);
-    expect(p.vx).toBeGreaterThan(20);
+    // Animal is squished flat and instantly killed/eliminated!
+    expect(p.alive).toBe(false);
+    expect(p.squishT).toBe(2.8);
 
-    const snap = w.snapshotFor(pid);
-    const pWire = snap.p.find(([id]) => id === pid);
-    expect(pWire).toBeDefined();
-    // Flags contain SQUISHED and STUN
-    expect((pWire![5] & FLAG.SQUISHED)).not.toBe(0);
-    expect((pWire![5] & FLAG.STUN)).not.toBe(0);
-
-    // Test lethal run-over when mass is low
-    const lowId = w.addPlayer('LowMassVictim', 'chicken');
-    const lowP = place(w, lowId, 15, 0, 11); // 11kg mass (near min mass 10kg)
-    w.tillTruck.x = 12.0;
-    w.tillTruck.z = 0;
-    w.tillTruck.angle = 0;
-    w.step();
-
-    // Player dies from till
-    expect(lowP.alive).toBe(false);
-    const dieEv = w.snapshotFor(lowId).ev.find((e) => e.k === 'die' && e.id === lowId);
+    const dieEv = w.snapshotFor(pid).ev.find((e) => e.k === 'die' && e.id === pid);
     expect(dieEv).toBeDefined();
     expect((dieEv as any).cause).toBe('till');
+
+    // Test forest exit: after sweeping, truck drives straight out and vanishes
+    w.tillTruck.sweepT = 0; // Sweeping complete
+    w.step();
+    expect(w.tillTruck.exiting).toBe(true);
+
+    // Fast-forward until truck reaches outer forest
+    for (let i = 0; i < 100 && w.tillTruck.active; i++) {
+      w.step();
+    }
+    // Vanished in the forest outside R = 70
+    expect(w.tillTruck.active).toBe(false);
+    expect(w.currentRule).toBe('');
   });
 });
 

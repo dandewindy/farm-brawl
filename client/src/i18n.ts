@@ -132,6 +132,7 @@ const vi = {
   choiceLeft: 'còn {s}s',
   modeLabel: 'Chế độ chơi',
   sound: 'Âm thanh',
+  fullscreen: 'Toàn màn hình',
   team0: 'A12',
   team1: 'WFM',
   tk_pitchfork: '🍴 Chĩa ba! Húc mạnh hơn và rút ký Vua gấp 3 (10 giây)',

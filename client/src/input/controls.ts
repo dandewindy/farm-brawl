@@ -20,7 +20,7 @@ export class InputManager {
   private keyA = 0;
 
   private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2, has: false };
-  private readonly isTouch: boolean;
+  private isTouch: boolean;
   private stickVec: { x: number; y: number } | null = null;
 
   private readonly raycaster = new THREE.Raycaster();
@@ -36,7 +36,7 @@ export class InputManager {
   onReleaseRam?: (heldSeconds: number) => void;
 
   constructor() {
-    this.isTouch = window.matchMedia('(pointer: coarse)').matches;
+    this.isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     this.stickEl = document.getElementById('stick');
     this.stickKnob = document.getElementById('stickKnob');
     this.dashBtn = document.getElementById('dashBtn');
@@ -138,6 +138,8 @@ export class InputManager {
     let stickTouchId: number | null = null;
 
     window.addEventListener('touchstart', (e) => {
+      this.isTouch = true;
+      document.body.classList.add('touch');
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
         // Only create stick for touches on the left half that aren't already tracked
@@ -192,6 +194,7 @@ export class InputManager {
 
     if (this.dashBtn) {
       this.dashBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         this.pressRam();
       });

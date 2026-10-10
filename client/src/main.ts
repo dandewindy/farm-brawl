@@ -176,47 +176,135 @@ hud.onToggleMute = () => {
   if (muteInGameBtn) muteInGameBtn.textContent = next ? '🔇' : '🔊';
 };
 
-// In-game fullscreen and mute controls
+// Fullscreen & anti-zoom management for desktop, mobile & iPad Chrome/Safari
 const fsBtn = document.getElementById('fsBtn') as HTMLButtonElement | null;
+const startFsBtn = document.getElementById('startFsBtn') as HTMLButtonElement | null;
 const muteInGameBtn = document.getElementById('muteInGame') as HTMLButtonElement | null;
+let isPseudoFs = false;
+
+function isFsActive(): boolean {
+  const doc = document as any;
+  return isPseudoFs || !!(
+    doc.fullscreenElement ||
+    doc.webkitFullscreenElement ||
+    doc.mozFullScreenElement ||
+    doc.msFullscreenElement
+  );
+}
 
 function updateFsIcon(): void {
-  const doc = document as any;
-  const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+  const active = isFsActive();
   if (fsBtn) {
-    fsBtn.textContent = isFs ? '🗗' : '⛶';
-    fsBtn.title = isFs ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+    fsBtn.textContent = active ? '🗗' : '⛶';
+    fsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+  }
+  if (startFsBtn) {
+    const ico = startFsBtn.querySelector('.ico');
+    if (ico) ico.textContent = active ? '🗗' : '⛶';
+    startFsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
   }
 }
 
-if (fsBtn) {
-  fsBtn.addEventListener('click', () => {
-    const doc = document as any;
-    const docEl = document.documentElement as any;
-    const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-    if (!isFs) {
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
-      } else if (docEl.msRequestFullscreen) {
-        docEl.msRequestFullscreen();
-      }
-    } else {
-      if (doc.exitFullscreen) {
-        doc.exitFullscreen().catch(() => {});
-      } else if (doc.webkitExitFullscreen) {
-        doc.webkitExitFullscreen();
-      } else if (doc.msExitFullscreen) {
-        doc.msExitFullscreen();
-      }
-    }
-  });
+function enablePseudoFs(): void {
+  isPseudoFs = true;
+  document.documentElement.classList.add('fullscreen-mode');
+  document.body.classList.add('fullscreen-mode');
+  try { window.scrollTo(0, 1); } catch (_) {}
+  updateFsIcon();
+  window.dispatchEvent(new Event('resize'));
 }
 
-document.addEventListener('fullscreenchange', updateFsIcon);
-document.addEventListener('webkitfullscreenchange', updateFsIcon);
+function disablePseudoFs(): void {
+  isPseudoFs = false;
+  document.documentElement.classList.remove('fullscreen-mode');
+  document.body.classList.remove('fullscreen-mode');
+  updateFsIcon();
+  window.dispatchEvent(new Event('resize'));
+}
+
+function toggleFs(): void {
+  const doc = document as any;
+  const docEl = document.documentElement as any;
+  const active = isFsActive();
+
+  if (!active) {
+    const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
+                (docEl.webkitRequestFullscreen && docEl.webkitRequestFullscreen()) ||
+                (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
+                (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
+    if (req && typeof req.catch === 'function') {
+      req.catch(() => {
+        // Fallback for browsers rejecting native fullscreen
+        enablePseudoFs();
+      });
+    } else if (!req) {
+      // iOS / iPadOS WebKit has no Fullscreen API on document/canvas
+      enablePseudoFs();
+    }
+  } else {
+    if (isPseudoFs) {
+      disablePseudoFs();
+    }
+    if (doc.exitFullscreen) {
+      doc.exitFullscreen().catch(() => {});
+    } else if (doc.webkitExitFullscreen) {
+      doc.webkitExitFullscreen();
+    } else if (doc.mozCancelFullScreen) {
+      doc.mozCancelFullScreen();
+    } else if (doc.msExitFullscreen) {
+      doc.msExitFullscreen();
+    }
+  }
+  setTimeout(updateFsIcon, 100);
+}
+
+if (fsBtn) fsBtn.addEventListener('click', toggleFs);
+if (startFsBtn) startFsBtn.addEventListener('click', toggleFs);
+
+document.addEventListener('fullscreenchange', () => {
+  const doc = document as any;
+  if (!doc.fullscreenElement) {
+    isPseudoFs = false;
+    document.documentElement.classList.remove('fullscreen-mode');
+    document.body.classList.remove('fullscreen-mode');
+  }
+  updateFsIcon();
+  window.dispatchEvent(new Event('resize'));
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  const doc = document as any;
+  if (!doc.webkitFullscreenElement) {
+    isPseudoFs = false;
+    document.documentElement.classList.remove('fullscreen-mode');
+    document.body.classList.remove('fullscreen-mode');
+  }
+  updateFsIcon();
+  window.dispatchEvent(new Event('resize'));
+});
 updateFsIcon();
+
+// Anti-Zoom & Touch Gesture Lock (iPad & Mobile Chrome/Safari)
+document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
+
+window.addEventListener('touchmove', (e) => {
+  if (e.touches.length > 1) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+let lastTouchEndTs = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEndTs <= 300) {
+    const target = e.target as HTMLElement | null;
+    if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) {
+      e.preventDefault();
+    }
+  }
+  lastTouchEndTs = now;
+}, { passive: false });
 
 if (muteInGameBtn) {
   muteInGameBtn.textContent = isMuted() ? '🔇' : '🔊';
@@ -901,7 +989,7 @@ function animate(now: number): void {
       : 0xffc928;
     world.updatePodiumRing(capProg, capContested, now, capColor);
     world.updatePodiumShield(gameState.podShield[0], gameState.podShield[1], now);
-    world.updateTillTruck(gameState.truck, now, foodParts);
+    world.updateTillTruck(gameState.truck, dt, now, foodParts);
 
   // Update player ground cooldown arc indicator
   if (me && gameState.alive) {

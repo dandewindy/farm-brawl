@@ -117,6 +117,8 @@ export class World {
     vz: 0,
     angle: 0,
     timer: 2.5,
+    sweepT: 0,
+    exiting: false,
   };
   teamScores: [number, number] = [0, 0];
   matchClock = 300;
@@ -675,7 +677,7 @@ export class World {
       }
     }
 
-    // Rule: "till" (Farmer Till returns in his giant tractor, circling & actively chasing animals)
+    // Rule: "till" (Farmer Till returns in his giant tractor, sweeps & hunts, then exits straight into forest)
     if (this.currentRule === 'till') {
       if (!this.tillTruck.active) {
         this.tillTruck.timer -= DT;
@@ -685,8 +687,10 @@ export class World {
           const sx = Math.cos(enterA) * 54;
           const sz = Math.sin(enterA) * 54;
           const aimA = enterA + Math.PI;
-          const speed = 18;
+          const speed = 19;
           this.tillTruck.active = true;
+          this.tillTruck.exiting = false;
+          this.tillTruck.sweepT = 14.0;
           this.tillTruck.x = sx;
           this.tillTruck.z = sz;
           this.tillTruck.vx = Math.cos(aimA) * speed;
@@ -699,27 +703,43 @@ export class World {
         const tz = this.tillTruck.z;
         const distFromCenter = Math.hypot(tx, tz);
 
-        // Desired angle calculation: perimeter avoidance + animal hunting
-        let desiredAngle = this.tillTruck.angle;
-        if (distFromCenter > 48) {
-          // Near the outer electric fence: steer strongly back toward center
-          desiredAngle = Math.atan2(-tz, -tx);
-        } else {
-          // Actively hunt and chase nearest living animal
-          let bestDist = Infinity;
-          let targetP: Player | null = null;
-          for (const p of alive) {
-            const d = Math.hypot(p.x - tx, p.z - tz);
-            if (d < bestDist) {
-              bestDist = d;
-              targetP = p;
-            }
+        if (!this.tillTruck.exiting) {
+          this.tillTruck.sweepT -= DT;
+          if (this.tillTruck.sweepT <= 0) {
+            // Sweeping complete! Switch to exiting straight out into the woods
+            this.tillTruck.exiting = true;
           }
-          if (targetP) {
-            desiredAngle = Math.atan2(targetP.z - tz, targetP.x - tx);
+        }
+
+        let desiredAngle = this.tillTruck.angle;
+        let speed = 19;
+
+        if (this.tillTruck.exiting) {
+          // Drive straight out across fence into the surrounding forest!
+          const exitA = Math.atan2(tz, tx);
+          desiredAngle = exitA;
+          speed = 24; // Fast exit
+        } else {
+          // Active sweeping & hunting phase:
+          if (distFromCenter > 48) {
+            // Near outer electric fence: steer strongly back toward center
+            desiredAngle = Math.atan2(-tz, -tx);
           } else {
-            // Idle circle: curve smoothly around the center
-            desiredAngle = this.tillTruck.angle + 0.4 * DT;
+            // Actively hunt and chase nearest living animal
+            let bestDist = Infinity;
+            let targetP: Player | null = null;
+            for (const p of alive) {
+              const d = Math.hypot(p.x - tx, p.z - tz);
+              if (d < bestDist) {
+                bestDist = d;
+                targetP = p;
+              }
+            }
+            if (targetP) {
+              desiredAngle = Math.atan2(targetP.z - tz, targetP.x - tx);
+            } else {
+              desiredAngle = this.tillTruck.angle + 0.4 * DT;
+            }
           }
         }
 
@@ -727,11 +747,10 @@ export class World {
         let diff = desiredAngle - this.tillTruck.angle;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        const maxTurn = 2.4 * DT;
+        const maxTurn = (this.tillTruck.exiting ? 2.8 : 2.4) * DT;
         const turn = Math.max(-maxTurn, Math.min(maxTurn, diff));
         this.tillTruck.angle += turn;
 
-        const speed = 19;
         this.tillTruck.vx = Math.cos(this.tillTruck.angle) * speed;
         this.tillTruck.vz = Math.sin(this.tillTruck.angle) * speed;
         this.tillTruck.x += this.tillTruck.vx * DT;
@@ -740,8 +759,9 @@ export class World {
         const cosA = Math.cos(-this.tillTruck.angle);
         const sinA = Math.sin(-this.tillTruck.angle);
 
-        // Check ram collision with every alive player
+        // Check ram collision with every alive player: INSTANT ELIMINATION!
         for (const p of alive) {
+          if (!p.alive) continue;
           const dx = p.x - this.tillTruck.x;
           const dz = p.z - this.tillTruck.z;
           const rx = dx * cosA - dz * sinA;
@@ -749,33 +769,27 @@ export class World {
           const pr = radiusOf(p.mass);
           // Collision box matching giant 2.4x model: front cutter blades (7.0) to rear cab/tires (-4.2)
           if (rx >= -4.2 - pr && rx <= 7.0 + pr && Math.abs(rz) <= 3.3 + pr) {
-            if (p.squishT <= 1.8) {
-              p.squishT = 2.8; // Squished flat pancake!
-              p.stunT = 2.0;   // Stunned
-              p.charging = false;
-              p.dashT = 0;
-              p.plow = false;
+            p.squishT = 2.8; // Squished flat pancake!
+            p.stunT = 2.0;   // Stunned
+            p.charging = false;
+            p.dashT = 0;
+            p.plow = false;
 
-              // Knockback impulse flung forward along tractor heading
-              const hitA = this.tillTruck.angle;
-              p.vx = Math.cos(hitA) * 34 + (this.rnd() - 0.5) * 6;
-              p.vz = Math.sin(hitA) * 34 + (this.rnd() - 0.5) * 6;
-
-              const loss = Math.min(24, Math.max(8, p.mass * 0.28));
-              this.scatter(p.x, p.z, loss, radiusOf(p.mass) + 0.8, Math.cos(hitA), Math.sin(hitA));
-
-              if (p.mass - loss < CFG.MIN_MASS) {
-                this.kill(p, 'till');
-              } else {
-                p.mass -= loss;
-                this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 34, loss });
-              }
-            }
+            // Instantly eliminate: squished flat and killed!
+            this.kill(p, 'till');
           }
+        }
+
+        // Disappear deep in the surrounding forest outside the fence (CFG.R = 70)
+        if (this.tillTruck.exiting && distFromCenter > 74) {
+          this.tillTruck.active = false;
+          this.tillTruck.exiting = false;
+          this.currentRule = '';
+          this.ruleTimer = 0;
         }
       }
     } else {
-      // Rule ended: if tractor was active, steer towards edge and leave farm
+      // Rule ended: if tractor was active, drive straight out into forest
       if (this.tillTruck.active) {
         const tx = this.tillTruck.x;
         const tz = this.tillTruck.z;
@@ -783,20 +797,20 @@ export class World {
         let diff = exitA - this.tillTruck.angle;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        this.tillTruck.angle += Math.max(-2.4 * DT, Math.min(2.4 * DT, diff));
-        const speed = 22;
+        this.tillTruck.angle += Math.max(-2.8 * DT, Math.min(2.8 * DT, diff));
+        const speed = 24;
         this.tillTruck.vx = Math.cos(this.tillTruck.angle) * speed;
         this.tillTruck.vz = Math.sin(this.tillTruck.angle) * speed;
         this.tillTruck.x += this.tillTruck.vx * DT;
         this.tillTruck.z += this.tillTruck.vz * DT;
 
-        if (Math.hypot(this.tillTruck.x, this.tillTruck.z) > 66) {
+        if (Math.hypot(this.tillTruck.x, this.tillTruck.z) > 74) {
           this.tillTruck.active = false;
-          this.tillTruck.timer = 1.0;
+          this.tillTruck.exiting = false;
         }
       } else {
         this.tillTruck.active = false;
-        this.tillTruck.timer = 1.0;
+        this.tillTruck.exiting = false;
       }
     }
 
@@ -969,6 +983,9 @@ export class World {
       }
     } else if (ruleId === 'till') {
       this.tillTruck.timer = 1.0; // Quick initial entrance for Till's tractor
+      this.tillTruck.active = false;
+      this.tillTruck.exiting = false;
+      this.tillTruck.sweepT = 14.0;
     } else if (ruleId === 'corn') {
       const [podX, podZ] = this.map.podium;
       for (let i = 0; i < 6; i++) {

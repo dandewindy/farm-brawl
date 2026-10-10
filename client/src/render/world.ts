@@ -654,6 +654,10 @@ export class WorldRenderer {
   private sun: THREE.DirectionalLight | null = null;
   private tillTruck: TractorData | null = null;
   private tillSmokeT = 0;
+  private truckCurrentX = 0;
+  private truckCurrentZ = 0;
+  private truckCurrentAngle = 0;
+  private truckHasPos = false;
   readonly camTarget = { x: 0, z: 0 };
   private camH = 60;
   private readonly tex: WorldTextures;
@@ -1333,14 +1337,33 @@ export class WorldRenderer {
 
   updateTillTruck(
     truck?: [number, number, number],
+    dt = 0.016,
     now = 0,
     parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void }
   ): void {
     if (!this.tillTruck) return;
     if (truck) {
       this.tillTruck.group.visible = true;
-      this.tillTruck.group.position.set(truck[0], 0, truck[1]);
-      this.tillTruck.group.rotation.y = -truck[2];
+
+      // 60/120 FPS smooth dead-reckoning & exponential lerp interpolation
+      if (!this.truckHasPos) {
+        this.truckCurrentX = truck[0];
+        this.truckCurrentZ = truck[1];
+        this.truckCurrentAngle = truck[2];
+        this.truckHasPos = true;
+      } else {
+        const k = 1 - Math.exp(-dt * 18);
+        this.truckCurrentX += (truck[0] - this.truckCurrentX) * k;
+        this.truckCurrentZ += (truck[1] - this.truckCurrentZ) * k;
+
+        let dAngle = truck[2] - this.truckCurrentAngle;
+        while (dAngle > Math.PI) dAngle -= Math.PI * 2;
+        while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+        this.truckCurrentAngle += dAngle * k;
+      }
+
+      this.tillTruck.group.position.set(this.truckCurrentX, 0, this.truckCurrentZ);
+      this.tillTruck.group.rotation.y = -this.truckCurrentAngle;
 
       // Rotate wheels & front harvester cutter drum
       const rollAngle = now * 0.015;
@@ -1352,16 +1375,17 @@ export class WorldRenderer {
       // Exhaust diesel smoke puffs
       if (parts && now - this.tillSmokeT > 75) {
         this.tillSmokeT = now;
-        const cosA = Math.cos(-truck[2]);
-        const sinA = Math.sin(-truck[2]);
+        const cosA = Math.cos(-this.truckCurrentAngle);
+        const sinA = Math.sin(-this.truckCurrentAngle);
         const off = this.tillTruck.exhaustPos;
-        const ex = truck[0] + (off.x * cosA - off.z * sinA);
+        const ex = this.truckCurrentX + (off.x * cosA - off.z * sinA);
         const ey = off.y;
-        const ez = truck[1] + (off.x * sinA + off.z * cosA);
+        const ez = this.truckCurrentZ + (off.x * sinA + off.z * cosA);
         parts.puff(ex, ey, ez, 0x222222, 1.3, 0.75, 1.8);
       }
     } else {
       this.tillTruck.group.visible = false;
+      this.truckHasPos = false;
     }
   }
 
