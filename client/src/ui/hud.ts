@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
-import { t } from '../i18n';
+import { t, getLanguage, toggleLanguage } from '../i18n';
 import { AnimalPreviewRenderer } from '../render/preview';
 import type { AudioMode } from '../audio/sfx';
 
@@ -145,6 +145,14 @@ export class HudManager {
   private readonly spSkinPalette: HTMLElement | null;
   private readonly spSkinPrev: HTMLElement | null;
   private readonly spSkinNext: HTMLElement | null;
+  private readonly spNavPrev: HTMLButtonElement | null;
+  private readonly spNavNext: HTMLButtonElement | null;
+  private readonly spRandomBtn: HTMLButtonElement | null;
+  private readonly langToggle: HTMLButtonElement | null;
+  private readonly nameEditBtn: HTMLButtonElement | null;
+  private isRandomSelected = false;
+  private carouselIndex = 0;
+  private updateSpeciesUI?: () => void;
 
   constructor(
     private readonly onStartPlay: (
@@ -231,6 +239,11 @@ export class HudManager {
     this.spSkinPalette = document.getElementById('spSkinPalette');
     this.spSkinPrev = document.getElementById('spSkinPrev');
     this.spSkinNext = document.getElementById('spSkinNext');
+    this.spNavPrev = document.getElementById('spNavPrev') as HTMLButtonElement | null;
+    this.spNavNext = document.getElementById('spNavNext') as HTMLButtonElement | null;
+    this.spRandomBtn = document.getElementById('spRandomBtn') as HTMLButtonElement | null;
+    this.langToggle = document.getElementById('langToggle') as HTMLButtonElement | null;
+    this.nameEditBtn = document.getElementById('nameEditBtn') as HTMLButtonElement | null;
 
     const previewCanvas = document.getElementById('spPreviewCanvas') as HTMLCanvasElement | null;
     if (previewCanvas) {
@@ -288,7 +301,33 @@ export class HudManager {
       }
     });
 
+    const updateCarousel = () => {
+      this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * 64}px)`;
+      if (this.spNavPrev) {
+        this.spNavPrev.disabled = this.carouselIndex <= 0;
+        this.spNavPrev.style.opacity = this.carouselIndex <= 0 ? '0.35' : '1';
+      }
+      if (this.spNavNext) {
+        this.spNavNext.disabled = this.carouselIndex >= SPECIES.length - 3;
+        this.spNavNext.style.opacity = this.carouselIndex >= SPECIES.length - 3 ? '0.35' : '1';
+      }
+    };
+
     const updateAllButtons = () => {
+      if (this.isRandomSelected) {
+        this.spRandomBtn?.classList.add('on');
+        this.speciesContainer.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+
+        if (this.speciesHint) this.speciesHint.textContent = t('randomHint');
+        if (this.spPreviewTitle) this.spPreviewTitle.textContent = t('randomTitle');
+        if (this.spPreviewSkinName) this.spPreviewSkinName.textContent = t('randomSkin');
+        if (this.spPreviewBadge) this.spPreviewBadge.textContent = '?';
+        if (this.previewRenderer) this.previewRenderer.setRandom();
+        if (this.spSkinPalette) this.spSkinPalette.innerHTML = '';
+        return;
+      }
+
+      this.spRandomBtn?.classList.remove('on');
       const activeSkin = this.mySkins[this.selectedSpecies] ?? 0;
 
       // 1. Update 6 species buttons
@@ -326,7 +365,8 @@ export class HudManager {
 
       // 4. Update preview 3D model
       if (this.previewRenderer) {
-        this.previewRenderer.setAnimal(this.selectedSpecies, activeSkin);
+        const team = this.selectedMode === 'team' ? this.selectedTeam : undefined;
+        this.previewRenderer.setAnimal(this.selectedSpecies, activeSkin, team);
       }
 
       // 5. Update skin palette swatches
@@ -341,6 +381,7 @@ export class HudManager {
           sw.title = `${t(`sk_${this.selectedSpecies}_${idx}`)}`;
           sw.addEventListener('click', (e) => {
             e.stopPropagation();
+            this.isRandomSelected = false;
             this.mySkins[this.selectedSpecies] = idx;
             localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(idx));
             updateAllButtons();
@@ -349,6 +390,8 @@ export class HudManager {
         });
       }
     };
+
+    this.updateSpeciesUI = updateAllButtons;
 
     // Build the 6 species buttons
     this.speciesContainer.innerHTML = '';
@@ -376,6 +419,7 @@ export class HudManager {
       btn.appendChild(dotsDiv);
 
       btn.addEventListener('click', () => {
+        this.isRandomSelected = false;
         if (this.selectedSpecies === sp) {
           // Clicking active animal cycles its skin among the 4 skins!
           this.mySkins[sp] = ((this.mySkins[sp] ?? 0) + 1) % 4;
@@ -392,6 +436,7 @@ export class HudManager {
     if (this.spSkinPrev) {
       this.spSkinPrev.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (this.isRandomSelected) return;
         const cur = this.mySkins[this.selectedSpecies] ?? 0;
         this.mySkins[this.selectedSpecies] = (cur - 1 + 4) % 4;
         localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(this.mySkins[this.selectedSpecies]));
@@ -401,6 +446,7 @@ export class HudManager {
     if (this.spSkinNext) {
       this.spSkinNext.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (this.isRandomSelected) return;
         const cur = this.mySkins[this.selectedSpecies] ?? 0;
         this.mySkins[this.selectedSpecies] = (cur + 1) % 4;
         localStorage.setItem(`fb_skin_${this.selectedSpecies}`, String(this.mySkins[this.selectedSpecies]));
@@ -408,16 +454,87 @@ export class HudManager {
       });
     }
 
+    // Carousel navigation
+    if (this.spNavPrev) {
+      this.spNavPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.carouselIndex > 0) {
+          this.carouselIndex--;
+          updateCarousel();
+        }
+      });
+    }
+    if (this.spNavNext) {
+      this.spNavNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.carouselIndex < SPECIES.length - 3) {
+          this.carouselIndex++;
+          updateCarousel();
+        }
+      });
+    }
+
+    // Mystery '?' button
+    if (this.spRandomBtn) {
+      this.spRandomBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.isRandomSelected = true;
+        updateAllButtons();
+      });
+    }
+
+    // Scroll carousel so selected species is initially visible
+    const selIdx = SPECIES.indexOf(this.selectedSpecies);
+    if (selIdx >= 0) {
+      if (selIdx < this.carouselIndex) this.carouselIndex = selIdx;
+      else if (selIdx >= this.carouselIndex + 3) this.carouselIndex = selIdx - 2;
+    }
+    updateCarousel();
+
     updateAllButtons();
+
+    // Name input & pencil
     this.nameInput.placeholder = t('namePh');
     this.nameInput.value = localStorage.getItem('fb_name') || '';
+
+    if (this.nameEditBtn) {
+      this.nameEditBtn.addEventListener('click', () => {
+        this.nameInput.focus();
+        this.nameInput.select();
+      });
+    }
+
+    // Language switcher
+    const curLang = getLanguage();
+    if (this.langToggle) {
+      const ico = this.langToggle.querySelector('.ico');
+      const txt = this.langToggle.querySelector('.lang-txt');
+      if (ico) ico.textContent = curLang === 'vi' ? '🇻🇳' : '🇬🇧';
+      if (txt) txt.textContent = curLang === 'vi' ? 'VI' : 'EN';
+
+      this.langToggle.addEventListener('click', () => {
+        const nextLang = toggleLanguage();
+        const ico = this.langToggle?.querySelector('.ico');
+        const txt = this.langToggle?.querySelector('.lang-txt');
+        if (ico) ico.textContent = nextLang === 'vi' ? '🇻🇳' : '🇬🇧';
+        if (txt) txt.textContent = nextLang === 'vi' ? 'VI' : 'EN';
+        this.nameInput.placeholder = t('namePh');
+        updateAllButtons();
+        this.showToast(nextLang === 'vi' ? '🇻🇳 Đã chuyển sang Tiếng Việt' : '🇬🇧 Switched to English', 1000);
+      });
+    }
   }
 
   private initEvents(): void {
     const play = () => {
       const name = this.nameInput.value.trim() || t('defaultName');
       localStorage.setItem('fb_name', name);
-      const skin = this.mySkins[this.selectedSpecies] ?? 0;
+      let chosenSpecies = this.selectedSpecies;
+      let chosenSkin = this.mySkins[this.selectedSpecies] ?? 0;
+      if (this.isRandomSelected) {
+        chosenSpecies = SPECIES[Math.floor(Math.random() * SPECIES.length)];
+        chosenSkin = Math.floor(Math.random() * 4);
+      }
       if (this.selectedMode === 'friend') {
         const inputVal = (this.joinRoomCode?.value || '').trim().toUpperCase();
         if (inputVal.length >= 3) {
@@ -432,7 +549,7 @@ export class HudManager {
         }
       }
       this.previewRenderer?.stop();
-      this.onStartPlay(name, this.selectedSpecies, this.selectedMode, skin, this.currentFriendCode);
+      this.onStartPlay(name, chosenSpecies, this.selectedMode, chosenSkin, this.currentFriendCode);
     };
 
     let playCountdownTimer: any = null;
@@ -548,6 +665,7 @@ export class HudManager {
       document.body.classList.remove('spectating');
       this.previewRenderer?.start();
       this.previewRenderer?.resize();
+      this.updateSpeciesUI?.();
     });
 
     if (this.spectateBtn) {
@@ -1239,11 +1357,11 @@ export class HudManager {
     setTimeout(() => div.remove(), 4000);
   }
 
-  showToast(text: string): void {
+  showToast(text: string, durationMs = 2600): void {
     const div = document.createElement('div');
     div.textContent = text;
     this.toastsEl.appendChild(div);
-    setTimeout(() => div.remove(), 2600);
+    setTimeout(() => div.remove(), durationMs);
   }
 
   showRuleBanner(ruleId: string): void {

@@ -138,78 +138,115 @@
   </div>
 
   <div id="start" class="screen">
-    <div class="card">
+    <div class="card start-card-wide">
       <div class="wall-top">
-        <button id="startFsBtn" type="button" title="Toàn màn hình"><span class="ico">⛶</span> <span data-i18n="fullscreen">Toàn màn hình</span></button>
-        <button id="mute" type="button" title="M"><span class="ico">🔊</span> <span data-i18n="sound">Âm thanh</span></button>
+        <button id="startFsBtn" type="button" title="Toàn màn hình / Fullscreen"><span class="ico">⛶</span></button>
+        <button id="mute" type="button" title="Âm thanh / Sound"><span class="ico">🔊</span></button>
+        <button id="langToggle" type="button" title="Ngôn ngữ / Language"><span class="ico">🇻🇳</span> <span class="lang-txt">VI</span></button>
       </div>
-      <h1><span class="t1">FARM</span><span class="t2">BRAWL</span></h1>
+      <h1 class="title-row"><span class="t1">FARM</span> <span class="t2">BRAWL</span></h1>
       <p class="slogan" data-i18n="slogan"></p>
-      <input id="name" maxlength="16" autocomplete="off" spellcheck="false">
-      <p class="eyebrow" data-i18n="modeLabel">Chế độ chơi</p>
-      <div id="modes">
-        <button type="button" class="on" data-mode="ffa"><span class="n">Tự do</span><span class="p">Ai lo thân nấy</span></button>
-        <button type="button" data-mode="team"><span class="n">Trại đấu</span><span class="p">A12 vs WFM</span></button>
-        <button type="button" data-mode="friend"><span class="n">Bạn bè 👥</span><span class="p">Phòng riêng không bot</span></button>
+      <div class="name-box">
+        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="TÊN CỦA BẠN">
+        <button type="button" id="nameEditBtn" class="name-pencil" title="Đổi tên">✏️</button>
       </div>
 
-      <!-- Team Pick on Start Screen (visible when mode === 'team') -->
-      <div id="startTeamPick" class="team-pick-wrap" hidden>
-        <span class="team-pick-label">CHỌN ĐỘI CỦA BẠN:</span>
-        <div class="team-pick-btns">
-          <button type="button" class="btn-team btn-team-0 on" data-team="0">A12 <span class="t-count" id="startCount0">(0 người)</span></button>
-          <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="startCount1">(0 người)</span></button>
-        </div>
-      </div>
+      <div class="start-cols">
+        <!-- CỘT TRÁI -->
+        <div class="start-col-left">
+          <p class="sec-label" data-i18n="modeLabel">CHẾ ĐỘ CHƠI</p>
+          <div id="modes">
+            <button type="button" class="on" data-mode="ffa">
+              <span class="n" data-i18n="m_ffa_title">TỰ DO</span>
+              <span class="p" data-i18n="m_ffa_desc">AI LO THÂN NẤY</span>
+            </button>
+            <button type="button" data-mode="team">
+              <span class="n" data-i18n="m_team_title">TRẠI ĐẤU</span>
+              <span class="p" data-i18n="m_team_desc">A12 VS WFM</span>
+            </button>
+            <button type="button" data-mode="friend">
+              <span class="n" data-i18n="m_friend_title">BẠN BÈ</span>
+              <span class="p" data-i18n="m_friend_desc">PHÒNG RIÊNG KHÔNG BOT</span>
+            </button>
+          </div>
 
-      <!-- Friend Mode Panel (Private Room with Code) -->
-      <div id="friendPanel" class="friend-panel" hidden>
-        <div class="fp-section">
-          <button type="button" id="btnCreateRoom" class="btn-wood">🎲 Tạo phòng riêng</button>
-          <div id="createdRoomBox" class="room-box" hidden>
-            <div class="room-badge room-badge-simple">
-              <span id="createdRoomCode">------</span>
-              <button type="button" id="btnCopyCode" class="btn-copy-ico" title="Sao chép mã">📋</button>
-              <button type="button" id="btnCopyLink" class="btn-copy-ico" title="Sao chép link mời">🔗</button>
+          <!-- Team Pick on Start Screen (visible when mode === 'team') -->
+          <div id="startTeamPick" class="team-pick-wrap" hidden>
+            <span class="team-pick-label" data-i18n="teamPickLabel">CHỌN ĐỘI CỦA BẠN:</span>
+            <div class="team-pick-btns">
+              <button type="button" class="btn-team btn-team-0 on" data-team="0">A12 <span class="t-count" id="startCount0">(0 người)</span></button>
+              <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="startCount1">(0 người)</span></button>
             </div>
           </div>
-        </div>
-        <div class="fp-divider"><span>HOẶC NHẬP MÃ PHÒNG</span></div>
-        <div class="fp-join-row">
-          <input id="joinRoomCode" class="room-code-input" placeholder="Nhập mã (VD: BRAWL8)" maxlength="12" autocomplete="off" spellcheck="false">
-          <button type="button" id="btnApplyCode" class="btn-wood-sm">Chọn mã</button>
-        </div>
-        <div id="roomStatusNotice" class="room-notice"></div>
-      </div>
-      <p class="label" data-i18n="pick"></p>
-      <div id="species"></div>
 
-      <!-- Live 3D Animal & Skin Preview Showcase -->
-      <div id="spPreviewWrap">
-        <div class="sp-preview-header">
-          <div class="sp-preview-text">
-            <span id="spPreviewTitle">Heo</span>
-            <span id="spPreviewSkinName">Heo hồng phấn</span>
+          <!-- Friend Mode Panel (Private Room with Code) -->
+          <div id="friendPanel" class="friend-panel" hidden>
+            <div class="fp-section">
+              <button type="button" id="btnCreateRoom" class="btn-wood" data-i18n="createRoom">🎲 Tạo phòng riêng</button>
+              <div id="createdRoomBox" class="room-box" hidden>
+                <div class="room-badge room-badge-simple">
+                  <span id="createdRoomCode">------</span>
+                  <button type="button" id="btnCopyCode" class="btn-copy-ico" title="Sao chép mã">📋</button>
+                  <button type="button" id="btnCopyLink" class="btn-copy-ico" title="Sao chép link mời">🔗</button>
+                </div>
+              </div>
+            </div>
+            <div class="fp-divider"><span data-i18n="orJoinCode">HOẶC NHẬP MÃ PHÒNG</span></div>
+            <div class="fp-join-row">
+              <input id="joinRoomCode" class="room-code-input" placeholder="Nhập mã (VD: BRAWL8)" maxlength="12" autocomplete="off" spellcheck="false">
+              <button type="button" id="btnApplyCode" class="btn-wood-sm" data-i18n="applyCode">Chọn mã</button>
+            </div>
+            <div id="roomStatusNotice" class="room-notice"></div>
           </div>
-          <span id="spPreviewBadge">Skin 1/4</span>
+
+          <p class="sec-label" data-i18n="pick">CHỌN CON VẬT</p>
+          <div class="sp-carousel-row">
+            <button type="button" id="spNavPrev" class="sp-arrow-btn" title="Trước">‹</button>
+            <div class="sp-carousel-viewport">
+              <div id="species" class="species-track"></div>
+            </div>
+            <button type="button" id="spNavNext" class="sp-arrow-btn" title="Kế tiếp">›</button>
+            <button type="button" id="spRandomBtn" class="sp-random-btn" title="Ngẫu nhiên (Chọn nhanh)">❓</button>
+          </div>
+
+          <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>
+          <p id="bestLine"></p>
         </div>
-        <div class="sp-preview-stage">
-          <canvas id="spPreviewCanvas" width="280" height="160"></canvas>
-          <button type="button" id="spSkinPrev" class="sp-nav-btn sp-prev" title="Skin trước">‹</button>
-          <button type="button" id="spSkinNext" class="sp-nav-btn sp-next" title="Skin kế tiếp">›</button>
+
+        <!-- CỘT PHẢI -->
+        <div class="start-col-right">
+          <!-- Hướng dẫn chơi -->
+          <div class="how-box">
+            <div class="how-title" data-i18n="howTitle">HƯỚNG DẪN CHIẾN ĐẤU</div>
+            <ul class="how">
+              <li data-i18n="how_dash">⚡ Húc đối thủ vào hàng rào điện và địa hình (lò lửa, ao nước, hố sâu) để hạ gục và cướp kg.</li>
+              <li data-i18n="how_podium">👑 Đứng một mình trên bục để lên ngôi và nắm luật, càng nặng chiếm càng nhanh.</li>
+              <li data-i18n="how_charge">💨 Giữ chuột (hoặc phím Space / nút Húc) để tích lực, thả ra để húc thật mạnh, xuyên qua cả đám đông.</li>
+              <li data-i18n="how_items">🌈 Ăn kẹo cầu vồng, nhặt chĩa ba 🍴, thuốc nổ 🧨; cẩn thận máy cày Ông Till 🚜!</li>
+              <li data-i18n="how_terrain">🌾 Bùn làm chậm (trừ Heo), ao sâu làm chìm (trừ Vịt), kiện rơm chắn đường.</li>
+            </ul>
+          </div>
+
+          <!-- 3D Preview Skin con vật kèm nội tại -->
+          <div id="spPreviewWrap">
+            <div class="sp-preview-header">
+              <div class="sp-preview-text">
+                <span id="spPreviewTitle">Heo</span>
+                <span id="spPreviewSkinName">Heo hồng phấn</span>
+              </div>
+              <span id="spPreviewBadge">Skin 1/4</span>
+            </div>
+            <div class="sp-preview-stage">
+              <canvas id="spPreviewCanvas" width="280" height="150"></canvas>
+              <button type="button" id="spSkinPrev" class="sp-nav-btn sp-prev" title="Skin trước">‹</button>
+              <button type="button" id="spSkinNext" class="sp-nav-btn sp-next" title="Skin kế tiếp">›</button>
+            </div>
+            <div id="spSkinPalette" class="sp-palette"></div>
+            <p id="speciesHint" class="hint"></p>
+          </div>
         </div>
-        <div id="spSkinPalette" class="sp-palette"></div>
       </div>
 
-      <p id="speciesHint" class="hint"></p>
-      <button id="play" class="btn-red" type="button" data-i18n="play"></button>
-      <p id="bestLine"></p>
-      <ul class="how">
-        <li data-i18n="how1"></li>
-        <li data-i18n="how2"></li>
-        <li data-i18n="how3"></li>
-        <li data-i18n="how4"></li>
-      </ul>
       <p class="mode-note" data-i18n="offlineNote"></p>
     </div>
   </div>

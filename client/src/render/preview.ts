@@ -2,6 +2,59 @@ import * as THREE from 'three';
 import type { Species } from '@shared/constants';
 import { buildFullAnimal } from './animals';
 
+function build3DQuestionMark(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffd54f,
+    emissive: 0xff9800,
+    emissiveIntensity: 0.45,
+    metalness: 0.75,
+    roughness: 0.25,
+  });
+
+  // Top curve arc of question mark
+  const arcGeo = new THREE.TorusGeometry(0.35, 0.11, 16, 28, Math.PI * 1.35);
+  const arc = new THREE.Mesh(arcGeo, mat);
+  arc.position.set(0, 1.35, 0);
+  arc.rotation.z = -0.55;
+  g.add(arc);
+
+  // Hook curve connecting down
+  const hookGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.3, 16);
+  const hook = new THREE.Mesh(hookGeo, mat);
+  hook.position.set(0.08, 1.05, 0);
+  hook.rotation.z = 0.45;
+  g.add(hook);
+
+  // Lower vertical stem
+  const stemGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.32, 16);
+  const stem = new THREE.Mesh(stemGeo, mat);
+  stem.position.set(0, 0.72, 0);
+  g.add(stem);
+
+  // Bottom dot
+  const dotGeo = new THREE.SphereGeometry(0.14, 16, 14);
+  const dot = new THREE.Mesh(dotGeo, mat);
+  dot.position.set(0, 0.24, 0);
+  g.add(dot);
+
+  // Base gold glow ring
+  const glowGeo = new THREE.RingGeometry(0.35, 0.65, 32);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffb300,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.35,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = 0.02;
+  g.add(glow);
+
+  g.scale.set(1.15, 1.15, 1.15);
+  return g;
+}
+
 export class AnimalPreviewRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: THREE.WebGLRenderer;
@@ -165,6 +218,25 @@ export class AnimalPreviewRenderer {
 
     // Initial presentation angle
     this.turntable.add(root);
+  }
+
+  public setRandom(): void {
+    if (this.currentAnimalGroup) {
+      this.turntable.remove(this.currentAnimalGroup);
+      this.currentAnimalGroup.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.geometry?.dispose();
+          if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+          else m.material?.dispose();
+        }
+      });
+      this.currentAnimalGroup = null;
+    }
+
+    const qMark = build3DQuestionMark();
+    this.currentAnimalGroup = qMark;
+    this.turntable.add(qMark);
   }
 
   public start(): void {
