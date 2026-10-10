@@ -325,13 +325,9 @@ function toggleFs(): void {
   setTimeout(updateFsIcon, 100);
 }
 
-if (fsBtn) fsBtn.addEventListener('click', toggleFs);
-if (startFsBtn) startFsBtn.addEventListener('click', toggleFs);
-
 document.addEventListener('fullscreenchange', () => {
   const doc = document as any;
-  if (!doc.fullscreenElement) {
-    isPseudoFs = false;
+  if (!doc.fullscreenElement && !isPseudoFs) {
     document.documentElement.classList.remove('fullscreen-mode');
     document.body.classList.remove('fullscreen-mode');
   }
@@ -340,8 +336,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 document.addEventListener('webkitfullscreenchange', () => {
   const doc = document as any;
-  if (!doc.webkitFullscreenElement) {
-    isPseudoFs = false;
+  if (!doc.webkitFullscreenElement && !isPseudoFs) {
     document.documentElement.classList.remove('fullscreen-mode');
     document.body.classList.remove('fullscreen-mode');
   }
@@ -349,6 +344,12 @@ document.addEventListener('webkitfullscreenchange', () => {
   window.dispatchEvent(new Event('resize'));
 });
 updateFsIcon();
+
+// Detect iPad / tablet and add 'ipad' class for specialized UI offsets
+const isIPad = (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) || /iPad/.test(navigator.userAgent);
+if (isIPad) {
+  document.body.classList.add('ipad');
+}
 
 // Anti-Zoom & Touch Gesture Lock (iPad & Mobile Chrome/Safari)
 document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
@@ -358,9 +359,39 @@ document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: fa
 // Prevent double-tap zoom natively without swallowing button clicks
 document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
 
-// Prevent multi-touch pinch to zoom
+// Lock downward swipe gesture on iOS/iPadOS to prevent exiting fullscreen or revealing browser bar
+let touchStartClientY = 0;
+window.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 0) {
+    touchStartClientY = e.touches[0].clientY;
+  }
+}, { passive: true });
+
 window.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 0) return;
   if (e.touches.length > 1) {
+    if (e.cancelable) e.preventDefault();
+    return;
+  }
+
+  const currentY = e.touches[0].clientY;
+  const dy = currentY - touchStartClientY;
+
+  const target = e.target as HTMLElement | null;
+  const isScrollable = target?.closest('.drawer-cols, .sp-palette, .screen');
+
+  if (isScrollable) {
+    const el = isScrollable as HTMLElement;
+    const isAtTop = el.scrollTop <= 0;
+    const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    if ((isAtTop && dy > 0) || (isAtBottom && dy < 0)) {
+      if (e.cancelable) e.preventDefault();
+    }
+    return;
+  }
+
+  // Prevent default globally on touchmove to lock fullscreen and prevent swipe down
+  if (e.cancelable) {
     e.preventDefault();
   }
 }, { passive: false });
@@ -371,6 +402,27 @@ window.addEventListener('scroll', () => {
     window.scrollTo(0, 0);
   }
 });
+
+// Helper for fast, reliable single-tap on iPad (fixes iOS double-tap requirement)
+function bindFastTap(el: HTMLElement | null, handler: (e: Event) => void): void {
+  if (!el) return;
+  let lastTouchTime = 0;
+  el.addEventListener('touchend', (e) => {
+    lastTouchTime = Date.now();
+    e.preventDefault();
+    e.stopPropagation();
+    handler(e);
+  }, { passive: false });
+
+  el.addEventListener('click', (e) => {
+    if (Date.now() - lastTouchTime < 400) return;
+    e.stopPropagation();
+    handler(e);
+  });
+}
+
+if (fsBtn) bindFastTap(fsBtn, toggleFs);
+if (startFsBtn) bindFastTap(startFsBtn, toggleFs);
 
 // Mobile & iPad Burger Drawer Modal
 const burgerBtn = document.getElementById('burgerBtn');
@@ -417,8 +469,7 @@ function syncLbUi(): void {
 }
 
 if (burgerBtn && gameDrawerModal) {
-  burgerBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  bindFastTap(burgerBtn, () => {
     gameDrawerModal.hidden = false;
     syncBoardUi();
     syncStatsUi();
@@ -429,24 +480,20 @@ function closeDrawer(): void {
   if (gameDrawerModal) gameDrawerModal.hidden = true;
 }
 
-if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', closeDrawer);
-if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
+bindFastTap(drawerCloseBtn, closeDrawer);
+bindFastTap(drawerBackdrop, closeDrawer);
 
-if (drawerBoardToggle) {
-  drawerBoardToggle.addEventListener('click', () => {
-    showBoard = !showBoard;
-    try { localStorage.setItem('fb_show_board', showBoard ? '1' : '0'); } catch (_) {}
-    syncBoardUi();
-  });
-}
+bindFastTap(drawerBoardToggle, () => {
+  showBoard = !showBoard;
+  try { localStorage.setItem('fb_show_board', showBoard ? '1' : '0'); } catch (_) {}
+  syncBoardUi();
+});
 
-if (drawerStatsToggle) {
-  drawerStatsToggle.addEventListener('click', () => {
-    showStats = !showStats;
-    try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
-    syncStatsUi();
-  });
-}
+bindFastTap(drawerStatsToggle, () => {
+  showStats = !showStats;
+  try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
+  syncStatsUi();
+});
 
 // PC Settings controls
 if (pcSettingsBtn && pcSettingsMenu) {
@@ -486,7 +533,7 @@ if (pcToggleLb) {
 }
 
 if (muteInGameBtn) {
-  muteInGameBtn.addEventListener('click', handleAudioToggle);
+  bindFastTap(muteInGameBtn, handleAudioToggle);
 }
 
 // Initialize audio and UI state
@@ -879,7 +926,7 @@ function connectToRoom(targetRoom: string): void {
   const inviteUrl = isPrivate ? `${window.location.origin}${window.location.pathname}?room=priv-${displayCode}` : undefined;
 
   hud.setRoomTag(
-    isPrivate ? `👥 Mã: ${displayCode} (Sao chép link)` : `Phòng ${displayCode}`,
+    isPrivate ? `${displayCode} 📋` : `Phòng ${displayCode}`,
     inviteUrl
   );
 

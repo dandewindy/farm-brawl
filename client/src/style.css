@@ -543,6 +543,8 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain;
 }
 .drawer-col {
   display: flex;
@@ -572,6 +574,9 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   padding: 2px 4px;
   border-radius: 4px;
   margin-bottom: 2px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .drawer-list li.me {
   color: var(--gold);
@@ -1113,10 +1118,10 @@ body.menu #hud { display: none; }
   #banner .h { font-size: 24px; }
 }
 
-@media (min-width: 769px) and (max-width: 1100px) {
+@media (min-width: 769px) and (max-width: 1280px) {
   #lb { width: 170px; font-size: 12px; }
   #board {
-    top: 8px;
+    top: calc(5vh + 6px);
     height: 28px;
     max-width: min(360px, calc(100vw - 260px));
   }
@@ -1124,27 +1129,64 @@ body.menu #hud { display: none; }
   #dashBtn { right: 24px; bottom: 24px; width: 86px; height: 86px; }
 
   body.touch #lb { display: none !important; }
+  body.touch #stats {
+    top: calc(5vh + 6px);
+    left: max(20px, calc(100vw / 15));
+  }
+  body.touch #board {
+    top: calc(5vh + 6px);
+  }
   body.touch #gameControls {
     display: flex !important;
-    top: 8px;
-    right: 10px;
+    top: calc(5vh + 6px);
+    right: 12px;
     gap: 6px;
   }
   body.touch #burgerBtn { display: grid !important; }
   body.touch #pcSettingsBtn { display: none !important; }
-  body.touch #mapWrap { top: 52px; right: 10px; bottom: auto; }
+  body.touch #mapWrap { top: calc(5vh + 52px); right: 12px; bottom: auto; }
   body.touch #minimap { width: 84px; height: 84px; }
+  body.touch #teamBar { top: calc(5vh + 4px); }
+  body.touch.mode-team #board,
+  body.touch #teamBar:not([hidden]) ~ #hud #board {
+    top: calc(5vh + 40px);
+  }
+}
+
+/* Dedicated iPad rules (body.ipad) */
+body.ipad #stats {
+  top: calc(5vh + 6px) !important;
+  left: max(20px, calc(100vw / 15)) !important;
+}
+body.ipad #board {
+  top: calc(5vh + 6px) !important;
+}
+body.ipad #gameControls {
+  display: flex !important;
+  top: calc(5vh + 6px) !important;
+  right: 12px !important;
+  gap: 6px;
+}
+body.ipad #burgerBtn { display: grid !important; }
+body.ipad #pcSettingsBtn { display: none !important; }
+body.ipad #lb { display: none !important; }
+body.ipad #mapWrap { top: calc(5vh + 52px) !important; right: 12px !important; bottom: auto !important; }
+body.ipad #minimap { width: 84px; height: 84px; }
+body.ipad #teamBar { top: calc(5vh + 4px) !important; }
+body.ipad.mode-team #board,
+body.ipad #teamBar:not([hidden]) ~ #hud #board {
+  top: calc(5vh + 40px) !important;
 }
 
 /* Portrait orientation layout adjustments (Mobile & iPad) */
 @media (orientation: portrait) {
   #board {
-    top: 48px;
+    top: calc(5vh + 44px);
     max-width: min(300px, 86vw);
     height: 26px;
   }
   #mapWrap {
-    top: 78px;
+    top: calc(5vh + 78px);
     right: 8px;
     bottom: auto;
   }
@@ -1157,6 +1199,19 @@ body.menu #hud { display: none; }
     bottom: 22px;
     width: 78px;
     height: 78px;
+  }
+  body.ipad #board,
+  body.touch #board {
+    top: calc(5vh + 44px) !important;
+  }
+  body.ipad #mapWrap,
+  body.touch #mapWrap {
+    top: calc(5vh + 78px) !important;
+  }
+  body.ipad #stats,
+  body.touch #stats {
+    top: calc(5vh + 6px) !important;
+    left: max(16px, calc(100vw / 15)) !important;
   }
 }
 
@@ -1389,6 +1444,43 @@ input, select, textarea, .room-code-input, #name {
   color: var(--gold);
   letter-spacing: 0.1em;
   margin-left: 4px;
+}
+.room-badge-simple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.room-badge-simple span {
+  font-family: var(--f-display);
+  font-weight: 900;
+  font-size: 24px;
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  margin-left: 0;
+}
+.btn-copy-ico {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.15s;
+}
+.btn-copy-ico:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--gold);
+}
+.btn-copy-ico:active {
+  transform: scale(0.92);
 }
 .room-btn-row {
   display: flex;

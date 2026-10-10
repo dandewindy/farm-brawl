@@ -656,7 +656,7 @@ export class HudManager {
       this.btnCopyCode.addEventListener('click', () => {
         if (this.currentFriendCode) {
           navigator.clipboard.writeText(this.currentFriendCode);
-          this.showToast(`Đã chép mã phòng: ${this.currentFriendCode} 📋`);
+          this.showToast(`Đã sao chép: ${this.currentFriendCode} 📋`);
         }
       });
     }
@@ -864,10 +864,10 @@ export class HudManager {
       this.roomTagEl.textContent = name;
       if (inviteUrl) {
         this.roomTagEl.style.cursor = 'pointer';
-        this.roomTagEl.title = 'Bấm để sao chép link mời bạn bè';
+        this.roomTagEl.title = `Bấm để sao chép link phòng ${name}`;
         this.roomTagEl.onclick = () => {
           navigator.clipboard.writeText(inviteUrl);
-          this.showToast('Đã sao chép link mời phòng bạn bè! 🔗');
+          this.showToast(`Đã sao chép: ${name}`);
         };
       } else {
         this.roomTagEl.style.cursor = 'default';
@@ -1177,7 +1177,16 @@ export class HudManager {
         row.append(n, k, v);
         li.appendChild(row);
         li.title = `Bấm để xem góc nhìn của ${name}`;
+        let rowTouched = false;
+        li.addEventListener('touchend', (e) => {
+          rowTouched = true;
+          e.preventDefault();
+          e.stopPropagation();
+          this.onSelectSpectateTarget?.(id);
+          setTimeout(() => { rowTouched = false; }, 300);
+        }, { passive: false });
         li.addEventListener('click', (e) => {
+          if (rowTouched) return;
           e.stopPropagation();
           this.onSelectSpectateTarget?.(id);
         });
