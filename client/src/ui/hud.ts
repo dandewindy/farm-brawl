@@ -882,6 +882,30 @@ export class HudManager {
         }
       }
     });
+
+    const handleLbSelect = (e: MouseEvent | PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      const li = target?.closest('li') as HTMLElement | null;
+      if (!li) return;
+      const idStr = li.dataset.playerId || li.getAttribute('data-player-id');
+      if (idStr) {
+        const id = parseInt(idStr, 10);
+        if (!isNaN(id)) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.onSelectSpectateTarget?.(id);
+        }
+      }
+    };
+
+    if (this.lbList) {
+      this.lbList.addEventListener('pointerdown', handleLbSelect);
+      this.lbList.addEventListener('click', handleLbSelect);
+    }
+    if (this.drawerLbList) {
+      this.drawerLbList.addEventListener('pointerdown', handleLbSelect);
+      this.drawerLbList.addEventListener('click', handleLbSelect);
+    }
   }
 
   public pickChoice(id: string): void {
@@ -1022,7 +1046,9 @@ export class HudManager {
   public setLbVisible(visible: boolean): void {
     const lb = document.getElementById('lb');
     if (lb) {
+      lb.classList.toggle('hidden-by-setting', !visible);
       lb.style.display = visible ? '' : 'none';
+      lb.hidden = !visible;
     }
   }
 
@@ -1267,54 +1293,52 @@ export class HudManager {
   }
 
   updateLeaderboard(lb: LeaderRow[], myId: number, napoleonId = 0): void {
-    this.lbList.innerHTML = '';
-    if (this.drawerLbList) this.drawerLbList.innerHTML = '';
+    if (this.lbList) this.syncLbList(this.lbList, lb, myId, napoleonId);
+    if (this.drawerLbList) this.syncLbList(this.drawerLbList, lb, myId, napoleonId);
+  }
 
-    lb.forEach(([id, name, mass, kills, reign]) => {
-      const createRow = () => {
-        const li = document.createElement('li');
-        if (id === myId) li.classList.add('me');
-        const isKing = id === napoleonId && id > 0;
-        if (isKing) li.classList.add('nap');
-
-        const row = document.createElement('div');
+  private syncLbList(container: HTMLElement, lb: LeaderRow[], myId: number, napoleonId: number): void {
+    const existing = container.children;
+    while (existing.length > lb.length) {
+      container.removeChild(container.lastElementChild!);
+    }
+    lb.forEach(([id, name, mass, kills, reign], idx) => {
+      let li = existing[idx] as HTMLElement | undefined;
+      let row: HTMLElement;
+      let n: HTMLElement;
+      let k: HTMLElement;
+      let v: HTMLElement;
+      if (!li) {
+        li = document.createElement('li');
+        row = document.createElement('div');
         row.className = 'r';
-
-        const n = document.createElement('span');
+        n = document.createElement('span');
         n.className = 'n';
-        n.textContent = name;
-
-        const k = document.createElement('span');
+        k = document.createElement('span');
         k.className = 'k';
-        k.textContent = kills > 0 ? `💥${kills}` : '';
-
-        const v = document.createElement('span');
+        v = document.createElement('span');
         v.className = 'v';
-        v.textContent = (isKing && reign && reign > 0) ? `👑 ${this.fmtTime(reign)} · ${mass} kg` : `${mass} kg`;
-
         row.append(n, k, v);
         li.appendChild(row);
-        li.title = `Bấm để xem góc nhìn của ${name}`;
-        let rowTouched = false;
-        li.addEventListener('touchend', (e) => {
-          rowTouched = true;
-          e.preventDefault();
-          e.stopPropagation();
-          this.onSelectSpectateTarget?.(id);
-          setTimeout(() => { rowTouched = false; }, 300);
-        }, { passive: false });
-        li.addEventListener('click', (e) => {
-          if (rowTouched) return;
-          e.stopPropagation();
-          this.onSelectSpectateTarget?.(id);
-        });
-        return li;
-      };
-
-      this.lbList.appendChild(createRow());
-      if (this.drawerLbList) {
-        this.drawerLbList.appendChild(createRow());
+        container.appendChild(li);
+      } else {
+        row = (li.querySelector('.r') as HTMLElement) || li;
+        n = li.querySelector('.n') as HTMLElement;
+        k = li.querySelector('.k') as HTMLElement;
+        v = li.querySelector('.v') as HTMLElement;
       }
+      li.dataset.playerId = String(id);
+      li.setAttribute('data-player-id', String(id));
+      li.style.cursor = 'pointer';
+      li.title = `Bấm để xem góc nhìn của ${name}`;
+      li.classList.toggle('me', id === myId);
+      const isKing = id === napoleonId && id > 0;
+      li.classList.toggle('nap', isKing);
+      if (n && n.textContent !== name) n.textContent = name;
+      const killText = kills > 0 ? `💥${kills}` : '';
+      if (k && k.textContent !== killText) k.textContent = killText;
+      const valText = (isKing && reign && reign > 0) ? `👑 ${this.fmtTime(reign)} · ${mass} kg` : `${mass} kg`;
+      if (v && v.textContent !== valText) v.textContent = valText;
     });
   }
 

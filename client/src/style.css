@@ -867,12 +867,19 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   font-size: 13px;
 }
 #hofList li {
+  padding: 1px 4px;
+}
+#hofList li > div,
+#hofList .r {
   display: flex;
   justify-content: space-between;
-  padding: 1px 0;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
 }
 #hofList .n {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -881,6 +888,10 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #hofList .v {
   color: var(--gold);
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 #podiumTimerBadge {
@@ -1019,7 +1030,12 @@ body.touch #lb {
 #gameControls #pcSettingsBtn { display: grid !important; }
 body.is-pc #gameControls #burgerBtn { display: none !important; }
 body.is-pc #gameControls #pcSettingsBtn { display: grid !important; }
-body.is-pc #lb { display: block !important; }
+body.is-pc #lb { display: block; }
+#lb.hidden-by-setting,
+body.is-pc #lb.hidden-by-setting,
+body.spectating #lb.hidden-by-setting {
+  display: none !important;
+}
 
 /* Mobile & Touch & iPad: Burger shown, settings button hidden */
 body.touch:not(.is-pc) #gameControls,

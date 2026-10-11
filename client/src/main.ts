@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { CFG, type Species } from '@shared/constants';
 import { insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
@@ -176,9 +177,9 @@ hud.onSelectSpectateTarget = (id: number) => {
   document.body.classList.remove('menu');
   const targetEnt = gameState.ents.get(id);
   const targetMeta = gameState.metas.get(id);
-  if (targetEnt) {
-    hud.updateSpectatorTarget(targetMeta ? targetMeta.name : 'Người chơi', Math.round(targetEnt.mass));
-  }
+  const playerName = targetMeta ? targetMeta.name : 'Người chơi';
+  const playerMass = targetEnt ? Math.round(targetEnt.mass) : 0;
+  hud.updateSpectatorTarget(playerName, playerMass);
 };
 
 hud.onStopSpectating = () => {
@@ -186,6 +187,51 @@ hud.onStopSpectating = () => {
   spectateTargetId = null;
   document.body.classList.remove('spectating');
 };
+
+// Click on 3D animal or floating name in spectator mode to follow that player
+window.addEventListener('pointerdown', (e) => {
+  if (!isSpectating) return;
+  const target = e.target as HTMLElement | null;
+  if (target && target.closest('#hud, #gameControls, #death, #start, #specBar, #lb, #drawer, button, input, #pcSettingsMenu')) {
+    return;
+  }
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+  const mouse = new THREE.Vector2(
+    (e.clientX / window.innerWidth) * 2 - 1,
+    -(e.clientY / window.innerHeight) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, world.camera);
+  const ray = raycaster.ray;
+
+  let bestId: number | null = null;
+  let bestDist = Infinity;
+
+  for (const [id, ent] of gameState.ents.entries()) {
+    if (ent.mass < 1) continue;
+    const sc = Math.pow(ent.mass / 20, 0.38);
+    const animalY = 0.8 * sc;
+    const labelY = animalY + sc * 1.8;
+
+    const pCenter = new THREE.Vector3(ent.x, animalY, ent.z);
+    const distCenter = ray.distanceToPoint(pCenter);
+
+    const pLabel = new THREE.Vector3(ent.x, labelY, ent.z);
+    const distLabel = ray.distanceToPoint(pLabel);
+
+    const hitThreshold = Math.max(2.8, sc * 2.5);
+    const minDist = Math.min(distCenter, distLabel);
+    if (minDist <= hitThreshold && minDist < bestDist) {
+      bestDist = minDist;
+      bestId = id;
+    }
+  }
+
+  if (bestId !== null) {
+    hud.onSelectSpectateTarget?.(bestId);
+  }
+});
 
 hud.onPickRule = (ruleId) => {
   transport?.send({ t: 'rule', id: ruleId });
