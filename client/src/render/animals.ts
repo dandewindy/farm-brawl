@@ -657,7 +657,7 @@ const LABEL_Y: Record<Species, number> = {
   pig: 2.1,
 };
 
-function createLabel(text: string, crowned = false, traitor = false): THREE.Sprite {
+function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const font = `700 40px ${LABEL_FONT}`;
@@ -676,9 +676,9 @@ function createLabel(text: string, crowned = false, traitor = false): THREE.Spri
     ctx.fillText(text, w / 2, 30);
   } else {
     ctx.lineWidth = 7;
-    ctx.strokeStyle = 'rgba(31, 26, 23, 0.75)';
+    ctx.strokeStyle = isMe ? 'rgba(25, 20, 15, 0.95)' : 'rgba(31, 26, 23, 0.75)';
     ctx.strokeText(text, w / 2, 30);
-    ctx.fillStyle = '#f2ead7';
+    ctx.fillStyle = isMe ? '#ffd54f' : '#f2ead7';
     ctx.fillText(text, w / 2, 30);
   }
 
@@ -703,6 +703,7 @@ interface ShockwaveRing {
 }
 
 export class AnimalRenderer {
+  public myId = 0;
   private readonly visuals = new Map<number, AnimalVisual>();
   private readonly group = new THREE.Group();
   private readonly shockwavePool: ShockwaveRing[] = [];
@@ -778,7 +779,8 @@ export class AnimalRenderer {
   getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
     let vis = this.visuals.get(id);
     if (!vis && meta) {
-      vis = this.buildAnimal(meta);
+      const isMe = id === this.myId;
+      vis = this.buildAnimal(meta, isMe);
       this.visuals.set(id, vis);
       this.group.add(vis.root);
     }
@@ -1102,6 +1104,7 @@ export class AnimalRenderer {
     if (flags & FLAG.DYNAMITE) iconPrefix += '🧨 ';
     if (flags & FLAG.PITCHFORK) iconPrefix += '🍴 ';
 
+    const isMe = id === this.myId;
     const roundedMass = Math.round(mass / 5) * 5;
     const labelText = showCrown
       ? `${iconPrefix}👑 ${meta.name} · ${roundedMass}kg`
@@ -1109,15 +1112,16 @@ export class AnimalRenderer {
       ? `${iconPrefix}⚡ ${meta.name} · ${t('traitor')}`
       : `${iconPrefix}${meta.name}`;
 
-    if (vis.labelKey !== labelText) {
+    const labelKey = `${labelText}_${isMe ? '1' : '0'}_${showCrown ? 'c' : ''}_${isTraitor ? 't' : ''}`;
+    if (vis.labelKey !== labelKey) {
       if (vis.label) {
         this.scene.remove(vis.label);
         vis.label.material.map?.dispose();
         vis.label.material.dispose();
       }
-      vis.label = createLabel(labelText, showCrown, isTraitor);
+      vis.label = createLabel(labelText, showCrown, isTraitor, isMe);
       this.scene.add(vis.label);
-      vis.labelKey = labelText;
+      vis.labelKey = labelKey;
       vis.isCrowned = showCrown;
     }
 
@@ -1171,7 +1175,7 @@ export class AnimalRenderer {
     vis.collarMat.color.setHex(isKing ? 0xffc928 : collarColor);
   }
 
-  private buildAnimal(meta: PlayerMeta): AnimalVisual {
+  private buildAnimal(meta: PlayerMeta, isMe = false): AnimalVisual {
     const { root, body, legs, collarMat } = buildFullAnimal(meta.species, meta.skin, meta.team);
 
     // Add King regalia (crown + cape)
@@ -1180,7 +1184,7 @@ export class AnimalRenderer {
     root.add(regalia);
 
     // Add floating name label
-    const label = createLabel(meta.name, false, false);
+    const label = createLabel(meta.name, false, false, isMe);
     this.scene.add(label);
 
     // Add ground indicator ring

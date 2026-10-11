@@ -142,7 +142,7 @@
       <div class="wall-top">
         <button id="startFsBtn" type="button" title="Toàn màn hình / Fullscreen"><span class="ico">⛶</span></button>
         <button id="mute" type="button" title="Âm thanh / Sound"><span class="ico">🔊</span></button>
-        <button id="langToggle" type="button" title="Ngôn ngữ / Language"><span class="ico">🇻🇳</span> <span class="lang-txt">VI</span></button>
+        <button id="langToggle" type="button" title="Ngôn ngữ / Language">VI</button>
       </div>
       <h1 class="title-row"><span class="t1">FARM</span> <span class="t2">BRAWL</span></h1>
       <p class="slogan" data-i18n="slogan"></p>
@@ -158,16 +158,21 @@
           <div id="modes">
             <button type="button" class="on" data-mode="ffa">
               <span class="n" data-i18n="m_ffa_title">TỰ DO</span>
-              <span class="p" data-i18n="m_ffa_desc">AI LO THÂN NẤY</span>
+              <span class="p" data-i18n="m_ffa_desc">Thân ai nấy lo</span>
             </button>
             <button type="button" data-mode="team">
               <span class="n" data-i18n="m_team_title">TRẠI ĐẤU</span>
-              <span class="p" data-i18n="m_team_desc">A12 VS WFM</span>
+              <span class="p" data-i18n="m_team_desc">Tranh tài 2 đội</span>
             </button>
             <button type="button" data-mode="friend">
               <span class="n" data-i18n="m_friend_title">BẠN BÈ</span>
-              <span class="p" data-i18n="m_friend_desc">PHÒNG RIÊNG KHÔNG BOT</span>
+              <span class="p" data-i18n="m_friend_desc">Phòng riêng không bot</span>
             </button>
+          </div>
+
+          <!-- Simple Gameplay Preview Banner for FFA Mode (balances empty vertical space) -->
+          <div id="ffaPreviewBox" class="ffa-preview-box">
+            <img src="/gameplay-preview.png" alt="Farm Brawl Gameplay" class="ffa-preview-img">
           </div>
 
           <!-- Team Pick on Start Screen (visible when mode === 'team') -->
@@ -205,8 +210,8 @@
             <div class="sp-carousel-viewport">
               <div id="species" class="species-track"></div>
             </div>
-            <button type="button" id="spNavNext" class="sp-arrow-btn" title="Kế tiếp">›</button>
             <button type="button" id="spRandomBtn" class="sp-random-btn" title="Ngẫu nhiên (Chọn nhanh)">❓</button>
+            <button type="button" id="spNavNext" class="sp-arrow-btn" title="Kế tiếp">›</button>
           </div>
 
           <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>

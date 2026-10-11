@@ -150,6 +150,7 @@ export class HudManager {
   private readonly spRandomBtn: HTMLButtonElement | null;
   private readonly langToggle: HTMLButtonElement | null;
   private readonly nameEditBtn: HTMLButtonElement | null;
+  private readonly ffaPreviewBox: HTMLElement | null;
   private isRandomSelected = false;
   private carouselIndex = 0;
   private updateSpeciesUI?: () => void;
@@ -244,6 +245,7 @@ export class HudManager {
     this.spRandomBtn = document.getElementById('spRandomBtn') as HTMLButtonElement | null;
     this.langToggle = document.getElementById('langToggle') as HTMLButtonElement | null;
     this.nameEditBtn = document.getElementById('nameEditBtn') as HTMLButtonElement | null;
+    this.ffaPreviewBox = document.getElementById('ffaPreviewBox');
 
     const previewCanvas = document.getElementById('spPreviewCanvas') as HTMLCanvasElement | null;
     if (previewCanvas) {
@@ -302,14 +304,16 @@ export class HudManager {
     });
 
     const updateCarousel = () => {
-      this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * 64}px)`;
+      const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
+      const step = firstBtn ? firstBtn.offsetWidth + 8 : 74;
+      this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * step}px)`;
       if (this.spNavPrev) {
         this.spNavPrev.disabled = this.carouselIndex <= 0;
-        this.spNavPrev.style.opacity = this.carouselIndex <= 0 ? '0.35' : '1';
+        this.spNavPrev.style.opacity = this.carouselIndex <= 0 ? '0.2' : '1';
       }
       if (this.spNavNext) {
         this.spNavNext.disabled = this.carouselIndex >= SPECIES.length - 3;
-        this.spNavNext.style.opacity = this.carouselIndex >= SPECIES.length - 3 ? '0.35' : '1';
+        this.spNavNext.style.opacity = this.carouselIndex >= SPECIES.length - 3 ? '0.2' : '1';
       }
     };
 
@@ -507,20 +511,16 @@ export class HudManager {
     // Language switcher
     const curLang = getLanguage();
     if (this.langToggle) {
-      const ico = this.langToggle.querySelector('.ico');
-      const txt = this.langToggle.querySelector('.lang-txt');
-      if (ico) ico.textContent = curLang === 'vi' ? '🇻🇳' : '🇬🇧';
-      if (txt) txt.textContent = curLang === 'vi' ? 'VI' : 'EN';
+      this.langToggle.textContent = curLang === 'vi' ? 'VI' : 'EN';
+      this.langToggle.title = curLang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : 'Language: English';
 
       this.langToggle.addEventListener('click', () => {
         const nextLang = toggleLanguage();
-        const ico = this.langToggle?.querySelector('.ico');
-        const txt = this.langToggle?.querySelector('.lang-txt');
-        if (ico) ico.textContent = nextLang === 'vi' ? '🇻🇳' : '🇬🇧';
-        if (txt) txt.textContent = nextLang === 'vi' ? 'VI' : 'EN';
+        this.langToggle!.textContent = nextLang === 'vi' ? 'VI' : 'EN';
+        this.langToggle!.title = nextLang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : 'Language: English';
         this.nameInput.placeholder = t('namePh');
         updateAllButtons();
-        this.showToast(nextLang === 'vi' ? '🇻🇳 Đã chuyển sang Tiếng Việt' : '🇬🇧 Switched to English', 1000);
+        this.showToast(nextLang === 'vi' ? 'Đã chuyển sang Tiếng Việt' : 'Switched to English', 1000);
       });
     }
   }
@@ -843,12 +843,19 @@ export class HudManager {
             if (this.startTeamPickEl) {
               this.startTeamPickEl.hidden = mode !== 'team';
             }
+            if (this.ffaPreviewBox) {
+              this.ffaPreviewBox.hidden = mode !== 'ffa';
+            }
             document.body.classList.toggle('mode-team', mode === 'team');
             this.setSelectedTeam(this.selectedTeam);
             this.onSelectMode?.(mode);
           }
         });
       });
+    }
+
+    if (this.ffaPreviewBox) {
+      this.ffaPreviewBox.hidden = this.selectedMode !== 'ffa';
     }
 
     // Auto-detect invite link from URL
@@ -862,6 +869,7 @@ export class HudManager {
         b.classList.toggle('on', b.dataset.mode === 'friend');
       });
       if (this.friendPanel) this.friendPanel.hidden = false;
+      if (this.ffaPreviewBox) this.ffaPreviewBox.hidden = true;
       if (this.joinRoomCode) this.joinRoomCode.value = cleanCode;
       if (this.createdRoomCode) this.createdRoomCode.textContent = cleanCode;
       if (this.createdRoomBox) this.createdRoomBox.hidden = false;
@@ -1021,13 +1029,9 @@ export class HudManager {
   public setMuteState(mutedOrMode: boolean | AudioMode): void {
     const mode: AudioMode = typeof mutedOrMode === 'number' ? mutedOrMode : (mutedOrMode ? 2 : 0);
     if (this.muteBtn) {
-      if (mode === 0) {
-        this.muteBtn.innerHTML = `<span class="ico">🔊</span> <span>${t('sound')}</span>`;
-      } else if (mode === 1) {
-        this.muteBtn.innerHTML = `<span class="ico">🔈</span> <span>Tắt nhạc</span>`;
-      } else {
-        this.muteBtn.innerHTML = `<span class="ico">🔇</span> <span>${t('sound')}</span>`;
-      }
+      const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+      this.muteBtn.innerHTML = `<span class="ico">${ico}</span>`;
+      this.muteBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
     }
   }
 

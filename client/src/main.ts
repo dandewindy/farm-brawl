@@ -271,8 +271,9 @@ function syncAudioUi(): void {
   }
   const startMuteBtn = document.getElementById('mute');
   if (startMuteBtn) {
-    const ico = startMuteBtn.querySelector('.ico');
-    if (ico) ico.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+    const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+    startMuteBtn.innerHTML = `<span class="ico">${ico}</span>`;
+    startMuteBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
   }
 }
 
@@ -1224,6 +1225,7 @@ function animate(now: number): void {
   gameState.interpolate(now);
 
   // Update 3D animal visual poses
+  animals.myId = gameState.myId;
   for (const ent of gameState.ents.values()) {
     const meta = gameState.metas.get(ent.id);
     if (meta) {

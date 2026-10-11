@@ -185,41 +185,45 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 .sp-carousel-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  margin: 4px 0 8px;
+  justify-content: space-between;
+  width: 100%;
+  gap: 4px;
+  margin: 4px 0 10px;
 }
 .sp-arrow-btn {
-  width: 28px;
-  height: 56px;
-  background: rgba(43, 33, 24, 0.85);
-  border: 1px solid rgba(224, 159, 62, 0.4);
-  border-radius: 8px;
-  color: #f7d27e;
-  font-size: 22px;
-  font-weight: 800;
+  width: 24px;
+  height: 66px;
+  background: transparent;
+  border: none;
+  color: var(--gold);
+  font-size: 32px;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease;
   touch-action: manipulation;
   flex-shrink: 0;
+  user-select: none;
+  line-height: 1;
 }
 .sp-arrow-btn:hover:not(:disabled) {
-  background: rgba(66, 50, 36, 0.95);
-  border-color: #ffd54f;
-  transform: scale(1.05);
+  color: #fff;
+  transform: scale(1.2);
+}
+.sp-arrow-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 .sp-arrow-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+  opacity: 0.2;
+  cursor: default;
 }
 .sp-carousel-viewport {
-  width: 184px;
+  width: 214px;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   flex-shrink: 0;
 }
 .species-track {
@@ -229,9 +233,9 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   will-change: transform;
 }
 #species button {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
+  flex: 0 0 66px;
+  width: 66px;
+  height: 66px;
   position: relative;
   aspect-ratio: 1;
   background: #2e2622;
@@ -250,8 +254,8 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #species button:hover { transform: translateY(-2px); }
 #species button.on { border-color: var(--gold); background: #4a3b2a; }
 #species button .sp-thumb {
-  width: 42px;
-  height: 42px;
+  width: 50px;
+  height: 50px;
   object-fit: contain;
   filter: drop-shadow(0 3px 5px rgba(0,0,0,.45));
   pointer-events: none;
@@ -276,12 +280,13 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
   box-shadow: 0 0 4px var(--gold);
 }
 .sp-random-btn {
-  width: 52px;
-  height: 56px;
+  flex: 0 0 66px;
+  width: 66px;
+  height: 66px;
   background: linear-gradient(135deg, rgba(230, 160, 30, 0.35), rgba(120, 80, 10, 0.45));
   border: 2px solid #ffd54f;
-  border-radius: 10px;
-  font-size: 22px;
+  border-radius: 12px;
+  font-size: 26px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -846,6 +851,7 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 #lbList .k { color: #ff9b7a; }
 #lbList .v { color: #d8c9a8; }
 #lbList li.me { color: var(--gold); font-weight: 700; }
+#lbList li.me .n { color: var(--gold) !important; font-weight: 700; }
 #lbList li.nap .n { color: var(--gold); }
 #lbList li.nap .n::before { content: '♛ '; }
 
@@ -1239,21 +1245,84 @@ body.menu #hud { display: none; }
 @keyframes fadeOut { to { opacity: 0; } }
 @keyframes bannerIn { from { opacity: 0; transform: scale(.7); } }
 
+body.mobile-phone #spPreviewWrap,
+body.mobile-phone .ffa-preview-box {
+  display: none !important;
+}
+
 @media (max-width: 768px) {
-  h1 { font-size: 46px; }
+  #spPreviewWrap,
+  .ffa-preview-box {
+    display: none !important;
+  }
+  h1 { font-size: 38px; }
   .title-row {
-    font-size: 38px;
+    font-size: 30px;
     gap: 8px;
+  }
+  .slogan {
+    font-size: 11.5px;
+    margin: 2px 0 6px;
+  }
+  .name-box {
+    margin: 0 auto 6px;
+    width: min(260px, 90%);
+  }
+  .name-box #name {
+    padding: 6px 32px 6px 12px;
+    font-size: 14px;
   }
   .start-cols {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 8px;
   }
   .card.start-card-wide {
-    padding: 14px 14px 12px;
+    padding: 10px 14px 10px;
+    max-height: 98vh;
+    width: min(680px, 98vw);
+  }
+  .sec-label {
+    margin: 3px 0;
+    font-size: 11px;
+  }
+  #modes {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  #modes button {
+    padding: 5px 2px;
+  }
+  #modes button .n {
+    font-size: 12px;
+  }
+  #modes button .p {
+    font-size: 8.5px;
   }
   .sp-carousel-row {
-    justify-content: center;
+    margin: 3px 0 6px;
+  }
+  .sp-carousel-viewport {
+    width: 172px;
+  }
+  #species button {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+  }
+  #species button .sp-thumb {
+    width: 38px;
+    height: 38px;
+  }
+  .sp-random-btn {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+  }
+  .play-btn-main {
+    padding: 8px 12px;
+    font-size: 16px;
+    margin-top: 4px;
   }
 
   /* Top-left: Compact single-row stats badge */
@@ -1507,6 +1576,121 @@ body.mobile-phone #teamBar {
   }
 }
 
+/* Landscape Mobile / Phone Optimization: Compact start card, fits screen with no scrolling */
+@media (orientation: landscape) and (max-height: 540px) {
+  .card.start-card-wide {
+    max-height: 98vh;
+    padding: 6px 16px 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .title-row {
+    font-size: 24px;
+    gap: 8px;
+    margin: 0;
+  }
+  .slogan {
+    display: none;
+  }
+  .wall-top {
+    margin-bottom: 0;
+    gap: 6px;
+  }
+  #mute, #startFsBtn, #langToggle {
+    width: 32px;
+    height: 28px;
+    font-size: 13px;
+  }
+  .name-box {
+    margin: 0 auto 4px;
+    width: min(220px, 80%);
+  }
+  .name-box #name {
+    padding: 4px 26px 4px 8px;
+    font-size: 13px;
+  }
+  .name-pencil {
+    font-size: 13px;
+    right: 4px;
+  }
+  .start-cols {
+    grid-template-columns: 1.15fr 0.85fr !important;
+    gap: 12px !important;
+    margin-top: 2px;
+  }
+  .sec-label {
+    font-size: 10px;
+    margin: 2px 0;
+  }
+  #modes {
+    gap: 4px;
+    margin-bottom: 3px;
+  }
+  #modes button {
+    padding: 3px 2px;
+    border-radius: 6px;
+  }
+  #modes button .n {
+    font-size: 11px;
+  }
+  #modes button .p {
+    font-size: 8px;
+  }
+  .sp-carousel-row {
+    margin: 2px 0 4px;
+    gap: 4px;
+  }
+  .sp-carousel-viewport {
+    width: 154px;
+  }
+  #species button {
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+  }
+  #species button .sp-thumb {
+    width: 34px;
+    height: 34px;
+  }
+  .sp-random-btn {
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    font-size: 18px;
+  }
+  .sp-arrow-btn {
+    font-size: 24px;
+    padding: 0 2px;
+    height: 46px;
+  }
+  .play-btn-main {
+    padding: 6px 10px;
+    font-size: 14px;
+    margin-top: 2px;
+    border-radius: 8px;
+  }
+  .how-box {
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+  .how-title {
+    font-size: 10.5px;
+    margin-bottom: 2px;
+  }
+  .how {
+    font-size: 9.5px;
+    line-height: 1.25;
+    margin: 0;
+    padding-left: 10px;
+  }
+  .how li {
+    margin-bottom: 1px;
+  }
+}
+
 /* Anti-zoom rules for iOS / iPadOS WebKit */
 input, select, textarea, .room-code-input, #name {
   font-size: 16px !important;
@@ -1639,26 +1823,29 @@ input, select, textarea, .room-code-input, #name {
   border: 1px solid #4a3e36;
   color: var(--paper);
   border-radius: 8px;
-  padding: 4px 8px;
+  width: 36px;
+  height: 34px;
   min-width: 36px;
-  height: 32px;
-  font-size: 14px;
+  font-size: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  font-family: var(--f-display);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0;
+  box-sizing: border-box;
 }
 #mute:hover, #startFsBtn:hover, #langToggle:hover {
   background: #3e322a;
   border-color: var(--gold);
+  transform: scale(1.05);
 }
-#langToggle .lang-txt {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+#langToggle {
   color: var(--gold);
+  font-size: 13px;
 }
 #modes {
   display: grid;
@@ -1694,8 +1881,29 @@ input, select, textarea, .room-code-input, #name {
   color: #b9a98a;
   line-height: 1.2;
   margin-top: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+/* Simple Gameplay Preview Box for FFA Mode */
+.ffa-preview-box {
+  width: 100%;
+  margin: 4px 0 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #3a302a;
+  background: #1e1814;
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ffa-preview-img {
+  width: 100%;
+  height: 105px;
+  object-fit: cover;
+  object-position: center 60%;
+  display: block;
 }
 
 /* Friend Mode Private Room Panel */
