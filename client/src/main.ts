@@ -254,8 +254,10 @@ function isFsActive(): boolean {
   );
 }
 
+let userWantsFs = false;
+
 function updateFsIcon(): void {
-  const active = isFsActive();
+  const active = isFsActive() || userWantsFs;
   if (fsBtn) {
     const enterEl = fsBtn.querySelector('.fs-icon-enter') as HTMLElement | null;
     const exitEl = fsBtn.querySelector('.fs-icon-exit') as HTMLElement | null;
@@ -294,24 +296,21 @@ function disablePseudoFs(): void {
 function toggleFs(): void {
   const doc = document as any;
   const docEl = document.documentElement as any;
-  const active = isFsActive();
+  const active = isFsActive() || userWantsFs;
 
   if (!active) {
+    userWantsFs = true;
+    enablePseudoFs(); // immediately lock pseudo fullscreen so layout doesn't shift
     const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
                 (docEl.webkitRequestFullscreen && docEl.webkitRequestFullscreen()) ||
                 (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
                 (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
     if (req && typeof req.catch === 'function') {
-      req.catch(() => {
-        enablePseudoFs();
-      });
-    } else if (!req) {
-      enablePseudoFs();
+      req.catch(() => {});
     }
   } else {
-    if (isPseudoFs) {
-      disablePseudoFs();
-    }
+    userWantsFs = false;
+    disablePseudoFs();
     if (doc.exitFullscreen) {
       doc.exitFullscreen().catch(() => {});
     } else if (doc.webkitExitFullscreen) {
@@ -325,30 +324,53 @@ function toggleFs(): void {
   setTimeout(updateFsIcon, 100);
 }
 
-document.addEventListener('fullscreenchange', () => {
+function handleFsChange(): void {
   const doc = document as any;
-  if (!doc.fullscreenElement && !isPseudoFs) {
-    document.documentElement.classList.remove('fullscreen-mode');
-    document.body.classList.remove('fullscreen-mode');
+  const hasNative = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+
+  if (!hasNative) {
+    if (userWantsFs) {
+      // Involuntary exit from iPadOS system gesture (swipe down to exit):
+      // Keep pseudo-fullscreen LOCKED so game stays full 100% viewport!
+      enablePseudoFs();
+      // On next user interaction, silently re-request native fullscreen
+      const reenter = () => {
+        if (userWantsFs) {
+          const docEl = document.documentElement as any;
+          const req = docEl.requestFullscreen?.() || docEl.webkitRequestFullscreen?.();
+          if (req?.catch) req.catch(() => {});
+        }
+        window.removeEventListener('touchend', reenter);
+        window.removeEventListener('pointerup', reenter);
+      };
+      window.addEventListener('touchend', reenter, { once: true });
+      window.addEventListener('pointerup', reenter, { once: true });
+    } else {
+      disablePseudoFs();
+    }
+  } else {
+    enablePseudoFs();
   }
   updateFsIcon();
   window.dispatchEvent(new Event('resize'));
-});
-document.addEventListener('webkitfullscreenchange', () => {
-  const doc = document as any;
-  if (!doc.webkitFullscreenElement && !isPseudoFs) {
-    document.documentElement.classList.remove('fullscreen-mode');
-    document.body.classList.remove('fullscreen-mode');
-  }
-  updateFsIcon();
-  window.dispatchEvent(new Event('resize'));
-});
+}
+
+document.addEventListener('fullscreenchange', handleFsChange);
+document.addEventListener('webkitfullscreenchange', handleFsChange);
 updateFsIcon();
 
-// Detect iPad / tablet and add 'ipad' class for specialized UI offsets
+// Detect device types
 const isIPad = (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) || /iPad/.test(navigator.userAgent);
+const isMobilePhone = /Android|iPhone|iPod/i.test(navigator.userAgent);
+const isPC = !isIPad && !isMobilePhone;
+
 if (isIPad) {
   document.body.classList.add('ipad');
+} else if (isMobilePhone) {
+  document.body.classList.add('mobile-phone');
+}
+if (isPC) {
+  document.body.classList.add('is-pc');
 }
 
 // Anti-Zoom & Touch Gesture Lock (iPad & Mobile Chrome/Safari)
@@ -364,8 +386,16 @@ let touchStartClientY = 0;
 window.addEventListener('touchstart', (e) => {
   if (e.touches.length > 0) {
     touchStartClientY = e.touches[0].clientY;
+    const target = e.target as HTMLElement | null;
+    const isInteractive = target?.closest('button, input, select, textarea, a, .drawer-modal, .card, #gameControls, #netPerf');
+    // If in fullscreen on iPad or touching in top edge zone, cancel default touch to prevent system exit gesture
+    if (!isInteractive && e.cancelable && (userWantsFs || isIPad)) {
+      if (e.touches[0].clientY < 80) {
+        e.preventDefault();
+      }
+    }
   }
-}, { passive: true });
+}, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
   if (e.touches.length === 0) return;

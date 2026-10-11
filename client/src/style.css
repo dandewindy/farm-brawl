@@ -1014,39 +1014,56 @@ body.touch #lb {
   transform: scale(0.95);
 }
 
-/* PC default: Burger hidden, settings button shown */
-#burgerBtn { display: none; }
-#pcSettingsBtn { display: grid; }
+/* PC default: Burger button completely hidden, settings button shown */
+#gameControls #burgerBtn { display: none !important; }
+#gameControls #pcSettingsBtn { display: grid !important; }
+body.is-pc #gameControls #burgerBtn { display: none !important; }
+body.is-pc #gameControls #pcSettingsBtn { display: grid !important; }
+body.is-pc #lb { display: block !important; }
 
-/* Mobile & Touch: Burger shown, settings button hidden, gameControls placed at top-right */
-body.touch #gameControls {
-  top: 8px;
-  right: 10px;
-  gap: 5px;
+/* Mobile & Touch & iPad: Burger shown, settings button hidden */
+body.touch:not(.is-pc) #gameControls,
+body.mobile-phone #gameControls {
+  top: 6px;
+  right: 6px;
+  gap: 4px;
 }
-body.touch #gameControls button {
+body.touch:not(.is-pc) #gameControls button,
+body.mobile-phone #gameControls button {
   width: 36px;
   height: 36px;
   font-size: 16px;
 }
-body.touch #burgerBtn { display: grid !important; }
-body.touch #pcSettingsBtn { display: none !important; }
-body.touch #lb { display: none !important; }
+body.touch:not(.is-pc) #gameControls #burgerBtn,
+body.mobile-phone #gameControls #burgerBtn,
+body.ipad #gameControls #burgerBtn {
+  display: grid !important;
+}
+body.touch:not(.is-pc) #gameControls #pcSettingsBtn,
+body.mobile-phone #gameControls #pcSettingsBtn,
+body.ipad #gameControls #pcSettingsBtn {
+  display: none !important;
+}
+body.touch:not(.is-pc) #lb,
+body.mobile-phone #lb,
+body.ipad #lb {
+  display: none !important;
+}
 
 @media (max-width: 1024px) {
-  #gameControls {
-    top: 8px;
-    right: 10px;
-    gap: 5px;
+  body:not(.is-pc) #gameControls {
+    top: 6px;
+    right: 6px;
+    gap: 4px;
   }
-  #gameControls button {
+  body:not(.is-pc) #gameControls button {
     width: 36px;
     height: 36px;
     font-size: 16px;
   }
-  #burgerBtn { display: grid !important; }
-  #pcSettingsBtn { display: none !important; }
-  #lb { display: none !important; }
+  body:not(.is-pc) #gameControls #burgerBtn { display: grid !important; }
+  body:not(.is-pc) #gameControls #pcSettingsBtn { display: none !important; }
+  body:not(.is-pc) #lb { display: none !important; }
 }
 
 #floats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
@@ -1249,9 +1266,9 @@ body.menu #hud { display: none; }
     height: 36px;
     font-size: 16px;
   }
-  #burgerBtn { display: grid !important; }
-  #pcSettingsBtn { display: none !important; }
-  #lb { display: none !important; }
+  body:not(.is-pc) #gameControls #burgerBtn { display: grid !important; }
+  body:not(.is-pc) #gameControls #pcSettingsBtn { display: none !important; }
+  body:not(.is-pc) #lb { display: none !important; }
 
   /* Sub-top: Rule / Commandment board (compact 1 row) */
   #board {
@@ -1354,42 +1371,17 @@ body.menu #hud { display: none; }
 @media (min-width: 769px) and (max-width: 1280px) {
   #lb { width: 170px; font-size: 12px; }
   #board {
-    top: calc(5vh + 6px);
     height: 28px;
     max-width: min(360px, calc(100vw - 260px));
   }
   #gameControls { right: 190px; }
   #dashBtn { right: 24px; bottom: 24px; width: 86px; height: 86px; }
-
-  body.touch #lb { display: none !important; }
-  body.touch #stats {
-    top: calc(5vh + 6px);
-    left: max(20px, calc(100vw / 15));
-  }
-  body.touch #board {
-    top: calc(5vh + 6px);
-  }
-  body.touch #gameControls {
-    display: flex !important;
-    top: calc(5vh + 6px);
-    right: 12px;
-    gap: 6px;
-  }
-  body.touch #burgerBtn { display: grid !important; }
-  body.touch #pcSettingsBtn { display: none !important; }
-  body.touch #mapWrap { top: calc(5vh + 52px); right: 12px; bottom: auto; }
-  body.touch #minimap { width: 84px; height: 84px; }
-  body.touch #teamBar { top: calc(5vh + 4px); }
-  body.touch.mode-team #board,
-  body.touch #teamBar:not([hidden]) ~ #hud #board {
-    top: calc(5vh + 40px);
-  }
 }
 
-/* Dedicated iPad rules (body.ipad) */
+/* Dedicated iPad rules (body.ipad): 5vh top inset + 92px left offset to avoid battery bar & browser X button */
 body.ipad #stats {
   top: calc(5vh + 6px) !important;
-  left: max(20px, calc(100vw / 15)) !important;
+  left: max(92px, calc(100vw / 9)) !important;
 }
 body.ipad #board {
   top: calc(5vh + 6px) !important;
@@ -1400,8 +1392,8 @@ body.ipad #gameControls {
   right: 12px !important;
   gap: 6px;
 }
-body.ipad #burgerBtn { display: grid !important; }
-body.ipad #pcSettingsBtn { display: none !important; }
+body.ipad #gameControls #burgerBtn { display: grid !important; }
+body.ipad #gameControls #pcSettingsBtn { display: none !important; }
 body.ipad #lb { display: none !important; }
 body.ipad #mapWrap { top: calc(5vh + 52px) !important; right: 12px !important; bottom: auto !important; }
 body.ipad #minimap { width: 84px; height: 84px; }
@@ -1409,6 +1401,43 @@ body.ipad #teamBar { top: calc(5vh + 4px) !important; }
 body.ipad.mode-team #board,
 body.ipad #teamBar:not([hidden]) ~ #hud #board {
   top: calc(5vh + 40px) !important;
+}
+
+/* Mobile Phone rules (body:not(.ipad):not(.is-pc) & body.mobile-phone):
+   Dồn sát mép viền tối đa (không bị chồng chéo thanh thời gian hay nút X) */
+body:not(.ipad):not(.is-pc) #stats,
+body.mobile-phone #stats {
+  top: 6px !important;
+  left: 6px !important;
+  padding: 0 !important;
+}
+body:not(.ipad):not(.is-pc) #gameControls,
+body.mobile-phone #gameControls {
+  top: 6px !important;
+  right: 6px !important;
+  gap: 4px !important;
+}
+body:not(.ipad):not(.is-pc) #gameControls #burgerBtn,
+body.mobile-phone #gameControls #burgerBtn {
+  display: grid !important;
+}
+body:not(.ipad):not(.is-pc) #gameControls #pcSettingsBtn,
+body.mobile-phone #gameControls #pcSettingsBtn {
+  display: none !important;
+}
+body:not(.ipad):not(.is-pc) #board,
+body.mobile-phone #board {
+  top: 6px !important;
+}
+body:not(.ipad):not(.is-pc) #mapWrap,
+body.mobile-phone #mapWrap {
+  top: 46px !important;
+  right: 6px !important;
+  bottom: auto !important;
+}
+body:not(.ipad):not(.is-pc) #teamBar,
+body.mobile-phone #teamBar {
+  top: 4px !important;
 }
 
 /* Portrait orientation layout adjustments (Mobile & iPad) */
@@ -1420,38 +1449,45 @@ body.ipad #teamBar:not([hidden]) ~ #hud #board {
   .sp-carousel-row {
     justify-content: center;
   }
-  #board {
-    top: calc(5vh + 44px);
-    max-width: min(300px, 86vw);
+
+  /* iPad Portrait */
+  body.ipad #board {
+    top: calc(5vh + 44px) !important;
+    max-width: min(300px, 86vw) !important;
     height: 26px;
   }
-  #mapWrap {
-    top: calc(5vh + 78px);
-    right: 8px;
+  body.ipad #mapWrap {
+    top: calc(5vh + 78px) !important;
+    right: 8px !important;
     bottom: auto;
   }
-  #minimap {
-    width: 72px;
-    height: 72px;
-  }
-  #dashBtn {
-    right: 18px;
-    bottom: 22px;
-    width: 78px;
-    height: 78px;
-  }
-  body.ipad #board,
-  body.touch #board {
-    top: calc(5vh + 44px) !important;
-  }
-  body.ipad #mapWrap,
-  body.touch #mapWrap {
-    top: calc(5vh + 78px) !important;
-  }
-  body.ipad #stats,
-  body.touch #stats {
+  body.ipad #stats {
     top: calc(5vh + 6px) !important;
-    left: max(16px, calc(100vw / 15)) !important;
+    left: max(92px, calc(100vw / 8)) !important;
+  }
+
+  /* Phone Portrait: sát viền gọn gàng */
+  body:not(.ipad):not(.is-pc) #board,
+  body.mobile-phone #board {
+    top: 44px !important;
+    max-width: min(290px, calc(100vw - 20px)) !important;
+    height: 26px;
+  }
+  body:not(.ipad):not(.is-pc) #mapWrap,
+  body.mobile-phone #mapWrap {
+    top: 76px !important;
+    right: 6px !important;
+    bottom: auto !important;
+  }
+  body:not(.ipad):not(.is-pc) #stats,
+  body.mobile-phone #stats {
+    top: 6px !important;
+    left: 6px !important;
+  }
+  body:not(.ipad):not(.is-pc) #gameControls,
+  body.mobile-phone #gameControls {
+    top: 6px !important;
+    right: 6px !important;
   }
 }
 

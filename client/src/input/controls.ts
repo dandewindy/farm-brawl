@@ -131,15 +131,21 @@ export class InputManager {
   }
 
   private bindTouch(): void {
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+    if (isMobileDevice) {
+      document.body.classList.add('touch');
+    }
     if (!this.isTouch && !('ontouchstart' in window) && !navigator.maxTouchPoints) return;
-    document.body.classList.add('touch');
 
     let touchStartX = 0, touchStartY = 0;
     let stickTouchId: number | null = null;
 
     window.addEventListener('touchstart', (e) => {
       this.isTouch = true;
-      document.body.classList.add('touch');
+      if (isMobileDevice) {
+        document.body.classList.add('touch');
+      }
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
         // Only create stick for touches on the left half that aren't already tracked and not on UI elements
