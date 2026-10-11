@@ -305,7 +305,9 @@ export class HudManager {
 
     const updateCarousel = () => {
       const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
-      const step = firstBtn ? firstBtn.offsetWidth + 8 : 74;
+      const style = window.getComputedStyle(this.speciesContainer);
+      const gap = parseFloat(style.gap) || 8;
+      const step = firstBtn ? firstBtn.offsetWidth + gap : 74;
       this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * step}px)`;
       if (this.spNavPrev) {
         this.spNavPrev.disabled = this.carouselIndex <= 0;
@@ -316,6 +318,8 @@ export class HudManager {
         this.spNavNext.style.opacity = this.carouselIndex >= SPECIES.length - 3 ? '0.2' : '1';
       }
     };
+    window.addEventListener('resize', updateCarousel);
+    window.addEventListener('orientationchange', () => setTimeout(updateCarousel, 120));
 
     const updateAllButtons = () => {
       if (this.isRandomSelected) {
@@ -848,6 +852,10 @@ export class HudManager {
             }
             document.body.classList.toggle('mode-team', mode === 'team');
             this.setSelectedTeam(this.selectedTeam);
+            const startScreen = document.getElementById('start');
+            if (startScreen && startScreen.scrollTop > 20) {
+              startScreen.scrollTo({ top: 0, behavior: 'smooth' });
+            }
             this.onSelectMode?.(mode);
           }
         });

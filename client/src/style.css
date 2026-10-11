@@ -58,16 +58,31 @@ button { font: inherit; cursor: pointer; }
 .screen {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   z-index: 20;
   background: radial-gradient(ellipse at center, rgba(31, 26, 23, .25), rgba(31, 26, 23, .7));
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
-.card { width: min(440px, 100%); background: var(--ink); border: 3px solid #3a302a; border-radius: 18px; padding: 22px 22px 18px; text-align: center; box-shadow: 0 18px 50px rgba(0, 0, 0, .45), inset 0 0 0 2px rgba(255, 255, 255, .04); }
+.card {
+  width: min(440px, 100%);
+  background: var(--ink);
+  border: 3px solid #3a302a;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45), inset 0 0 0 2px rgba(255, 255, 255, .04);
+  margin: auto;
+  flex-shrink: 0;
+}
 .card.start-card-wide {
+  position: relative;
   width: min(780px, 96vw);
   max-width: 780px;
   padding: 16px 20px 14px;
@@ -1255,74 +1270,218 @@ body.mobile-phone .ffa-preview-box {
   .ffa-preview-box {
     display: none !important;
   }
-  h1 { font-size: 38px; }
+  .screen {
+    padding: 8px 6px;
+    justify-content: flex-start;
+  }
+  .card.start-card-wide {
+    width: min(390px, 95vw);
+    max-width: 390px;
+    padding: 8px 12px 10px;
+    border-radius: 14px;
+    margin: auto 0;
+    max-height: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  }
+  .wall-top {
+    gap: 5px;
+    margin-bottom: 2px;
+  }
+  #mute, #startFsBtn, #langToggle {
+    width: 30px;
+    height: 28px;
+    min-width: 30px;
+    font-size: 13px;
+    border-radius: 7px;
+  }
+  h1 { font-size: 28px; }
   .title-row {
-    font-size: 30px;
-    gap: 8px;
+    font-size: 24px;
+    gap: 6px;
   }
   .slogan {
-    font-size: 11.5px;
-    margin: 2px 0 6px;
+    font-size: 10.5px;
+    margin: 1px 0 4px;
   }
   .name-box {
-    margin: 0 auto 6px;
-    width: min(260px, 90%);
+    margin: 0 auto 5px;
+    width: min(220px, 85%);
   }
   .name-box #name {
-    padding: 6px 32px 6px 12px;
-    font-size: 14px;
+    padding: 4px 28px 4px 10px;
+    font-size: 13px;
+    height: 32px;
+  }
+  .name-pencil {
+    font-size: 12px;
+    right: 6px;
   }
   .start-cols {
     grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .card.start-card-wide {
-    padding: 10px 14px 10px;
-    max-height: 98vh;
-    width: min(680px, 98vw);
+    gap: 6px;
+    margin-top: 2px;
   }
   .sec-label {
-    margin: 3px 0;
-    font-size: 11px;
+    margin: 2px 0 3px;
+    font-size: 10px;
   }
   #modes {
     gap: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
   #modes button {
-    padding: 5px 2px;
+    padding: 4px 2px;
+    border-radius: 8px;
   }
   #modes button .n {
-    font-size: 12px;
+    font-size: 11px;
   }
   #modes button .p {
-    font-size: 8.5px;
+    font-size: 8px;
+    margin-top: 1px;
+  }
+  .team-pick-wrap {
+    margin: 3px 0 4px;
+    padding: 4px 6px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .team-pick-label {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+  .btn-team {
+    padding: 3px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+  .btn-team .t-count {
+    font-size: 9px;
+  }
+  .friend-panel {
+    padding: 5px 6px;
+    margin: 3px 0 4px;
+    border-radius: 8px;
+    background: rgba(30, 24, 20, 0.65);
+    border: 1px solid #4a382c;
+  }
+  .friend-panel .fp-section {
+    gap: 3px;
+  }
+  .btn-wood {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    box-shadow: 0 2px 0 #20150d;
+  }
+  .room-box {
+    padding: 3px 6px;
+    border-radius: 6px;
+  }
+  .room-badge-simple {
+    gap: 6px;
+    margin-bottom: 1px;
+  }
+  .room-badge-simple span {
+    font-size: 15px;
+  }
+  .btn-copy-ico {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+  .fp-divider {
+    margin: 3px 0;
+    font-size: 8px;
+  }
+  .fp-join-row {
+    gap: 4px;
+  }
+  .room-code-input {
+    padding: 4px 8px;
+    font-size: 11px;
+    height: 26px;
+    border-radius: 6px;
+  }
+  .btn-wood-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+    height: 26px;
+    border-radius: 6px;
+  }
+  .room-notice {
+    font-size: 9.5px;
+    margin-top: 2px;
   }
   .sp-carousel-row {
-    margin: 3px 0 6px;
+    margin: 2px 0 4px;
+    gap: 4px;
+    justify-content: space-between;
   }
   .sp-carousel-viewport {
-    width: 172px;
+    width: 166px;
   }
   #species button {
-    flex: 0 0 52px;
-    width: 52px;
-    height: 52px;
+    flex: 0 0 50px;
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    padding: 2px;
   }
   #species button .sp-thumb {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
+  }
+  #species button .dots {
+    gap: 2px;
+  }
+  #species button .dot {
+    width: 4px;
+    height: 4px;
   }
   .sp-random-btn {
-    flex: 0 0 52px;
-    width: 52px;
-    height: 52px;
-    font-size: 20px;
+    flex: 0 0 50px;
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    font-size: 19px;
+  }
+  .sp-arrow-btn {
+    font-size: 22px;
+    width: 16px;
+    height: 50px;
   }
   .play-btn-main {
     padding: 8px 12px;
-    font-size: 16px;
+    font-size: 15px;
     margin-top: 4px;
+    border-radius: 8px;
+  }
+  #bestLine {
+    font-size: 11px;
+    margin-top: 2px;
+    min-height: 1.1em;
+  }
+  .how-box {
+    padding: 6px 8px;
+    border-radius: 8px;
+    margin-top: 5px;
+    background: rgba(20, 16, 14, 0.45);
+  }
+  .how-title {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .how {
+    font-size: 9px;
+    line-height: 1.25;
+    margin: 0;
+    padding-left: 8px;
+    gap: 2px;
+  }
+  .how li {
+    margin-bottom: 1px;
   }
 
   /* Top-left: Compact single-row stats badge */
@@ -1529,10 +1688,10 @@ body.mobile-phone #teamBar {
 @media (orientation: portrait) {
   .start-cols {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 6px;
   }
   .sp-carousel-row {
-    justify-content: center;
+    justify-content: space-between;
   }
 
   /* iPad Portrait */
@@ -1576,115 +1735,219 @@ body.mobile-phone #teamBar {
   }
 }
 
-/* Landscape Mobile / Phone Optimization: Compact start card, fits screen with no scrolling */
+/* Landscape Mobile / Phone Optimization: Ultra-compact, stable, fits within ~210px with zero scrolling */
 @media (orientation: landscape) and (max-height: 540px) {
+  .screen {
+    padding: 4px 8px;
+    justify-content: flex-start;
+  }
   .card.start-card-wide {
-    max-height: 98vh;
-    padding: 6px 16px 6px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    width: min(600px, 96vw);
+    max-width: 600px;
+    padding: 5px 12px 5px;
+    border-radius: 12px;
+    margin: auto 0;
+    max-height: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  }
+  .wall-top {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    margin: 0;
+    gap: 4px;
+    z-index: 2;
+  }
+  #mute, #startFsBtn, #langToggle {
+    width: 28px;
+    height: 26px;
+    min-width: 28px;
+    font-size: 12px;
+    border-radius: 6px;
   }
   .title-row {
-    font-size: 24px;
-    gap: 8px;
-    margin: 0;
+    font-size: 19px;
+    gap: 6px;
+    margin: 0 0 2px;
   }
   .slogan {
     display: none;
   }
-  .wall-top {
-    margin-bottom: 0;
-    gap: 6px;
-  }
-  #mute, #startFsBtn, #langToggle {
-    width: 32px;
-    height: 28px;
-    font-size: 13px;
-  }
   .name-box {
-    margin: 0 auto 4px;
-    width: min(220px, 80%);
+    margin: 0 auto 3px;
+    width: min(180px, 60%);
   }
   .name-box #name {
-    padding: 4px 26px 4px 8px;
-    font-size: 13px;
+    padding: 2px 24px 2px 8px;
+    font-size: 12px;
+    height: 26px;
   }
   .name-pencil {
-    font-size: 13px;
+    font-size: 11px;
     right: 4px;
   }
   .start-cols {
     grid-template-columns: 1.15fr 0.85fr !important;
-    gap: 12px !important;
-    margin-top: 2px;
+    gap: 10px !important;
+    margin-top: 1px;
   }
   .sec-label {
-    font-size: 10px;
-    margin: 2px 0;
+    font-size: 8.5px;
+    margin: 1px 0 2px;
   }
   #modes {
-    gap: 4px;
-    margin-bottom: 3px;
+    gap: 3px;
+    margin-bottom: 2px;
   }
   #modes button {
-    padding: 3px 2px;
-    border-radius: 6px;
+    padding: 2px 1px;
+    border-radius: 5px;
   }
   #modes button .n {
-    font-size: 11px;
+    font-size: 10px;
   }
   #modes button .p {
+    font-size: 7.5px;
+    margin-top: 0;
+  }
+  .team-pick-wrap {
+    padding: 2px 6px;
+    margin: 2px 0 3px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .team-pick-label {
+    font-size: 8px;
+    margin-bottom: 1px;
+  }
+  .btn-team {
+    padding: 2px 6px;
+    font-size: 9.5px;
+    border-radius: 5px;
+  }
+  .btn-team .t-count {
     font-size: 8px;
   }
-  .sp-carousel-row {
-    margin: 2px 0 4px;
+  .friend-panel {
+    padding: 3px 6px;
+    margin: 2px 0 3px;
+    border-radius: 6px;
+    background: rgba(30, 24, 20, 0.65);
+    border: 1px solid #4a382c;
+  }
+  .friend-panel .fp-section {
+    gap: 2px;
+  }
+  .btn-wood {
+    padding: 2px 8px;
+    font-size: 9.5px;
+    border-radius: 5px;
+    box-shadow: 0 1px 0 #20150d;
+  }
+  .room-box {
+    padding: 2px 6px;
+    border-radius: 5px;
+  }
+  .room-badge-simple {
     gap: 4px;
+    margin-bottom: 1px;
+  }
+  .room-badge-simple span {
+    font-size: 13px;
+  }
+  .btn-copy-ico {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+    border-radius: 5px;
+  }
+  .fp-divider {
+    margin: 1px 0;
+    font-size: 7px;
+  }
+  .fp-join-row {
+    gap: 3px;
+  }
+  .room-code-input {
+    padding: 2px 6px;
+    font-size: 9.5px;
+    height: 22px;
+    border-radius: 5px;
+  }
+  .btn-wood-sm {
+    padding: 2px 6px;
+    font-size: 9.5px;
+    height: 22px;
+    border-radius: 5px;
+  }
+  .room-notice {
+    font-size: 8px;
+    margin-top: 1px;
+  }
+  .sp-carousel-row {
+    margin: 1px 0 2px;
+    gap: 3px;
+    justify-content: space-between;
   }
   .sp-carousel-viewport {
-    width: 154px;
+    width: 132px;
   }
   #species button {
-    flex: 0 0 46px;
-    width: 46px;
-    height: 46px;
-    border-radius: 8px;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    padding: 1px;
   }
   #species button .sp-thumb {
-    width: 34px;
-    height: 34px;
+    width: 26px;
+    height: 26px;
+  }
+  #species button .dots {
+    gap: 1.5px;
+  }
+  #species button .dot {
+    width: 3px;
+    height: 3px;
   }
   .sp-random-btn {
-    flex: 0 0 46px;
-    width: 46px;
-    height: 46px;
-    border-radius: 8px;
-    font-size: 18px;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    font-size: 15px;
   }
   .sp-arrow-btn {
-    font-size: 24px;
-    padding: 0 2px;
-    height: 46px;
+    font-size: 18px;
+    width: 12px;
+    height: 38px;
   }
   .play-btn-main {
-    padding: 6px 10px;
-    font-size: 14px;
+    padding: 4px 8px;
+    font-size: 12.5px;
     margin-top: 2px;
-    border-radius: 8px;
+    border-radius: 6px;
+  }
+  #bestLine {
+    font-size: 9.5px;
+    margin-top: 1px;
+    min-height: 1.1em;
   }
   .how-box {
-    padding: 6px 8px;
-    border-radius: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: rgba(20, 16, 14, 0.45);
   }
   .how-title {
-    font-size: 10.5px;
+    font-size: 9px;
     margin-bottom: 2px;
   }
   .how {
-    font-size: 9.5px;
-    line-height: 1.25;
+    font-size: 8px;
+    line-height: 1.2;
     margin: 0;
-    padding-left: 10px;
+    padding-left: 6px;
+    gap: 1px;
   }
   .how li {
     margin-bottom: 1px;
