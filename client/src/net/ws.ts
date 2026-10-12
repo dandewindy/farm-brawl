@@ -98,7 +98,7 @@ export class WsClient implements Transport {
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
           // In-game auto-detection: if playing on high-latency node, trigger seamless background migration
-          const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.rtt > 180);
+          const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.colo === 'MXP' || this.colo === 'CDG' || this.rtt > 150);
           if (this.inGame && isHighLatency) {
             this.triggerHotMigration();
           }
@@ -113,7 +113,7 @@ export class WsClient implements Transport {
             }
             // Auto-steer away from high-latency edge nodes in lobby:
             // SIN (~35ms) and HKG (~75ms) are both fast low-latency APAC routes for Vietnam.
-            const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.rtt > 180);
+            const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.colo === 'MXP' || this.colo === 'CDG' || this.rtt > 150);
             if (isHighLatency && !this.inGame && this.autoSteerAttempts < 3) {
               this.autoSteerAttempts++;
               console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/3)...`);

@@ -7,15 +7,9 @@ export interface Env {
   ASSETS?: Fetcher;
 }
 
-function getTargetLocationHint(request: Request): string {
-  const cf = (request as any).cf;
-  const continent = cf?.continent;
-  const country = cf?.country;
-  if (country === 'VN' || continent === 'AS') {
-    return 'apac-se'; // Southeast Asia (Singapore) for lowest latency in Vietnam (~30ms)
-  }
-  if (continent === 'EU') return 'weur';
-  if (continent === 'NA') return 'enam';
+function getTargetLocationHint(_request: Request): string {
+  // Always lock all Durable Objects to Southeast Asia (Singapore) for lowest latency in Vietnam (~30ms).
+  // Hardcoding this unconditionally prevents foreign crawlers or health checks from poisoning the DO location.
   return 'apac-se';
 }
 
@@ -30,19 +24,16 @@ export default {
       // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sea-3';
+        targetRoomKey = 'pub-sea-sg1';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sea-3';
+        targetRoomKey = 'team-sea-sg1';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      const reqHeaders = new Headers(request.headers);
-      const cfColo = (request as any).cf?.colo;
-      if (cfColo) reqHeaders.set('x-edge-colo', cfColo);
-
-      return roomStub.fetch(new Request(request, { headers: reqHeaders }));
+      // Pass native request directly to preserve WebSocket upgrade headers and zero-copy piping
+      return roomStub.fetch(request);
     }
 
     // Health check endpoint
@@ -65,19 +56,16 @@ export default {
       const hint = getTargetLocationHint(request);
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sea-3';
+        targetRoomKey = 'pub-sea-sg1';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sea-3';
+        targetRoomKey = 'team-sea-sg1';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
-      const reqHeaders = new Headers(request.headers);
-      const cfColo = (request as any).cf?.colo;
-      if (cfColo) reqHeaders.set('x-edge-colo', cfColo);
 
       return roomStub.fetch(new Request(`${url.origin}/info?room=${encodeURIComponent(roomParam)}`, {
-        headers: reqHeaders,
+        headers: request.headers,
       }));
     }
 
