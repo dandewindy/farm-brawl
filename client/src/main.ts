@@ -152,6 +152,24 @@ hud.onReconnect = () => {
   }
 };
 
+hud.onExitLobby = () => {
+  if (transport) {
+    transport.inGame = false;
+    try {
+      transport.send({ t: 'leave' });
+    } catch (_) {}
+  }
+  predictor.on = false;
+  gameState.alive = false;
+  deathCamTarget = null;
+  localStunTimer = 0;
+  animals.clear();
+  tools.clear();
+  corpses.clear();
+  hud.returnToLobby();
+  hud.showToast(t('exitLobbyToast'));
+};
+
 let isSpectating = false;
 let spectateTargetId: number | null = null;
 
@@ -648,23 +666,27 @@ syncLbUi();
 let firstSpawn = true;
 
 const gameState = new GameState({
-  onInit(map) {
-    world.buildMap(map);
-    corpses.setMap(map);
-    animals.clear();
-    tools.clear();
+  onInit(map, isReconnecting) {
+    if (!isReconnecting) {
+      world.buildMap(map);
+      corpses.setMap(map);
+      animals.clear();
+      tools.clear();
+    }
   },
-  onJoined(_id) {
+  onJoined(_id, isReconnecting) {
     deathCamTarget = null;
     isSpectating = false;
     spectateTargetId = null;
     hud.showInGame();
-    hud.showBanner(t('welcome'), t('welcomeSub'));
-    prevMass = CFG.START_MASS;
-    gainAcc = 0;
-    gainTimer = 0;
-    firstSpawn = true;
-    predictor.on = false;
+    if (!isReconnecting) {
+      hud.showBanner(t('welcome'), t('welcomeSub'));
+      prevMass = CFG.START_MASS;
+      gainAcc = 0;
+      gainTimer = 0;
+      firstSpawn = true;
+      predictor.on = false;
+    }
   },
   onEvent(ev: GameEvent) {
     handleGameEvent(ev);

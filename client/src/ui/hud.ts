@@ -126,6 +126,8 @@ export class HudManager {
   public onNextSpectating?: () => void;
   public onSelectSpectateTarget?: (id: number) => void;
   public onStopSpectating?: () => void;
+  public onExitLobby?: () => void;
+  private deathCountdownTimer: any = null;
   private currentFriendCode = '';
   private currentChoiceOptions: string[] = [];
   private lastChoiceKey = '';
@@ -665,13 +667,12 @@ export class HudManager {
       if (e.key === 'Enter') handlePlayClick();
     });
 
-    let deathCountdownTimer: any = null;
     let deathCountdownSec = 3;
 
     const stopDeathCountdown = () => {
-      if (deathCountdownTimer) {
-        clearInterval(deathCountdownTimer);
-        deathCountdownTimer = null;
+      if (this.deathCountdownTimer) {
+        clearInterval(this.deathCountdownTimer);
+        this.deathCountdownTimer = null;
       }
       if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
       if (this.againBtn) {
@@ -682,7 +683,7 @@ export class HudManager {
     };
 
     const startDeathCountdown = () => {
-      if (deathCountdownTimer) return;
+      if (this.deathCountdownTimer) return;
       if (this.selectedMode === 'team') {
         const myTeam = this.selectedTeam;
         const otherTeam = myTeam === 0 ? 1 : 0;
@@ -698,7 +699,7 @@ export class HudManager {
       this.againBtn.disabled = true;
       this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
 
-      deathCountdownTimer = setInterval(() => {
+      this.deathCountdownTimer = setInterval(() => {
         deathCountdownSec--;
         if (this.againBtn) {
           this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
@@ -722,14 +723,22 @@ export class HudManager {
 
     this.changeBtn.addEventListener('click', () => {
       stopDeathCountdown();
-      this.deathScreen.hidden = true;
-      this.startScreen.hidden = false;
-      document.body.classList.add('menu');
-      document.body.classList.remove('spectating');
-      this.previewRenderer?.start();
-      this.previewRenderer?.resize();
-      this.updateSpeciesUI?.();
+      this.returnToLobby();
     });
+
+    const btnExitLobby = document.getElementById('btnExitLobby');
+    if (btnExitLobby) {
+      btnExitLobby.addEventListener('click', () => {
+        this.onExitLobby?.();
+      });
+    }
+
+    const drawerExitBtn = document.getElementById('drawerExitBtn');
+    if (drawerExitBtn) {
+      drawerExitBtn.addEventListener('click', () => {
+        this.onExitLobby?.();
+      });
+    }
 
     if (this.spectateBtn) {
       this.spectateBtn.addEventListener('click', () => {
@@ -1177,6 +1186,32 @@ export class HudManager {
     }
     this.hudEl.hidden = false;
     document.body.classList.remove('menu');
+  }
+
+  returnToLobby(): void {
+    if (this.deathCountdownTimer) {
+      clearInterval(this.deathCountdownTimer);
+      this.deathCountdownTimer = null;
+    }
+    if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
+    if (this.againBtn) {
+      this.againBtn.disabled = false;
+      this.againBtn.innerHTML = t('again');
+      this.againBtn.style.opacity = '1';
+    }
+    this.hudEl.hidden = true;
+    this.deathScreen.hidden = true;
+    if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
+    if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+    const gameDrawer = document.getElementById('gameDrawerModal');
+    if (gameDrawer) gameDrawer.hidden = true;
+    this.isSpectating = false;
+    document.body.classList.remove('spectating');
+    document.body.classList.add('menu');
+    this.startScreen.hidden = false;
+    this.previewRenderer?.start();
+    this.previewRenderer?.resize();
+    this.updateSpeciesUI?.();
   }
 
   showDeath(ev: Extract<GameEvent, { k: 'die' }>, killerName?: string): void {

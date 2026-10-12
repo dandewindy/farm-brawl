@@ -13,6 +13,7 @@ export class GameRoom extends DurableObject {
   private readonly clientSockets = new Map<string, WebSocket>();
   private readonly socketClientIds = new Map<WebSocket, string>();
   private readonly playerTokens = new Map<number, string>();
+  private readonly clientPlayerIds = new Map<string, number>();
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private nextTickTime = 0;
@@ -91,21 +92,6 @@ export class GameRoom extends DurableObject {
     ws.accept();
 
     if (cid) {
-      const oldWs = this.clientSockets.get(cid);
-      if (oldWs && oldWs !== ws) {
-        this.allSockets.delete(oldWs);
-        this.lobbyTeams.delete(oldWs);
-        const oldPid = this.sockets.get(oldWs);
-        if (oldPid) {
-          this.sockets.delete(oldWs);
-          this.world.removePlayer(oldPid);
-          const tok = this.playerTokens.get(oldPid);
-          if (tok) this.playerTokens.delete(oldPid);
-        }
-        this.socketClientIds.delete(oldWs);
-        try { oldWs.close(1000, 'Replaced'); } catch (_) {}
-      }
-      this.clientSockets.set(cid, ws);
       this.socketClientIds.set(ws, cid);
     }
 
@@ -116,7 +102,7 @@ export class GameRoom extends DurableObject {
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
         const msg = JSON.parse(raw) as ClientMsg;
-        this.onMessage(ws, msg, edgeColo);
+        this.onMessage(ws, msg, edgeColo, cid);
       } catch (err) {
         console.error('Invalid WS message:', err);
       }
@@ -136,7 +122,7 @@ export class GameRoom extends DurableObject {
         const token = this.playerTokens.get(playerId);
         const player = this.world.players.get(playerId);
         if (token && player) {
-          // Keep player in world during grace period, but stop their motion
+          // Keep player in world during grace period (8s), stop their motion
           this.world.setInput(playerId, { a: 0, mv: false, btn: false });
           this.disconnectedPlayers.set(token, {
             playerId,
@@ -145,6 +131,7 @@ export class GameRoom extends DurableObject {
         } else {
           this.world.removePlayer(playerId);
           if (token) this.playerTokens.delete(playerId);
+          if (c) this.clientPlayerIds.delete(c);
         }
       }
       this.broadcastTeamCounts();
@@ -157,27 +144,26 @@ export class GameRoom extends DurableObject {
     ws.addEventListener('error', onCloseOrError);
   }
 
-  private onMessage(ws: WebSocket, msg: ClientMsg, edgeColo: string): void {
+  private onMessage(ws: WebSocket, msg: ClientMsg, edgeColo: string, cid = ''): void {
     if (msg.t === 'join') {
       let playerId = this.sockets.get(ws);
       let sessionToken = msg.token;
 
-      // Check if reconnecting within grace period with an existing session token
-      if (sessionToken && this.disconnectedPlayers.has(sessionToken)) {
+      // 1. Check if reconnecting within grace period with an existing session token
+      if (!playerId && sessionToken && this.disconnectedPlayers.has(sessionToken)) {
         const entry = this.disconnectedPlayers.get(sessionToken)!;
         this.disconnectedPlayers.delete(sessionToken);
         const existingPlayer = this.world.players.get(entry.playerId);
         if (existingPlayer) {
           playerId = entry.playerId;
           this.sockets.set(ws, playerId);
-          // If the player died while disconnected, respawn them
           if (!existingPlayer.alive) {
             this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
           }
         }
       }
 
-      // Hot handover: another active socket transferring connection for the same session token
+      // 2. Hot handover: another active socket transferring connection for the same session token
       if (!playerId && sessionToken) {
         for (const [existingPid, token] of this.playerTokens.entries()) {
           if (token === sessionToken && this.world.players.has(existingPid)) {
@@ -194,6 +180,23 @@ export class GameRoom extends DurableObject {
             this.sockets.set(ws, playerId);
             break;
           }
+        }
+      }
+
+      // 3. Fallback: reclaim by client ID (cid) if sessionToken was lost
+      if (!playerId && cid && this.clientPlayerIds.has(cid)) {
+        const candidatePid = this.clientPlayerIds.get(cid)!;
+        if (this.world.players.has(candidatePid)) {
+          playerId = candidatePid;
+          for (const [oldWs, pid] of this.sockets.entries()) {
+            if (pid === playerId && oldWs !== ws) {
+              this.sockets.delete(oldWs);
+              try {
+                oldWs.close(1000, 'Handover');
+              } catch (_) {}
+            }
+          }
+          this.sockets.set(ws, playerId);
         }
       }
 
@@ -215,12 +218,18 @@ export class GameRoom extends DurableObject {
           if (!existingPlayer.alive) {
             this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
           } else {
+            // Player is alive: preserve exact position, velocity & mass!
             if (msg.name) existingPlayer.name = msg.name.slice(0, 16);
             if (msg.species) existingPlayer.species = msg.species;
             if (msg.skin !== undefined) existingPlayer.skin = msg.skin % SKIN_COUNT;
             if (msg.team !== undefined) existingPlayer.team = msg.team;
           }
         }
+      }
+
+      if (cid && playerId) {
+        this.clientPlayerIds.set(cid, playerId);
+        this.clientSockets.set(cid, ws);
       }
 
       // Send initial world configuration & map
@@ -242,6 +251,20 @@ export class GameRoom extends DurableObject {
       this.lobbyTeams.delete(ws);
       this.broadcastTeamCounts();
       this.startLoop();
+    } else if (msg.t === 'leave') {
+      const playerId = this.sockets.get(ws);
+      if (playerId) {
+        this.sockets.delete(ws);
+        const tok = this.playerTokens.get(playerId);
+        if (tok) this.playerTokens.delete(playerId);
+        if (cid) this.clientPlayerIds.delete(cid);
+        this.world.removePlayer(playerId);
+      }
+      this.lobbyTeams.delete(ws);
+      this.broadcastTeamCounts();
+      if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
+        this.stopLoop();
+      }
     } else if (msg.t === 'team_select') {
       const team = msg.team === 1 ? 1 : 0;
       this.lobbyTeams.set(ws, team);
@@ -348,6 +371,9 @@ export class GameRoom extends DurableObject {
           this.disconnectedPlayers.delete(token);
           this.playerTokens.delete(entry.playerId);
           this.world.removePlayer(entry.playerId);
+          for (const [c, pid] of this.clientPlayerIds.entries()) {
+            if (pid === entry.playerId) this.clientPlayerIds.delete(c);
+          }
         }
       }
     }

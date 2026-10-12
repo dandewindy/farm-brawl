@@ -32,8 +32,8 @@ export interface FoodItem {
 }
 
 export interface GameHooks {
-  onInit(map: MapData): void;
-  onJoined(id: number): void;
+  onInit(map: MapData, isReconnecting?: boolean): void;
+  onJoined(id: number, isReconnecting?: boolean): void;
   onEvent(ev: GameEvent): void;
   onSnapshot(s: Snapshot): void;
 }
@@ -82,15 +82,19 @@ export class GameState {
       this.cfg = m.cfg;
       this.map = m.map;
       this.tick = m.tick;
-      this.metas.clear(); this.ents.clear(); this.food.clear(); this.tools.clear();
+      const isReconnecting = this.alive && this.myId > 0;
+      if (!isReconnecting) {
+        this.metas.clear(); this.ents.clear(); this.food.clear(); this.tools.clear();
+      }
       for (const p of m.players) this.metas.set(p.id, p);
       for (const f of m.food) this.addFood(f, true);
       if (m.tools) for (const t of m.tools) this.tools.set(t[0], t);
-      this.hooks.onInit(m.map);
+      this.hooks.onInit(m.map, isReconnecting);
     } else if (m.t === 'joined') {
+      const isReconnecting = this.alive && this.myId === m.id;
       this.myId = m.id;
       this.alive = true;
-      this.hooks.onJoined(m.id);
+      this.hooks.onJoined(m.id, isReconnecting);
     } else if (m.t === 's') {
       this.onSnapshot(m);
     }

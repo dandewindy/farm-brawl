@@ -757,6 +757,15 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 .drawer-btn:active {
   transform: scale(0.96);
 }
+.drawer-btn.drawer-btn-exit {
+  background: rgba(185, 45, 35, 0.85);
+  border-color: rgba(255, 120, 100, 0.5);
+  color: #fff;
+}
+.drawer-btn.drawer-btn-exit:hover,
+.drawer-btn.drawer-btn-exit:active {
+  background: rgba(220, 50, 40, 0.95);
+}
 .drawer-close {
   width: 30px;
   height: 30px;
@@ -1111,6 +1120,15 @@ body.touch #lb {
 #gameControls button:active {
   background: rgba(20,16,14,.98);
   transform: scale(0.95);
+}
+#gameControls .btn-exit-lobby {
+  background: rgba(185, 45, 35, 0.85);
+  border-color: rgba(255, 120, 100, 0.5);
+  color: #fff;
+}
+#gameControls .btn-exit-lobby:hover {
+  background: rgba(220, 50, 40, 0.95);
+  border-color: rgba(255, 150, 130, 0.8);
 }
 
 /* PC default: Burger button completely hidden, settings button shown */

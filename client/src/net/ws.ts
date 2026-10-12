@@ -213,6 +213,10 @@ export class WsClient implements Transport {
           this.ws = probeSocket;
           this.migrationWs = null;
           if (msg.colo) this.colo = msg.colo;
+          if (msg.token) {
+            this.sessionToken = msg.token;
+            if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
+          }
           this.rttWin.length = 0;
 
           if (oldWs) {
@@ -224,6 +228,8 @@ export class WsClient implements Transport {
           }
 
           this.bindActiveSocket(probeSocket);
+          this.startPing();
+          this.onMsg(msg);
           this.onMigrationSuccess?.(this.colo);
         }
       } catch (err) {

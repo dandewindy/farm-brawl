@@ -148,6 +148,7 @@ export type ServerMsg =
 
 export type ClientMsg =
   | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string }
+  | { t: 'leave' }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }
   | { t: 'team_select'; team: number }
