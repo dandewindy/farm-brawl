@@ -184,6 +184,9 @@ const vi = {
   statsSetting: 'Chỉ số',
   lbSetting: 'Bảng xếp hạng',
   uiSettings: 'CÀI ĐẶT GIAO DIỆN',
+  arenaLabel: 'CHỌN SÀN ĐẤU',
+  theme_classic: 'Mặc định',
+  theme_women_day: 'Phụ Nữ VN (20/10)',
   on: 'BẬT',
   off: 'TẮT',
 };
@@ -373,6 +376,9 @@ const en: Record<keyof typeof vi, string> = {
   statsSetting: 'Stats',
   lbSetting: 'Leaderboard',
   uiSettings: 'UI SETTINGS',
+  arenaLabel: 'ARENA THEME',
+  theme_classic: 'Default',
+  theme_women_day: 'VN Women\'s Day (Oct 20)',
   on: 'ON',
   off: 'OFF',
 };

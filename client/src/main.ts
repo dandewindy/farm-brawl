@@ -23,6 +23,7 @@ import { MinimapRenderer } from './render/minimap';
 import { ToolRenderer } from './render/tools';
 import { WorldRenderer } from './render/world';
 import { HudManager } from './ui/hud';
+import { onThemeChange } from './theme';
 
 // Apply translations to static HTML tags
 applyTexts();
@@ -40,6 +41,13 @@ animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
+
+onThemeChange((theme) => {
+  world.setTheme(theme);
+  animals.setTheme(theme);
+  tools.setTheme(theme);
+  foodParts.setTheme(theme);
+});
 
 let transport: Transport | null = null;
 let shake = 0;

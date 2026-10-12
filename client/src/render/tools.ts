@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ToolKind, ToolWire } from '@shared/protocol';
+import { getArenaTheme, type ArenaTheme } from '../theme';
 
 interface ToolObject {
   group: THREE.Group;
@@ -17,8 +18,13 @@ export class ToolRenderer {
     this.scene.add(this.group);
   }
 
+  setTheme(_theme: ArenaTheme): void {
+    this.clear();
+  }
+
   private buildTool(kind: ToolKind): THREE.Group {
     const g = new THREE.Group();
+    const isWomenDay = getArenaTheme() === 'women_day';
 
     const mesh = (
       geo: THREE.BufferGeometry,
@@ -37,43 +43,108 @@ export class ToolRenderer {
       return m;
     };
 
-    if (kind === 'pitchfork') {
-      // Long wooden pole
-      g.add(mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), 0x8b5a2b, 0, 1.5, 0));
-      // Crossbar
-      g.add(mesh(new THREE.BoxGeometry(0.9, 0.1, 0.1), 0xb0b0b0, 0, 3, 0, { metalness: 0.6, roughness: 0.3 }));
-      // 3 metal prongs
-      for (const x of [-0.4, 0, 0.4]) {
-        g.add(mesh(new THREE.BoxGeometry(0.08, 0.8, 0.08), 0xd0d0d0, x, 3.4, 0, { metalness: 0.6, roughness: 0.3 }));
+    if (isWomenDay) {
+      if (kind === 'pitchfork') {
+        // Bó hoa hồng rực rỡ (Rose Bouquet)
+        // Bundle of green stems
+        g.add(mesh(new THREE.CylinderGeometry(0.12, 0.08, 2.2, 8), 0x388e3c, 0, 1.1, 0));
+        // Golden-pink ribbon wrapping around stems
+        const ribbon = mesh(new THREE.TorusGeometry(0.18, 0.05, 8, 16), 0xff4081, 0, 1.2, 0, { roughness: 0.3 });
+        ribbon.rotation.x = Math.PI / 2;
+        g.add(ribbon);
+        // Ribbon bow tails
+        g.add(mesh(new THREE.BoxGeometry(0.08, 0.45, 0.04), 0xff4081, -0.1, 0.95, 0.16));
+        g.add(mesh(new THREE.BoxGeometry(0.08, 0.45, 0.04), 0xff4081, 0.1, 0.95, 0.16));
+
+        // Green leaves around base of roses
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          const leaf = mesh(new THREE.SphereGeometry(0.18, 8, 6), 0x4caf50, Math.cos(a) * 0.35, 2.15, Math.sin(a) * 0.35);
+          leaf.scale.set(1.4, 0.3, 0.8);
+          leaf.rotation.y = a;
+          g.add(leaf);
+        }
+
+        // Center large red rose
+        g.add(mesh(new THREE.SphereGeometry(0.42, 12, 10), 0xd81b60, 0, 2.5, 0, { roughness: 0.4, emissive: 0x4a0e1c, emissiveIntensity: 0.2 }));
+        // 4 surrounding blooming roses
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          g.add(mesh(new THREE.SphereGeometry(0.3, 10, 8), 0xe91e63, Math.cos(a) * 0.38, 2.38, Math.sin(a) * 0.38, { roughness: 0.4 }));
+        }
+      } else if (kind === 'dynamite') {
+        // Hộp quà bất ngờ (Surprise Gift Box)
+        // Square festive gift box
+        g.add(mesh(new THREE.BoxGeometry(1.3, 1.3, 1.3), 0xf06292, 0, 1.15, 0, { roughness: 0.35 }));
+        // Cross ribbon horizontal & vertical
+        g.add(mesh(new THREE.BoxGeometry(1.34, 1.34, 0.28), 0xffd700, 0, 1.15, 0, { metalness: 0.6, roughness: 0.25 }));
+        g.add(mesh(new THREE.BoxGeometry(0.28, 1.34, 1.34), 0xffd700, 0, 1.15, 0, { metalness: 0.6, roughness: 0.25 }));
+        // Ribbon loop bow on top
+        const loopL = mesh(new THREE.TorusGeometry(0.24, 0.06, 8, 16), 0xffd700, -0.16, 1.95, 0, { metalness: 0.6, roughness: 0.25 });
+        loopL.rotation.y = Math.PI / 4;
+        g.add(loopL);
+        const loopR = mesh(new THREE.TorusGeometry(0.24, 0.06, 8, 16), 0xffd700, 0.16, 1.95, 0, { metalness: 0.6, roughness: 0.25 });
+        loopR.rotation.y = -Math.PI / 4;
+        g.add(loopR);
+        g.add(mesh(new THREE.SphereGeometry(0.12, 10, 8), 0xffd700, 0, 1.88, 0, { metalness: 0.6, roughness: 0.25 }));
+      } else {
+        // Thư tình & Trái tim (Love Letter / Heart Melody)
+        // Pearl envelope
+        g.add(mesh(new THREE.BoxGeometry(1.6, 1.2, 0.12), 0xfff8f0, 0, 1.5, 0, { roughness: 0.5 }));
+        // Flap crease
+        g.add(mesh(new THREE.BoxGeometry(1.52, 0.06, 0.14), 0xf3e5f5, 0, 1.85, 0));
+        // Heart wax seal in center
+        const heartL = mesh(new THREE.SphereGeometry(0.12, 10, 8), 0xe91e63, -0.07, 1.55, 0.08);
+        const heartR = mesh(new THREE.SphereGeometry(0.12, 10, 8), 0xe91e63, 0.07, 1.55, 0.08);
+        const heartPt = mesh(new THREE.ConeGeometry(0.15, 0.22, 8), 0xe91e63, 0, 1.45, 0.08);
+        heartPt.rotation.z = Math.PI;
+        g.add(heartL, heartR, heartPt);
+        // Floating heart above
+        const topHeartL = mesh(new THREE.SphereGeometry(0.15, 10, 8), 0xff4081, -0.09, 2.38, 0);
+        const topHeartR = mesh(new THREE.SphereGeometry(0.15, 10, 8), 0xff4081, 0.09, 2.38, 0);
+        const topHeartPt = mesh(new THREE.ConeGeometry(0.19, 0.28, 8), 0xff4081, 0, 2.25, 0);
+        topHeartPt.rotation.z = Math.PI;
+        g.add(topHeartL, topHeartR, topHeartPt);
       }
-    } else if (kind === 'dynamite') {
-      // 3 sticks of red dynamite
-      for (const [x, z] of [[-0.25, 0], [0.25, 0], [0, 0.3]]) {
-        g.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.4, 10), 0xd62d20, x, 1.2, z));
-      }
-      // Black strapping band
-      g.add(mesh(new THREE.BoxGeometry(0.9, 0.15, 0.75), 0x3a2a1a, 0, 1.2, 0.1));
-      // Fuse cord
-      g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), 0x222222, 0, 2.2, 0));
     } else {
-      // Sheet music parchment ("Beasts of England")
-      g.add(mesh(new THREE.BoxGeometry(1.4, 1.8, 0.05), 0xf2ead7, 0, 1.6, 0));
-      // 4 staff lines
-      for (let i = 0; i < 4; i++) {
-        g.add(mesh(new THREE.BoxGeometry(1.1, 0.03, 0.06), 0x222222, 0, 1.1 + i * 0.3, 0.03));
+      if (kind === 'pitchfork') {
+        // Long wooden pole
+        g.add(mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), 0x8b5a2b, 0, 1.5, 0));
+        // Crossbar
+        g.add(mesh(new THREE.BoxGeometry(0.9, 0.1, 0.1), 0xb0b0b0, 0, 3, 0, { metalness: 0.6, roughness: 0.3 }));
+        // 3 metal prongs
+        for (const x of [-0.4, 0, 0.4]) {
+          g.add(mesh(new THREE.BoxGeometry(0.08, 0.8, 0.08), 0xd0d0d0, x, 3.4, 0, { metalness: 0.6, roughness: 0.3 }));
+        }
+      } else if (kind === 'dynamite') {
+        // 3 sticks of red dynamite
+        for (const [x, z] of [[-0.25, 0], [0.25, 0], [0, 0.3]]) {
+          g.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.4, 10), 0xd62d20, x, 1.2, z));
+        }
+        // Black strapping band
+        g.add(mesh(new THREE.BoxGeometry(0.9, 0.15, 0.75), 0x3a2a1a, 0, 1.2, 0.1));
+        // Fuse cord
+        g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), 0x222222, 0, 2.2, 0));
+      } else {
+        // Sheet music parchment ("Beasts of England")
+        g.add(mesh(new THREE.BoxGeometry(1.4, 1.8, 0.05), 0xf2ead7, 0, 1.6, 0));
+        // 4 staff lines
+        for (let i = 0; i < 4; i++) {
+          g.add(mesh(new THREE.BoxGeometry(1.1, 0.03, 0.06), 0x222222, 0, 1.1 + i * 0.3, 0.03));
+        }
+        // Notehead + stem
+        g.add(mesh(new THREE.SphereGeometry(0.16, 8, 6), 0x111111, -0.2, 1.3, 0.06));
+        g.add(mesh(new THREE.BoxGeometry(0.05, 0.6, 0.05), 0x111111, -0.06, 1.6, 0.06));
       }
-      // Notehead + stem
-      g.add(mesh(new THREE.SphereGeometry(0.16, 8, 6), 0x111111, -0.2, 1.3, 0.06));
-      g.add(mesh(new THREE.BoxGeometry(0.05, 0.6, 0.05), 0x111111, -0.06, 1.6, 0.06));
     }
 
-    // Glowing gold circular ring on the ground underneath
+    // Glowing circular ring on the ground underneath (rose-pink for 20/10, gold for classic)
     const glow = new THREE.Mesh(
       new THREE.RingGeometry(1.1, 1.5, 24),
       new THREE.MeshBasicMaterial({
-        color: 0xe8b641,
+        color: isWomenDay ? 0xff4081 : 0xe8b641,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.75,
         depthWrite: false,
         side: THREE.DoubleSide,
       })

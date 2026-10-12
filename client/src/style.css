@@ -1462,6 +1462,16 @@ body.mobile-phone .ffa-preview-box {
     font-size: 8px;
     margin-top: 1px;
   }
+  .arena-picker {
+    gap: 4px;
+    margin-bottom: 3px;
+  }
+  .btn-arena {
+    padding: 4px 3px;
+    font-size: 10px;
+    border-radius: 6px;
+  }
+  .btn-arena .ico { font-size: 12px; }
   .team-pick-wrap {
     margin: 3px 0 4px;
     padding: 4px 6px;
@@ -2274,6 +2284,44 @@ input, select, textarea, .room-code-input, #name {
   margin-top: 2px;
   text-transform: none;
   letter-spacing: 0.01em;
+}
+
+/* Arena Theme Picker */
+.arena-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.btn-arena {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #2e2622;
+  border: 2px solid #3a302a;
+  border-radius: 10px;
+  padding: 8px 6px;
+  color: var(--paper);
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-arena .ico {
+  font-size: 15px;
+}
+.btn-arena.on {
+  border-color: var(--gold);
+  background: #4a3b2a;
+  box-shadow: 0 0 10px rgba(232, 182, 65, 0.25);
+}
+.btn-arena[data-arena="women_day"].on {
+  border-color: #ff69b4;
+  background: #4a2434;
+  color: #ffc0cb;
+  box-shadow: 0 0 12px rgba(255, 105, 180, 0.35);
 }
 
 /* Simple Gameplay Preview Box for FFA Mode */

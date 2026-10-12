@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t, getLanguage, toggleLanguage, formatTeamCount, type Lang } from '../i18n';
+import { getArenaTheme, setArenaTheme, type ArenaTheme } from '../theme';
 import { AnimalPreviewRenderer } from '../render/preview';
 import type { AudioMode } from '../audio/sfx';
 
@@ -163,6 +164,7 @@ export class HudManager {
   private readonly langToggle: HTMLButtonElement | null;
   private readonly nameEditBtn: HTMLButtonElement | null;
   private readonly ffaPreviewBox: HTMLElement | null;
+  private readonly arenaPickerEl: HTMLElement | null;
   private isRandomSelected = false;
   private carouselIndex = 0;
   private updateSpeciesUI?: () => void;
@@ -282,6 +284,7 @@ export class HudManager {
     this.langToggle = document.getElementById('langToggle') as HTMLButtonElement | null;
     this.nameEditBtn = document.getElementById('nameEditBtn') as HTMLButtonElement | null;
     this.ffaPreviewBox = document.getElementById('ffaPreviewBox');
+    this.arenaPickerEl = document.getElementById('arenaPicker');
 
     const previewCanvas = document.getElementById('spPreviewCanvas') as HTMLCanvasElement | null;
     if (previewCanvas) {
@@ -563,6 +566,24 @@ export class HudManager {
         this.updateTeamCounts(this.lastCount0, this.lastCount1);
         this.onChangeLanguage?.(nextLang);
         this.showToast(nextLang === 'vi' ? 'Đã chuyển sang Tiếng Việt' : 'Switched to English', 1000);
+      });
+    }
+
+    // Arena Theme Picker
+    if (this.arenaPickerEl) {
+      const curTheme = getArenaTheme();
+      const arenaBtns = this.arenaPickerEl.querySelectorAll<HTMLButtonElement>('.btn-arena');
+      arenaBtns.forEach((btn) => {
+        const arena = btn.getAttribute('data-arena') as ArenaTheme;
+        btn.classList.toggle('on', arena === curTheme);
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (btn.classList.contains('on')) return;
+          arenaBtns.forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          setArenaTheme(arena);
+          this.previewRenderer?.updateTheme(arena);
+        });
       });
     }
   }

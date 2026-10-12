@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CFG, radiusOf, type Species } from '@shared/constants';
 import { FLAG, type PlayerMeta } from '@shared/protocol';
 import { t } from '../i18n';
+import { getArenaTheme, type ArenaTheme } from '../theme';
 
 interface AnimalVisual {
   root: THREE.Group;
@@ -12,6 +13,7 @@ interface AnimalVisual {
   label: THREE.Sprite | null;
   labelKey: string;
   regalia: THREE.Group | null;
+  flowerHat: THREE.Group;
   isCrowned: boolean;
   ring: THREE.Mesh;
   ringMat: THREE.MeshBasicMaterial;
@@ -647,6 +649,89 @@ function buildRegalia(species: Species): THREE.Group {
   return g;
 }
 
+export function buildFlowerHat(species: Species): THREE.Group {
+  const g = new THREE.Group();
+  const [hx, hy] = HEAD[species] || [0.5, 1.8];
+
+  // Side offsets so flower sits cutely beside ear / comb / horn
+  const zOffsets: Record<Species, number> = {
+    chicken: 0.16,
+    sheep: 0.22,
+    horse: 0.16,
+    cow: 0.24,
+    duck: 0.16,
+    pig: 0.20,
+  };
+  const yOffsets: Record<Species, number> = {
+    chicken: 0.08,
+    sheep: 0.05,
+    horse: 0.08,
+    cow: 0.06,
+    duck: 0.06,
+    pig: 0.06,
+  };
+  const hz = zOffsets[species] ?? 0.18;
+  const hyOffset = yOffsets[species] ?? 0.06;
+
+  const flowerGroup = new THREE.Group();
+  flowerGroup.position.set(hx, hy + hyOffset, hz);
+  // Tilt outward slightly
+  flowerGroup.rotation.set(0.35, 0.2, -0.25);
+
+  // 1. Calyx / green base
+  const calyx = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.02, 0.09, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4caf50, roughness: 0.7 })
+  );
+  calyx.rotation.x = Math.PI / 2;
+  flowerGroup.add(calyx);
+
+  // 2. Small leafy accents
+  for (const rotZ of [-0.6, 0.6]) {
+    const leaf = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x43a047, roughness: 0.7 })
+    );
+    leaf.scale.set(1.7, 0.35, 0.7);
+    leaf.position.set(rotZ * 0.12, -0.04, 0);
+    leaf.rotation.z = rotZ;
+    flowerGroup.add(leaf);
+  }
+
+  // 3. Five blooming pink/rose petals
+  const petalMat = new THREE.MeshStandardMaterial({
+    color: 0xff4081,
+    roughness: 0.38,
+    metalness: 0.08,
+  });
+  const petalGeo = new THREE.SphereGeometry(0.08, 10, 8);
+  petalGeo.scale(1.3, 0.45, 0.85);
+
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const petal = new THREE.Mesh(petalGeo, petalMat);
+    petal.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, 0.04);
+    petal.rotation.z = a;
+    petal.rotation.y = 0.18;
+    flowerGroup.add(petal);
+  }
+
+  // 4. Center pistil (bright golden dome)
+  const pistilMat = new THREE.MeshStandardMaterial({
+    color: 0xffd54f,
+    roughness: 0.3,
+    metalness: 0.25,
+    emissive: 0xff9800,
+    emissiveIntensity: 0.3,
+  });
+  const pistil = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), pistilMat);
+  pistil.position.set(0, 0, 0.06);
+  flowerGroup.add(pistil);
+
+  g.add(flowerGroup);
+  return g;
+}
+
 // Height where name label floats for each species
 const LABEL_Y: Record<Species, number> = {
   chicken: 2.3,
@@ -1175,8 +1260,15 @@ export class AnimalRenderer {
     vis.collarMat.color.setHex(isKing ? 0xffc928 : collarColor);
   }
 
+  setTheme(theme: ArenaTheme): void {
+    const isWomenDay = theme === 'women_day';
+    for (const vis of this.visuals.values()) {
+      vis.flowerHat.visible = isWomenDay;
+    }
+  }
+
   private buildAnimal(meta: PlayerMeta, isMe = false): AnimalVisual {
-    const { root, body, legs, collarMat } = buildFullAnimal(meta.species, meta.skin, meta.team);
+    const { root, body, legs, collarMat, flowerHat } = buildFullAnimal(meta.species, meta.skin, meta.team);
 
     // Add King regalia (crown + cape)
     const regalia = buildRegalia(meta.species);
@@ -1208,6 +1300,7 @@ export class AnimalRenderer {
       label,
       labelKey: meta.name,
       regalia,
+      flowerHat,
       isCrowned: false,
       ring,
       ringMat,
@@ -1231,6 +1324,7 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   body: THREE.Group;
   legs: THREE.Group[];
   collarMat: THREE.MeshStandardMaterial;
+  flowerHat: THREE.Group;
 } {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -1252,7 +1346,13 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   });
   body.add(buildCollar(species, collarMat));
 
-  return { root, body, legs, collarMat };
+  // 20/10 Flower Hat accessory
+  const flowerHat = buildFlowerHat(species);
+  flowerHat.name = 'flowerHat';
+  flowerHat.visible = getArenaTheme() === 'women_day';
+  root.add(flowerHat);
+
+  return { root, body, legs, collarMat, flowerHat };
 }
 
 export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false, team?: number): { group: THREE.Group; regalia: THREE.Group | null } {

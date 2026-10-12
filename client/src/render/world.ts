@@ -3,6 +3,7 @@ import { CFG, radiusOf } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { blobOutline, type Blob } from '@shared/math';
 import { t } from '../i18n';
+import { getArenaTheme, type ArenaTheme } from '../theme';
 
 function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, size: number) => void, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -665,6 +666,10 @@ export class WorldRenderer {
   private camH = 60;
   private readonly tex: WorldTextures;
 
+  private outerMat!: THREE.MeshStandardMaterial;
+  private arenaMat!: THREE.MeshStandardMaterial;
+  private warnMat!: THREE.MeshStandardMaterial;
+
   // Local player cooldown ground indicator ring & arc
   private readonly cdArc: THREE.Mesh;
   private readonly cdTrack: THREE.Mesh;
@@ -732,6 +737,8 @@ export class WorldRenderer {
     this.tillTruck.group.visible = false;
     this.scene.add(this.tillTruck.group);
 
+    this.setTheme(getArenaTheme());
+
     window.addEventListener('resize', () => this.resize());
   }
 
@@ -762,8 +769,8 @@ export class WorldRenderer {
 
     // Outer endless field
     const outerGeo = new THREE.PlaneGeometry(1000, 1000);
-    const outerMat = new THREE.MeshStandardMaterial({ color: 0x6aa84f, roughness: 0.85, flatShading: true });
-    const outer = new THREE.Mesh(outerGeo, outerMat);
+    this.outerMat = new THREE.MeshStandardMaterial({ color: 0x6aa84f, roughness: 0.85, flatShading: true });
+    const outer = new THREE.Mesh(outerGeo, this.outerMat);
     outer.rotation.x = -Math.PI / 2;
     outer.position.y = -0.05;
     outer.receiveShadow = true;
@@ -771,20 +778,43 @@ export class WorldRenderer {
 
     // Inner farm arena
     const arenaGeo = new THREE.CircleGeometry(R, 128);
-    const arenaMat = new THREE.MeshStandardMaterial({ color: 0x8ccf5e, roughness: 0.85, flatShading: true });
-    const arena = new THREE.Mesh(arenaGeo, arenaMat);
+    this.arenaMat = new THREE.MeshStandardMaterial({ color: 0x8ccf5e, roughness: 0.85, flatShading: true });
+    const arena = new THREE.Mesh(arenaGeo, this.arenaMat);
     arena.rotation.x = -Math.PI / 2;
     arena.receiveShadow = true;
     this.scene.add(arena);
 
     // Warning perimeter ring near electric fence
     const warnGeo = new THREE.RingGeometry(R - 5, R, 128);
-    const warnMat = new THREE.MeshStandardMaterial({ color: 0xc9b56a, roughness: 0.85, flatShading: true });
-    const warn = new THREE.Mesh(warnGeo, warnMat);
+    this.warnMat = new THREE.MeshStandardMaterial({ color: 0xc9b56a, roughness: 0.85, flatShading: true });
+    const warn = new THREE.Mesh(warnGeo, this.warnMat);
     warn.rotation.x = -Math.PI / 2;
     warn.position.y = 0.02;
     warn.receiveShadow = true;
     this.scene.add(warn);
+  }
+
+  setTheme(theme: ArenaTheme): void {
+    if (theme === 'women_day') {
+      const sky = new THREE.Color(0xffe2ea);
+      this.scene.background = sky;
+      if (this.scene.fog) {
+        (this.scene.fog as THREE.Fog).color.copy(sky);
+      }
+      if (this.outerMat) this.outerMat.color.setHex(0xdb839d);
+      if (this.arenaMat) this.arenaMat.color.setHex(0xf5a3b7);
+      if (this.warnMat) this.warnMat.color.setHex(0xe65c82);
+    } else {
+      const sky = new THREE.Color(0xa8dcff);
+      this.scene.background = sky;
+      if (this.scene.fog) {
+        (this.scene.fog as THREE.Fog).color.copy(sky);
+      }
+      if (this.outerMat) this.outerMat.color.setHex(0x6aa84f);
+      if (this.arenaMat) this.arenaMat.color.setHex(0x8ccf5e);
+      if (this.warnMat) this.warnMat.color.setHex(0xc9b56a);
+    }
+    this.updateBarnSign();
   }
 
   private buildFence(): void {
@@ -1047,10 +1077,11 @@ export class WorldRenderer {
     }
     sg.textAlign = 'center';
     sg.textBaseline = 'middle';
-    sg.fillStyle = '#a5281b';
+    const isWomenDay = getArenaTheme() === 'women_day';
+    sg.fillStyle = isWomenDay ? '#ff4081' : '#a5281b';
     sg.font = '900 52px "Baloo 2", sans-serif';
-    sg.fillText(t('boardEyebrow'), this.barnSignCanvas.width / 2, 70);
-    sg.fillStyle = '#f2ead7';
+    sg.fillText(isWomenDay ? '🌸 ' + t('boardEyebrow') + ' 🌸' : t('boardEyebrow'), this.barnSignCanvas.width / 2, 70);
+    sg.fillStyle = isWomenDay ? '#ffe4ec' : '#f2ead7';
     sg.font = '700 58px "Be Vietnam Pro", sans-serif';
     sg.fillText(t('r_equal'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
     this.barnSignTex.needsUpdate = true;

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CFG, FOOD_KG, type FoodKind } from '@shared/constants';
 import type { FoodItem } from '../game/state';
+import { getArenaTheme, type ArenaTheme } from '../theme';
 
 interface Particle {
   x: number;
@@ -52,6 +53,7 @@ export class FoodAndParticleRenderer {
 
   private readonly foodMeshes: THREE.InstancedMesh[] = [];
   private readonly foodTops: Partial<Record<FoodKind, THREE.InstancedMesh>> = {};
+  private readonly foodMats: THREE.Material[];
   private readonly foodShadow: THREE.InstancedMesh;
   private readonly particleMesh: THREE.InstancedMesh;
   private readonly particles: Particle[] = [];
@@ -271,6 +273,68 @@ export class FoodAndParticleRenderer {
     this.particleMesh.frustumCulled = false;
     this.particleMesh.count = 0;
     this.scene.add(this.particleMesh);
+
+    this.foodMats = mats;
+    this.setTheme(getArenaTheme());
+  }
+
+  setTheme(theme: ArenaTheme): void {
+    if (!this.foodMats || this.foodMats.length < 6) return;
+    if (theme === 'women_day') {
+      // 0: Rose flower (Corn) -> Vibrant red rose
+      const m0 = this.foodMats[0] as THREE.MeshStandardMaterial;
+      m0.color.setHex(0xe91e63);
+      m0.emissive.setHex(0x4a0e1c);
+
+      // 1: Perfume bottle (Apple) -> Rose blossom pink
+      const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
+      m1.color.setHex(0xff4081);
+      m1.emissive.setHex(0x330018);
+
+      // 2: Golden Rose (Golden Corn)
+      const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
+      m2.color.setHex(0xffd54f);
+      m2.emissive.setHex(0xaa8800);
+
+      // 3: Lipstick (Carrot) -> Magenta red lipstick
+      const m3 = this.foodMats[3] as THREE.MeshStandardMaterial;
+      m3.color.setHex(0xd81b60);
+      m3.emissive.setHex(0x330011);
+
+      // 4: Heart gift (Pumpkin) -> Romantic pastel pink
+      const m4 = this.foodMats[4] as THREE.MeshStandardMaterial;
+      m4.color.setHex(0xff69b4);
+      m4.emissive.setHex(0x330818);
+
+      // 5: Cake / Strawberry sweet (Bread/Turnip) -> Soft strawberry pink
+      const m5 = this.foodMats[5] as THREE.MeshStandardMaterial;
+      m5.color.setHex(0xffc0cb);
+      m5.emissive.setHex(0x221118);
+    } else {
+      const m0 = this.foodMats[0] as THREE.MeshStandardMaterial;
+      m0.color.setHex(0xffcb2b);
+      m0.emissive.setHex(0x442c00);
+
+      const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
+      m1.color.setHex(0xdb2828);
+      m1.emissive.setHex(0x220000);
+
+      const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
+      m2.color.setHex(0xffd700);
+      m2.emissive.setHex(0xaa7700);
+
+      const m3 = this.foodMats[3] as THREE.MeshStandardMaterial;
+      m3.color.setHex(0xff7a00);
+      m3.emissive.setHex(0x331100);
+
+      const m4 = this.foodMats[4] as THREE.MeshStandardMaterial;
+      m4.color.setHex(0xee7200);
+      m4.emissive.setHex(0x2a1000);
+
+      const m5 = this.foodMats[5] as THREE.MeshStandardMaterial;
+      m5.color.setHex(0xf5f5f0);
+      m5.emissive.setHex(0x222222);
+    }
   }
 
   updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {

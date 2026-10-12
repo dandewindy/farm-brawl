@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Species } from '@shared/constants';
 import { buildFullAnimal } from './animals';
+import type { ArenaTheme } from '../theme';
 
 function build3DQuestionMark(): THREE.Group {
   const g = new THREE.Group();
@@ -251,6 +252,15 @@ export class AnimalPreviewRenderer {
     const qMark = build3DQuestionMark();
     this.currentAnimalGroup = qMark;
     this.turntable.add(qMark);
+  }
+
+  public updateTheme(theme: ArenaTheme): void {
+    if (this.currentAnimalGroup) {
+      const flower = this.currentAnimalGroup.getObjectByName('flowerHat');
+      if (flower) {
+        flower.visible = theme === 'women_day';
+      }
+    }
   }
 
   public start(): void {
