@@ -388,6 +388,24 @@ function disablePseudoFs(): void {
   window.dispatchEvent(new Event('resize'));
 }
 
+function lockLandscape(): void {
+  try {
+    const ori = screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    if (ori && typeof ori.lock === 'function') {
+      ori.lock('landscape').catch(() => {});
+    }
+  } catch (_e) {}
+}
+
+function unlockLandscape(): void {
+  try {
+    const ori = screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    if (ori && typeof ori.unlock === 'function') {
+      ori.unlock();
+    }
+  } catch (_e) {}
+}
+
 function toggleFs(): void {
   const doc = document as any;
   const docEl = document.documentElement as any;
@@ -396,16 +414,18 @@ function toggleFs(): void {
   if (!active) {
     userWantsFs = true;
     enablePseudoFs(); // immediately lock pseudo fullscreen so layout doesn't shift
+    lockLandscape();
     const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
                 (docEl.webkitRequestFullscreen && docEl.webkitRequestFullscreen()) ||
                 (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
                 (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
-    if (req && typeof req.catch === 'function') {
-      req.catch(() => {});
+    if (req && typeof req.then === 'function') {
+      req.then(() => lockLandscape()).catch(() => {});
     }
   } else {
     userWantsFs = false;
     disablePseudoFs();
+    unlockLandscape();
     if (doc.exitFullscreen) {
       doc.exitFullscreen().catch(() => {});
     } else if (doc.webkitExitFullscreen) {
@@ -422,6 +442,9 @@ function toggleFs(): void {
 function handleFsChange(): void {
   const doc = document as any;
   const hasNative = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+  if (hasNative) {
+    lockLandscape();
+  }
 
   if (!hasNative) {
     if (userWantsFs) {

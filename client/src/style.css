@@ -89,7 +89,11 @@ button { font: inherit; cursor: pointer; }
 }
 h1 { margin: 0; font-family: var(--f-display); font-weight: 800; line-height: .9; font-size: 64px; letter-spacing: .02em; }
 h1 .t1 { color: var(--paper); display: block; }
-h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
+.start-header-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .title-row {
   display: flex;
   align-items: center;
@@ -483,6 +487,21 @@ h1 .t2 { color: var(--gold); display: block; text-shadow: 0 4px 0 var(--red); }
 .deathStats b { font: 800 26px var(--f-display); color: var(--gold); }
 .deathStats span { font-size: 12px; color: #b9a98a; }
 #deathBest { min-height: 1.2em; color: var(--gold); font-weight: 700; }
+.death-actions-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+.death-actions-row button {
+  flex: 1;
+}
+
+#modes button[data-mode="friend"]:hover .p::after {
+  content: ' (không bot)';
+  font-size: 0.9em;
+  opacity: 0.85;
+}
 
 /* ---------- HUD ---------- */
 .panel { background: rgba(31, 26, 23, .78); border-radius: 12px; backdrop-filter: blur(4px); }
@@ -2056,192 +2075,299 @@ body.mobile-phone #teamBar {
     font-size: 12px;
     border-radius: 6px;
   }
-  .title-row {
-    font-size: 19px;
-    gap: 6px;
-    margin: 0 0 2px;
+  .start-header-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    margin: 0 0 3px !important;
   }
-  .slogan {
-    display: none;
+  .start-header-row .slogan {
+    display: none !important;
   }
-  .name-box {
-    margin: 0 auto 3px;
-    width: min(180px, 60%);
+  .start-header-row .title-row {
+    font-size: 17px !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  .start-header-row .name-box {
+    margin: 0 !important;
+    width: min(170px, 46%) !important;
+    flex-shrink: 0 !important;
   }
   .name-box #name {
-    padding: 2px 24px 2px 8px;
-    font-size: 12px;
-    height: 26px;
+    padding: 2px 22px 2px 8px !important;
+    font-size: 11px !important;
+    height: 24px !important;
   }
   .name-pencil {
-    font-size: 11px;
-    right: 4px;
+    font-size: 10px !important;
+    right: 4px !important;
   }
   .start-cols {
-    grid-template-columns: 1.15fr 0.85fr !important;
-    gap: 10px !important;
-    margin-top: 1px;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-top: 1px !important;
+  }
+  .start-col-left, .start-col-right {
+    gap: 2px !important;
   }
   .sec-label {
-    font-size: 8.5px;
-    margin: 1px 0 2px;
+    font-size: 8.5px !important;
+    margin: 1px 0 2px !important;
   }
   #modes {
-    gap: 3px;
-    margin-bottom: 2px;
+    gap: 3px !important;
+    margin-bottom: 2px !important;
   }
   #modes button {
-    padding: 2px 1px;
-    border-radius: 5px;
+    padding: 2px 1px !important;
+    border-radius: 5px !important;
   }
   #modes button .n {
-    font-size: 10px;
+    font-size: 10px !important;
   }
   #modes button .p {
-    font-size: 7.5px;
-    margin-top: 0;
+    font-size: 7.5px !important;
+    margin-top: 0 !important;
   }
   .team-pick-wrap {
-    padding: 2px 6px;
-    margin: 2px 0 3px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.25);
+    padding: 2px 6px !important;
+    margin: 2px 0 3px !important;
+    border-radius: 6px !important;
+    background: rgba(0, 0, 0, 0.25) !important;
   }
   .team-pick-label {
-    font-size: 8px;
-    margin-bottom: 1px;
+    font-size: 8px !important;
+    margin-bottom: 1px !important;
   }
   .btn-team {
-    padding: 2px 6px;
-    font-size: 9.5px;
-    border-radius: 5px;
+    padding: 2px 6px !important;
+    font-size: 9.5px !important;
+    border-radius: 5px !important;
   }
   .btn-team .t-count {
-    font-size: 8px;
+    font-size: 8px !important;
   }
   .friend-panel {
-    padding: 3px 6px;
-    margin: 2px 0 3px;
-    border-radius: 6px;
-    background: rgba(30, 24, 20, 0.65);
-    border: 1px solid #4a382c;
+    padding: 2px 5px !important;
+    margin: 1px 0 2px !important;
+    border-radius: 6px !important;
+    background: rgba(30, 24, 20, 0.65) !important;
+    border: 1px solid #4a382c !important;
   }
   .friend-panel .fp-section {
-    gap: 2px;
+    gap: 2px !important;
   }
   .btn-wood {
-    padding: 2px 8px;
-    font-size: 9.5px;
-    border-radius: 5px;
-    box-shadow: 0 1px 0 #20150d;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    border-radius: 5px !important;
+    box-shadow: 0 1px 0 #20150d !important;
   }
   .room-box {
-    padding: 2px 6px;
-    border-radius: 5px;
+    padding: 2px 6px !important;
+    border-radius: 5px !important;
   }
   .room-badge-simple {
-    gap: 4px;
-    margin-bottom: 1px;
+    gap: 4px !important;
+    margin-bottom: 1px !important;
   }
   .room-badge-simple span {
-    font-size: 13px;
+    font-size: 13px !important;
   }
   .btn-copy-ico {
-    width: 22px;
-    height: 22px;
-    font-size: 10px;
-    border-radius: 5px;
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
   }
   .fp-divider {
-    margin: 1px 0;
-    font-size: 7px;
+    margin: 1px 0 !important;
+    font-size: 7px !important;
   }
   .fp-join-row {
-    gap: 3px;
+    display: flex !important;
+    gap: 3px !important;
+    width: 100% !important;
+    align-items: center !important;
   }
   .room-code-input {
-    padding: 2px 6px;
-    font-size: 9.5px;
-    height: 22px;
-    border-radius: 5px;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: 120px !important;
+    padding: 2px 5px !important;
+    font-size: 9.5px !important;
+    height: 22px !important;
+    border-radius: 5px !important;
   }
   .btn-wood-sm {
-    padding: 2px 6px;
-    font-size: 9.5px;
-    height: 22px;
-    border-radius: 5px;
+    flex-shrink: 0 !important;
+    padding: 2px 6px !important;
+    font-size: 9.5px !important;
+    height: 22px !important;
+    white-space: nowrap !important;
+    border-radius: 5px !important;
   }
   .room-notice {
-    font-size: 8px;
-    margin-top: 1px;
+    font-size: 8px !important;
+    margin-top: 1px !important;
+  }
+  .arena-picker {
+    gap: 3px !important;
+    margin-bottom: 2px !important;
+  }
+  .btn-arena {
+    padding: 2px 4px !important;
+    font-size: 9px !important;
+    border-radius: 5px !important;
+  }
+  .btn-arena .ico {
+    font-size: 10px !important;
   }
   .sp-carousel-row {
-    margin: 1px 0 2px;
-    gap: 3px;
-    justify-content: space-between;
+    margin: 1px 0 2px !important;
+    gap: 3px !important;
+    width: 100% !important;
+    justify-content: space-between !important;
   }
   .sp-carousel-viewport {
-    width: 132px;
+    width: 132px !important;
   }
   #species button {
-    flex: 0 0 38px;
-    width: 38px;
-    height: 38px;
-    border-radius: 6px;
-    padding: 1px;
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 6px !important;
+    padding: 1px !important;
   }
   #species button .sp-thumb {
-    width: 26px;
-    height: 26px;
+    width: 26px !important;
+    height: 26px !important;
   }
   #species button .dots {
-    gap: 1.5px;
+    gap: 1.5px !important;
   }
   #species button .dot {
-    width: 3px;
-    height: 3px;
+    width: 3px !important;
+    height: 3px !important;
   }
   .sp-random-btn {
-    flex: 0 0 38px;
-    width: 38px;
-    height: 38px;
-    border-radius: 6px;
-    font-size: 15px;
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 6px !important;
+    font-size: 15px !important;
   }
   .sp-arrow-btn {
-    font-size: 18px;
-    width: 12px;
-    height: 38px;
+    font-size: 18px !important;
+    width: 12px !important;
+    height: 38px !important;
   }
   .play-btn-main {
-    padding: 4px 8px;
-    font-size: 12.5px;
-    margin-top: 2px;
-    border-radius: 6px;
+    width: 100% !important;
+    padding: 4px 8px !important;
+    font-size: 13px !important;
+    margin-top: 1px !important;
+    margin-bottom: 2px !important;
+    border-radius: 6px !important;
   }
   #bestLine {
-    font-size: 9.5px;
-    margin-top: 1px;
-    min-height: 1.1em;
+    font-size: 9.5px !important;
+    margin-top: 1px !important;
+    min-height: 1.1em !important;
   }
   .how-box {
-    padding: 4px 6px;
-    border-radius: 6px;
-    background: rgba(20, 16, 14, 0.45);
+    padding: 2px 4px !important;
+    border-radius: 5px !important;
+    background: rgba(20, 16, 14, 0.45) !important;
+    margin-top: 1px !important;
   }
   .how-title {
-    font-size: 9px;
-    margin-bottom: 2px;
+    font-size: 8px !important;
+    margin-bottom: 1px !important;
   }
   .how {
-    font-size: 8px;
-    line-height: 1.2;
-    margin: 0;
-    padding-left: 6px;
-    gap: 1px;
+    font-size: 7.5px !important;
+    line-height: 1.15 !important;
+    margin: 0 !important;
+    padding-left: 5px !important;
+    gap: 1px !important;
   }
   .how li {
-    margin-bottom: 1px;
+    margin-bottom: 1px !important;
+  }
+
+  /* Compact Death Screen on Mobile Landscape */
+  #death {
+    padding: 4px 8px !important;
+  }
+  #death .card.notice {
+    width: min(390px, 92vw) !important;
+    max-width: 390px !important;
+    padding: 8px 14px 8px !important;
+    border-radius: 12px !important;
+    margin: auto !important;
+  }
+  #death .stamp {
+    font-size: 20px !important;
+    padding: 2px 10px !important;
+    border-width: 2.5px !important;
+    border-radius: 6px !important;
+  }
+  #deathCause {
+    margin: 4px 0 6px !important;
+    font-size: 11.5px !important;
+    line-height: 1.25 !important;
+  }
+  #death .deathStats {
+    gap: 4px !important;
+    margin-bottom: 6px !important;
+  }
+  #death .deathStats div {
+    padding: 3px 2px !important;
+    border-radius: 6px !important;
+  }
+  #death .deathStats b {
+    font-size: 16px !important;
+    line-height: 1.1 !important;
+  }
+  #death .deathStats span {
+    font-size: 9px !important;
+  }
+  #deathBest {
+    display: none !important;
+  }
+  #deathTeamPick {
+    padding: 2px 4px !important;
+    margin: 2px 0 3px !important;
+  }
+  #deathCountdown {
+    font-size: 10px !important;
+    margin: 2px 0 !important;
+  }
+  #death #again {
+    width: 100% !important;
+    padding: 5px 10px !important;
+    font-size: 13.5px !important;
+    border-radius: 7px !important;
+    margin-top: 2px !important;
+  }
+  #death .death-actions-row {
+    display: flex !important;
+    gap: 6px !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+  #death #spectateBtn,
+  #death #change {
+    flex: 1 1 0 !important;
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    margin: 0 !important;
   }
 
   /* Choice cards overlay on mobile landscape: 3 cards side-by-side in one row */

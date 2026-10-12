@@ -141,7 +141,7 @@ export class World {
     if (this.foodEnabled) {
       for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     }
-    for (let i = 0; i < 3; i++) this.spawnTool();
+    for (let i = 0; i < 6; i++) this.spawnTool();
     this.flush();
   }
 
@@ -464,11 +464,11 @@ export class World {
 
     this.eat(alive);
 
-    // Tool & Super Candy spawning
+    // Tool & Super Candy spawning (special items spawn 2x faster, max 7 tools)
     this.toolSpawnTimer -= DT;
     if (this.toolSpawnTimer <= 0) {
-      this.toolSpawnTimer = 12 + this.rnd() * 8;
-      if (this.tools.size < 3) {
+      this.toolSpawnTimer = 6 + this.rnd() * 4;
+      if (this.tools.size < 7) {
         this.spawnTool();
       }
     }
@@ -1088,14 +1088,18 @@ export class World {
     if (isDynamite) {
       vic.lastHitBy = att.id;
       vic.lastHitT = this.time;
-      // Target mass loses 25%; for animals >= 100kg, remaining mass cannot drop below 100kg
-      const targetMass = vic.mass >= 100 ? Math.max(100, vic.mass * 0.75) : vic.mass * 0.75;
-      if (targetMass <= 10) {
+      // Animals under 100kg immediately explode and die
+      if (vic.mass < 100) {
         this.kill(vic, 'dynamite');
         return;
       }
-      const loss = vic.mass - targetMass;
-      vic.mass = targetMass;
+      // Animals >= 100kg lose 25% of current mass, with at least 100kg lost
+      const loss = Math.max(100, Math.round(vic.mass * 0.25));
+      vic.mass -= loss;
+      if (vic.mass <= 10) {
+        this.kill(vic, 'dynamite');
+        return;
+      }
       if (loss > 0.5) {
         this.scatter(boomX, boomZ, loss, radiusOf(vic.mass) + 3.5, nx, nz);
       }
@@ -1303,7 +1307,7 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'song'];
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'dynamite', 'song'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
     for (let tries = 0; tries < 25; tries++) {
@@ -1436,7 +1440,7 @@ export class World {
     this.food.clear();
     this.tools.clear();
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
-    for (let i = 0; i < 3; i++) this.spawnTool();
+    for (let i = 0; i < 6; i++) this.spawnTool();
     this.matchClock = 300;
     this.teamScores = [0, 0];
     this.matchEnded = false;

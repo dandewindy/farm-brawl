@@ -189,15 +189,17 @@
         <button id="mute" type="button" title="Âm thanh / Sound"><span class="ico">🔊</span></button>
         <button id="langToggle" type="button" title="Ngôn ngữ / Language">VI</button>
       </div>
-      <h1 class="title-row"><span class="t1">FARM</span> <span class="t2">BRAWL</span></h1>
-      <p class="slogan" data-i18n="slogan"></p>
-      <div class="name-box">
-        <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="TÊN CỦA BẠN">
-        <button type="button" id="nameEditBtn" class="name-pencil" title="Đổi tên">✏️</button>
+      <div class="start-header-row">
+        <h1 class="title-row"><span class="t1">FARM</span> <span class="t2">BRAWL</span></h1>
+        <p class="slogan" data-i18n="slogan"></p>
+        <div class="name-box">
+          <input id="name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="TÊN CỦA BẠN">
+          <button type="button" id="nameEditBtn" class="name-pencil" title="Đổi tên">✏️</button>
+        </div>
       </div>
 
       <div class="start-cols">
-        <!-- CỘT TRÁI -->
+        <!-- CỘT TRÁI: Chế độ chơi & Sàn đấu -->
         <div class="start-col-left">
           <p class="sec-label" data-i18n="modeLabel">CHẾ ĐỘ CHƠI</p>
           <div id="modes">
@@ -209,9 +211,9 @@
               <span class="n" data-i18n="m_team_title">TRẠI ĐẤU</span>
               <span class="p" data-i18n="m_team_desc">Tranh tài 2 đội</span>
             </button>
-            <button type="button" data-mode="friend">
+            <button type="button" data-mode="friend" title="Phòng riêng không bot">
               <span class="n" data-i18n="m_friend_title">BẠN BÈ</span>
-              <span class="p" data-i18n="m_friend_desc">Phòng riêng không bot</span>
+              <span class="p" data-i18n="m_friend_desc">Phòng riêng</span>
             </button>
           </div>
 
@@ -243,7 +245,7 @@
             </div>
             <div class="fp-divider"><span data-i18n="orJoinCode">HOẶC NHẬP MÃ PHÒNG</span></div>
             <div class="fp-join-row">
-              <input id="joinRoomCode" class="room-code-input" placeholder="Nhập mã (VD: BRAWL8)" maxlength="12" autocomplete="off" spellcheck="false">
+              <input id="joinRoomCode" class="room-code-input" placeholder="VD: BRAWL8" maxlength="12" autocomplete="off" spellcheck="false">
               <button type="button" id="btnApplyCode" class="btn-wood-sm" data-i18n="applyCode">Chọn mã</button>
             </div>
             <div id="roomStatusNotice" class="room-notice"></div>
@@ -260,7 +262,10 @@
               <span class="txt" data-i18n="theme_women_day">Phụ Nữ VN (20/10)</span>
             </button>
           </div>
+        </div>
 
+        <!-- CỘT PHẢI: Chọn con vật & Nút vào game -->
+        <div class="start-col-right">
           <p class="sec-label" data-i18n="pick">CHỌN CON VẬT</p>
           <div class="sp-carousel-row">
             <button type="button" id="spNavPrev" class="sp-arrow-btn" title="Trước">‹</button>
@@ -273,10 +278,7 @@
 
           <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>
           <p id="bestLine"></p>
-        </div>
 
-        <!-- CỘT PHẢI -->
-        <div class="start-col-right">
           <!-- Hướng dẫn chơi -->
           <div class="how-box">
             <div class="how-title" data-i18n="howTitle">HƯỚNG DẪN CHIẾN ĐẤU</div>
@@ -333,8 +335,10 @@
       </div>
       <div id="deathCountdown" class="tw-countdown" hidden>Hồi sinh trong <b id="deathTimer">3</b>s...</div>
       <button id="again" class="btn-red" type="button" data-i18n="again"></button>
-      <button id="spectateBtn" class="btn-ghost" type="button">Xem</button>
-      <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
+      <div class="death-actions-row">
+        <button id="spectateBtn" class="btn-ghost" type="button">Xem</button>
+        <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
+      </div>
     </div>
   </div>
 

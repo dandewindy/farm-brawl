@@ -233,7 +233,7 @@ describe('bonus weapons and tools', () => {
     const vicId = w.addPlayer('Victim', 'pig');
     const byId = w.addPlayer('Bystander', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 50);
+    place(w, vicId, 2, 0, 200); // >= 100kg so survives
     place(w, byId, 1, 3, 50);
 
     const att = w.players.get(attId)!;
@@ -250,12 +250,12 @@ describe('bonus weapons and tools', () => {
     expect(Math.abs(bystander.vz)).toBeGreaterThan(0.5);
   });
 
-  it('dynamite kills victim if remaining mass drops to <= 10kg with dynamite cause', () => {
+  it('dynamite immediately kills any victim under 100kg', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('Bomber', 'pig');
-    const vicId = w.addPlayer('Victim', 'pig');
+    const vicId = w.addPlayer('SmallVictim', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 12); // 12kg * 0.75 = 9kg <= 10kg
+    place(w, vicId, 2, 0, 80); // under 100kg -> instant explosion death
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -272,12 +272,12 @@ describe('bonus weapons and tools', () => {
     expect((dieEv as any).by).toBe(attId);
   });
 
-  it('dynamite reduces 25% when victim is >= 100kg', () => {
+  it('dynamite reduces 25% with a minimum loss of 100kg for victims >= 100kg', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('Bomber', 'pig');
     const vicId = w.addPlayer('HeavyVictim', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 200); // 200kg * 0.75 = 150kg
+    place(w, vicId, 2, 0, 1000); // 1000kg: 25% = 250kg (> 100kg) -> remaining 750kg
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -286,28 +286,26 @@ describe('bonus weapons and tools', () => {
     att.vx = 20;
 
     w.step();
-    const vic = w.players.get(vicId)!;
-    expect(vic.alive).toBe(true);
-    expect(Math.round(vic.mass)).toBe(150); // 200 - 25% = 150
-  });
+    const hitEv = w.events.find((e) => e.k === 'hit' && e.v === vicId) as any;
+    expect(hitEv).toBeDefined();
+    expect(hitEv.loss).toBe(250); // 25% of 1000kg is 250kg
 
-  it('dynamite clamps victim mass to minimum 100kg if under 133kg', () => {
-    const w = emptyWorld();
-    const attId = w.addPlayer('Bomber', 'pig');
-    const vicId = w.addPlayer('Victim120', 'pig');
-    place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 120); // 120kg * 0.75 = 90kg -> clamped to 100kg
+    // Test minimum 100kg loss when 25% is less than 100kg (e.g. 200kg: 25% is 50kg, min is 100kg)
+    const w2 = emptyWorld();
+    const a2 = w2.addPlayer('B2', 'pig');
+    const v2 = w2.addPlayer('V2', 'pig');
+    place(w2, a2, 0, 0, 50);
+    place(w2, v2, 2, 0, 200);
+    const att2 = w2.players.get(a2)!;
+    att2.hasDynamite = true;
+    att2.dashT = 0.3;
+    att2.power = 1.0;
+    att2.vx = 20;
 
-    const att = w.players.get(attId)!;
-    att.hasDynamite = true;
-    att.dashT = 0.3;
-    att.power = 1.0;
-    att.vx = 20;
-
-    w.step();
-    const vic = w.players.get(vicId)!;
-    expect(vic.alive).toBe(true);
-    expect(vic.mass).toBe(100); // Clamped to 100
+    w2.step();
+    const hitEv2 = w2.events.find((e) => e.k === 'hit' && e.v === v2) as any;
+    expect(hitEv2).toBeDefined();
+    expect(hitEv2.loss).toBe(100); // Math.max(100, 200 * 0.25) = 100kg
   });
 
   it('song slows down Napoleon and blocks ramming', () => {
@@ -624,7 +622,7 @@ describe('bonus weapons and tools', () => {
 
     expect(w.map.seed).toBe(999);
     expect(w.food.size).toBe(CFG.FOOD_TARGET);
-    expect(w.tools.size).toBe(3);
+    expect(w.tools.size).toBe(6);
     expect(w.matchClock).toBe(300);
     expect(w.teamScores).toEqual([0, 0]);
   });
