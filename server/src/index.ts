@@ -30,15 +30,19 @@ export default {
       // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sea-2';
+        targetRoomKey = 'pub-sea-3';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sea-2';
+        targetRoomKey = 'team-sea-3';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      return roomStub.fetch(request);
+      const reqHeaders = new Headers(request.headers);
+      const cfColo = (request as any).cf?.colo;
+      if (cfColo) reqHeaders.set('x-edge-colo', cfColo);
+
+      return roomStub.fetch(new Request(request, { headers: reqHeaders }));
     }
 
     // Health check endpoint
@@ -61,15 +65,19 @@ export default {
       const hint = getTargetLocationHint(request);
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sea-2';
+        targetRoomKey = 'pub-sea-3';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sea-2';
+        targetRoomKey = 'team-sea-3';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
+      const reqHeaders = new Headers(request.headers);
+      const cfColo = (request as any).cf?.colo;
+      if (cfColo) reqHeaders.set('x-edge-colo', cfColo);
+
       return roomStub.fetch(new Request(`${url.origin}/info?room=${encodeURIComponent(roomParam)}`, {
-        headers: request.headers,
+        headers: reqHeaders,
       }));
     }
 

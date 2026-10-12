@@ -58,7 +58,7 @@ export class GameRoom extends DurableObject {
 
       const cid = url.searchParams.get('cid') || '';
       const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
+      const edgeColo = request.headers.get('x-edge-colo') || cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
       this.handleWebSocket(server, edgeColo, cid);
 
       return new Response(null, {
@@ -69,7 +69,7 @@ export class GameRoom extends DurableObject {
 
     if (url.pathname === '/info') {
       const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
+      const edgeColo = request.headers.get('x-edge-colo') || cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
       return new Response(
         JSON.stringify({
           room: roomParam,

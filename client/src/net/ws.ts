@@ -97,8 +97,9 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
-          // In-game auto-detection: if playing on high-latency NRT, trigger seamless background migration
-          if (this.inGame && this.colo === 'NRT') {
+          // In-game auto-detection: if playing on high-latency node, trigger seamless background migration
+          const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.rtt > 180);
+          if (this.inGame && isHighLatency) {
             this.triggerHotMigration();
           }
         } else {
@@ -110,10 +111,10 @@ export class WsClient implements Transport {
                 this.lastJoinMsg.token = msg.token;
               }
             }
-            // Auto-steer away from high-latency edge nodes (NRT) in lobby:
+            // Auto-steer away from high-latency edge nodes in lobby:
             // SIN (~35ms) and HKG (~75ms) are both fast low-latency APAC routes for Vietnam.
-            // Only NRT (~460ms cross-colo) causes high ping and should be steered away from.
-            if (this.colo === 'NRT' && !this.inGame && this.autoSteerAttempts < 3) {
+            const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.rtt > 180);
+            if (isHighLatency && !this.inGame && this.autoSteerAttempts < 3) {
               this.autoSteerAttempts++;
               console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/3)...`);
               setTimeout(() => {
@@ -121,7 +122,7 @@ export class WsClient implements Transport {
                   this.forceReconnect();
                 }
               }, 450);
-            } else if (this.inGame && this.colo === 'NRT') {
+            } else if (this.inGame && isHighLatency) {
               this.triggerHotMigration();
             }
           }
@@ -147,12 +148,12 @@ export class WsClient implements Transport {
   }
 
   public triggerHotMigration(): void {
-    if (!this.inGame || this.colo !== 'NRT' || this.closed || !this.sessionToken) return;
+    if (!this.inGame || (this.colo === 'SIN' || this.colo === 'HKG') || this.closed || !this.sessionToken) return;
     const now = performance.now();
     // Throttle attempts: probe at most once every 12 seconds to prevent spam
     if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 12000) return;
     this.lastMigrationProbeTime = now;
-    console.log('[WS] In-game NRT detected. Starting zero-downtime hot migration probe...');
+    console.log(`[WS] In-game high latency node detected (${this.colo}). Starting zero-downtime hot migration probe...`);
 
     let probeSocket: WebSocket;
     try {
