@@ -81,6 +81,9 @@ export class HudManager {
   private readonly fpsDot: HTMLElement | null;
   private readonly pingDot: HTMLElement | null;
   private readonly coloVal: HTMLElement | null;
+  private readonly exitConfirmModal: HTMLElement | null;
+  private readonly btnCancelExit: HTMLElement | null;
+  private readonly btnConfirmExit: HTMLElement | null;
 
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
@@ -256,6 +259,9 @@ export class HudManager {
     this.fpsDot = document.getElementById('fpsDot');
     this.pingDot = document.getElementById('pingDot');
     this.coloVal = document.getElementById('coloVal');
+    this.exitConfirmModal = document.getElementById('exitConfirmModal');
+    this.btnCancelExit = document.getElementById('btnCancelExit');
+    this.btnConfirmExit = document.getElementById('btnConfirmExit');
 
     const netPerfEl = document.getElementById('netPerf');
     if (netPerfEl) {
@@ -727,16 +733,45 @@ export class HudManager {
     });
 
     const btnExitLobby = document.getElementById('btnExitLobby');
+    const drawerExitBtn = document.getElementById('drawerExitBtn');
+
+    const showExitPrompt = () => {
+      const drawer = document.getElementById('gameDrawerModal');
+      if (drawer) drawer.hidden = true;
+      if (this.exitConfirmModal) {
+        this.exitConfirmModal.hidden = false;
+      } else {
+        this.onExitLobby?.();
+      }
+    };
+
+    const hideExitPrompt = () => {
+      if (this.exitConfirmModal) {
+        this.exitConfirmModal.hidden = true;
+      }
+    };
+
     if (btnExitLobby) {
-      btnExitLobby.addEventListener('click', () => {
+      btnExitLobby.addEventListener('click', showExitPrompt);
+    }
+    if (drawerExitBtn) {
+      drawerExitBtn.addEventListener('click', showExitPrompt);
+    }
+    if (this.btnCancelExit) {
+      this.btnCancelExit.addEventListener('click', hideExitPrompt);
+    }
+    if (this.btnConfirmExit) {
+      this.btnConfirmExit.addEventListener('click', () => {
+        hideExitPrompt();
         this.onExitLobby?.();
       });
     }
-
-    const drawerExitBtn = document.getElementById('drawerExitBtn');
-    if (drawerExitBtn) {
-      drawerExitBtn.addEventListener('click', () => {
-        this.onExitLobby?.();
+    if (this.exitConfirmModal) {
+      this.exitConfirmModal.addEventListener('pointerdown', (e) => {
+        const card = this.exitConfirmModal?.querySelector('.center-modal-card');
+        if (card && !card.contains(e.target as Node)) {
+          hideExitPrompt();
+        }
       });
     }
 
@@ -1205,6 +1240,7 @@ export class HudManager {
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     const gameDrawer = document.getElementById('gameDrawerModal');
     if (gameDrawer) gameDrawer.hidden = true;
+    if (this.exitConfirmModal) this.exitConfirmModal.hidden = true;
     this.isSpectating = false;
     document.body.classList.remove('spectating');
     document.body.classList.add('menu');

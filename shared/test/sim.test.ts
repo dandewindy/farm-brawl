@@ -209,6 +209,7 @@ describe('bonus weapons and tools', () => {
     place(w, attacker, 0, 0, 40);
     place(w, king, 2, 0, 40);
     w.napoleonId = king;
+    w.ruleTimer = 40;
 
     const pAtt = w.players.get(attacker)!;
     pAtt.pitchforkT = 10;
@@ -218,9 +219,12 @@ describe('bonus weapons and tools', () => {
     pAtt.vx = 20;
 
     const massBefore = w.players.get(king)!.mass;
+    const attMassBefore = pAtt.mass;
     w.step();
     const massAfter = w.players.get(king)!.mass;
     expect(massBefore - massAfter).toBeGreaterThan(1.0);
+    // Pitchfork steals mass directly based on hit force
+    expect(pAtt.mass).toBeGreaterThan(attMassBefore);
   });
 
   it('dynamite explodes on hit and knocks back bystanders', () => {
@@ -228,9 +232,9 @@ describe('bonus weapons and tools', () => {
     const attId = w.addPlayer('Bomber', 'pig');
     const vicId = w.addPlayer('Victim', 'pig');
     const byId = w.addPlayer('Bystander', 'pig');
-    place(w, attId, 0, 0, 30);
-    place(w, vicId, 2, 0, 30);
-    place(w, byId, 1, 3, 30);
+    place(w, attId, 0, 0, 50);
+    place(w, vicId, 2, 0, 50);
+    place(w, byId, 1, 3, 50);
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -246,12 +250,12 @@ describe('bonus weapons and tools', () => {
     expect(Math.abs(bystander.vz)).toBeGreaterThan(0.5);
   });
 
-  it('dynamite kills victim if under 110kg with dynamite cause', () => {
+  it('dynamite kills victim if remaining mass drops to <= 10kg with dynamite cause', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('Bomber', 'pig');
     const vicId = w.addPlayer('Victim', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 80); // 80kg < 110kg
+    place(w, vicId, 2, 0, 12); // 12kg * 0.75 = 9kg <= 10kg
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -268,12 +272,12 @@ describe('bonus weapons and tools', () => {
     expect((dieEv as any).by).toBe(attId);
   });
 
-  it('dynamite reduces 25kg when victim is >= 110kg', () => {
+  it('dynamite reduces 25% when victim is >= 100kg', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('Bomber', 'pig');
     const vicId = w.addPlayer('HeavyVictim', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 160); // 160kg >= 110kg
+    place(w, vicId, 2, 0, 200); // 200kg * 0.75 = 150kg
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -284,15 +288,15 @@ describe('bonus weapons and tools', () => {
     w.step();
     const vic = w.players.get(vicId)!;
     expect(vic.alive).toBe(true);
-    expect(Math.round(vic.mass)).toBe(135); // 160 - 25 = 135
+    expect(Math.round(vic.mass)).toBe(150); // 200 - 25% = 150
   });
 
-  it('dynamite clamps victim mass to minimum 100kg if under 125kg', () => {
+  it('dynamite clamps victim mass to minimum 100kg if under 133kg', () => {
     const w = emptyWorld();
     const attId = w.addPlayer('Bomber', 'pig');
-    const vicId = w.addPlayer('Victim115', 'pig');
+    const vicId = w.addPlayer('Victim120', 'pig');
     place(w, attId, 0, 0, 50);
-    place(w, vicId, 2, 0, 115); // 115kg >= 110kg
+    place(w, vicId, 2, 0, 120); // 120kg * 0.75 = 90kg -> clamped to 100kg
 
     const att = w.players.get(attId)!;
     att.hasDynamite = true;
@@ -303,7 +307,7 @@ describe('bonus weapons and tools', () => {
     w.step();
     const vic = w.players.get(vicId)!;
     expect(vic.alive).toBe(true);
-    expect(vic.mass).toBe(100); // 115 - 25 = 90 -> clamped to 100
+    expect(vic.mass).toBe(100); // Clamped to 100
   });
 
   it('song slows down Napoleon and blocks ramming', () => {

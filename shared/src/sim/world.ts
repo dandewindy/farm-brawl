@@ -1041,9 +1041,11 @@ export class World {
       k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
     }
 
-    // Weapon: Pitchfork (1.35x knockback)
+    // Weapon: Pitchfork (+100% knockback against normal animals, +200% / 3x against King)
     if (att.pitchforkT > 0) {
-      k = clamp(k * 1.35, CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX * 1.5);
+      const isKing = vic.id === this.napoleonId;
+      const pitchMult = isKing ? 3.0 : 2.0;
+      k = Math.max(k * pitchMult, isKing ? 58 : 42);
     }
 
     // Weapon: Dynamite explosion
@@ -1085,11 +1087,12 @@ export class World {
     if (isDynamite) {
       vic.lastHitBy = att.id;
       vic.lastHitT = this.time;
-      if (vic.mass < 110) {
+      // Target mass loses 25%; for animals >= 100kg, remaining mass cannot drop below 100kg
+      const targetMass = vic.mass >= 100 ? Math.max(100, vic.mass * 0.75) : vic.mass * 0.75;
+      if (targetMass <= 10) {
         this.kill(vic, 'dynamite');
         return;
       }
-      const targetMass = Math.max(100, vic.mass - 25);
       const loss = vic.mass - targetMass;
       vic.mass = targetMass;
       if (loss > 0.5) {
@@ -1109,9 +1112,16 @@ export class World {
     }
 
     let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
-    // Pitchfork strips 3x weight off Napoleon
-    if (att.pitchforkT > 0 && vic.id === this.napoleonId) {
-      loss = Math.min(vic.mass - CFG.MIN_MASS, loss * 3);
+    // Pitchfork heavily strips weight based on ram force and grants mass to attacker
+    if (att.pitchforkT > 0) {
+      const isKing = vic.id === this.napoleonId;
+      const forceScale = clamp(k / 16, 1.5, 4.0);
+      loss = Math.min(vic.mass - CFG.MIN_MASS, loss * forceScale * (isKing ? 3.0 : 2.0));
+      const steal = Math.round(loss * 0.5);
+      if (steal > 0) {
+        att.mass += steal;
+        att.best = Math.max(att.best, att.mass);
+      }
     }
     if (loss > 0.5) {
       vic.mass -= loss;

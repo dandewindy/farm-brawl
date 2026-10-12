@@ -1310,6 +1310,92 @@ body.ipad #lb {
   to { transform: translateY(-4px); }
 }
 
+/* Center Confirmation Modal (Exit to Lobby) */
+.center-modal-wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: caFadeIn 0.15s ease-out;
+}
+.center-modal-wrap[hidden] {
+  display: none !important;
+}
+.center-modal-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(38, 28, 20, 0.98), rgba(26, 18, 12, 0.98));
+  border: 2px solid var(--gold);
+  border-radius: 18px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 201, 40, 0.25);
+  padding: 22px 28px;
+  max-width: min(92vw, 380px);
+  text-align: center;
+  color: #fff;
+  cursor: default;
+  pointer-events: auto;
+  animation: caPopIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.cm-icon {
+  font-size: 34px;
+  margin-bottom: 8px;
+}
+.cm-title {
+  font-family: var(--f-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: #ffd84a;
+  margin: 0 0 8px 0;
+  letter-spacing: 0.02em;
+}
+.cm-desc {
+  font-size: 13.5px;
+  color: #ddd4c4;
+  margin: 0 0 20px 0;
+  line-height: 1.45;
+}
+.cm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.cm-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  touch-action: manipulation;
+  transition: transform 0.1s, opacity 0.1s, background-color 0.15s;
+}
+.cm-btn:active {
+  transform: scale(0.96);
+}
+.cm-btn-cancel {
+  background: rgba(255, 255, 255, 0.15);
+  color: #f7f4ec;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.cm-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+.cm-btn-confirm {
+  background: linear-gradient(135deg, #e53935, #b71c1c);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(229, 57, 53, 0.45);
+}
+.cm-btn-confirm:hover {
+  background: linear-gradient(135deg, #f44336, #c62828);
+}
+
 /* Tarred planks: horizontal wooden boards with dark seams and grain */
 .plank {
   background:
