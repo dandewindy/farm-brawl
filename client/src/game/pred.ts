@@ -1,4 +1,4 @@
-import { CFG, TICK_MS, radiusOf, type Species } from '@shared/constants';
+import { CFG, TICK_MS, TRAITS, radiusOf, type Species } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { insideBlob, wrapAngle } from '@shared/math';
 import type { Ent } from './state';
@@ -149,20 +149,22 @@ export class ClientPredictor {
       return;
     }
     const inMud = map ? map.mud.some((b) => insideBlob(b, this.x, this.z)) : false;
-    const mud = inMud && species !== 'pig' ? 0.6 : 1;
+    const mud = inMud && species !== 'pig' ? 0.55 : 1;
+    const mudT = inMud && species !== 'pig' ? 0.6 : 1;
     const DS = CFG.DASH_SPEED;
     const DT = CFG.DASH_TIME;
     const CMIN = CFG.CHARGE_MIN;
     const CMAX = CFG.CHARGE_MAX;
 
-    let sp = DS * mud * (species === 'chicken' ? 1.1 : 1);
-    let dashT = DT;
+    const chickenDash = species === 'chicken' ? 1.30 : 1;
+    let sp = DS * mud * chickenDash;
+    let dashT = DT * mudT;
 
     this.plow = held >= CMIN;
     if (this.plow) {
       const c = Math.min(1, Math.max(0, (held - CMIN) / (CMAX - CMIN)));
-      sp = DS * (1 + 0.45 * c) * mud;
-      dashT = DT + 0.28 * c;
+      sp = DS * (1 + 0.45 * c) * mud * chickenDash;
+      dashT = (DT + 0.28 * c) * mudT;
     }
 
     this.vx = Math.cos(aimA) * sp;
@@ -228,12 +230,13 @@ export class ClientPredictor {
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
 
       let terrain = water
-        ? species === 'duck' ? 1.25 : 0.4
+        ? species === 'duck' ? 1.25 : species === 'dog' ? 0.70 : 0.45
         : mud
-        ? species === 'pig' ? 1.1 : 0.5
+        ? species === 'pig' ? 1.1 : 0.45
         : species === 'duck' ? 0.87 : 1;
 
-      const maxSp = CFG.MOVE_SPEED * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
+      const spMult = TRAITS[species]?.speed ?? 1.0;
+      const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
 
       if (this.dashT > 0) {
         const d = Math.exp(-1.2 * h);

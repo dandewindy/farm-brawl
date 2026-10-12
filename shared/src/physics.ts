@@ -56,8 +56,8 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
     b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
     b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
   }
-  // ponds drag everyone but ducks, even while knocked back
-  if (t === 1 && sp !== 'duck' && b.dashT <= 0) {
+  // ponds drag everyone but ducks and dogs, even while knocked back
+  if (t === 1 && sp !== 'duck' && sp !== 'dog' && b.dashT <= 0) {
     const d = Math.exp(-2 * dt);
     b.vx *= d; b.vz *= d;
   }
@@ -113,14 +113,15 @@ export interface DashParams {
 
 /** what a release of the ram button does after holding it for `held` seconds */
 export function dashParams(sp: Species, held: number, t: Terrain): DashParams {
-  const mud = t === 2 && sp !== 'pig' ? 0.6 : 1;
+  const mud = t === 2 && sp !== 'pig' ? 0.55 : 1;
+  const mudT = t === 2 && sp !== 'pig' ? 0.6 : 1;
   let speed = CFG.DASH_SPEED * TRAITS[sp].dash * mud;
-  let time: number = CFG.DASH_TIME;
+  let time: number = CFG.DASH_TIME * mudT;
   let plow = false, power = 1;
   if (held >= CFG.CHARGE_MIN) {
     const c = clamp((held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN), 0, 1);
     speed *= 1 + 0.45 * c;
-    time += 0.28 * c;
+    time += (0.28 * c) * mudT;
     plow = true;
     power = 1 + c;
   }

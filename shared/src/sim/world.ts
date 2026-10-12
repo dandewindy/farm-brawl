@@ -153,11 +153,12 @@ export class World {
 
   addPlayer(name: string, species: Species, bot = false, team?: number, skin?: number): number {
     const id = this.nextId++;
+    const startMass = species === 'cow' ? 100 : CFG.START_MASS;
     const p: Player = {
       id, name: name.slice(0, 16), species,
       skin: skin !== undefined ? (skin % SKIN_COUNT) : Math.floor(this.rnd() * SKIN_COUNT),
       bot, alive: false,
-      x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: CFG.START_MASS, dashT: 0, stunT: 0, charging: false,
+      x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
       respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, team, ai: bot ? newBrain(this.rnd) : null,
@@ -207,11 +208,12 @@ export class World {
 
   private spawn(p: Player): void {
     const [x, z] = this.freeSpot();
+    const spawnMass = p.species === 'cow' ? 100 : CFG.START_MASS;
     Object.assign(p, {
-      alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: CFG.START_MASS, dashT: 0, stunT: 0,
+      alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: spawnMass, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
-      best: Math.max(CFG.START_MASS, p.best || 0), btnLatch: false, inWaterT: 0,
+      best: Math.max(spawnMass, p.best || 0), btnLatch: false, inWaterT: 0,
       pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0,
     });
     p.input.btn = false;
@@ -439,8 +441,8 @@ export class World {
       }
       if (!p.alive) continue;
 
-      // 4. Pond drowning (ducks swim freely; other animals struggle for 1.5s before drowning)
-      if (p.species !== 'duck') {
+      // 4. Pond drowning (ducks & dogs swim freely; other animals struggle for 1.5s before drowning)
+      if (p.species !== 'duck' && p.species !== 'dog') {
         let inPond = false;
         for (const b of (this.map.pond || [])) {
           if (insideBlob(b, p.x, p.z, -0.7)) {
@@ -900,7 +902,7 @@ export class World {
       p.flyT = 0.55;
       p.plow = true;
       p.power = 2.5;
-      p.cd = CFG.DASH_CD;
+      p.cd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
       return;
@@ -912,7 +914,8 @@ export class World {
     p.dashT = d.time;
     p.plow = d.plow;
     p.power = d.power;
-    p.cd = CFG.DASH_CD + (d.plow ? CFG.PLOW_CD : 0);
+    const baseCd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
+    p.cd = baseCd + (d.plow ? CFG.PLOW_CD * (p.species === 'chicken' ? 0.65 : 1) : 0);
     p.dashHit.clear();
   }
 
@@ -1029,7 +1032,7 @@ export class World {
 
     // Rule: "fourleg" (Four legs good - 4-legged animals ram 50% harder, King 80% harder)
     if (this.currentRule === 'fourleg') {
-      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig';
+      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig' || att.species === 'dog';
       if (att.id === this.napoleonId) {
         k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
       } else if (isFourLeg) {
@@ -1367,7 +1370,7 @@ export class World {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
         | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0)
-        | (o.species !== 'duck' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
+        | (o.species !== 'duck' && o.species !== 'dog' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
         | (o.slowT > 0 ? FLAG.SONG : 0)
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)

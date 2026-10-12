@@ -220,6 +220,7 @@ export class AnimalPreviewRenderer {
       cow: 1.02,
       duck: 1.18,
       pig: 1.0,
+      dog: 1.05,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
@@ -347,6 +348,7 @@ export class AnimalPreviewRenderer {
       cow: 1.02,
       duck: 1.18,
       pig: 1.0,
+      dog: 1.05,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);

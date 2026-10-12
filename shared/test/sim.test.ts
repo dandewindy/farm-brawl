@@ -852,6 +852,62 @@ describe('bonus weapons and tools', () => {
     // Till active velocity should be ~1.5x of normal
     expect(tillVx / normalVx).toBeCloseTo(1.5, 1);
   });
+
+  it('mud slows dash speed and shortens dash range for non-pig animals, but pig is immune', () => {
+    const grassSheep = dashParams('sheep', 0, 0);
+    const mudSheep = dashParams('sheep', 0, 2);
+    expect(mudSheep.speed).toBeLessThan(grassSheep.speed);
+    expect(mudSheep.time).toBeLessThan(grassSheep.time);
+    expect(mudSheep.time).toBeCloseTo(grassSheep.time * 0.6);
+
+    const grassPig = dashParams('pig', 0, 0);
+    const mudPig = dashParams('pig', 0, 2);
+    expect(mudPig.speed).toBe(grassPig.speed);
+    expect(mudPig.time).toBe(grassPig.time);
+  });
+
+  it('chicken has +30% dash speed and faster dash cooldown', () => {
+    expect(TRAITS.chicken.dash).toBe(1.30);
+    const w = emptyWorld();
+    const cid = w.addPlayer('Chick', 'chicken', false);
+    const c = place(w, cid, 0, 0);
+    c.input = { a: 0, mv: false, btn: true };
+    w.step();
+    c.input = { a: 0, mv: false, btn: false };
+    w.step();
+    expect(c.cd).toBeCloseTo(CFG.DASH_CD * 0.65, 1);
+  });
+
+  it('cow spawns with minimum 100kg mass', () => {
+    const w = emptyWorld();
+    const cowId = w.addPlayer('Daisy', 'cow', false);
+    const cow = w.players.get(cowId)!;
+    expect(cow.mass).toBe(100);
+    expect(cow.best).toBe(100);
+  });
+
+  it('dog can swim in water without drowning, runs fast on land like horse', () => {
+    expect(TRAITS.dog.speed).toBe(TRAITS.horse.speed);
+    expect(TRAITS.dog.water).toBe(0.70);
+
+    const w = emptyWorld();
+    w.map.pond = [[10, 10, 8, 8]];
+
+    const dogId = w.addPlayer('Buddy', 'dog', false);
+    const dog = place(w, dogId, 10, 10, 30);
+
+    const sheepId = w.addPlayer('Fluffy', 'sheep', false);
+    const sheep = place(w, sheepId, 10, 10, 30);
+
+    // Run for 2.0 seconds (40 ticks > 1.5s drown threshold)
+    for (let i = 0; i < 40; i++) {
+      w.step();
+    }
+
+    expect(sheep.alive).toBe(false); // Sheep drowned
+    expect(dog.alive).toBe(true); // Dog is swimming happily!
+  });
 });
+
 
 

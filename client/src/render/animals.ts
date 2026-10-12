@@ -73,6 +73,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   cow: 0x4fc3f7,
   duck: 0xffd54f,
   pig: 0xf48fb1,
+  dog: 0xffa726,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -112,6 +113,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0x2f2a2c, snout: 0xf0b9c4 },
     { body: 0xd2773a, snout: 0xe39a6b },
     { body: 0xf6a5b5, snout: 0xee8fa2, spot: 0x2e2628 },
+  ],
+  dog: [
+    { body: 0xd9822b, head: 0xd9822b, snout: 0xf4eedb, chest: 0xf4eedb, collar: 0xd32f2f, ear: 0xd9822b, innerEar: 0xf4eedb, tail: 0xd9822b, tailTip: 0xf4eedb, legs: 0xd9822b, paws: 0xf4eedb },
+    { body: 0x48505c, head: 0x48505c, snout: 0xe8ecf0, chest: 0xe8ecf0, collar: 0x1976d2, ear: 0x2e343d, innerEar: 0xe8ecf0, tail: 0x48505c, tailTip: 0xe8ecf0, legs: 0x48505c, paws: 0xe8ecf0 },
+    { body: 0xc47b38, head: 0xc47b38, snout: 0xffffff, chest: 0xffffff, collar: 0x388e3c, ear: 0xb36a28, innerEar: 0xf4c2c2, tail: 0xc47b38, tailTip: 0xffffff, legs: 0xffffff, paws: 0xffffff },
+    { body: 0x242228, head: 0x242228, snout: 0xa86a3d, chest: 0xa86a3d, collar: 0xf57c00, ear: 0x242228, innerEar: 0xa86a3d, tail: 0x242228, tailTip: 0x242228, legs: 0xa86a3d, paws: 0x242228 },
   ],
 };
 
@@ -484,6 +491,69 @@ function buildPig(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   return addLegs(g, s.body, [[0.5, 0.3], [0.5, -0.3], [-0.5, 0.3], [-0.5, -0.3]], 0.45, 0.13);
 }
 
+function buildDog(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  // Elongated rounded body using capsule (casts shadow)
+  const bodyGeo = new THREE.CapsuleGeometry(0.34, 0.60, 8, 16);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, s.body, 0, 1.15, 0, undefined, true);
+  bodyMesh.scale.set(1.05, 0.95, 0.9);
+  g.add(bodyMesh);
+
+  // Chest / Underbelly patch
+  if (s.chest) {
+    blob(g, s.chest, 0.24, [1.0, 0.75, 0.75], 0.22, 1.02, 0);
+  }
+
+  // Head (rounded sphere)
+  g.add(part(new THREE.SphereGeometry(0.33, 16, 12), s.head ?? s.body, 0.72, 1.48, 0));
+
+  // Snout / Muzzle (rounded capsule extending forward)
+  const muzzleGeo = new THREE.CapsuleGeometry(0.12, 0.16, 6, 12);
+  muzzleGeo.rotateZ(Math.PI / 2);
+  g.add(part(muzzleGeo, s.snout ?? s.body, 1.02, 1.38, 0));
+
+  // Cute Black Nose at muzzle tip
+  g.add(part(new THREE.SphereGeometry(0.046, 8, 6), 0x1a1614, 1.16, 1.43, 0));
+
+  // Triangular perky ears with inner ear flap
+  for (const z of [-0.18, 0.18]) {
+    const ear = part(new THREE.ConeGeometry(0.10, 0.28, 8), s.ear ?? s.body, 0.70, 1.84, z);
+    ear.rotation.z = -0.15;
+    ear.rotation.x = z > 0 ? 0.3 : -0.3;
+    g.add(ear);
+
+    if (s.innerEar) {
+      const inner = part(new THREE.ConeGeometry(0.065, 0.22, 6), s.innerEar, 0.72, 1.84, z);
+      inner.rotation.z = -0.15;
+      inner.rotation.x = z > 0 ? 0.3 : -0.3;
+      g.add(inner);
+    }
+  }
+
+  // Collar with golden medallion tag
+  const collar = part(new THREE.TorusGeometry(0.24, 0.035, 8, 20), s.collar ?? 0xd32f2f, 0.55, 1.34, 0);
+  collar.rotation.y = Math.PI / 2;
+  collar.rotation.x = 0.35;
+  g.add(collar);
+  const tag = part(new THREE.SphereGeometry(0.06, 8, 6), 0xffd700, 0.65, 1.22, 0, { metalness: 0.8, roughness: 0.2 });
+  g.add(tag);
+
+  // Wagging tail tilted up/curved
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.55, 1.26, 0);
+  tailGroup.rotation.z = 0.65;
+  const tailStem = part(new THREE.CapsuleGeometry(0.05, 0.36, 6, 10), s.tail ?? s.body, 0, 0.16, 0);
+  tailGroup.add(tailStem);
+  if (s.tailTip) {
+    const tailTip = part(new THREE.SphereGeometry(0.065, 8, 6), s.tailTip, 0, 0.34, 0);
+    tailGroup.add(tailTip);
+  }
+  g.add(tailGroup);
+
+  addEyes(g, 0.94, 1.55, 0.15, 0.07);
+  return addLegs(g, s.legs ?? s.body, [[0.38, 0.22], [0.38, -0.22], [-0.38, 0.22], [-0.38, -0.22]], 0.72, 0.09, s.paws ?? 0x2b2522);
+}
+
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
   chicken: buildChicken,
   sheep: buildSheep,
@@ -491,6 +561,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   cow: buildCow,
   duck: buildDuck,
   pig: buildPig,
+  dog: buildDog,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -570,6 +641,17 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'dog': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.034, 8, 24), mat);
+      band.position.set(0.55, 1.35, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.35;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), goldMat);
+      medal.position.set(0.66, 1.24, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -582,6 +664,7 @@ const HEAD: Record<Species, [number, number]> = {
   cow: [0.92, 1.8],
   duck: [0.55, 1.83],
   pig: [0.85, 1.83],
+  dog: [0.72, 1.85],
 };
 
 // Back of each species for the cape
@@ -592,6 +675,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   cow: [-0.15, 1.2, 0.47, 0.45, 1.2],
   duck: [-0.2, 0.85, 0.56, 0.53, 0.95],
   pig: [-0.25, 1.0, 0.77, 0.77, 1.3],
+  dog: [-0.15, 1.1, 0.55, 0.55, 1.05],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -661,6 +745,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     cow: 0.24,
     duck: 0.16,
     pig: 0.20,
+    dog: 0.18,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -669,6 +754,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     cow: 0.06,
     duck: 0.06,
     pig: 0.06,
+    dog: 0.06,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -740,6 +826,7 @@ const LABEL_Y: Record<Species, number> = {
   cow: 2.2,
   duck: 2.0,
   pig: 2.1,
+  dog: 2.1,
 };
 
 function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -985,7 +1072,7 @@ export class AnimalRenderer {
     const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
 
     // Visual sinking effect reduced by 20%
-    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck'
+    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.max(0.68, 1 - sinkProgress * 0.32)
       : 1;
 
@@ -993,6 +1080,9 @@ export class AnimalRenderer {
       if (vis.species === 'duck') {
         // Ducks float peacefully on the surface with slight bobbing
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
+      } else if (vis.species === 'dog') {
+        // Dogs can swim, half body submerged under water with paddling bob
+        y = -0.45 * sc + Math.sin(now / 220) * 0.04;
       } else {
         // Visual sinking speed reduced by 20% over the 1.5s duration
         const sinkDepth = 0.30 + Math.pow(sinkProgress, 1.3) * 1.32;
@@ -1035,7 +1125,7 @@ export class AnimalRenderer {
       ? -0.25
       : isDrowning
       ? Math.sin(now / 180) * 0.3
-      : isWater && vis.species !== 'duck'
+      : isWater && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.sin(now / 120) * 0.15
       : isCharging
       ? 0.15 + lvl * 0.15
@@ -1085,11 +1175,15 @@ export class AnimalRenderer {
         // Flattened pancake: legs splayed flat horizontally to the sides
         leg.rotation.z = (Math.PI / 2.2) * (idx % 2 === 0 ? 1 : -1);
         leg.rotation.x = 0;
-      } else if (isDrowning || (isWater && vis.species !== 'duck')) {
+      } else if (isDrowning || (isWater && vis.species !== 'duck' && vis.species !== 'dog')) {
         // Slow paddling motion, slowing as it sinks deeper
         const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
         leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
         leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
+      } else if (isWater && vis.species === 'dog') {
+        // Dog swimming doggy paddle motion
+        leg.rotation.z = baseSwing * 0.55;
+        leg.rotation.x = Math.sin(now / 140 + idx * 1.5) * 0.4;
       } else if (isStunned) {
         leg.rotation.z = 0;
         leg.rotation.x = 0;

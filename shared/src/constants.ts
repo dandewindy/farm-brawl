@@ -71,7 +71,7 @@ export type Cfg = typeof CFG;
 /** body radius from mass (kg) */
 export const radiusOf = (m: number): number => 1 + Math.sqrt(m) * 0.09;
 
-export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'] as const;
+export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog'] as const;
 export type Species = (typeof SPECIES)[number];
 
 export interface SpeciesTraits {
@@ -90,12 +90,13 @@ export interface SpeciesTraits {
 }
 
 export const TRAITS: Record<Species, SpeciesTraits> = {
-  chicken: { speed: 1.0, dash: 1.12, weight: 0.9, water: 0.45, mud: 0.5, ram: 1.0 },
-  sheep: { speed: 0.97, dash: 1.0, weight: 1.15, water: 0.45, mud: 0.5, ram: 1.3 },
-  horse: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.45, mud: 0.5, ram: 1.0 },
-  cow: { speed: 0.95, dash: 0.97, weight: 1.25, water: 0.45, mud: 0.5, ram: 1.0 },
-  duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.5, ram: 1.0 },
+  chicken: { speed: 1.0, dash: 1.30, weight: 0.9, water: 0.45, mud: 0.45, ram: 1.0 },
+  sheep: { speed: 0.97, dash: 1.0, weight: 1.15, water: 0.45, mud: 0.45, ram: 1.3 },
+  horse: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.45, mud: 0.45, ram: 1.0 },
+  cow: { speed: 0.95, dash: 0.97, weight: 1.25, water: 0.45, mud: 0.45, ram: 1.0 },
+  duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.45, ram: 1.0 },
   pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1, ram: 1.0 },
+  dog: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.70, mud: 0.45, ram: 1.0 },
 };
 
 export const SKIN_COUNT = 4;

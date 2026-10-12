@@ -144,6 +144,7 @@ export class HudManager {
     cow: 0,
     duck: 0,
     pig: 0,
+    dog: 0,
   };
 
   private readonly friendPanel: HTMLElement | null;
@@ -340,7 +341,11 @@ export class HudManager {
       cow: [0xffffff, 0x7a4320, 0xb8814a, 0x2a2624],
       duck: [0xffd23f, 0xf7f4ec, 0x1f6b3a, 0x34343a],
       pig: [0xf6a5b5, 0x2f2a2c, 0xd2773a, 0x3a3335],
+      dog: [0xd9822b, 0x48505c, 0xc47b38, 0x242228],
     };
+
+    const SELECTABLE_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
+    const TOTAL_CAROUSEL_ITEMS = SELECTABLE_SPECIES.length + 1; // 6 animals + 1 random '?' = 7
 
     SPECIES.forEach((sp) => {
       const saved = localStorage.getItem(`fb_skin_${sp}`);
@@ -355,14 +360,19 @@ export class HudManager {
       const style = window.getComputedStyle(this.speciesContainer);
       const gap = parseFloat(style.gap) || 8;
       const step = firstBtn ? firstBtn.offsetWidth + gap : 74;
+      const viewportWidth = this.speciesContainer.parentElement?.clientWidth || 214;
+      const visibleCount = Math.max(1, Math.floor((viewportWidth + gap) / step));
+      const maxIndex = Math.max(0, TOTAL_CAROUSEL_ITEMS - visibleCount);
+      this.carouselIndex = Math.max(0, Math.min(this.carouselIndex, maxIndex));
+
       this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * step}px)`;
       if (this.spNavPrev) {
         this.spNavPrev.disabled = this.carouselIndex <= 0;
         this.spNavPrev.style.opacity = this.carouselIndex <= 0 ? '0.2' : '1';
       }
       if (this.spNavNext) {
-        this.spNavNext.disabled = this.carouselIndex >= SPECIES.length - 3;
-        this.spNavNext.style.opacity = this.carouselIndex >= SPECIES.length - 3 ? '0.2' : '1';
+        this.spNavNext.disabled = this.carouselIndex >= maxIndex;
+        this.spNavNext.style.opacity = this.carouselIndex >= maxIndex ? '0.2' : '1';
       }
     };
     window.addEventListener('resize', updateCarousel);
@@ -370,25 +380,28 @@ export class HudManager {
 
     const updateAllButtons = () => {
       if (this.isRandomSelected) {
-        this.spRandomBtn?.classList.add('on');
-        this.speciesContainer.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+        this.speciesContainer.querySelectorAll('button').forEach((b) => {
+          b.classList.toggle('on', b.dataset.species === 'random');
+        });
 
         if (this.speciesHint) this.speciesHint.textContent = t('randomHint');
         if (this.spPreviewTitle) this.spPreviewTitle.textContent = t('randomTitle');
         if (this.spPreviewSkinName) this.spPreviewSkinName.textContent = t('randomSkin');
-        if (this.spPreviewBadge) this.spPreviewBadge.textContent = '?';
+        if (this.spPreviewBadge) this.spPreviewBadge.textContent = '30% 🐶';
         if (this.previewRenderer) this.previewRenderer.setRandom();
         if (this.spSkinPalette) this.spSkinPalette.innerHTML = '';
         return;
       }
 
-      this.spRandomBtn?.classList.remove('on');
       const activeSkin = this.mySkins[this.selectedSpecies] ?? 0;
 
       // 1. Update 6 species buttons
       this.speciesContainer.querySelectorAll('button').forEach((b) => {
         const sp = b.dataset.species as Species;
-        if (!sp) return;
+        if (!sp || (sp as string) === 'random') {
+          b.classList.remove('on');
+          return;
+        }
         b.classList.toggle('on', sp === this.selectedSpecies);
 
         // Update 3D full-body thumbnail
@@ -450,7 +463,7 @@ export class HudManager {
 
     // Build the 6 species buttons
     this.speciesContainer.innerHTML = '';
-    SPECIES.forEach((sp) => {
+    SELECTABLE_SPECIES.forEach((sp) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.species = sp;
@@ -487,6 +500,20 @@ export class HudManager {
       this.speciesContainer.appendChild(btn);
     });
 
+    // 7th item: Random '?' button placed at the end of the animal track
+    const rndBtn = document.createElement('button');
+    rndBtn.type = 'button';
+    rndBtn.id = 'spItemRandom';
+    rndBtn.className = 'sp-btn-item sp-btn-random';
+    rndBtn.dataset.species = 'random';
+    rndBtn.title = t('randomTitle');
+    rndBtn.innerHTML = `<span class="sp-random-mark">❓</span><div class="dots"><i class="dot rnd-dot"></i></div>`;
+    rndBtn.addEventListener('click', () => {
+      this.isRandomSelected = true;
+      updateAllButtons();
+    });
+    this.speciesContainer.appendChild(rndBtn);
+
     // Wire up navigation arrows for skin switching
     if (this.spSkinPrev) {
       this.spSkinPrev.addEventListener('click', (e) => {
@@ -522,19 +549,17 @@ export class HudManager {
     if (this.spNavNext) {
       this.spNavNext.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (this.carouselIndex < SPECIES.length - 3) {
+        const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
+        const style = window.getComputedStyle(this.speciesContainer);
+        const gap = parseFloat(style.gap) || 8;
+        const step = firstBtn ? firstBtn.offsetWidth + gap : 74;
+        const viewportWidth = this.speciesContainer.parentElement?.clientWidth || 214;
+        const visibleCount = Math.max(1, Math.floor((viewportWidth + gap) / step));
+        const maxIndex = Math.max(0, TOTAL_CAROUSEL_ITEMS - visibleCount);
+        if (this.carouselIndex < maxIndex) {
           this.carouselIndex++;
           updateCarousel();
         }
-      });
-    }
-
-    // Mystery '?' button
-    if (this.spRandomBtn) {
-      this.spRandomBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.isRandomSelected = true;
-        updateAllButtons();
       });
     }
 
@@ -603,7 +628,12 @@ export class HudManager {
       let chosenSpecies = this.selectedSpecies;
       let chosenSkin = this.mySkins[this.selectedSpecies] ?? 0;
       if (this.isRandomSelected) {
-        chosenSpecies = SPECIES[Math.floor(Math.random() * SPECIES.length)];
+        if (Math.random() < 0.3) {
+          chosenSpecies = 'dog';
+        } else {
+          const normalSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
+          chosenSpecies = normalSpecies[Math.floor(Math.random() * normalSpecies.length)];
+        }
         chosenSkin = Math.floor(Math.random() * 4);
       }
       if (this.selectedMode === 'friend') {
