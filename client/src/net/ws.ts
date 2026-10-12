@@ -1,7 +1,8 @@
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 import type { Handler, Transport } from './transport';
 
-export function isFastColo(colo: string): boolean {
+export function isFastColo(colo?: string): boolean {
+  if (!colo) return false;
   return colo === 'SIN' || colo === 'HKG' || colo === 'HAN' || colo === 'SGN' || colo === 'BKK';
 }
 
@@ -81,7 +82,7 @@ export class WsClient implements Transport {
           const now = Math.round(performance.now());
           this.send({ t: 'ping', c: now });
         }
-      }, 300);
+      }, 50);
 
       this.startPing();
     };
@@ -102,9 +103,17 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
-          // In-game auto-detection: if playing on high-latency node, trigger seamless background migration
+          // High latency detection: non-fast PoP or RTT > 120ms
           const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
-          if (this.inGame && isHighLatency) {
+          if (!this.inGame && isHighLatency && this.autoSteerAttempts < 10) {
+            this.autoSteerAttempts++;
+            console.log(`[WS] High latency edge node detected in lobby (${this.colo}, ${Math.round(this.rtt)}ms). Auto-steering to Singapore (attempt ${this.autoSteerAttempts}/10)...`);
+            setTimeout(() => {
+              if (!this.closed && !this.inGame && this.ws === socket) {
+                this.forceReconnect();
+              }
+            }, 100);
+          } else if (this.inGame && isHighLatency) {
             this.triggerHotMigration();
           }
         } else {
@@ -116,18 +125,8 @@ export class WsClient implements Transport {
                 this.lastJoinMsg.token = msg.token;
               }
             }
-            // Auto-steer away from high-latency edge nodes in lobby:
-            // SIN (~35ms) and HKG (~75ms) are both fast low-latency APAC routes for Vietnam.
             const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
-            if (isHighLatency && !this.inGame && this.autoSteerAttempts < 10) {
-              this.autoSteerAttempts++;
-              console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/10)...`);
-              setTimeout(() => {
-                if (!this.closed && !this.inGame && this.ws === socket) {
-                  this.forceReconnect();
-                }
-              }, 250);
-            } else if (this.inGame && isHighLatency) {
+            if (this.inGame && isHighLatency) {
               this.triggerHotMigration();
             }
           }
@@ -155,8 +154,8 @@ export class WsClient implements Transport {
   public triggerHotMigration(): void {
     if (!this.inGame || isFastColo(this.colo) || this.closed || !this.sessionToken) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 1.5 seconds while searching for SIN/HKG
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 1500) return;
+    // Throttle attempts: probe at most once every 400ms while searching for SIN/HKG
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 400) return;
     this.lastMigrationProbeTime = now;
     console.log(`[WS] In-game high latency node detected (${this.colo}). Starting zero-downtime hot migration probe...`);
 
@@ -204,7 +203,7 @@ export class WsClient implements Transport {
               if (this.migrationRetryTimer !== null) clearTimeout(this.migrationRetryTimer);
               this.migrationRetryTimer = window.setTimeout(() => {
                 this.triggerHotMigration();
-              }, 600);
+              }, 400);
             }
           }
         } else if (msg.t === 'joined') {
@@ -315,7 +314,7 @@ export class WsClient implements Transport {
       if (!this.closed) {
         this.connect();
       }
-    }, 250);
+    }, 100);
   }
 
   close(): void {
