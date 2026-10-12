@@ -10,6 +10,8 @@ export class GameRoom extends DurableObject {
   private readonly sockets = new Map<WebSocket, number>();
   private readonly allSockets = new Set<WebSocket>();
   private readonly lobbyTeams = new Map<WebSocket, number>();
+  private readonly clientSockets = new Map<string, WebSocket>();
+  private readonly socketClientIds = new Map<WebSocket, string>();
   private readonly playerTokens = new Map<number, string>();
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,6 +34,18 @@ export class GameRoom extends DurableObject {
       }
     }
 
+    if (isTeam && this.allSockets.size === 0) {
+      // Clear any orphaned players from inactive team sessions
+      for (const [id] of [...this.world.players.entries()]) {
+        this.world.removePlayer(id);
+      }
+      this.lobbyTeams.clear();
+      this.sockets.clear();
+      this.clientSockets.clear();
+      this.socketClientIds.clear();
+      this.disconnectedPlayers.clear();
+    }
+
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const upgradeHeader = request.headers.get('Upgrade');
       if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
@@ -41,9 +55,10 @@ export class GameRoom extends DurableObject {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
+      const cid = url.searchParams.get('cid') || '';
       const cfRay = request.headers.get('cf-ray') || '';
       const edgeColo = cfRay.split('-')[1] || (request as any).cf?.colo || 'APAC';
-      this.handleWebSocket(server, edgeColo);
+      this.handleWebSocket(server, edgeColo, cid);
 
       return new Response(null, {
         status: 101,
@@ -71,8 +86,28 @@ export class GameRoom extends DurableObject {
     return new Response('Not found', { status: 404 });
   }
 
-  private handleWebSocket(ws: WebSocket, edgeColo: string): void {
+  private handleWebSocket(ws: WebSocket, edgeColo: string, cid = ''): void {
     ws.accept();
+
+    if (cid) {
+      const oldWs = this.clientSockets.get(cid);
+      if (oldWs && oldWs !== ws) {
+        this.allSockets.delete(oldWs);
+        this.lobbyTeams.delete(oldWs);
+        const oldPid = this.sockets.get(oldWs);
+        if (oldPid) {
+          this.sockets.delete(oldWs);
+          this.world.removePlayer(oldPid);
+          const tok = this.playerTokens.get(oldPid);
+          if (tok) this.playerTokens.delete(oldPid);
+        }
+        this.socketClientIds.delete(oldWs);
+        try { oldWs.close(1000, 'Replaced'); } catch (_) {}
+      }
+      this.clientSockets.set(cid, ws);
+      this.socketClientIds.set(ws, cid);
+    }
+
     this.allSockets.add(ws);
     this.sendTeamCounts(ws);
 
@@ -89,6 +124,11 @@ export class GameRoom extends DurableObject {
     const onCloseOrError = () => {
       this.allSockets.delete(ws);
       this.lobbyTeams.delete(ws);
+      const c = this.socketClientIds.get(ws);
+      if (c && this.clientSockets.get(c) === ws) {
+        this.clientSockets.delete(c);
+      }
+      this.socketClientIds.delete(ws);
       const playerId = this.sockets.get(ws);
       if (playerId) {
         this.sockets.delete(ws);
@@ -196,6 +236,11 @@ export class GameRoom extends DurableObject {
     } else if (msg.t === 'team_select') {
       const team = msg.team === 1 ? 1 : 0;
       this.lobbyTeams.set(ws, team);
+      const playerId = this.sockets.get(ws);
+      if (playerId) {
+        const p = this.world.players.get(playerId);
+        if (p) p.team = team;
+      }
       this.broadcastTeamCounts();
     } else if (msg.t === 'input') {
       const playerId = this.sockets.get(ws);
@@ -215,13 +260,20 @@ export class GameRoom extends DurableObject {
   private getTeamCounts(): [number, number] {
     let c0 = 0;
     let c1 = 0;
-    for (const p of this.world.players.values()) {
-      if (p.team === 0) c0++;
-      else if (p.team === 1) c1++;
-    }
-    for (const team of this.lobbyTeams.values()) {
-      if (team === 0) c0++;
-      else if (team === 1) c1++;
+    for (const ws of this.allSockets) {
+      if (ws.readyState !== 1) continue;
+      const playerId = this.sockets.get(ws);
+      if (playerId) {
+        const p = this.world.players.get(playerId);
+        if (p && !p.bot && p.team !== undefined) {
+          if (p.team === 0) c0++;
+          else if (p.team === 1) c1++;
+        }
+      } else {
+        const team = this.lobbyTeams.get(ws);
+        if (team === 0) c0++;
+        else if (team === 1) c1++;
+      }
     }
     return [c0, c1];
   }
@@ -230,6 +282,7 @@ export class GameRoom extends DurableObject {
     const [c0, c1] = this.getTeamCounts();
     const packet = JSON.stringify({ t: 'team_counts', c0, c1 });
     for (const ws of this.allSockets) {
+      if (ws.readyState !== 1) continue;
       try {
         ws.send(packet);
       } catch {

@@ -1035,10 +1035,19 @@ function connectToRoom(targetRoom: string): void {
     return;
   }
 
+function getClientId(): string {
+  let cid = localStorage.getItem('fb_cid');
+  if (!cid) {
+    cid = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem('fb_cid', cid); } catch (_) {}
+  }
+  return cid;
+}
+
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = isViteDev ? 'localhost:8787' : window.location.host;
-  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}`;
+  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}`;
 
   transport = new WsClient(
     wsUrl,
