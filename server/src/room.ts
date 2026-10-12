@@ -26,8 +26,9 @@ export class GameRoom extends DurableObject {
     const url = new URL(request.url);
     const roomParam = url.searchParams.get('room') || 'pub-1';
     const isPrivate = roomParam.startsWith('priv-') || roomParam.startsWith('friend-');
-    const isTeam = roomParam.startsWith('team-') || roomParam === 'team-1' || roomParam === 'team-sea-1';
+    const isTeam = roomParam.startsWith('team-') || roomParam === 'team-1' || roomParam === 'team-sea-1' || roomParam.includes('team');
     if (isPrivate || isTeam) {
+      this.world.mode = isTeam ? 'team' : 'friend';
       this.world.botsEnabled = false;
       for (const [id, p] of this.world.players.entries()) {
         if (p.bot) this.world.removePlayer(id);
@@ -229,6 +230,14 @@ export class GameRoom extends DurableObject {
       // Send joined confirmation with session token and edge colo
       const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken, colo: edgeColo };
       ws.send(JSON.stringify(joinedMsg));
+
+      if (msg.team !== undefined) {
+        this.world.mode = 'team';
+        this.world.botsEnabled = false;
+        for (const [id, p] of this.world.players.entries()) {
+          if (p.bot) this.world.removePlayer(id);
+        }
+      }
 
       this.lobbyTeams.delete(ws);
       this.broadcastTeamCounts();

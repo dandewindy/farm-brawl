@@ -48,6 +48,13 @@ export class LocalServer implements Transport {
 
   send(m: ClientMsg): void {
     if (m.t === 'join') {
+      if (m.team !== undefined) {
+        this.world.mode = 'team';
+        this.world.botsEnabled = false;
+        for (const [id, p] of this.world.players.entries()) {
+          if (p.bot) this.world.removePlayer(id);
+        }
+      }
       const me = this.world.players.get(this.myId);
       if (me) this.world.respawn(this.myId, m.name, m.species, m.skin, m.team);
       else this.myId = this.world.addPlayer(m.name, m.species, false, m.team, m.skin);

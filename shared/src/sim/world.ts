@@ -93,6 +93,8 @@ export class World {
   botsEnabled: boolean;
   /** spawn ambient food */
   foodEnabled: boolean;
+  /** game mode: ffa, team, or friend */
+  mode: 'ffa' | 'team' | 'friend';
 
   /** Podium capture & protective shield system */
   podiumCaptor = 0;
@@ -127,10 +129,14 @@ export class World {
   matchEnded = false;
   matchEndTimer = 0;
 
-  constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean; food?: boolean } = {}) {
+  constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean; food?: boolean; mode?: 'ffa' | 'team' | 'friend' } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
     this.map = generateMap(seed);
-    this.botsEnabled = opts.bots ?? true;
+    this.mode = opts.mode ?? 'ffa';
+    this.botsEnabled = opts.bots !== undefined ? opts.bots : (this.mode === 'ffa');
+    if (this.mode === 'team' || this.mode === 'friend') {
+      this.botsEnabled = false;
+    }
     this.foodEnabled = opts.food ?? true;
     if (this.foodEnabled) {
       for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
@@ -230,9 +236,9 @@ export class World {
   }
 
   private fillBots(): void {
-    if (!this.botsEnabled) return;
+    if (!this.botsEnabled || this.mode === 'team' || this.mode === 'friend') return;
     const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
-    if (hasTeams) return; // Team mode temporarily has no bots
+    if (hasTeams) return; // Team mode has no bots
 
     if (this.players.size < CFG.BOT_FILL) {
       const sp = SPECIES[Math.floor(this.rnd() * SPECIES.length)];
@@ -257,7 +263,7 @@ export class World {
     this.fillBots();
 
     // Team mode match clock & scoring
-    const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
+    const hasTeams = this.mode === 'team' || [...this.players.values()].some((p) => p.team !== undefined);
     if (hasTeams) {
       // Clean up any remaining bots in team mode
       for (const [id, p] of this.players.entries()) {
@@ -1405,13 +1411,20 @@ export class World {
     this.podiumPhaseTimer = 30;
     this.podiumWarned5s = false;
 
-    // Respawns bots at new free spots; human players respawn when clicking Continue on team victory modal
-    for (const p of this.players.values()) {
+    // Respawns bots at new free spots (in FFA); in team/friend mode no bots exist
+    if (this.mode === 'team' || this.mode === 'friend') {
+      this.botsEnabled = false;
+    }
+    for (const [id, p] of [...this.players.entries()]) {
       p.score = 0;
       p.kills = 0;
       p.totalKills = 0;
       if (p.bot) {
-        this.spawn(p);
+        if (this.mode === 'team' || this.mode === 'friend') {
+          this.removePlayer(id);
+        } else {
+          this.spawn(p);
+        }
       } else {
         p.alive = false;
       }

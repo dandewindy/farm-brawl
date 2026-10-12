@@ -694,6 +694,34 @@ describe('bonus weapons and tools', () => {
     expect(w.tillTruck.active).toBe(false);
     expect(w.currentRule).toBe('');
   });
+
+  it('team mode never spawns bots under any circumstances', () => {
+    const w = new World(9999, { mode: 'team' });
+    expect(w.botsEnabled).toBe(false);
+    expect(w.players.size).toBe(0);
+
+    // Run 50 ticks, should never spawn any bot
+    for (let i = 0; i < 50; i++) {
+      w.step();
+    }
+    expect(w.players.size).toBe(0);
+
+    // Human player joins team 0
+    const humanId = w.addPlayer('HumanPlayer', 'cow', false, 0);
+    for (let i = 0; i < 50; i++) {
+      w.step();
+    }
+    // Only the human exists, still zero bots
+    expect(w.players.size).toBe(1);
+    expect(w.players.get(humanId)?.bot).toBe(false);
+
+    // Renew game also keeps zero bots (human player remains connected, awaiting respawn)
+    w.renewGame();
+    expect(w.botsEnabled).toBe(false);
+    expect(w.players.size).toBe(1);
+    expect(w.players.get(humanId)?.bot).toBe(false);
+    expect(w.players.get(humanId)?.alive).toBe(false);
+  });
 });
 
 
