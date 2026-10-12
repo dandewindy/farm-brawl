@@ -23,7 +23,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
 
   /** find a free spot for something of radius `r`, at least `margin` from the fence */
   const place = (r: number, margin: number): [number, number] | null => {
-    for (let tries = 0; tries < 120; tries++) {
+    for (let tries = 0; tries < 250; tries++) {
       const a = between(0, Math.PI * 2);
       const d = Math.sqrt(rnd()) * Math.max(1, R - margin - r);
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
@@ -36,10 +36,13 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   };
 
   const pond: Blob[] = [];
-  const nPond = 2 + Math.floor(rnd() * 2);
+  const nPond = 2;
   for (let i = 0; i < nPond; i++) {
-    const r = between(5, 7.5);
-    const p = place(r * 1.3, 8);
+    // Water ponds: exactly 1 scaled x2 and 1 scaled x4
+    const scale = i === 0 ? 2 : 4;
+    const baseR = between(3.6, 4.2);
+    const r = baseR * scale;
+    const p = place(r * 1.15, 6);
     if (p) pond.push([p[0], p[1], r, between(0, 100)]);
   }
 
@@ -65,18 +68,18 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   }
 
   const well: Circle[] = [];
-  const nWell = 1;
+  const nWell = 3;
   for (let i = 0; i < nWell; i++) {
     const r = between(1.6, 2.2);
-    const p = place(r, 7);
+    const p = place(r, 6);
     if (p) well.push([p[0], p[1], r]);
   }
 
   const fire: Circle[] = [];
-  const nFire = 1;
+  const nFire = 3;
   for (let i = 0; i < nFire; i++) {
     const r = between(1.8, 2.4);
-    const p = place(r, 7);
+    const p = place(r, 6);
     if (p) fire.push([p[0], p[1], r]);
   }
 

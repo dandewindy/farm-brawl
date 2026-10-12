@@ -1325,7 +1325,7 @@ body.ipad #lb {
 }
 #teamBar:not([hidden]) ~ #hud #board,
 body.mode-team #board {
-  top: 42px;
+  top: 56px !important;
 }
 #board .eyebrow {
   display: inline-block;
@@ -1727,7 +1727,7 @@ body.mobile-phone .ffa-preview-box {
   }
   #teamBar:not([hidden]) ~ #hud #board,
   body.mode-team #board {
-    top: 42px;
+    top: 56px !important;
   }
 
   #feed { display: none; }
@@ -1766,7 +1766,7 @@ body.ipad #minimap { width: 84px; height: 84px; }
 body.ipad #teamBar { top: calc(5vh + 4px) !important; }
 body.ipad.mode-team #board,
 body.ipad #teamBar:not([hidden]) ~ #hud #board {
-  top: calc(5vh + 40px) !important;
+  top: calc(5vh + 48px) !important;
 }
 
 /* Mobile Phone rules (body:not(.ipad):not(.is-pc) & body.mobile-phone):
@@ -1794,6 +1794,12 @@ body.mobile-phone #gameControls #pcSettingsBtn {
 body:not(.ipad):not(.is-pc) #board,
 body.mobile-phone #board {
   top: 6px !important;
+}
+body:not(.ipad):not(.is-pc).mode-team #board,
+body.mobile-phone.mode-team #board,
+body:not(.ipad):not(.is-pc) #teamBar:not([hidden]) ~ #hud #board,
+body.mobile-phone #teamBar:not([hidden]) ~ #hud #board {
+  top: 38px !important;
 }
 body:not(.ipad):not(.is-pc) #mapWrap,
 body.mobile-phone #mapWrap {

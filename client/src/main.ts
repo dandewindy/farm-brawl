@@ -115,7 +115,13 @@ hud.onSelectTeam = (team) => {
 
 hud.onChangeLanguage = () => {
   syncAudioUi();
+  syncBoardUi();
+  syncStatsUi();
+  world.updateBarnSign();
   hud.updateTeamCounts(hud.lastCount0, hud.lastCount1);
+  const kingMeta = gameState.metas.get(gameState.napoleonId);
+  const kingName = kingMeta ? kingMeta.name : undefined;
+  hud.updateBoard(gameState.rule, gameState.reign, kingName, gameState.napoleonId === gameState.myId);
 };
 
 hud.onReconnect = () => {
@@ -536,7 +542,7 @@ function syncBoardUi(): void {
   hud.setBoardVisible(showBoard);
   if (drawerBoardToggle) {
     const lbl = drawerBoardToggle.querySelector('.lbl') || drawerBoardToggle;
-    lbl.textContent = `Điều Răn: ${showBoard ? 'BẬT' : 'TẮT'}`;
+    lbl.textContent = `${t('boardSetting')}: ${showBoard ? t('on') : t('off')}`;
     drawerBoardToggle.classList.toggle('off', !showBoard);
   }
   if (pcToggleBoard) pcToggleBoard.checked = showBoard;
@@ -546,7 +552,7 @@ function syncStatsUi(): void {
   hud.setStatsVisible(showStats);
   if (drawerStatsToggle) {
     const lbl = drawerStatsToggle.querySelector('.lbl') || drawerStatsToggle;
-    lbl.textContent = `Chỉ số: ${showStats ? 'BẬT' : 'TẮT'}`;
+    lbl.textContent = `${t('statsSetting')}: ${showStats ? t('on') : t('off')}`;
     drawerStatsToggle.classList.toggle('off', !showStats);
   }
   if (pcToggleStats) pcToggleStats.checked = showStats;

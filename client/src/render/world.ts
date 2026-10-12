@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CFG, radiusOf } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { blobOutline, type Blob } from '@shared/math';
+import { t } from '../i18n';
 
 function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, size: number) => void, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -644,6 +645,8 @@ export class WorldRenderer {
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
   private readonly podiumTileMats: THREE.MeshStandardMaterial[] = [];
+  private barnSignCanvas: HTMLCanvasElement | null = null;
+  private barnSignTex: THREE.CanvasTexture | null = null;
   private shieldGroup: THREE.Group | null = null;
   private shieldMat: THREE.MeshBasicMaterial | null = null;
   private shieldRingMat: THREE.MeshBasicMaterial | null = null;
@@ -1016,35 +1019,41 @@ export class WorldRenderer {
     barn.add(roof);
 
     // The Seven Commandments Wooden Sign on Barn
-    const signCanvas = document.createElement('canvas');
-    signCanvas.width = 1024;
-    signCanvas.height = 290;
-    const sg = signCanvas.getContext('2d')!;
-    sg.fillStyle = '#1f1a17';
-    sg.fillRect(0, 0, signCanvas.width, signCanvas.height);
-    for (let y = 0; y < signCanvas.height; y += 48) {
-      sg.fillStyle = 'rgba(0,0,0,.45)';
-      sg.fillRect(0, y + 45, signCanvas.width, 3);
-    }
-    sg.textAlign = 'center';
-    sg.textBaseline = 'middle';
-    sg.fillStyle = '#a5281b';
-    sg.font = '900 52px "Baloo 2", sans-serif';
-    sg.fillText('★ ĐIỀU RĂN ★', signCanvas.width / 2, 70);
-    sg.fillStyle = '#f2ead7';
-    sg.font = '700 58px "Be Vietnam Pro", sans-serif';
-    sg.fillText('TẤT CẢ CON VẬT ĐỀU BÌNH ĐẲNG', signCanvas.width / 2, 185, signCanvas.width - 60);
+    this.barnSignCanvas = document.createElement('canvas');
+    this.barnSignCanvas.width = 1024;
+    this.barnSignCanvas.height = 290;
+    this.barnSignTex = new THREE.CanvasTexture(this.barnSignCanvas);
+    this.barnSignTex.colorSpace = THREE.SRGBColorSpace;
+    this.updateBarnSign();
 
-    const signTex = new THREE.CanvasTexture(signCanvas);
-    signTex.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(18, 5.1),
-      new THREE.MeshBasicMaterial({ map: signTex })
+      new THREE.MeshBasicMaterial({ map: this.barnSignTex })
     );
     sign.position.set(0, 6.5, 7.1);
     barn.add(sign);
 
     this.scene.add(barn);
+  }
+
+  updateBarnSign(): void {
+    if (!this.barnSignCanvas || !this.barnSignTex) return;
+    const sg = this.barnSignCanvas.getContext('2d')!;
+    sg.fillStyle = '#1f1a17';
+    sg.fillRect(0, 0, this.barnSignCanvas.width, this.barnSignCanvas.height);
+    for (let y = 0; y < this.barnSignCanvas.height; y += 48) {
+      sg.fillStyle = 'rgba(0,0,0,.45)';
+      sg.fillRect(0, y + 45, this.barnSignCanvas.width, 3);
+    }
+    sg.textAlign = 'center';
+    sg.textBaseline = 'middle';
+    sg.fillStyle = '#a5281b';
+    sg.font = '900 52px "Baloo 2", sans-serif';
+    sg.fillText(t('boardEyebrow'), this.barnSignCanvas.width / 2, 70);
+    sg.fillStyle = '#f2ead7';
+    sg.font = '700 58px "Be Vietnam Pro", sans-serif';
+    sg.fillText(t('r_equal'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
+    this.barnSignTex.needsUpdate = true;
   }
 
   private buildFarmhouse(): void {

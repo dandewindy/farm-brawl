@@ -34,9 +34,9 @@
 
   <div id="hud" hidden>
     <header id="board" class="plank">
-      <span class="eyebrow">★ ĐIỀU RĂN ★</span>
-      <div class="paint"><span id="ruleName">MỌI CON VẬT ĐỀU BÌNH ĐẲNG</span></div>
-      <small id="ruleDesc">Nhưng một số con vật bình đẳng hơn những con vật khác</small>
+      <span class="eyebrow" data-i18n="boardEyebrow">★ ĐIỀU RĂN ★</span>
+      <div class="paint"><span id="ruleName" data-i18n="r_equal">MỌI CON VẬT ĐỀU BÌNH ĐẲNG</span></div>
+      <small id="ruleDesc" data-i18n="d_equal">Con nào cũng nặng như nhau... trừ Vua, nặng gần gấp đôi</small>
       <span id="reign" hidden>♛ 0:00</span>
     </header>
 
@@ -86,18 +86,18 @@
       </button>
       <button id="pcSettingsBtn" type="button" title="Cài đặt giao diện">⚙️</button>
       <div id="pcSettingsMenu" class="pc-settings-dropdown panel" hidden>
-        <div class="settings-title">CÀI ĐẶT GIAO DIỆN</div>
+        <div class="settings-title" data-i18n="uiSettings">CÀI ĐẶT GIAO DIỆN</div>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleBoard" checked>
-          <span>Điều Răn</span>
+          <span data-i18n="boardSetting">Điều Răn</span>
         </label>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleStats" checked>
-          <span>Chỉ số (Kg, Hạng)</span>
+          <span data-i18n="statsSetting">Chỉ số</span>
         </label>
         <label class="settings-item">
           <input type="checkbox" id="pcToggleLb" checked>
-          <span>Bảng xếp hạng</span>
+          <span data-i18n="lbSetting">Bảng xếp hạng</span>
         </label>
       </div>
     </div>

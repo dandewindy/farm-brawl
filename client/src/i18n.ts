@@ -179,6 +179,13 @@ const vi = {
   roomCodeLbl: 'MÃ PHÒNG',
   copyLink: 'Sao chép link phòng',
   copiedRoomLink: 'Đã sao chép link phòng',
+  boardEyebrow: '★ ĐIỀU RĂN ★',
+  boardSetting: 'Điều Răn',
+  statsSetting: 'Chỉ số',
+  lbSetting: 'Bảng xếp hạng',
+  uiSettings: 'CÀI ĐẶT GIAO DIỆN',
+  on: 'BẬT',
+  off: 'TẮT',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -361,6 +368,13 @@ const en: Record<keyof typeof vi, string> = {
   roomCodeLbl: 'ROOM CODE',
   copyLink: 'Copy room link',
   copiedRoomLink: 'Copied room link',
+  boardEyebrow: '★ COMMANDMENTS ★',
+  boardSetting: 'Commandments',
+  statsSetting: 'Stats',
+  lbSetting: 'Leaderboard',
+  uiSettings: 'UI SETTINGS',
+  on: 'ON',
+  off: 'OFF',
 };
 
 export function formatTeamCount(count: number): string {

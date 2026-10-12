@@ -1150,6 +1150,10 @@ export class HudManager {
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
     document.body.classList.remove('spectating');
+    if (this.selectedMode !== 'team') {
+      if (this.teamBarEl) this.teamBarEl.hidden = true;
+      document.body.classList.remove('mode-team');
+    }
     this.hudEl.hidden = false;
     document.body.classList.remove('menu');
   }
@@ -1516,6 +1520,10 @@ export class HudManager {
   }
 
   updateBoard(ruleId?: string, reignSec?: number, kingName?: string, isMe = false): void {
+    if (this.boardEl) {
+      const eyebrow = this.boardEl.querySelector('.eyebrow');
+      if (eyebrow) eyebrow.textContent = t('boardEyebrow');
+    }
     if (this.ruleNameEl && this.ruleDescEl) {
       if (ruleId) {
         this.ruleNameEl.textContent = t(`r_${ruleId}`);

@@ -8,12 +8,14 @@ import { World, type Player } from '../src/sim/world';
 
 /** a world with no bots and no food, so tests control everything */
 function emptyWorld(): World {
-  const w = new World(1234, { bots: false });
+  const w = new World(1234, { bots: false, food: false });
   w.food.clear();
   // keep hazards out of the way of the test arena
   w.map.hay.length = 0;
   w.map.pond.length = 0;
   w.map.mud.length = 0;
+  w.map.well.length = 0;
+  w.map.fire.length = 0;
   w.map.podium = [45, 45];
   return w;
 }

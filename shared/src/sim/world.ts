@@ -91,6 +91,8 @@ export class World {
   private foodRemoved: number[] = [];
   /** fill empty seats with bots */
   botsEnabled: boolean;
+  /** spawn ambient food */
+  foodEnabled: boolean;
 
   /** Podium capture & protective shield system */
   podiumCaptor = 0;
@@ -125,11 +127,14 @@ export class World {
   matchEnded = false;
   matchEndTimer = 0;
 
-  constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean } = {}) {
+  constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean; food?: boolean } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
     this.map = generateMap(seed);
     this.botsEnabled = opts.bots ?? true;
-    for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
+    this.foodEnabled = opts.food ?? true;
+    if (this.foodEnabled) {
+      for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
+    }
     for (let i = 0; i < 3; i++) this.spawnTool();
     this.flush();
   }
@@ -840,7 +845,9 @@ export class World {
       if (p.mass > p.best) p.best = p.mass;
     }
 
-    for (let i = 0; i < CFG.FOOD_SPAWN_PER_TICK && this.food.size < CFG.FOOD_TARGET; i++) this.spawnFood();
+    if (this.foodEnabled) {
+      for (let i = 0; i < CFG.FOOD_SPAWN_PER_TICK && this.food.size < CFG.FOOD_TARGET; i++) this.spawnFood();
+    }
 
     this.ranked = alive.filter((p) => p.alive).sort((a, b) => b.mass - a.mass);
   }
