@@ -886,9 +886,9 @@ describe('bonus weapons and tools', () => {
     expect(cow.best).toBe(100);
   });
 
-  it('dog can swim in water without drowning, runs fast on land like horse', () => {
+  it('dog can swim in water without drowning, runs fast on land like horse, water speed is 0.35', () => {
     expect(TRAITS.dog.speed).toBe(TRAITS.horse.speed);
-    expect(TRAITS.dog.water).toBe(0.70);
+    expect(TRAITS.dog.water).toBe(0.35);
 
     const w = emptyWorld();
     w.map.pond = [[10, 10, 8, 8]];
@@ -906,6 +906,22 @@ describe('bonus weapons and tools', () => {
 
     expect(sheep.alive).toBe(false); // Sheep drowned
     expect(dog.alive).toBe(true); // Dog is swimming happily!
+  });
+
+  it('bots never spawn as dog in fillBots', () => {
+    for (let run = 0; run < 10; run++) {
+      const w = emptyWorld();
+      w.botsEnabled = true;
+      for (let i = 0; i < 25; i++) {
+        w.step();
+      }
+      expect(w.players.size).toBeGreaterThanOrEqual(1);
+      for (const p of w.players.values()) {
+        if (p.bot) {
+          expect(p.species).not.toBe('dog');
+        }
+      }
+    }
   });
 });
 

@@ -61,11 +61,7 @@ export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
     'Hắc Mã', 'Boxer', 'Clover', 'Tuấn Mã', 'Ngựa Hoang',
     'Thiên Mã', 'Ngựa Phi',
   ],
-  dog: [
-    'Chó Shiba', 'Corgi Vui Vẻ', 'Husky Ngáo', 'Chó Cỏ', 'Bé Vàng',
-    'Chó Đốm', 'Chó Mực', 'Cậu Vàng', 'Chó Béc-giê', 'Chó Xù',
-    'Chó Lạp Xưởng', 'Chó Phú Quốc',
-  ],
+  dog: [],
 };
 
 export const SPECIES_NAMES_VI: Record<Species, string> = {

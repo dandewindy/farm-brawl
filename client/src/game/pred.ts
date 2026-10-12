@@ -230,7 +230,7 @@ export class ClientPredictor {
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
 
       let terrain = water
-        ? species === 'duck' ? 1.25 : species === 'dog' ? 0.70 : 0.45
+        ? species === 'duck' ? 1.25 : species === 'dog' ? 0.35 : 0.45
         : mud
         ? species === 'pig' ? 1.1 : 0.45
         : species === 'duck' ? 0.87 : 1;

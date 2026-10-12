@@ -387,7 +387,7 @@ export class HudManager {
         if (this.speciesHint) this.speciesHint.textContent = t('randomHint');
         if (this.spPreviewTitle) this.spPreviewTitle.textContent = t('randomTitle');
         if (this.spPreviewSkinName) this.spPreviewSkinName.textContent = t('randomSkin');
-        if (this.spPreviewBadge) this.spPreviewBadge.textContent = '30% 🐶';
+        if (this.spPreviewBadge) this.spPreviewBadge.textContent = '?';
         if (this.previewRenderer) this.previewRenderer.setRandom();
         if (this.spSkinPalette) this.spSkinPalette.innerHTML = '';
         return;
@@ -507,7 +507,7 @@ export class HudManager {
     rndBtn.className = 'sp-btn-item sp-btn-random';
     rndBtn.dataset.species = 'random';
     rndBtn.title = t('randomTitle');
-    rndBtn.innerHTML = `<span class="sp-random-mark">❓</span><div class="dots"><i class="dot rnd-dot"></i></div>`;
+    rndBtn.innerHTML = `<span class="sp-random-mark">?</span>`;
     rndBtn.addEventListener('click', () => {
       this.isRandomSelected = true;
       updateAllButtons();
@@ -549,17 +549,8 @@ export class HudManager {
     if (this.spNavNext) {
       this.spNavNext.addEventListener('click', (e) => {
         e.stopPropagation();
-        const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
-        const style = window.getComputedStyle(this.speciesContainer);
-        const gap = parseFloat(style.gap) || 8;
-        const step = firstBtn ? firstBtn.offsetWidth + gap : 74;
-        const viewportWidth = this.speciesContainer.parentElement?.clientWidth || 214;
-        const visibleCount = Math.max(1, Math.floor((viewportWidth + gap) / step));
-        const maxIndex = Math.max(0, TOTAL_CAROUSEL_ITEMS - visibleCount);
-        if (this.carouselIndex < maxIndex) {
-          this.carouselIndex++;
-          updateCarousel();
-        }
+        this.carouselIndex++;
+        updateCarousel();
       });
     }
 
@@ -567,7 +558,7 @@ export class HudManager {
     const selIdx = SPECIES.indexOf(this.selectedSpecies);
     if (selIdx >= 0) {
       if (selIdx < this.carouselIndex) this.carouselIndex = selIdx;
-      else if (selIdx >= this.carouselIndex + 3) this.carouselIndex = selIdx - 2;
+      else if (selIdx >= this.carouselIndex + 5) this.carouselIndex = selIdx - 4;
     }
     updateCarousel();
 
@@ -606,6 +597,14 @@ export class HudManager {
     if (this.arenaPickerEl) {
       const curTheme = getArenaTheme();
       const arenaBtns = this.arenaPickerEl.querySelectorAll<HTMLButtonElement>('.btn-arena');
+      const ffaImg = document.getElementById('ffaPreviewImg') as HTMLImageElement | null;
+      const updateSnapshot = (theme: ArenaTheme) => {
+        if (ffaImg) {
+          ffaImg.src = theme === 'women_day' ? '/arena-womenday.jpg' : '/arena-classic.jpg';
+        }
+      };
+      updateSnapshot(curTheme);
+
       arenaBtns.forEach((btn) => {
         const arena = btn.getAttribute('data-arena') as ArenaTheme;
         btn.classList.toggle('on', arena === curTheme);
@@ -616,9 +615,39 @@ export class HudManager {
           btn.classList.add('on');
           setArenaTheme(arena);
           this.previewRenderer?.updateTheme(arena);
+          updateSnapshot(arena);
         });
       });
     }
+
+    // Dynamic Combat Guide positioning:
+    // On PC (desktop) & portrait: move #howBox to bottom of left column (.start-col-left)
+    // On mobile landscape: keep #howBox in right column below play button
+    const repositionHowBox = () => {
+      const isLandscapeMobile = window.matchMedia('(orientation: landscape) and (max-height: 540px)').matches;
+      const leftCol = document.querySelector('.start-col-left');
+      const rightCol = document.querySelector('.start-col-right');
+      const howBox = document.getElementById('howBox');
+      const bestLine = document.getElementById('bestLine');
+
+      if (!howBox || !leftCol || !rightCol) return;
+
+      if (isLandscapeMobile) {
+        if (howBox.parentElement !== rightCol) {
+          if (bestLine && bestLine.nextSibling) {
+            rightCol.insertBefore(howBox, bestLine.nextSibling);
+          } else {
+            rightCol.appendChild(howBox);
+          }
+        }
+      } else {
+        if (howBox.parentElement !== leftCol) {
+          leftCol.appendChild(howBox);
+        }
+      }
+    };
+    repositionHowBox();
+    window.addEventListener('resize', repositionHowBox);
   }
 
   private initEvents(): void {

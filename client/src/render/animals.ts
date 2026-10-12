@@ -551,7 +551,7 @@ function buildDog(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   g.add(tailGroup);
 
   addEyes(g, 0.94, 1.55, 0.15, 0.07);
-  return addLegs(g, s.legs ?? s.body, [[0.38, 0.22], [0.38, -0.22], [-0.38, 0.22], [-0.38, -0.22]], 0.72, 0.09, s.paws ?? 0x2b2522);
+  return addLegs(g, s.legs ?? s.body, [[0.28, 0.13], [0.28, -0.13], [-0.28, 0.13], [-0.28, -0.13]], 0.90, 0.095, s.paws ?? 0x2b2522);
 }
 
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
@@ -1081,8 +1081,8 @@ export class AnimalRenderer {
         // Ducks float peacefully on the surface with slight bobbing
         y = -0.25 * sc + Math.sin(now / 300) * 0.05;
       } else if (vis.species === 'dog') {
-        // Dogs can swim, half body submerged under water with paddling bob
-        y = -0.45 * sc + Math.sin(now / 220) * 0.04;
+        // Dogs can swim, half body submerged under water with paddling bob (only upper half and head visible)
+        y = -1.05 * sc + Math.sin(now / 220) * 0.03;
       } else {
         // Visual sinking speed reduced by 20% over the 1.5s duration
         const sinkDepth = 0.30 + Math.pow(sinkProgress, 1.3) * 1.32;
@@ -1170,20 +1170,22 @@ export class AnimalRenderer {
 
     // Dynamic leg swinging with amplitude 0.7
     vis.legs.forEach((leg, idx) => {
+      if (isWater && vis.species === 'dog') {
+        leg.visible = false;
+        return;
+      }
+      leg.visible = true;
+
       const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
       if (sq > 0.4) {
         // Flattened pancake: legs splayed flat horizontally to the sides
         leg.rotation.z = (Math.PI / 2.2) * (idx % 2 === 0 ? 1 : -1);
         leg.rotation.x = 0;
-      } else if (isDrowning || (isWater && vis.species !== 'duck' && vis.species !== 'dog')) {
+      } else if (isDrowning || (isWater && vis.species !== 'duck')) {
         // Slow paddling motion, slowing as it sinks deeper
         const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
         leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
         leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
-      } else if (isWater && vis.species === 'dog') {
-        // Dog swimming doggy paddle motion
-        leg.rotation.z = baseSwing * 0.55;
-        leg.rotation.x = Math.sin(now / 140 + idx * 1.5) * 0.4;
       } else if (isStunned) {
         leg.rotation.z = 0;
         leg.rotation.x = 0;

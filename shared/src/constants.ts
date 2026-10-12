@@ -96,7 +96,7 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
   cow: { speed: 0.95, dash: 0.97, weight: 1.25, water: 0.45, mud: 0.45, ram: 1.0 },
   duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.45, ram: 1.0 },
   pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1, ram: 1.0 },
-  dog: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.70, mud: 0.45, ram: 1.0 },
+  dog: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.35, mud: 0.45, ram: 1.0 },
 };
 
 export const SKIN_COUNT = 4;

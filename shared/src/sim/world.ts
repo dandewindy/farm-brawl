@@ -242,8 +242,9 @@ export class World {
     const hasTeams = [...this.players.values()].some((p) => p.team !== undefined);
     if (hasTeams) return; // Team mode has no bots
 
+    const BOT_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
     if (this.players.size < CFG.BOT_FILL) {
-      const sp = SPECIES[Math.floor(this.rnd() * SPECIES.length)];
+      const sp = BOT_SPECIES[Math.floor(this.rnd() * BOT_SPECIES.length)];
       const used = new Set([...this.players.values()].map((p) => p.name));
       const pool = SPECIES_BOT_NAMES[sp] || [];
       const free = pool.filter((n) => !used.has(n));

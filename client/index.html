@@ -211,15 +211,15 @@
               <span class="n" data-i18n="m_team_title">TRẠI ĐẤU</span>
               <span class="p" data-i18n="m_team_desc">Tranh tài 2 đội</span>
             </button>
-            <button type="button" data-mode="friend" title="Phòng riêng không bot">
+            <button type="button" data-mode="friend">
               <span class="n" data-i18n="m_friend_title">BẠN BÈ</span>
               <span class="p" data-i18n="m_friend_desc">Phòng riêng</span>
             </button>
           </div>
 
-          <!-- Simple Gameplay Preview Banner for FFA Mode (balances empty vertical space) -->
+          <!-- Arena Snapshot Banner for FFA Mode -->
           <div id="ffaPreviewBox" class="ffa-preview-box">
-            <img src="/gameplay-preview.png" alt="Farm Brawl Gameplay" class="ffa-preview-img">
+            <img id="ffaPreviewImg" src="/arena-classic.jpg" alt="Farm Brawl Arena" class="ffa-preview-img">
           </div>
 
           <!-- Team Pick on Start Screen (visible when mode === 'team') -->
@@ -279,14 +279,14 @@
           <p id="bestLine"></p>
 
           <!-- Hướng dẫn chơi -->
-          <div class="how-box">
+          <div id="howBox" class="how-box">
             <div class="how-title" data-i18n="howTitle">HƯỚNG DẪN CHIẾN ĐẤU</div>
             <ul class="how">
               <li data-i18n="how_dash">⚡ Húc đối thủ vào hàng rào điện và địa hình (lò lửa, ao nước, hố sâu) để hạ gục và cướp kg.</li>
               <li data-i18n="how_podium">👑 Đứng một mình trên bục để lên ngôi và nắm luật, càng nặng chiếm càng nhanh.</li>
               <li data-i18n="how_charge">💨 Giữ chuột (hoặc phím Space / nút Húc) để tích lực, thả ra để húc thật mạnh, xuyên qua cả đám đông.</li>
               <li data-i18n="how_items">🌈 Ăn kẹo cầu vồng, nhặt chĩa ba 🍴, thuốc nổ 🧨; cẩn thận máy cày Ông Till 🚜!</li>
-              <li data-i18n="how_terrain">🌾 Bùn làm chậm &amp; giảm lực húc (trừ Heo), ao sâu làm chìm (trừ Vịt &amp; Chó), kiện rơm chắn đường.</li>
+              <li data-i18n="how_terrain">🌾 Bùn làm chậm &amp; giảm lực húc (trừ Heo), ao sâu làm chìm (trừ Vịt), kiện rơm chắn đường.</li>
             </ul>
           </div>
 
