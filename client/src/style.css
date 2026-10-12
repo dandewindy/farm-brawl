@@ -1245,10 +1245,10 @@ body.ipad #lb {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  pointer-events: none;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(3px);
-  animation: caFadeIn 0.2s ease-out;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: caFadeIn 0.15s ease-out;
 }
 .center-alert[hidden] {
   display: none !important;
@@ -1258,22 +1258,24 @@ body.ipad #lb {
   align-items: center;
   gap: 12px;
   max-width: 90vw;
-  padding: 16px 26px;
+  padding: 14px 24px;
   background: linear-gradient(135deg, rgba(38, 28, 20, 0.96), rgba(26, 18, 12, 0.98));
   border: 2px solid var(--gold);
   border-radius: 16px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 201, 40, 0.35);
   color: #fff;
   font-family: var(--f-display);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-align: center;
   line-height: 1.4;
-  animation: caPopIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: auto;
+  cursor: default;
+  animation: caPopIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .ca-icon {
-  font-size: 26px;
+  font-size: 24px;
   flex-shrink: 0;
   animation: caBounce 1s infinite alternate ease-in-out;
 }

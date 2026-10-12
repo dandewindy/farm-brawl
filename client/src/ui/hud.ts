@@ -222,6 +222,22 @@ export class HudManager {
     this.roomTagEl = document.getElementById('roomTag');
     this.centerAlertEl = document.getElementById('centerAlert');
     this.caTextEl = document.getElementById('caText');
+    if (this.centerAlertEl) {
+      this.centerAlertEl.addEventListener('pointerdown', (e) => {
+        const caContent = this.centerAlertEl?.querySelector('.ca-content');
+        if (caContent && !caContent.contains(e.target as Node)) {
+          this.hideCenterAlert();
+        }
+      });
+    }
+    window.addEventListener('pointerdown', (e) => {
+      if (this.centerAlertEl && !this.centerAlertEl.hidden) {
+        const caContent = this.centerAlertEl.querySelector('.ca-content');
+        if (caContent && !caContent.contains(e.target as Node)) {
+          this.hideCenterAlert();
+        }
+      }
+    }, true);
     this.teamRoomBadgeEl = document.getElementById('teamRoomBadge');
     this.trbCodeEl = document.getElementById('trbCode');
     this.trbCopyBtnEl = document.getElementById('trbCopyBtn') as HTMLButtonElement | null;
@@ -1466,7 +1482,17 @@ export class HudManager {
     setTimeout(() => div.remove(), durationMs);
   }
 
-  showCenterAlert(text: string, durationMs = 2800): void {
+  hideCenterAlert(): void {
+    if (this.centerAlertTimer) {
+      clearTimeout(this.centerAlertTimer);
+      this.centerAlertTimer = null;
+    }
+    if (this.centerAlertEl) {
+      this.centerAlertEl.hidden = true;
+    }
+  }
+
+  showCenterAlert(text: string, durationMs = 1600): void {
     if (!this.centerAlertEl || !this.caTextEl) {
       this.showToast(text, durationMs);
       return;
@@ -1475,11 +1501,11 @@ export class HudManager {
       clearTimeout(this.centerAlertTimer);
       this.centerAlertTimer = null;
     }
-    this.caTextEl.textContent = text;
+    const cleanText = text.replace(/^⚠️\s*/, '');
+    this.caTextEl.textContent = cleanText;
     this.centerAlertEl.hidden = false;
     this.centerAlertTimer = setTimeout(() => {
-      if (this.centerAlertEl) this.centerAlertEl.hidden = true;
-      this.centerAlertTimer = null;
+      this.hideCenterAlert();
     }, durationMs);
   }
 
