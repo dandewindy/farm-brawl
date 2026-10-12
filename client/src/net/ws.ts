@@ -1,6 +1,10 @@
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 import type { Handler, Transport } from './transport';
 
+export function isFastColo(colo: string): boolean {
+  return colo === 'SIN' || colo === 'HKG' || colo === 'HAN' || colo === 'SGN' || colo === 'BKK';
+}
+
 export class WsClient implements Transport {
   private ws: WebSocket | null = null;
   private readonly queue: ClientMsg[] = [];
@@ -20,6 +24,7 @@ export class WsClient implements Transport {
   // In-Game Zero-Downtime Hot Migration
   private migrationWs: WebSocket | null = null;
   private lastMigrationProbeTime = 0;
+  private migrationRetryTimer: number | null = null;
   public onMigrationSuccess?: (newColo: string) => void;
 
   constructor(
@@ -98,7 +103,7 @@ export class WsClient implements Transport {
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
           // In-game auto-detection: if playing on high-latency node, trigger seamless background migration
-          const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.colo === 'MXP' || this.colo === 'CDG' || this.rtt > 150);
+          const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
           if (this.inGame && isHighLatency) {
             this.triggerHotMigration();
           }
@@ -113,15 +118,15 @@ export class WsClient implements Transport {
             }
             // Auto-steer away from high-latency edge nodes in lobby:
             // SIN (~35ms) and HKG (~75ms) are both fast low-latency APAC routes for Vietnam.
-            const isHighLatency = (this.colo !== 'SIN' && this.colo !== 'HKG') && (this.colo === 'NRT' || this.colo === 'MRS' || this.colo === 'MXP' || this.colo === 'CDG' || this.rtt > 150);
-            if (isHighLatency && !this.inGame && this.autoSteerAttempts < 3) {
+            const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
+            if (isHighLatency && !this.inGame && this.autoSteerAttempts < 10) {
               this.autoSteerAttempts++;
-              console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/3)...`);
+              console.log(`[WS] High latency edge node detected (${this.colo}). Auto-steering to optimal APAC node (attempt ${this.autoSteerAttempts}/10)...`);
               setTimeout(() => {
                 if (!this.closed && !this.inGame && this.ws === socket) {
                   this.forceReconnect();
                 }
-              }, 450);
+              }, 250);
             } else if (this.inGame && isHighLatency) {
               this.triggerHotMigration();
             }
@@ -148,10 +153,10 @@ export class WsClient implements Transport {
   }
 
   public triggerHotMigration(): void {
-    if (!this.inGame || (this.colo === 'SIN' || this.colo === 'HKG') || this.closed || !this.sessionToken) return;
+    if (!this.inGame || isFastColo(this.colo) || this.closed || !this.sessionToken) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 12 seconds to prevent spam
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 12000) return;
+    // Throttle attempts: probe at most once every 1.5 seconds while searching for SIN/HKG
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 1500) return;
     this.lastMigrationProbeTime = now;
     console.log(`[WS] In-game high latency node detected (${this.colo}). Starting zero-downtime hot migration probe...`);
 
@@ -180,7 +185,7 @@ export class WsClient implements Transport {
         if (msg.t === 'pong') {
           const probeColo = msg.colo;
           console.log(`[WS] Hot migration probe response colo: ${probeColo}`);
-          if (probeColo === 'SIN' || probeColo === 'HKG') {
+          if (isFastColo(probeColo)) {
             // Optimal edge node found! Hand over existing session token
             if (this.lastJoinMsg && this.sessionToken) {
               probeSocket.send(JSON.stringify({
@@ -192,9 +197,15 @@ export class WsClient implements Transport {
               this.migrationWs = null;
             }
           } else {
-            // Still NRT, quietly discard probe and continue playing on current socket
+            // Still not optimal, quietly close probe and quickly retry
             probeSocket.close();
             this.migrationWs = null;
+            if (this.inGame && !isFastColo(this.colo)) {
+              if (this.migrationRetryTimer !== null) clearTimeout(this.migrationRetryTimer);
+              this.migrationRetryTimer = window.setTimeout(() => {
+                this.triggerHotMigration();
+              }, 600);
+            }
           }
         } else if (msg.t === 'joined') {
           // Handover acknowledged by server! Seamlessly swap active socket
@@ -277,6 +288,7 @@ export class WsClient implements Transport {
 
   public forceReconnect(): void {
     if (this.closed) return;
+    this.autoSteerAttempts = 0;
     this.stopPing();
     if (this.migrationWs) {
       try { this.migrationWs.close(); } catch (_) {}
