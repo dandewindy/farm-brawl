@@ -182,6 +182,8 @@ const SQUEAK: Record<Species, number> = {
   pig: 520,
   cow: 260,
   horse: 380,
+  dog: 620,
+  elephant: 180,
 };
 
 export function yelp(species: Species, vol = 1): void {

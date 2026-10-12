@@ -44,7 +44,7 @@ export const FLAG = {
   FLYING: 65536,
 } as const;
 
-export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite';
+export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
 
 export type ToolKind = 'pitchfork' | 'dynamite' | 'song';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];

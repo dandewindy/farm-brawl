@@ -919,9 +919,75 @@ describe('bonus weapons and tools', () => {
       for (const p of w.players.values()) {
         if (p.bot) {
           expect(p.species).not.toBe('dog');
+          expect(p.species).not.toBe('elephant');
         }
       }
     }
+  });
+
+  it('elephant spawns with 1000kg start mass', () => {
+    const w = emptyWorld();
+    const eleId = w.addPlayer('Dumbo', 'elephant', false);
+    const ele = w.players.get(eleId)!;
+    expect(ele.mass).toBe(1000);
+    expect(ele.best).toBe(1000);
+  });
+
+  it('elephant >= 1000kg ramming enemy < 50kg crushes and instakills victim', () => {
+    const w = emptyWorld();
+    const eleId = w.addPlayer('Dumbo', 'elephant', false);
+    const ele = place(w, eleId, 0, 0, 1000);
+
+    const chickenId = w.addPlayer('Chick', 'chicken', false);
+    const chicken = place(w, chickenId, 2.5, 0, 40);
+
+    // Elephant dashes right into chicken
+    ele.dashT = 0.5;
+    ele.vx = 25;
+    ele.charging = false;
+
+    w.step();
+
+    expect(chicken.alive).toBe(false);
+    expect(chicken.squishT).toBe(2.8);
+    const dieEv = w.events.find((e) => e.k === 'die' && e.id === chickenId);
+    expect(dieEv).toBeDefined();
+    if (dieEv && dieEv.k === 'die') {
+      expect(dieEv.cause).toBe('crush');
+      expect(dieEv.by).toBe(eleId);
+    }
+  });
+
+  it('elephant ramming enemy >= 50kg or when elephant < 1000kg does not instakill', () => {
+    const w = emptyWorld();
+    const eleId = w.addPlayer('Dumbo', 'elephant', false);
+    const ele = place(w, eleId, 0, 0, 1000);
+
+    const sheepId = w.addPlayer('Woolly', 'sheep', false);
+    const sheep = place(w, sheepId, 2.5, 0, 60); // 60kg >= 50kg
+
+    ele.dashT = 0.5;
+    ele.vx = 25;
+    ele.charging = false;
+
+    w.step();
+
+    expect(sheep.alive).toBe(true); // not crushed!
+
+    // Now test elephant with < 1000kg against < 50kg victim
+    const ele2Id = w.addPlayer('MiniEle', 'elephant', false);
+    const ele2 = place(w, ele2Id, 10, 10, 800); // 800kg < 1000kg
+
+    const chick2Id = w.addPlayer('Pip', 'chicken', false);
+    const chick2 = place(w, chick2Id, 12.5, 10, 30); // 30kg < 50kg
+
+    ele2.dashT = 0.5;
+    ele2.vx = 25;
+    ele2.charging = false;
+
+    w.step();
+
+    expect(chick2.alive).toBe(true); // not crushed because elephant < 1000kg!
   });
 });
 

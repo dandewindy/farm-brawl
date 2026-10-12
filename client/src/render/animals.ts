@@ -74,6 +74,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   duck: 0xffd54f,
   pig: 0xf48fb1,
   dog: 0xffa726,
+  elephant: 0x90a4ae,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -119,6 +120,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0x48505c, head: 0x48505c, snout: 0xe8ecf0, chest: 0xe8ecf0, collar: 0x1976d2, ear: 0x2e343d, innerEar: 0xe8ecf0, tail: 0x48505c, tailTip: 0xe8ecf0, legs: 0x48505c, paws: 0xe8ecf0 },
     { body: 0xc47b38, head: 0xc47b38, snout: 0xffffff, chest: 0xffffff, collar: 0x388e3c, ear: 0xb36a28, innerEar: 0xf4c2c2, tail: 0xc47b38, tailTip: 0xffffff, legs: 0xffffff, paws: 0xffffff },
     { body: 0x242228, head: 0x242228, snout: 0xa86a3d, chest: 0xa86a3d, collar: 0xf57c00, ear: 0x242228, innerEar: 0xa86a3d, tail: 0x242228, tailTip: 0x242228, legs: 0xa86a3d, paws: 0x242228 },
+  ],
+  elephant: [
+    { body: 0x828892, tusk: 0xf7f5f0, innerEar: 0xdfb4b4, toenails: 0xd0c8be, tuft: 0x2b2522 },
+    { body: 0xf2ede4, tusk: 0xffd700, innerEar: 0xf5c6c6, toenails: 0xe8dfd5, tuft: 0xffd700 },
+    { body: 0x6d5e54, tusk: 0xf0eee6, innerEar: 0xc99b9b, toenails: 0xbaa89b, tuft: 0x261d18 },
+    { body: 0x607d8b, tusk: 0xffffff, innerEar: 0xf8bbd0, toenails: 0xcfd8dc, tuft: 0x37474f },
   ],
 };
 
@@ -554,6 +561,60 @@ function buildDog(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   return addLegs(g, s.legs ?? s.body, [[0.28, 0.13], [0.28, -0.13], [-0.28, 0.13], [-0.28, -0.13]], 0.90, 0.095, s.paws ?? 0x2b2522);
 }
 
+function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  // Hefty rounded body (main shadow caster)
+  const bodyGeo = new THREE.CapsuleGeometry(0.55, 0.75, 8, 16);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, s.body, 0, 1.35, 0, undefined, true);
+  bodyMesh.scale.set(1.05, 1.08, 1.02);
+  g.add(bodyMesh);
+
+  // Head (rounded sphere)
+  g.add(part(new THREE.SphereGeometry(0.46, 18, 14), s.body, 0.95, 1.65, 0));
+  // Forehead brow / dome
+  blob(g, s.body, 0.28, [0.85, 0.9, 1.15], 0.9, 1.95, 0);
+
+  // Trunk curling forward and up:
+  // Segment 1 (sloping down)
+  const t1 = part(new THREE.CylinderGeometry(0.18, 0.14, 0.38, 10), s.body, 1.32, 1.48, 0);
+  t1.rotation.z = -0.7;
+  g.add(t1);
+  // Segment 2 (forward)
+  const t2 = part(new THREE.CylinderGeometry(0.14, 0.11, 0.38, 10), s.body, 1.54, 1.25, 0);
+  t2.rotation.z = -1.25;
+  g.add(t2);
+  // Segment 3 (curling upwards)
+  const t3 = part(new THREE.CylinderGeometry(0.11, 0.08, 0.32, 10), s.body, 1.72, 1.15, 0);
+  t3.rotation.z = -2.1;
+  g.add(t3);
+  // Trunk tip
+  g.add(part(new THREE.SphereGeometry(0.085, 8, 6), s.body, 1.78, 1.28, 0));
+
+  // Tusks (2 white/ivory or gold curved tusks)
+  for (const z of [-0.22, 0.22]) {
+    const tusk = part(new THREE.ConeGeometry(0.06, 0.44, 8), s.tusk ?? 0xf7f5f0, 1.42, 1.35, z, { roughness: 0.3, metalness: 0.1 });
+    tusk.rotation.z = -1.85;
+    tusk.rotation.x = z > 0 ? 0.14 : -0.14;
+    g.add(tusk);
+  }
+
+  // Large flapping ears with inner ear flap
+  for (const z of [-0.44, 0.44]) {
+    blob(g, s.body, 0.38, [0.75, 1.15, 0.15], 0.78, 1.72, z, [0, z > 0 ? -0.25 : 0.25, -0.15]);
+    blob(g, s.innerEar ?? 0xdfb4b4, 0.28, [0.65, 1.05, 0.12], 0.80, 1.72, z > 0 ? z - 0.02 : z + 0.02, [0, z > 0 ? -0.25 : 0.25, -0.15]);
+  }
+
+  // Tail
+  const tailStem = part(new THREE.CylinderGeometry(0.035, 0.025, 0.55, 6), s.body, -0.72, 1.25, 0);
+  tailStem.rotation.z = -0.25;
+  g.add(tailStem);
+  const tailTuft = part(new THREE.SphereGeometry(0.065, 8, 6), s.tuft ?? 0x2b2522, -0.84, 0.95, 0);
+  g.add(tailTuft);
+
+  addEyes(g, 1.24, 1.75, 0.25, 0.07);
+  return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
+}
+
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
   chicken: buildChicken,
   sheep: buildSheep,
@@ -562,6 +623,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   duck: buildDuck,
   pig: buildPig,
   dog: buildDog,
+  elephant: buildElephant,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -652,6 +714,17 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'elephant': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.045, 8, 24), mat);
+      band.position.set(0.72, 1.48, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.3;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
+      medal.position.set(0.85, 1.34, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -665,6 +738,7 @@ const HEAD: Record<Species, [number, number]> = {
   duck: [0.55, 1.83],
   pig: [0.85, 1.83],
   dog: [0.72, 1.85],
+  elephant: [0.95, 2.15],
 };
 
 // Back of each species for the cape
@@ -676,6 +750,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   duck: [-0.2, 0.85, 0.56, 0.53, 0.95],
   pig: [-0.25, 1.0, 0.77, 0.77, 1.3],
   dog: [-0.15, 1.1, 0.55, 0.55, 1.05],
+  elephant: [-0.15, 1.35, 0.65, 0.65, 1.3],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -746,6 +821,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     duck: 0.16,
     pig: 0.20,
     dog: 0.18,
+    elephant: 0.28,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -755,6 +831,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     duck: 0.06,
     pig: 0.06,
     dog: 0.06,
+    elephant: 0.08,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -827,6 +904,7 @@ const LABEL_Y: Record<Species, number> = {
   duck: 2.0,
   pig: 2.1,
   dog: 2.1,
+  elephant: 2.6,
 };
 
 function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {

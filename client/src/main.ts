@@ -803,7 +803,7 @@ function handleGameEvent(ev: GameEvent): void {
         yelp(vm.species, isMine ? 1 : 0.5);
       }
       const FLUFF_COLORS: Record<Species, number> = {
-        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b,
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -865,7 +865,7 @@ function handleGameEvent(ev: GameEvent): void {
         sfxBurn(isMine ? 1 : 0.5);
       } else if (ev.cause === 'starve') {
         foodParts.puff(ev.x, 0.4, ev.z, 0xaaaaaa, 0.8, 1.0, 1.2);
-      } else if (ev.cause === 'till') {
+      } else if (ev.cause === 'till' || ev.cause === 'crush') {
         foodParts.burst(ev.x, 0.4, ev.z, 0x795548, 22, 6, 6, 0.4);
         foodParts.puff(ev.x, 0.3, ev.z, 0x5d4037, 1.2, 1.0, 1.8);
         sfxZap(isMine ? 0.7 : 0.35);

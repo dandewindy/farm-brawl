@@ -71,7 +71,7 @@ export type Cfg = typeof CFG;
 /** body radius from mass (kg) */
 export const radiusOf = (m: number): number => 1 + Math.sqrt(m) * 0.09;
 
-export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog'] as const;
+export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant'] as const;
 export type Species = (typeof SPECIES)[number];
 
 export interface SpeciesTraits {
@@ -97,6 +97,7 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
   duck: { speed: 0.88, dash: 1.0, weight: 0.95, water: 1.25, mud: 0.45, ram: 1.0 },
   pig: { speed: 1.0, dash: 1.0, weight: 1.05, water: 0.45, mud: 1.1, ram: 1.0 },
   dog: { speed: 1.08, dash: 1.0, weight: 1.0, water: 0.35, mud: 0.45, ram: 1.0 },
+  elephant: { speed: 0.92, dash: 0.95, weight: 1.4, water: 0.45, mud: 0.45, ram: 1.5 },
 };
 
 export const SKIN_COUNT = 4;

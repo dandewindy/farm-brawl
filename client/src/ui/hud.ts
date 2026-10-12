@@ -145,6 +145,7 @@ export class HudManager {
     duck: 0,
     pig: 0,
     dog: 0,
+    elephant: 0,
   };
 
   private readonly friendPanel: HTMLElement | null;
@@ -342,6 +343,7 @@ export class HudManager {
       duck: [0xffd23f, 0xf7f4ec, 0x1f6b3a, 0x34343a],
       pig: [0xf6a5b5, 0x2f2a2c, 0xd2773a, 0x3a3335],
       dog: [0xd9822b, 0x48505c, 0xc47b38, 0x242228],
+      elephant: [0x828892, 0xf2ede4, 0x6d5e54, 0x607d8b],
     };
 
     const SELECTABLE_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
@@ -657,7 +659,10 @@ export class HudManager {
       let chosenSpecies = this.selectedSpecies;
       let chosenSkin = this.mySkins[this.selectedSpecies] ?? 0;
       if (this.isRandomSelected) {
-        if (Math.random() < 0.3) {
+        const roll = Math.random();
+        if (roll < 0.10) {
+          chosenSpecies = 'elephant';
+        } else if (roll < 0.40) {
           chosenSpecies = 'dog';
         } else {
           const normalSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];

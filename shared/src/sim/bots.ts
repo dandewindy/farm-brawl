@@ -62,6 +62,7 @@ export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
     'Thiên Mã', 'Ngựa Phi',
   ],
   dog: [],
+  elephant: [],
 };
 
 export const SPECIES_NAMES_VI: Record<Species, string> = {
@@ -72,6 +73,7 @@ export const SPECIES_NAMES_VI: Record<Species, string> = {
   sheep: 'Cừu',
   horse: 'Ngựa',
   dog: 'Chó',
+  elephant: 'Voi',
 };
 
 export const BOT_NAMES = Object.values(SPECIES_BOT_NAMES).flat();

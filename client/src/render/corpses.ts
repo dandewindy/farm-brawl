@@ -59,8 +59,8 @@ export class CorpseRenderer {
     const { group } = buildCorpseAnimal(meta.species, meta.skin, isKing, meta.team);
 
     const sc = radiusOf(ev.mass) * 1.35;
-    group.position.set(ev.x, ev.cause === 'till' ? 0.04 : 0, ev.z);
-    if (ev.cause === 'till') {
+    group.position.set(ev.x, (ev.cause === 'till' || ev.cause === 'crush') ? 0.04 : 0, ev.z);
+    if (ev.cause === 'till' || ev.cause === 'crush') {
       group.scale.set(sc * 1.55, sc * 0.08, sc * 1.55);
     } else {
       group.scale.setScalar(sc);
@@ -179,8 +179,8 @@ export class CorpseRenderer {
           g.scale.setScalar(c.sc * Math.max(0.01, 1 - (a - 1.2) / 0.4));
         }
         done = a > 1.6;
-      } else if (c.cause === 'till') {
-        // Run over by Farmer Till's tractor: squished pancake flat on ground
+      } else if (c.cause === 'till' || c.cause === 'crush') {
+        // Run over by Farmer Till's tractor or crushed by giant Elephant: squished pancake flat on ground
         g.position.set(c.x, 0.04, c.z);
         if (a < 0.35 && c.fx <= 0) {
           c.fx = 0.08;

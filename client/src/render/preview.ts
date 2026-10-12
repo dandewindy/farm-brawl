@@ -221,12 +221,13 @@ export class AnimalPreviewRenderer {
       duck: 1.18,
       pig: 1.0,
       dog: 1.05,
+      elephant: 0.85,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
 
-    // Center pig's pivot so its protruding snout stays nicely inside the frame
-    if (species === 'pig') {
+    // Center pig / elephant pivot so their protruding parts stay nicely inside the frame
+    if (species === 'pig' || species === 'elephant') {
       root.position.x = -0.15;
     } else {
       root.position.x = 0;
@@ -349,10 +350,11 @@ export class AnimalPreviewRenderer {
       duck: 1.18,
       pig: 1.0,
       dog: 1.05,
+      elephant: 0.85,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
-    if (species === 'pig') {
+    if (species === 'pig' || species === 'elephant') {
       root.position.x = -0.12;
     }
 

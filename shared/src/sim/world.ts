@@ -153,7 +153,7 @@ export class World {
 
   addPlayer(name: string, species: Species, bot = false, team?: number, skin?: number): number {
     const id = this.nextId++;
-    const startMass = species === 'cow' ? 100 : CFG.START_MASS;
+    const startMass = species === 'elephant' ? 1000 : species === 'cow' ? 100 : CFG.START_MASS;
     const p: Player = {
       id, name: name.slice(0, 16), species,
       skin: skin !== undefined ? (skin % SKIN_COUNT) : Math.floor(this.rnd() * SKIN_COUNT),
@@ -208,7 +208,7 @@ export class World {
 
   private spawn(p: Player): void {
     const [x, z] = this.freeSpot();
-    const spawnMass = p.species === 'cow' ? 100 : CFG.START_MASS;
+    const spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
     Object.assign(p, {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: spawnMass, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
@@ -1033,7 +1033,7 @@ export class World {
 
     // Rule: "fourleg" (Four legs good - 4-legged animals ram 50% harder, King 80% harder)
     if (this.currentRule === 'fourleg') {
-      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig' || att.species === 'dog';
+      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig' || att.species === 'dog' || att.species === 'elephant';
       if (att.id === this.napoleonId) {
         k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
       } else if (isFourLeg) {
@@ -1088,6 +1088,29 @@ export class World {
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
+
+    // Elephant passive: when mass >= 1000kg, ramming instantly squashes & kills rivals under 50kg (like Farmer Till's tractor)
+    if (att.species === 'elephant' && att.mass >= 1000 && vic.mass < 50) {
+      vic.squishT = 2.8;
+      vic.stunT = 2.0;
+      vic.charging = false;
+      vic.dashT = 0;
+      vic.plow = false;
+      vic.lastHitBy = att.id;
+      vic.lastHitT = this.time;
+      const rv = radiusOf(vic.mass);
+      this.events.push({
+        k: 'hit',
+        a: att.id,
+        v: vic.id,
+        x: r2(vic.x - nx * rv),
+        z: r2(vic.z - nz * rv),
+        s: Math.round(k),
+        loss: 0,
+      });
+      this.kill(vic, 'crush');
+      return;
+    }
 
     if (isDynamite) {
       vic.lastHitBy = att.id;
