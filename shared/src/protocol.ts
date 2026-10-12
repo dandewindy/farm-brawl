@@ -143,10 +143,12 @@ export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[] }
   | { t: 'joined'; id: number; token?: string; colo?: string }
   | { t: 'pong'; c: number; colo?: string }
+  | { t: 'team_counts'; c0: number; c1: number }
   | Snapshot;
 
 export type ClientMsg =
   | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }
+  | { t: 'team_select'; team: number }
   | ({ t: 'input' } & Input);

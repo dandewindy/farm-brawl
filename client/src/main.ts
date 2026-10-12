@@ -99,9 +99,23 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
 hud.onSelectMode = (mode) => {
   if (mode === 'team') {
     connectToRoom('team-1');
+    if (transport) {
+      transport.send({ t: 'team_select', team: hud.selectedTeam });
+    }
   } else if (mode === 'ffa') {
     connectToRoom('pub-1');
   }
+};
+
+hud.onSelectTeam = (team) => {
+  if (currentRoomName.startsWith('team-') && transport) {
+    transport.send({ t: 'team_select', team });
+  }
+};
+
+hud.onChangeLanguage = () => {
+  syncAudioUi();
+  hud.updateTeamCounts(hud.lastCount0, hud.lastCount1);
 };
 
 hud.onReconnect = () => {
@@ -239,11 +253,8 @@ hud.onPickRule = (ruleId) => {
 // 3-State Audio Synchronization & 1-Second Notification Toast
 let audioToastTimer: any = null;
 function showAudioToast(mode: AudioMode): void {
-  const titles: Record<AudioMode, string> = {
-    0: '🔊 Âm thanh: Bật tất cả',
-    1: '🔈 Âm thanh: Chỉ hiệu ứng (Tắt nhạc)',
-    2: '🔇 Âm thanh: Tắt tất cả',
-  };
+  const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+  const txt = mode === 0 ? t('audio_all') : (mode === 1 ? t('audio_sfx') : t('audio_mute'));
   let toast = document.getElementById('audioToast');
   if (!toast) {
     toast = document.createElement('div');
@@ -251,7 +262,7 @@ function showAudioToast(mode: AudioMode): void {
     toast.className = 'audio-toast';
     document.body.appendChild(toast);
   }
-  toast.textContent = titles[mode];
+  toast.textContent = `${ico} ${txt}`;
   toast.classList.remove('fade-out');
   toast.classList.add('show');
 
@@ -265,15 +276,16 @@ function showAudioToast(mode: AudioMode): void {
 function syncAudioUi(): void {
   const mode = getAudioMode();
   hud.setMuteState(mode);
+  const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
+  const txt = mode === 0 ? t('audio_all') : (mode === 1 ? t('audio_sfx') : t('audio_mute'));
   if (muteInGameBtn) {
-    muteInGameBtn.textContent = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
-    muteInGameBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng (Tắt nhạc)' : 'Âm thanh: Tắt tất cả');
+    muteInGameBtn.textContent = ico;
+    muteInGameBtn.title = txt;
   }
   const startMuteBtn = document.getElementById('mute');
   if (startMuteBtn) {
-    const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
     startMuteBtn.innerHTML = `<span class="ico">${ico}</span>`;
-    startMuteBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
+    startMuteBtn.title = txt;
   }
 }
 
@@ -999,13 +1011,22 @@ function connectToRoom(targetRoom: string): void {
 
   currentRoomName = targetRoom;
   const isPrivate = targetRoom.startsWith('priv-') || targetRoom.startsWith('friend-');
+  const isTeam = targetRoom.startsWith('team-');
   const displayCode = isPrivate ? targetRoom.replace(/^(priv|friend)-/, '').toUpperCase() : targetRoom.toUpperCase();
-  const inviteUrl = isPrivate ? `${window.location.origin}${window.location.pathname}?room=priv-${displayCode}` : undefined;
+  const inviteUrl = isPrivate
+    ? `${window.location.origin}${window.location.pathname}?room=priv-${displayCode}`
+    : (isTeam ? `${window.location.origin}${window.location.pathname}?mode=team&room=${targetRoom}` : undefined);
 
-  hud.setRoomTag(
-    isPrivate ? `${displayCode} 📋` : `Phòng ${displayCode}`,
-    inviteUrl
-  );
+  if (isTeam) {
+    hud.setTeamRoomBadge(displayCode, inviteUrl);
+    hud.hideRoomTag();
+  } else {
+    hud.hideTeamRoomBadge();
+    hud.setRoomTag(
+      isPrivate ? `${displayCode} 📋` : `Phòng ${displayCode}`,
+      inviteUrl
+    );
+  }
 
   if (isExplicitOffline) {
     transport = new LocalServer((m) => {
@@ -1022,15 +1043,26 @@ function connectToRoom(targetRoom: string): void {
   transport = new WsClient(
     wsUrl,
     (m) => {
+      if ((m as any).t === 'team_counts') {
+        const tc = m as any;
+        hud.updateTeamCounts(tc.c0, tc.c1);
+        return;
+      }
       gameState.handle(m);
     },
     (status) => {
       if (status === 'open') {
+        if (targetRoom.startsWith('team-')) {
+          transport?.send({ t: 'team_select', team: hud.selectedTeam });
+        }
         const msg = isPrivate
           ? `Đã vào phòng bạn bè: ${displayCode} (Không có bot) 👥`
           : `Đã vào phòng trực tuyến: ${displayCode} 🌐`;
         hud.showToast(msg);
       } else if (status === 'reconnected') {
+        if (targetRoom.startsWith('team-')) {
+          transport?.send({ t: 'team_select', team: hud.selectedTeam });
+        }
         hud.showToast('⚡ Đã kết nối lại thành công!');
       } else if (status === 'closed') {
         if (gameState.alive) {
@@ -1048,9 +1080,12 @@ function connectToRoom(targetRoom: string): void {
   };
 }
 
+const modeParam = params.get('mode');
 const roomParam = params.get('room') || params.get('code');
 let initialRoom = 'pub-1';
-if (roomParam) {
+if (modeParam === 'team' || roomParam?.startsWith('team-')) {
+  initialRoom = roomParam || 'team-1';
+} else if (roomParam) {
   if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
     initialRoom = roomParam;
   } else if (roomParam.length >= 3 && roomParam !== 'pub-1') {

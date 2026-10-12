@@ -12,30 +12,37 @@ function build3DQuestionMark(): THREE.Group {
     roughness: 0.25,
   });
 
-  // Top curve arc of question mark
-  const arcGeo = new THREE.TorusGeometry(0.35, 0.11, 16, 28, Math.PI * 1.35);
-  const arc = new THREE.Mesh(arcGeo, mat);
-  arc.position.set(0, 1.35, 0);
-  arc.rotation.z = -0.55;
-  g.add(arc);
+  // Smooth continuous spline for the question mark hook with elegant natural bend
+  const curvePoints = [
+    new THREE.Vector3(-0.32, 1.42, 0), // curl end tip
+    new THREE.Vector3(-0.25, 1.66, 0), // upper left curve
+    new THREE.Vector3(0.0, 1.76, 0),   // top crown apex
+    new THREE.Vector3(0.26, 1.66, 0),  // upper right curve
+    new THREE.Vector3(0.38, 1.42, 0),  // right bulge
+    new THREE.Vector3(0.30, 1.18, 0),  // transition to inner curve
+    new THREE.Vector3(0.10, 0.98, 0),  // inflection bend curve returning to center
+    new THREE.Vector3(0.0, 0.78, 0),   // vertical stem
+    new THREE.Vector3(0.0, 0.54, 0),   // bottom tip of hook
+  ];
+  const curve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.5);
+  const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.10, 16, false);
+  const hookMesh = new THREE.Mesh(tubeGeo, mat);
+  g.add(hookMesh);
 
-  // Hook curve connecting down
-  const hookGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.3, 16);
-  const hook = new THREE.Mesh(hookGeo, mat);
-  hook.position.set(0.08, 1.05, 0);
-  hook.rotation.z = 0.45;
-  g.add(hook);
+  // Rounded spherical caps at both tube tips
+  const capGeo = new THREE.SphereGeometry(0.10, 16, 12);
+  const capTop = new THREE.Mesh(capGeo, mat);
+  capTop.position.copy(curvePoints[0]);
+  g.add(capTop);
 
-  // Lower vertical stem
-  const stemGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.32, 16);
-  const stem = new THREE.Mesh(stemGeo, mat);
-  stem.position.set(0, 0.72, 0);
-  g.add(stem);
+  const capBottom = new THREE.Mesh(capGeo, mat);
+  capBottom.position.copy(curvePoints[curvePoints.length - 1]);
+  g.add(capBottom);
 
   // Bottom dot
-  const dotGeo = new THREE.SphereGeometry(0.14, 16, 14);
+  const dotGeo = new THREE.SphereGeometry(0.13, 18, 14);
   const dot = new THREE.Mesh(dotGeo, mat);
-  dot.position.set(0, 0.24, 0);
+  dot.position.set(0, 0.22, 0);
   g.add(dot);
 
   // Base gold glow ring
@@ -96,8 +103,8 @@ export class AnimalPreviewRenderer {
     this.renderer.shadowMap.enabled = false;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(36, 280 / 180, 0.1, 30);
-    this.camera.position.set(0, 2.1, 4.4);
+    this.camera = new THREE.PerspectiveCamera(35, 280 / 180, 0.1, 30);
+    this.camera.position.set(0, 2.15, 4.95);
     this.camera.lookAt(0, 0.95, 0);
 
     // Studio Lighting
@@ -208,13 +215,20 @@ export class AnimalPreviewRenderer {
     const scales: Record<Species, number> = {
       chicken: 1.15,
       sheep: 1.15,
-      horse: 0.92,
-      cow: 1.05,
-      duck: 1.2,
-      pig: 1.12,
+      horse: 0.90,
+      cow: 1.02,
+      duck: 1.18,
+      pig: 1.0,
     };
-    const s = scales[species] || 1.1;
+    const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
+
+    // Center pig's pivot so its protruding snout stays nicely inside the frame
+    if (species === 'pig') {
+      root.position.x = -0.15;
+    } else {
+      root.position.x = 0;
+    }
 
     // Initial presentation angle
     this.turntable.add(root);
@@ -319,13 +333,16 @@ export class AnimalPreviewRenderer {
     const scales: Record<Species, number> = {
       chicken: 1.15,
       sheep: 1.15,
-      horse: 0.92,
-      cow: 1.05,
-      duck: 1.2,
-      pig: 1.12,
+      horse: 0.90,
+      cow: 1.02,
+      duck: 1.18,
+      pig: 1.0,
     };
-    const s = scales[species] || 1.1;
+    const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
+    if (species === 'pig') {
+      root.position.x = -0.12;
+    }
 
     // Face 3/4 front toward camera
     root.rotation.y = 0;

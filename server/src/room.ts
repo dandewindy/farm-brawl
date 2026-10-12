@@ -8,6 +8,8 @@ const GRACE_PERIOD_MS = 8000;
 export class GameRoom extends DurableObject {
   private readonly world: World;
   private readonly sockets = new Map<WebSocket, number>();
+  private readonly allSockets = new Set<WebSocket>();
+  private readonly lobbyTeams = new Map<WebSocket, number>();
   private readonly playerTokens = new Map<number, string>();
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,6 +73,8 @@ export class GameRoom extends DurableObject {
 
   private handleWebSocket(ws: WebSocket, edgeColo: string): void {
     ws.accept();
+    this.allSockets.add(ws);
+    this.sendTeamCounts(ws);
 
     ws.addEventListener('message', (event) => {
       try {
@@ -83,6 +87,8 @@ export class GameRoom extends DurableObject {
     });
 
     const onCloseOrError = () => {
+      this.allSockets.delete(ws);
+      this.lobbyTeams.delete(ws);
       const playerId = this.sockets.get(ws);
       if (playerId) {
         this.sockets.delete(ws);
@@ -100,6 +106,7 @@ export class GameRoom extends DurableObject {
           if (token) this.playerTokens.delete(playerId);
         }
       }
+      this.broadcastTeamCounts();
       if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
         this.stopLoop();
       }
@@ -183,7 +190,13 @@ export class GameRoom extends DurableObject {
       const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken, colo: edgeColo };
       ws.send(JSON.stringify(joinedMsg));
 
+      this.lobbyTeams.delete(ws);
+      this.broadcastTeamCounts();
       this.startLoop();
+    } else if (msg.t === 'team_select') {
+      const team = msg.team === 1 ? 1 : 0;
+      this.lobbyTeams.set(ws, team);
+      this.broadcastTeamCounts();
     } else if (msg.t === 'input') {
       const playerId = this.sockets.get(ws);
       if (playerId) {
@@ -196,6 +209,41 @@ export class GameRoom extends DurableObject {
       if (playerId) {
         this.world.chooseRule(playerId, msg.id);
       }
+    }
+  }
+
+  private getTeamCounts(): [number, number] {
+    let c0 = 0;
+    let c1 = 0;
+    for (const p of this.world.players.values()) {
+      if (p.team === 0) c0++;
+      else if (p.team === 1) c1++;
+    }
+    for (const team of this.lobbyTeams.values()) {
+      if (team === 0) c0++;
+      else if (team === 1) c1++;
+    }
+    return [c0, c1];
+  }
+
+  private broadcastTeamCounts(): void {
+    const [c0, c1] = this.getTeamCounts();
+    const packet = JSON.stringify({ t: 'team_counts', c0, c1 });
+    for (const ws of this.allSockets) {
+      try {
+        ws.send(packet);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private sendTeamCounts(ws: WebSocket): void {
+    const [c0, c1] = this.getTeamCounts();
+    try {
+      ws.send(JSON.stringify({ t: 'team_counts', c0, c1 }));
+    } catch {
+      // ignore
     }
   }
 

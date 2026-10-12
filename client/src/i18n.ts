@@ -172,6 +172,13 @@ const vi = {
   teamWin1: 'ĐỘI WFM CHIẾN THẮNG! 🏆',
   teamTie: 'TRẬN ĐẤU HOÀ! 🤝',
   teamScoreSub: 'Tỷ số: A12 {s0} – {s1} WFM',
+  audio_all: 'Âm thanh: Bật tất cả',
+  audio_sfx: 'Âm thanh: Chỉ hiệu ứng (Tắt nhạc)',
+  audio_mute: 'Âm thanh: Tắt tất cả',
+  teamNeedPlayers: '⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!',
+  roomCodeLbl: 'MÃ PHÒNG',
+  copyLink: 'Sao chép link phòng',
+  copiedRoomLink: 'Đã sao chép link phòng',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -347,7 +354,21 @@ const en: Record<keyof typeof vi, string> = {
   teamWin1: 'TEAM WFM VICTORY! 🏆',
   teamTie: 'MATCH TIED! 🤝',
   teamScoreSub: 'Score: A12 {s0} – {s1} WFM',
+  audio_all: 'Audio: All Sound ON',
+  audio_sfx: 'Audio: SFX Only (Music OFF)',
+  audio_mute: 'Audio: Mute All',
+  teamNeedPlayers: '⚠️ Need at least 1 player on each team (A12 & WFM) to start!',
+  roomCodeLbl: 'ROOM CODE',
+  copyLink: 'Copy room link',
+  copiedRoomLink: 'Copied room link',
 };
+
+export function formatTeamCount(count: number): string {
+  if (currentLang === 'en') {
+    return `(${count} player${count === 1 ? '' : 's'})`;
+  }
+  return `(${count} người)`;
+}
 
 export type Lang = 'vi' | 'en';
 let currentLang: Lang = (localStorage.getItem('fb_lang') as Lang) || 'vi';

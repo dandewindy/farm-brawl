@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { radiusOf, SPECIES, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
-import { t, getLanguage, toggleLanguage } from '../i18n';
+import { t, getLanguage, toggleLanguage, formatTeamCount, type Lang } from '../i18n';
 import { AnimalPreviewRenderer } from '../render/preview';
 import type { AudioMode } from '../audio/sfx';
 
@@ -62,6 +62,16 @@ export class HudManager {
   private readonly muteBtn: HTMLElement | null;
   private readonly modesContainer: HTMLElement | null;
   private readonly roomTagEl: HTMLElement | null;
+  private readonly centerAlertEl: HTMLElement | null;
+  private readonly caTextEl: HTMLElement | null;
+  private centerAlertTimer: any = null;
+
+  private readonly teamRoomBadgeEl: HTMLElement | null;
+  private readonly trbCodeEl: HTMLElement | null;
+  private readonly trbCopyBtnEl: HTMLButtonElement | null;
+  private readonly drawerTeamRoomBadgeEl: HTMLElement | null;
+  private readonly drawerTrbCodeEl: HTMLElement | null;
+  private readonly drawerTrbCopyBtnEl: HTMLButtonElement | null;
   private readonly podiumBadgeEl: HTMLElement | null;
   private readonly ptIconEl: HTMLElement | null;
   private readonly ptTxtEl: HTMLElement | null;
@@ -74,6 +84,8 @@ export class HudManager {
   public onPickRule?: (id: string) => void;
   public onToggleMute?: () => void;
   public onSelectMode?: (mode: 'ffa' | 'team' | 'friend') => void;
+  public onSelectTeam?: (team: number) => void;
+  public onChangeLanguage?: (lang: Lang) => void;
   public onReconnect?: () => void;
   public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
   public selectedTeam: number = 0;
@@ -208,6 +220,14 @@ export class HudManager {
     this.muteBtn = document.getElementById('mute');
     this.modesContainer = document.getElementById('modes');
     this.roomTagEl = document.getElementById('roomTag');
+    this.centerAlertEl = document.getElementById('centerAlert');
+    this.caTextEl = document.getElementById('caText');
+    this.teamRoomBadgeEl = document.getElementById('teamRoomBadge');
+    this.trbCodeEl = document.getElementById('trbCode');
+    this.trbCopyBtnEl = document.getElementById('trbCopyBtn') as HTMLButtonElement | null;
+    this.drawerTeamRoomBadgeEl = document.getElementById('drawerTeamRoomBadge');
+    this.drawerTrbCodeEl = document.getElementById('drawerTrbCode');
+    this.drawerTrbCopyBtnEl = document.getElementById('drawerTrbCopyBtn') as HTMLButtonElement | null;
     this.podiumBadgeEl = document.getElementById('podiumTimerBadge');
     this.ptIconEl = document.getElementById('ptIcon');
     this.ptTxtEl = document.getElementById('ptTxt');
@@ -524,6 +544,8 @@ export class HudManager {
         this.langToggle!.title = nextLang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : 'Language: English';
         this.nameInput.placeholder = t('namePh');
         updateAllButtons();
+        this.updateTeamCounts(this.lastCount0, this.lastCount1);
+        this.onChangeLanguage?.(nextLang);
         this.showToast(nextLang === 'vi' ? 'Đã chuyển sang Tiếng Việt' : 'Switched to English', 1000);
       });
     }
@@ -576,7 +598,7 @@ export class HudManager {
         const otherTeam = myTeam === 0 ? 1 : 0;
         const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
         if (otherCount < 1) {
-          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          this.showCenterAlert(t('teamNeedPlayers'));
           return;
         }
 
@@ -629,7 +651,7 @@ export class HudManager {
         const otherTeam = myTeam === 0 ? 1 : 0;
         const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
         if (otherCount < 1) {
-          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          this.showCenterAlert(t('teamNeedPlayers'));
           return;
         }
       }
@@ -720,7 +742,7 @@ export class HudManager {
         const otherTeam = myTeam === 0 ? 1 : 0;
         const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
         if (otherCount < 1) {
-          this.showToast('⚠️ Cần ít nhất 1 người chơi mỗi đội (A12 & WFM) để bắt đầu!');
+          this.showCenterAlert(t('teamNeedPlayers'));
           return;
         }
 
@@ -1034,12 +1056,53 @@ export class HudManager {
     }
   }
 
+  public hideRoomTag(): void {
+    if (this.roomTagEl) this.roomTagEl.hidden = true;
+  }
+
+  public setTeamRoomBadge(code: string, inviteUrl?: string): void {
+    if (this.teamRoomBadgeEl && this.trbCodeEl) {
+      this.teamRoomBadgeEl.hidden = false;
+      this.trbCodeEl.textContent = code;
+    }
+    if (this.drawerTeamRoomBadgeEl && this.drawerTrbCodeEl) {
+      this.drawerTeamRoomBadgeEl.hidden = false;
+      this.drawerTrbCodeEl.textContent = code;
+    }
+    const onCopy = () => {
+      const textToCopy = inviteUrl || code;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy).catch(() => {});
+      }
+      this.showToast(t('copiedRoomLink'));
+      if (this.trbCopyBtnEl) {
+        this.trbCopyBtnEl.classList.add('copied');
+        setTimeout(() => this.trbCopyBtnEl?.classList.remove('copied'), 1000);
+      }
+      if (this.drawerTrbCopyBtnEl) {
+        this.drawerTrbCopyBtnEl.classList.add('copied');
+        setTimeout(() => this.drawerTrbCopyBtnEl?.classList.remove('copied'), 1000);
+      }
+    };
+    if (this.trbCopyBtnEl) {
+      this.trbCopyBtnEl.onclick = onCopy;
+    }
+    if (this.drawerTrbCopyBtnEl) {
+      this.drawerTrbCopyBtnEl.onclick = onCopy;
+    }
+  }
+
+  public hideTeamRoomBadge(): void {
+    if (this.teamRoomBadgeEl) this.teamRoomBadgeEl.hidden = true;
+    if (this.drawerTeamRoomBadgeEl) this.drawerTeamRoomBadgeEl.hidden = true;
+  }
+
   public setMuteState(mutedOrMode: boolean | AudioMode): void {
     const mode: AudioMode = typeof mutedOrMode === 'number' ? mutedOrMode : (mutedOrMode ? 2 : 0);
     if (this.muteBtn) {
       const ico = mode === 0 ? '🔊' : (mode === 1 ? '🔈' : '🔇');
       this.muteBtn.innerHTML = `<span class="ico">${ico}</span>`;
-      this.muteBtn.title = mode === 0 ? 'Âm thanh: Bật tất cả' : (mode === 1 ? 'Âm thanh: Chỉ hiệu ứng' : 'Âm thanh: Tắt tất cả');
+      this.muteBtn.title = mode === 0 ? t('audio_all') : (mode === 1 ? t('audio_sfx') : t('audio_mute'));
     }
   }
 
@@ -1119,17 +1182,20 @@ export class HudManager {
     if (this.selectedMode === 'team' && this.previewRenderer) {
       this.previewRenderer.setAnimal(this.selectedSpecies, this.mySkins[this.selectedSpecies] ?? 0, team);
     }
+    this.onSelectTeam?.(team);
   }
 
   public updateTeamCounts(count0: number, count1: number): void {
     this.lastCount0 = count0;
     this.lastCount1 = count1;
-    if (this.startCount0El) this.startCount0El.textContent = `(${count0} người)`;
-    if (this.startCount1El) this.startCount1El.textContent = `(${count1} người)`;
-    if (this.deathCount0El) this.deathCount0El.textContent = `(${count0} người)`;
-    if (this.deathCount1El) this.deathCount1El.textContent = `(${count1} người)`;
-    if (this.twCount0El) this.twCount0El.textContent = `(${count0} người)`;
-    if (this.twCount1El) this.twCount1El.textContent = `(${count1} người)`;
+    const txt0 = formatTeamCount(count0);
+    const txt1 = formatTeamCount(count1);
+    if (this.startCount0El) this.startCount0El.textContent = txt0;
+    if (this.startCount1El) this.startCount1El.textContent = txt1;
+    if (this.deathCount0El) this.deathCount0El.textContent = txt0;
+    if (this.deathCount1El) this.deathCount1El.textContent = txt1;
+    if (this.twCount0El) this.twCount0El.textContent = txt0;
+    if (this.twCount1El) this.twCount1El.textContent = txt1;
     if (this.tbCount0El) this.tbCount0El.textContent = `(${count0})`;
     if (this.tbCount1El) this.tbCount1El.textContent = `(${count1})`;
   }
@@ -1398,6 +1464,23 @@ export class HudManager {
     div.textContent = text;
     this.toastsEl.appendChild(div);
     setTimeout(() => div.remove(), durationMs);
+  }
+
+  showCenterAlert(text: string, durationMs = 2800): void {
+    if (!this.centerAlertEl || !this.caTextEl) {
+      this.showToast(text, durationMs);
+      return;
+    }
+    if (this.centerAlertTimer) {
+      clearTimeout(this.centerAlertTimer);
+      this.centerAlertTimer = null;
+    }
+    this.caTextEl.textContent = text;
+    this.centerAlertEl.hidden = false;
+    this.centerAlertTimer = setTimeout(() => {
+      if (this.centerAlertEl) this.centerAlertEl.hidden = true;
+      this.centerAlertTimer = null;
+    }, durationMs);
   }
 
   showRuleBanner(ruleId: string): void {
