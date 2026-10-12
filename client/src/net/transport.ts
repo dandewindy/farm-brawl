@@ -13,6 +13,7 @@ export interface Transport {
   inGame?: boolean;
   forceReconnect?(): void;
   triggerHotMigration?(): void;
+  leaveGame?(): void;
   onMigrationSuccess?: (newColo: string) => void;
 }
 

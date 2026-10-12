@@ -65,7 +65,8 @@ export class WsClient implements Transport {
       this.isReconnecting = false;
       this.onStatus?.(wasReconnecting ? 'reconnected' : 'open');
 
-      if (this.lastJoinMsg) {
+      const hasQueuedJoin = this.queue.some((m) => m.t === 'join');
+      if (this.lastJoinMsg && this.inGame && !hasQueuedJoin) {
         this.send({
           ...this.lastJoinMsg,
           token: this.sessionToken || undefined,
@@ -103,19 +104,6 @@ export class WsClient implements Transport {
             this.rttMin = sorted[0];
             this.rtt = sorted[Math.floor(sorted.length / 2)];
           }
-          // High latency detection: non-fast PoP or RTT > 120ms
-          const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
-          if (!this.inGame && isHighLatency && this.autoSteerAttempts < 10) {
-            this.autoSteerAttempts++;
-            console.log(`[WS] High latency edge node detected in lobby (${this.colo}, ${Math.round(this.rtt)}ms). Auto-steering to Singapore (attempt ${this.autoSteerAttempts}/10)...`);
-            setTimeout(() => {
-              if (!this.closed && !this.inGame && this.ws === socket) {
-                this.forceReconnect();
-              }
-            }, 100);
-          } else if (this.inGame && isHighLatency) {
-            this.triggerHotMigration();
-          }
         } else {
           if (msg.t === 'joined') {
             if (msg.colo) this.colo = msg.colo;
@@ -125,10 +113,6 @@ export class WsClient implements Transport {
                 this.lastJoinMsg.token = msg.token;
               }
             }
-            const isHighLatency = !isFastColo(this.colo) || this.rtt > 120;
-            if (this.inGame && isHighLatency) {
-              this.triggerHotMigration();
-            }
           }
           this.onMsg(msg);
         }
@@ -137,9 +121,13 @@ export class WsClient implements Transport {
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (ev) => {
       if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally
       this.stopPing();
+      if (ev.reason === 'Handover') {
+        // Handover handled cleanly by probeSocket
+        return;
+      }
       this.isReconnecting = true;
       this.onStatus?.('closed');
       this.scheduleReconnect();
@@ -154,8 +142,8 @@ export class WsClient implements Transport {
   public triggerHotMigration(): void {
     if (!this.inGame || isFastColo(this.colo) || this.closed || !this.sessionToken) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 400ms while searching for SIN/HKG
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 400) return;
+    // Throttle attempts: probe at most once every 10 seconds
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 10000) return;
     this.lastMigrationProbeTime = now;
     console.log(`[WS] In-game high latency node detected (${this.colo}). Starting zero-downtime hot migration probe...`);
 
@@ -167,6 +155,8 @@ export class WsClient implements Transport {
       console.warn('[WS] Failed to create hot migration socket:', e);
       return;
     }
+
+    let pendingInit: ServerMsg | null = null;
 
     probeSocket.onopen = () => {
       if (this.migrationWs !== probeSocket || this.closed) {
@@ -196,16 +186,13 @@ export class WsClient implements Transport {
               this.migrationWs = null;
             }
           } else {
-            // Still not optimal, quietly close probe and quickly retry
+            // Not optimal, quietly close probe
             probeSocket.close();
             this.migrationWs = null;
-            if (this.inGame && !isFastColo(this.colo)) {
-              if (this.migrationRetryTimer !== null) clearTimeout(this.migrationRetryTimer);
-              this.migrationRetryTimer = window.setTimeout(() => {
-                this.triggerHotMigration();
-              }, 400);
-            }
           }
+        } else if (msg.t === 'init') {
+          // Buffer init so it can be delivered right before joined
+          pendingInit = msg;
         } else if (msg.t === 'joined') {
           // Handover acknowledged by server! Seamlessly swap active socket
           console.log(`[WS] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'}`);
@@ -224,13 +211,18 @@ export class WsClient implements Transport {
             oldWs.onmessage = null;
             oldWs.onclose = null;
             oldWs.onerror = null;
-            try { oldWs.close(); } catch (_) {}
+            try { oldWs.close(1000, 'Handover'); } catch (_) {}
           }
 
           this.bindActiveSocket(probeSocket);
           this.startPing();
+          if (pendingInit) {
+            this.onMsg(pendingInit);
+          }
           this.onMsg(msg);
           this.onMigrationSuccess?.(this.colo);
+        } else if (this.ws === probeSocket) {
+          this.onMsg(msg);
         }
       } catch (err) {
         console.error('[WS] Error during hot migration:', err);
@@ -276,19 +268,39 @@ export class WsClient implements Transport {
   }
 
   send(m: ClientMsg): void {
+    let toSend = m;
     if (m.t === 'join') {
-      this.lastJoinMsg = { ...m, token: this.sessionToken || m.token };
+      toSend = { ...m, token: this.sessionToken || m.token };
+      this.lastJoinMsg = toSend;
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       if (m.t !== 'input') {
-        this.queue.push(m);
+        this.queue.push(toSend);
       }
       return;
     }
     if (m.t === 'input' && this.ws.bufferedAmount > 65536) {
       return;
     }
-    this.ws.send(JSON.stringify(m));
+    this.ws.send(JSON.stringify(toSend));
+  }
+
+  leaveGame(): void {
+    this.inGame = false;
+    this.sessionToken = null;
+    this.lastJoinMsg = null;
+    this.queue.length = 0;
+    if (this.migrationWs) {
+      try { this.migrationWs.close(); } catch (_) {}
+      this.migrationWs = null;
+    }
+    if (this.migrationRetryTimer !== null) {
+      clearTimeout(this.migrationRetryTimer);
+      this.migrationRetryTimer = null;
+    }
+    try {
+      this.send({ t: 'leave' });
+    } catch (_) {}
   }
 
   public forceReconnect(): void {

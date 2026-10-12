@@ -215,10 +215,11 @@ export class GameRoom extends DurableObject {
         }
         const existingPlayer = this.world.players.get(playerId);
         if (existingPlayer) {
-          if (!existingPlayer.alive) {
+          if (!existingPlayer.alive || !msg.token) {
+            existingPlayer.alive = false;
             this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
           } else {
-            // Player is alive: preserve exact position, velocity & mass!
+            // Player is alive and has valid sessionToken (hot handover/reconnect): preserve exact position, velocity & mass!
             if (msg.name) existingPlayer.name = msg.name.slice(0, 16);
             if (msg.species) existingPlayer.species = msg.species;
             if (msg.skin !== undefined) existingPlayer.skin = msg.skin % SKIN_COUNT;

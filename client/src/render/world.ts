@@ -643,6 +643,7 @@ export class WorldRenderer {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
+  zoomBias = 0;
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
   private readonly podiumTileMats: THREE.MeshStandardMaterial[] = [];
@@ -1429,9 +1430,29 @@ export class WorldRenderer {
     }
   }
 
+  snapCamera(targetX: number, targetZ: number, mass: number): void {
+    const r = radiusOf(mass);
+    let h = 30 + r * 6 + this.zoomBias;
+    if (this.camera.aspect < 1) h *= 1 + (1 - this.camera.aspect) * 0.9;
+
+    this.camTarget.x = targetX;
+    this.camTarget.z = targetZ;
+    this.camH = h;
+
+    this.camera.position.set(targetX, h, targetZ + h * 0.7);
+    this.camera.lookAt(targetX, 0, targetZ - 1);
+    this.camera.updateMatrixWorld(true);
+
+    if (this.sun) {
+      this.sun.position.set(targetX + 30, 65, targetZ + 22);
+      this.sun.target.position.set(targetX, 0, targetZ);
+      this.sun.target.updateMatrixWorld();
+    }
+  }
+
   updateCamera(targetX: number, targetZ: number, mass: number, dt: number, shake = 0): void {
     const r = radiusOf(mass);
-    let h = 30 + r * 6;
+    let h = 30 + r * 6 + this.zoomBias;
     if (this.camera.aspect < 1) h *= 1 + (1 - this.camera.aspect) * 0.9;
 
     const k = 1 - Math.exp(-dt * 7);

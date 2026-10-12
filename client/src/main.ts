@@ -154,10 +154,14 @@ hud.onReconnect = () => {
 
 hud.onExitLobby = () => {
   if (transport) {
-    transport.inGame = false;
-    try {
-      transport.send({ t: 'leave' });
-    } catch (_) {}
+    if (transport.leaveGame) {
+      transport.leaveGame();
+    } else {
+      transport.inGame = false;
+      try {
+        transport.send({ t: 'leave' });
+      } catch (_) {}
+    }
   }
   predictor.on = false;
   gameState.alive = false;
@@ -700,8 +704,7 @@ const gameState = new GameState({
         if (firstSpawn) {
           firstSpawn = false;
           predictor.reset(x, z);
-          world.camTarget.x = x;
-          world.camTarget.z = z;
+          world.snapCamera(x, z, mass);
         }
         const currentRtt = transport ? transport.rtt : 0;
         predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, currentRtt);
@@ -1369,8 +1372,17 @@ function animate(now: number): void {
       }
     }
   } else {
-    targetX = deathCamTarget ? deathCamTarget.x : me ? (predictor.on ? predictor.x : me.x) : 0;
-    targetZ = deathCamTarget ? deathCamTarget.z : me ? (predictor.on ? predictor.z : me.z) : 0;
+    if (deathCamTarget) {
+      targetX = deathCamTarget.x;
+      targetZ = deathCamTarget.z;
+    } else if (me) {
+      targetX = predictor.on ? predictor.x : me.x;
+      targetZ = predictor.on ? predictor.z : me.z;
+    } else {
+      // Hold camera position while awaiting spawn instead of jumping to podium (0, 0)
+      targetX = world.camTarget.x;
+      targetZ = world.camTarget.z;
+    }
     targetMass = me ? me.mass : CFG.START_MASS;
   }
   world.updateCamera(targetX, targetZ, targetMass, dt, shake);
