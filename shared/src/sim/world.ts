@@ -355,7 +355,8 @@ export class World {
           p.pressed = false;
           p.btnLatch = false;
         }
-        stepMove(p, p.input, h, p.species, p.terrain);
+        const tillSpeedMult = this.tillTruck.active ? 1.5 : 1.0;
+        stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
         if (p.slowT > 0) {
           p.vx *= 0.85;
           p.vz *= 0.85;
@@ -646,7 +647,7 @@ export class World {
       this.napoleonReign += DT;
       this.ruleTimer -= DT;
       if (this.ruleTimer <= 0 && !this.kingChoice) {
-        this.pickRule();
+        this.startKingChoice();
       }
 
       // King rule choice timer: bot king picks after 1.5s, or timeout
@@ -979,7 +980,7 @@ export class World {
 
   applyRule(ruleId: string): void {
     this.currentRule = ruleId;
-    this.ruleTimer = 40;
+    this.ruleTimer = 30;
     this.kingChoice = null;
     if (ruleId === 'equal') {
       for (const p of this.players.values()) {

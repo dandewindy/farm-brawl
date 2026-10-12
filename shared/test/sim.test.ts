@@ -786,6 +786,74 @@ describe('bonus weapons and tools', () => {
     expect(w.players.get(humanId)?.bot).toBe(false);
     expect(w.players.get(humanId)?.alive).toBe(false);
   });
+
+  it('King continuously gets to choose commandments every 30 seconds', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('KingPig', 'pig', false);
+    const king = place(w, kingId, 0, 0, 40);
+    w.napoleonId = kingId;
+
+    // Coronation triggers commandment choice
+    w.startKingChoice();
+    expect(w.kingChoice).not.toBeNull();
+    expect(w.kingChoice!.options.length).toBe(3);
+
+    // King picks first option
+    const choice1 = w.kingChoice!.options[0];
+    w.chooseRule(kingId, choice1);
+    expect(w.currentRule).toBe(choice1);
+    expect(w.ruleTimer).toBe(30);
+    expect(w.kingChoice).toBeNull();
+
+    // Fast-forward 30 seconds (600 ticks)
+    for (let i = 0; i < 600; i++) {
+      w.step();
+    }
+
+    // King should now be offered a new choice again!
+    expect(w.kingChoice).not.toBeNull();
+    expect(w.kingChoice!.options.length).toBe(3);
+
+    // King picks new rule
+    const choice2 = w.kingChoice!.options[0];
+    w.chooseRule(kingId, choice2);
+    expect(w.currentRule).toBe(choice2);
+    expect(w.ruleTimer).toBe(30);
+  });
+
+  it('Farmer Till rule gives +50% movement speed while tractor is on the field', () => {
+    const w = emptyWorld();
+    const pid = w.addPlayer('Runner', 'pig', false);
+    const p = place(w, pid, 10, 10, 40);
+
+    // Initial movement without Till
+    p.input = { a: 0, mv: true, btn: false };
+    w.step();
+    const normalVx = p.vx;
+    expect(normalVx).toBeGreaterThan(0);
+
+    // Reset position and activate Till rule
+    p.vx = 0;
+    p.vz = 0;
+    w.applyRule('till');
+    // Step until tractor is active
+    for (let i = 0; i < 30; i++) {
+      w.step();
+    }
+    expect(w.tillTruck.active).toBe(true);
+
+    // Measure movement with tractor active
+    p.vx = 0;
+    p.vz = 0;
+    p.x = 20; // safe from tractor
+    p.z = 20;
+    p.input = { a: 0, mv: true, btn: false };
+    w.step();
+    const tillVx = p.vx;
+
+    // Till active velocity should be ~1.5x of normal
+    expect(tillVx / normalVx).toBeCloseTo(1.5, 1);
+  });
 });
 
 

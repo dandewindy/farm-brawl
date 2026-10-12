@@ -204,7 +204,8 @@ export class ClientPredictor {
     ents: Map<number, Ent>,
     myId: number,
     snapTick: number,
-    rtt: number
+    rtt: number,
+    speedMult = 1.0
   ): void {
     if (!this.on || !map) return;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
@@ -232,7 +233,7 @@ export class ClientPredictor {
         ? species === 'pig' ? 1.1 : 0.5
         : species === 'duck' ? 0.87 : 1;
 
-      const maxSp = CFG.MOVE_SPEED * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1);
+      const maxSp = CFG.MOVE_SPEED * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
 
       if (this.dashT > 0) {
         const d = Math.exp(-1.2 * h);

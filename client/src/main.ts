@@ -1242,6 +1242,7 @@ function animate(now: number): void {
 
     // Authoritative client physics prediction step
     if (myMeta && me) {
+      const tillSpeedMult = gameState.truck !== undefined ? 1.5 : 1.0;
       predictor.step(
         dt,
         now,
@@ -1255,7 +1256,8 @@ function animate(now: number): void {
         gameState.ents,
         gameState.myId,
         gameState.snapTick,
-        transport.rtt
+        transport.rtt,
+        tillSpeedMult
       );
     }
 

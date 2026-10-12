@@ -42,7 +42,7 @@ export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolea
 }
 
 /** advance one body by dt seconds */
-export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain): void {
+export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult = 1.0): void {
   const stunned = b.stunT > 0;
   if (b.dashT > 0) {
     const d = Math.exp(-1.2 * dt);
@@ -51,7 +51,7 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
     const d = Math.exp(-3.5 * dt);
     b.vx *= d; b.vz *= d;
   } else {
-    const ms = maxSpeed(sp, b.mass, t, b.charging);
+    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
     const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.25) * terrainFactor(sp, t) * dt);
     b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
     b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
