@@ -375,8 +375,12 @@ export function click(): void {
 
 export function boom(): void {
   if (!ready()) return;
-  tone('sine', 160, 35, 0.5, 0.45, { attack: 0.005 });
-  noise('lowpass', 600, 80, 2, 0.6, 0.4, { attack: 0.01 });
+  // Deep concussive sub-bass thump
+  tone('sine', 190, 25, 0.6, 0.7, { attack: 0.005 });
+  tone('sawtooth', 260, 40, 0.45, 0.35, { attack: 0.008 });
+  // Heavy low explosion blast + crackle rumble
+  noise('lowpass', 1400, 60, 1.8, 0.75, 0.65, { attack: 0.006 });
+  noise('bandpass', 700, 180, 2.0, 0.5, 0.4, { delay: 0.04 });
 }
 export const sfxBoom = boom;
 

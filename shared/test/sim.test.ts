@@ -246,6 +246,66 @@ describe('bonus weapons and tools', () => {
     expect(Math.abs(bystander.vz)).toBeGreaterThan(0.5);
   });
 
+  it('dynamite kills victim if under 110kg with dynamite cause', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('Bomber', 'pig');
+    const vicId = w.addPlayer('Victim', 'pig');
+    place(w, attId, 0, 0, 50);
+    place(w, vicId, 2, 0, 80); // 80kg < 110kg
+
+    const att = w.players.get(attId)!;
+    att.hasDynamite = true;
+    att.dashT = 0.3;
+    att.power = 1.0;
+    att.vx = 20;
+
+    w.step();
+    const vic = w.players.get(vicId)!;
+    expect(vic.alive).toBe(false);
+    const dieEv = w.events.find((e) => e.k === 'die' && e.id === vicId);
+    expect(dieEv).toBeDefined();
+    expect((dieEv as any).cause).toBe('dynamite');
+    expect((dieEv as any).by).toBe(attId);
+  });
+
+  it('dynamite reduces 25kg when victim is >= 110kg', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('Bomber', 'pig');
+    const vicId = w.addPlayer('HeavyVictim', 'pig');
+    place(w, attId, 0, 0, 50);
+    place(w, vicId, 2, 0, 160); // 160kg >= 110kg
+
+    const att = w.players.get(attId)!;
+    att.hasDynamite = true;
+    att.dashT = 0.3;
+    att.power = 1.0;
+    att.vx = 20;
+
+    w.step();
+    const vic = w.players.get(vicId)!;
+    expect(vic.alive).toBe(true);
+    expect(Math.round(vic.mass)).toBe(135); // 160 - 25 = 135
+  });
+
+  it('dynamite clamps victim mass to minimum 100kg if under 125kg', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('Bomber', 'pig');
+    const vicId = w.addPlayer('Victim115', 'pig');
+    place(w, attId, 0, 0, 50);
+    place(w, vicId, 2, 0, 115); // 115kg >= 110kg
+
+    const att = w.players.get(attId)!;
+    att.hasDynamite = true;
+    att.dashT = 0.3;
+    att.power = 1.0;
+    att.vx = 20;
+
+    w.step();
+    const vic = w.players.get(vicId)!;
+    expect(vic.alive).toBe(true);
+    expect(vic.mass).toBe(100); // 115 - 25 = 90 -> clamped to 100
+  });
+
   it('song slows down Napoleon and blocks ramming', () => {
     const w = emptyWorld();
     const kingId = w.addPlayer('KingPig', 'pig');

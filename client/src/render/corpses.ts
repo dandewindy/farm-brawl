@@ -105,21 +105,23 @@ export class CorpseRenderer {
       let done = false;
       c.fx -= dt;
 
-      if (c.cause === 'fence') {
-        // Electrocuted: violent jitter and visibility flicker, then charred & smoking
+      if (c.cause === 'fence' || c.cause === 'dynamite') {
+        // Electrocuted / Blown up: violent jitter and visibility flicker, then charred black & smoking
         if (a < 0.6) {
-          g.position.set(c.x + rand(-0.15, 0.15), rand(0, 0.2), c.z + rand(-0.15, 0.15));
+          g.position.set(c.x + rand(-0.18, 0.18), rand(0, 0.22), c.z + rand(-0.18, 0.18));
           g.visible = Math.floor(now / 45) % 2 === 0;
           if (c.fx <= 0) {
             c.fx = 0.05;
-            parts?.burst(c.x, c.sc * 1.2, c.z, 0xfff35c, 4, 6, 6, 0.3);
+            const sparkCol = c.cause === 'dynamite' ? 0xff7a1a : 0xfff35c;
+            parts?.burst(c.x, c.sc * 1.2, c.z, sparkCol, 5, 6, 6, 0.3);
+            if (c.cause === 'dynamite') parts?.burst(c.x, c.sc * 1.2, c.z, 0xffd23f, 3, 5, 5, 0.25);
           }
         } else {
           g.visible = true;
           if (!c.charred) this.charify(c);
           if (c.fx <= 0) {
             c.fx = 0.08;
-            parts?.puff(c.x + rand(-0.5, 0.5), c.sc * 1.4, c.z + rand(-0.5, 0.5), 0x444444, 1.2, 1);
+            parts?.puff(c.x + rand(-0.5, 0.5), c.sc * 1.4, c.z + rand(-0.5, 0.5), 0x333333, 1.3, 1);
           }
         }
         if (a > 1.0) {

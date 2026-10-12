@@ -1829,6 +1829,47 @@ body:not(.ipad):not(.is-pc) #teamBar:not([hidden]) ~ #hud #board,
 body.mobile-phone #teamBar:not([hidden]) ~ #hud #board {
   top: 38px !important;
 }
+
+/* Mobile only: Sub-notifications (toasts & banner) placed right below commandment board to keep center play area clear */
+body:not(.ipad):not(.is-pc) #toasts,
+body.mobile-phone #toasts {
+  top: 38px !important;
+  gap: 4px !important;
+  max-width: 90vw !important;
+}
+body:not(.ipad):not(.is-pc) #toasts div,
+body.mobile-phone #toasts div {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+body:not(.ipad):not(.is-pc).mode-team #toasts,
+body.mobile-phone.mode-team #toasts,
+body:not(.ipad):not(.is-pc) #teamBar:not([hidden]) ~ #hud #toasts,
+body.mobile-phone #teamBar:not([hidden]) ~ #hud #toasts {
+  top: 70px !important;
+}
+
+body:not(.ipad):not(.is-pc) #banner,
+body.mobile-phone #banner {
+  top: 38px !important;
+  padding: 4px 14px 6px !important;
+}
+body:not(.ipad):not(.is-pc) #banner .head,
+body.mobile-phone #banner .head {
+  font-size: 15px !important;
+}
+body:not(.ipad):not(.is-pc) #banner .sub,
+body.mobile-phone #banner .sub {
+  font-size: 11px !important;
+}
+body:not(.ipad):not(.is-pc).mode-team #banner,
+body.mobile-phone.mode-team #banner,
+body:not(.ipad):not(.is-pc) #teamBar:not([hidden]) ~ #hud #banner,
+body.mobile-phone #teamBar:not([hidden]) ~ #hud #banner {
+  top: 70px !important;
+}
 body:not(.ipad):not(.is-pc) #mapWrap,
 body.mobile-phone #mapWrap {
   top: 46px !important;
@@ -1872,6 +1913,14 @@ body.mobile-phone #teamBar {
     top: 44px !important;
     max-width: min(290px, calc(100vw - 20px)) !important;
     height: 26px;
+  }
+  body:not(.ipad):not(.is-pc) #toasts,
+  body.mobile-phone #toasts {
+    top: 76px !important;
+  }
+  body:not(.ipad):not(.is-pc) #banner,
+  body.mobile-phone #banner {
+    top: 76px !important;
   }
   body:not(.ipad):not(.is-pc) #mapWrap,
   body.mobile-phone #mapWrap {

@@ -1047,20 +1047,22 @@ export class World {
     }
 
     // Weapon: Dynamite explosion
+    const isDynamite = att.hasDynamite;
+    let boomX = 0, boomZ = 0;
     if (att.hasDynamite) {
       att.hasDynamite = false;
-      k = Math.max(k * 1.4, 25);
-      const boomX = r2((att.x + vic.x) / 2);
-      const boomZ = r2((att.z + vic.z) / 2);
+      k = Math.max(k * 2.5, 55);
+      boomX = r2((att.x + vic.x) / 2);
+      boomZ = r2((att.z + vic.z) / 2);
       this.events.push({ k: 'boom', id: att.id, x: boomX, z: boomZ });
-      const BOOM_R = 6.5;
+      const BOOM_R = 9.0;
       for (const bystander of this.players.values()) {
         if (!bystander.alive || bystander.id === att.id) continue;
         const bdx = bystander.x - boomX;
         const bdz = bystander.z - boomZ;
         const bdist = Math.hypot(bdx, bdz);
         if (bdist < BOOM_R && bdist > 0.01) {
-          const bForce = clamp((1 - bdist / BOOM_R) * 28, 6, 26);
+          const bForce = clamp((1 - bdist / BOOM_R) * 38, 10, 34);
           bystander.vx += (bdx / bdist) * bForce;
           bystander.vz += (bdz / bdist) * bForce;
         }
@@ -1079,6 +1081,32 @@ export class World {
     att.dashHit.add(vic.id);
     if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
+
+    if (isDynamite) {
+      vic.lastHitBy = att.id;
+      vic.lastHitT = this.time;
+      if (vic.mass < 110) {
+        this.kill(vic, 'dynamite');
+        return;
+      }
+      const targetMass = Math.max(100, vic.mass - 25);
+      const loss = vic.mass - targetMass;
+      vic.mass = targetMass;
+      if (loss > 0.5) {
+        this.scatter(boomX, boomZ, loss, radiusOf(vic.mass) + 3.5, nx, nz);
+      }
+      const rv = radiusOf(vic.mass);
+      this.events.push({
+        k: 'hit',
+        a: att.id,
+        v: vic.id,
+        x: r2(vic.x - nx * rv),
+        z: r2(vic.z - nz * rv),
+        s: Math.round(k),
+        loss: Math.round(loss * 10) / 10,
+      });
+      return;
+    }
 
     let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
     // Pitchfork strips 3x weight off Napoleon

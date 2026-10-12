@@ -939,13 +939,15 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'boom': {
-      foodParts.burst(ev.x, 1, ev.z, 0xff7a1a, 30, 12, 9, 0.8);
-      foodParts.burst(ev.x, 1, ev.z, 0x333333, 16, 6, 6, 1.1);
+      foodParts.burst(ev.x, 1.2, ev.z, 0xff3b14, 45, 16, 12, 1.0);
+      foodParts.burst(ev.x, 1.5, ev.z, 0xffd23f, 35, 14, 10, 0.8);
+      foodParts.burst(ev.x, 1.0, ev.z, 0x222222, 28, 8, 8, 1.4);
+      foodParts.sonicWave(ev.x, 0.8, ev.z, 3.5);
       sfxBoom();
       const me = gameState.ents.get(myId);
       const distToBoom = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
-      if (distToBoom < 25) {
-        shake = Math.max(shake, 1.2 * (1 - distToBoom / 25));
+      if (distToBoom < 35) {
+        shake = Math.max(shake, 1.8 * (1 - distToBoom / 35));
       }
       break;
     }
