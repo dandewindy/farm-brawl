@@ -101,6 +101,16 @@ export class GameRoom extends DurableObject {
     ws.addEventListener('message', (event) => {
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
+        // Instant microsecond pong response bypassing full JSON parsing
+        if (raw.charCodeAt(7) === 112 && raw.startsWith('{"t":"ping"')) {
+          const cIdx = raw.indexOf('"c":');
+          if (cIdx !== -1) {
+            const endIdx = raw.indexOf('}', cIdx);
+            const cVal = raw.slice(cIdx + 4, endIdx !== -1 ? endIdx : undefined).trim();
+            ws.send(`{"t":"pong","c":${cVal},"s":${Date.now()},"colo":"${edgeColo}"}`);
+            return;
+          }
+        }
         const msg = JSON.parse(raw) as ClientMsg;
         this.onMessage(ws, msg, edgeColo, cid);
       } catch (err) {

@@ -93,42 +93,47 @@ export class WsClient implements Transport {
       if (this.ws !== socket) return;
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
-        const msg = JSON.parse(raw) as ServerMsg;
-        if (msg.t === 'pong') {
-          if (msg.colo) this.colo = msg.colo;
-          if (typeof document !== 'undefined' && document.hidden) return;
-          const s = performance.now() - msg.c;
-          if (s >= 0 && s < 2000) {
-            this.rttWin.push(s);
-            if (this.rttWin.length > 5) this.rttWin.shift();
-            const sorted = [...this.rttWin].sort((a, b) => a - b);
-            this.rttMin = sorted[0];
-            this.rtt = sorted[Math.floor(sorted.length / 2)];
-
-            // Auto background hot migration check:
-            // If connected to non-fast node (e.g. MAD, CDG) or ping > 180ms for 3 consecutive pings,
-            // automatically trigger background hot migration to silently reconnect to SIN!
-            if (this.inGame && (!isFastColo(this.colo) || this.rttMin > 180)) {
-              this.badPingStreak++;
-              if (this.badPingStreak >= 3) {
-                this.triggerHotMigration();
-              }
-            } else {
-              this.badPingStreak = 0;
-            }
-          }
-        } else {
-          if (msg.t === 'joined') {
+        // Fast-path: instant pong extraction before heavy game state JSON decoding
+        if (raw.charCodeAt(7) === 112 && raw.startsWith('{"t":"pong"')) {
+          const msg = JSON.parse(raw) as ServerMsg;
+          if (msg.t === 'pong') {
             if (msg.colo) this.colo = msg.colo;
-            if (msg.token) {
-              this.sessionToken = msg.token;
-              if (this.lastJoinMsg) {
-                this.lastJoinMsg.token = msg.token;
+            if (typeof document !== 'undefined' && document.hidden) return;
+            const s = performance.now() - msg.c;
+            if (s >= 0 && s < 2000) {
+              this.rttWin.push(s);
+              if (this.rttWin.length > 8) this.rttWin.shift();
+              const sorted = [...this.rttWin].sort((a, b) => a - b);
+              this.rttMin = sorted[0];
+              this.rtt = sorted[Math.floor(sorted.length / 2)];
+
+              // Auto background hot migration check:
+              // If connected to non-fast node (e.g. MAD, CDG) or ping > 150ms for 3 consecutive pings,
+              // automatically trigger background hot migration to silently reconnect to SIN/HKG!
+              if (this.inGame && (!isFastColo(this.colo) || this.rttMin > 150)) {
+                this.badPingStreak++;
+                if (this.badPingStreak >= 3) {
+                  this.triggerHotMigration();
+                }
+              } else {
+                this.badPingStreak = 0;
               }
             }
           }
-          this.onMsg(msg);
+          return;
         }
+
+        const msg = JSON.parse(raw) as ServerMsg;
+        if (msg.t === 'joined') {
+          if (msg.colo) this.colo = msg.colo;
+          if (msg.token) {
+            this.sessionToken = msg.token;
+            if (this.lastJoinMsg) {
+              this.lastJoinMsg.token = msg.token;
+            }
+          }
+        }
+        this.onMsg(msg);
       } catch (err) {
         console.error('Failed to parse server message:', err);
       }
@@ -260,7 +265,7 @@ export class WsClient implements Transport {
         const now = Math.round(performance.now());
         this.send({ t: 'ping', c: now });
       }
-    }, 1000);
+    }, 500);
   }
 
   private stopPing(): void {
