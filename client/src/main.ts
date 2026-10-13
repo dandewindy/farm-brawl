@@ -87,6 +87,7 @@ input.onReleaseRam = (held: number) => {
 
 const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
+  firstSpawn = true;
   if (mode === 'friend') {
     const code = (roomCode || 'BRAWL').toUpperCase();
     const privRoom = `priv-${code}`;
@@ -697,7 +698,9 @@ const gameState = new GameState({
     if (!isReconnecting) {
       world.buildMap(map);
       corpses.setMap(map);
-      animals.clear();
+      if (!gameState.alive) {
+        animals.clear();
+      }
       tools.clear();
     }
   },
@@ -1337,7 +1340,18 @@ function animate(now: number): void {
   // Update 3D animal visual poses
   animals.myId = gameState.myId;
   for (const ent of gameState.ents.values()) {
-    const meta = gameState.metas.get(ent.id);
+    let meta = gameState.metas.get(ent.id);
+    if (!meta && ent.id === gameState.myId) {
+      meta = {
+        id: gameState.myId,
+        name: hud.selectedName || 'Brawler',
+        species: hud.selectedSpecies || 'chicken',
+        skin: hud.selectedSkin || 0,
+        bot: false,
+        team: hud.selectedTeam,
+      };
+      gameState.metas.set(gameState.myId, meta);
+    }
     if (meta) {
       const isMe = ent.id === gameState.myId && predictor.on;
       const px = isMe ? predictor.x : ent.x;
@@ -1403,10 +1417,13 @@ function animate(now: number): void {
     } else if (me) {
       targetX = predictor.on ? predictor.x : me.x;
       targetZ = predictor.on ? predictor.z : me.z;
+    } else if (gameState.alive && predictor.on) {
+      targetX = predictor.x;
+      targetZ = predictor.z;
     } else {
       // Hold camera position while awaiting spawn instead of jumping to podium (0, 0)
-      targetX = world.camTarget.x;
-      targetZ = world.camTarget.z;
+      targetX = world.camTarget.x !== 0 ? world.camTarget.x : 0;
+      targetZ = world.camTarget.z !== 0 ? world.camTarget.z : 0;
     }
     targetMass = me ? me.mass : CFG.START_MASS;
   }

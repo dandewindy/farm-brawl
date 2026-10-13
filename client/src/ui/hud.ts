@@ -1458,22 +1458,22 @@ export class HudManager {
       }
     }
     if (this.pingVal) {
-      this.pingVal.textContent = ping > 0 ? String(ping) : (ping === 0 ? '<1' : '--');
+      this.pingVal.textContent = ping > 0 ? String(ping) : '--';
       if (this.pingDot) {
-        this.pingDot.className = `perf-dot ${ping <= 70 ? 'good' : ping <= 140 ? 'warn' : 'bad'}`;
+        this.pingDot.className = `perf-dot ${ping > 0 ? (ping <= 70 ? 'good' : ping <= 140 ? 'warn' : 'bad') : 'good'}`;
       }
     }
     if (this.coloVal && colo) {
       this.coloVal.textContent = colo;
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
-      const isHkg = colo === 'HKG';
-      this.coloVal.className = `perf-colo ${isSin ? 'good' : isHkg ? 'good' : 'bad'}`;
+      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|TPE|KUL|MNL|NRT|KIX|ICN)$/i.test(colo);
+      this.coloVal.className = `perf-colo ${isSin || isFast ? 'good' : 'warn'}`;
       this.coloVal.title = isSin
-        ? 'Trạm Singapore (SIN) tối ưu - Ping cực thấp ~35ms'
-        : isHkg
-        ? 'Trạm Hồng Kông (HKG) nhanh - Ping ổn định ~75ms'
-        : `Trạm ${colo} (Độ trễ cao - Đang tự động đổi tuyến)`;
+        ? `Trạm Singapore (SIN) tối ưu - Ping cực thấp (~${ping > 0 ? ping : 35}ms)`
+        : isFast
+        ? `Trạm ${colo} (Châu Á) - Tốc độ cao (~${ping > 0 ? ping : 50}ms)`
+        : `Trạm ${colo} - Đang định tuyến tới máy chủ Singapore`;
     }
   }
 

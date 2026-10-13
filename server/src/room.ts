@@ -102,7 +102,7 @@ export class GameRoom extends DurableObject {
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
         // Instant microsecond pong response bypassing full JSON parsing
-        if (raw.charCodeAt(7) === 112 && raw.startsWith('{"t":"ping"')) {
+        if (raw.startsWith('{"t":"ping"')) {
           const cIdx = raw.indexOf('"c":');
           if (cIdx !== -1) {
             const endIdx = raw.indexOf('}', cIdx);
@@ -235,7 +235,21 @@ export class GameRoom extends DurableObject {
             if (msg.skin !== undefined) existingPlayer.skin = msg.skin % SKIN_COUNT;
             if (msg.team !== undefined) existingPlayer.team = msg.team;
           }
+        } else {
+          playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
+          this.sockets.set(ws, playerId);
+          this.playerTokens.set(playerId, sessionToken);
         }
+      }
+
+      // 100% guarantee that player exists and is alive upon join
+      const currentP = this.world.players.get(playerId);
+      if (!currentP) {
+        playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
+        this.sockets.set(ws, playerId);
+        this.playerTokens.set(playerId, sessionToken);
+      } else if (!currentP.alive) {
+        this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
       }
 
       if (cid && playerId) {
@@ -245,6 +259,10 @@ export class GameRoom extends DurableObject {
 
       // Send initial world configuration & map
       const initMsg: ServerMsg = this.world.init();
+      const confirmedP = this.world.players.get(playerId);
+      if (confirmedP && !initMsg.players.some((p) => p.id === playerId)) {
+        initMsg.players.push(this.world.meta(confirmedP));
+      }
       ws.send(JSON.stringify(initMsg));
 
       // Send joined confirmation with session token and edge colo

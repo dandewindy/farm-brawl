@@ -3,7 +3,7 @@ import type { Handler, Transport } from './transport';
 
 export function isFastColo(colo?: string): boolean {
   if (!colo) return false;
-  return colo === 'SIN' || colo === 'HKG' || colo === 'HAN' || colo === 'SGN' || colo === 'BKK';
+  return /^(SIN|HKG|HAN|SGN|DAD|BKK|TPE|KUL|MNL|NRT|KIX|ICN)$/i.test(colo);
 }
 
 export class WsClient implements Transport {
@@ -93,8 +93,8 @@ export class WsClient implements Transport {
       if (this.ws !== socket) return;
       try {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
-        // Fast-path: instant pong extraction before heavy game state JSON decoding
-        if (raw.charCodeAt(7) === 112 && raw.startsWith('{"t":"pong"')) {
+        // Fast-path: instant pong extraction
+        if (raw.startsWith('{"t":"pong"')) {
           const msg = JSON.parse(raw) as ServerMsg;
           if (msg.t === 'pong') {
             if (msg.colo) this.colo = msg.colo;
@@ -107,16 +107,16 @@ export class WsClient implements Transport {
               this.rttMin = sorted[0];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
-              // Auto background hot migration check:
-              // If connected to non-fast node (e.g. MAD, CDG) or ping > 150ms for 3 consecutive pings,
-              // automatically trigger background hot migration to silently reconnect to SIN/HKG!
-              if (this.inGame && (!isFastColo(this.colo) || this.rttMin > 150)) {
-                this.badPingStreak++;
-                if (this.badPingStreak >= 3) {
-                  this.triggerHotMigration();
-                }
-              } else {
-                this.badPingStreak = 0;
+              // Silent Lobby Steer:
+              // Before entering active gameplay, if connected to a distant node (like CDG, MAD),
+              // quietly reconnect once in the background while player is picking character in lobby.
+              if (!this.inGame && !isFastColo(this.colo) && this.autoSteerAttempts < 2) {
+                this.autoSteerAttempts++;
+                setTimeout(() => {
+                  if (!this.inGame && !this.closed) {
+                    this.forceReconnect();
+                  }
+                }, 400);
               }
             }
           }
