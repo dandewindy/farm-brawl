@@ -1418,8 +1418,9 @@ function animate(now: number): void {
   foodParts.updateParticles(dt);
   animals.updateShockwaves(dt);
 
-  // Update animated world hazards (water ripples, pulsing coals, flames)
-  world.updateHazards(now);
+  // Update animated world hazards (water ripples, pulsing coals, flames, electric fence arcs)
+  const playerPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z } : undefined;
+  world.updateHazards(now, foodParts, playerPos);
 
     // Update podium capture tile glow
     const [capId, capProg, capContested] = gameState.pod;

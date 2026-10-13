@@ -4,6 +4,7 @@ import type { MapData } from '@shared/map';
 import { blobOutline, type Blob } from '@shared/math';
 import { t } from '../i18n';
 import { getArenaTheme, type ArenaTheme } from '../theme';
+import { sfxZap } from '../audio/sfx';
 
 function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, size: number) => void, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -654,6 +655,20 @@ export class WorldRenderer {
   private shieldRingMat: THREE.MeshBasicMaterial | null = null;
   private shieldTex: THREE.CanvasTexture | null = null;
   private readonly fenceRails: THREE.Mesh[] = [];
+  private readonly treeGroup = new THREE.Group();
+  private readonly treeCoords: { x: number; z: number; s: number }[] = [];
+  private readonly electricGroup = new THREE.Group();
+  private readonly electricArcs: {
+    line: THREE.Line;
+    glowLine: THREE.Line;
+    coreSphere: THREE.Mesh;
+    active: boolean;
+    startTime: number;
+    duration: number;
+    angle: number;
+    soundPlayed: boolean;
+  }[] = [];
+  private nextZapTime = 0;
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
   private sun: THREE.DirectionalLight | null = null;
@@ -731,7 +746,8 @@ export class WorldRenderer {
     this.buildWindmill();
     this.buildBarn();
     this.buildFarmhouse();
-    this.buildTrees();
+    this.scene.add(this.treeGroup);
+    this.scene.add(this.electricGroup);
     this.scene.add(this.hazardGroup);
 
     this.tillTruck = buildTractor();
@@ -816,6 +832,7 @@ export class WorldRenderer {
       if (this.warnMat) this.warnMat.color.setHex(0xc9b56a);
     }
     this.updateBarnSign();
+    this.buildTrees(theme);
   }
 
   private buildFence(): void {
@@ -849,6 +866,57 @@ export class WorldRenderer {
       rail.position.y = y;
       this.scene.add(rail);
       this.fenceRails.push(rail);
+    }
+    this.buildElectricArcs();
+  }
+
+  private buildElectricArcs(): void {
+    const arcCount = 6;
+    for (let i = 0; i < arcCount; i++) {
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(30);
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0x00f5ff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+      });
+      const glowMat = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const line = new THREE.Line(geo, lineMat);
+      line.visible = false;
+
+      const glowGeo = new THREE.BufferGeometry();
+      glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30), 3));
+      const glowLine = new THREE.Line(glowGeo, glowMat);
+      glowLine.visible = false;
+
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x80ffff,
+        transparent: true,
+        opacity: 0.9,
+      });
+      const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), coreMat);
+      coreSphere.visible = false;
+
+      this.electricGroup.add(line, glowLine, coreSphere);
+      this.electricArcs.push({
+        line,
+        glowLine,
+        coreSphere,
+        active: false,
+        startTime: 0,
+        duration: 0,
+        angle: 0,
+        soundPlayed: false,
+      });
     }
   }
   private buildPodium(): void {
@@ -1112,35 +1180,118 @@ export class WorldRenderer {
     this.scene.add(house);
   }
 
-  private buildTrees(): void {
+  private buildTrees(theme: ArenaTheme = getArenaTheme()): void {
+    this.treeGroup.clear();
     const R = CFG.R;
     const nTree = 140;
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, flatShading: true });
-    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.85, flatShading: true });
 
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.4, 0.6, 3, 5), trunkMat, nTree);
-    const leaves = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 6.5, 6), leavesMat, nTree);
-    trunks.castShadow = true;
-    leaves.castShadow = true;
+    // Fixed coordinates generation so trees stay in consistent spots across theme changes
+    if (this.treeCoords.length === 0) {
+      const rand = (a: number, b: number) => a + Math.random() * (b - a);
+      for (let i = 0; i < nTree; i++) {
+        const a = rand(0, Math.PI * 2);
+        const d = rand(R + 8, R + 80);
+        let x = Math.cos(a) * d;
+        const z = Math.sin(a) * d;
+        if (z < -(R + 6) && z > -(R + 40) && x > -36 && x < 36) x += 90;
+        const s = rand(0.8, 1.5);
+        this.treeCoords.push({ x, z, s });
+      }
+    }
 
-    const rand = (a: number, b: number) => a + Math.random() * (b - a);
     const m4 = new THREE.Matrix4();
 
-    for (let i = 0; i < nTree; i++) {
-      const a = rand(0, Math.PI * 2);
-      const d = rand(R + 8, R + 80);
-      let x = Math.cos(a) * d;
-      const z = Math.sin(a) * d;
-      if (z < -(R + 6) && z > -(R + 40) && x > -36 && x < 36) x += 90;
-      const s = rand(0.8, 1.5);
-      m4.makeScale(s, s, s);
-      m4.setPosition(x, 1.5 * s, z);
-      trunks.setMatrixAt(i, m4);
-      m4.makeScale(s, s, s);
-      m4.setPosition(x, 5.5 * s, z);
-      leaves.setMatrixAt(i, m4);
+    if (theme === 'women_day') {
+      // 20/10 Vietnamese Women's Day: Romantic flowering reddish-pink shrub bushes with scattered blossoms!
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.85, flatShading: true });
+      // Main rich reddish-pink dome (hồng đỏ)
+      const bushMat1 = new THREE.MeshStandardMaterial({ color: 0xeb407a, roughness: 0.8, flatShading: true });
+      // Upper blush pink dome (hồng phấn)
+      const bushMat2 = new THREE.MeshStandardMaterial({ color: 0xf48fb1, roughness: 0.8, flatShading: true });
+      // Scattered white & soft pastel baby pink flower blossoms
+      const flowerWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, flatShading: true });
+      const flowerPinkMat = new THREE.MeshStandardMaterial({ color: 0xff80ab, roughness: 0.6, flatShading: true });
+
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.45, 1.8, 5), trunkMat, nTree);
+      const bushes1 = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.3, 1), bushMat1, nTree);
+      const bushes2 = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1.6, 1), bushMat2, nTree);
+      const flowers1 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 6, 5), flowerWhiteMat, nTree * 3);
+      const flowers2 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.24, 6, 5), flowerPinkMat, nTree * 3);
+
+      trunks.castShadow = true;
+      bushes1.castShadow = true;
+      bushes2.castShadow = true;
+      flowers1.castShadow = true;
+      flowers2.castShadow = true;
+
+      let fIdx1 = 0;
+      let fIdx2 = 0;
+
+      for (let i = 0; i < nTree; i++) {
+        const { x, z, s } = this.treeCoords[i];
+
+        // Trunk
+        m4.makeScale(s, s, s);
+        m4.setPosition(x, 0.9 * s, z);
+        trunks.setMatrixAt(i, m4);
+
+        // Lower broad reddish-pink dome
+        m4.makeScale(s * 1.15, s * 0.9, s * 1.15);
+        m4.setPosition(x, 2.3 * s, z);
+        bushes1.setMatrixAt(i, m4);
+
+        // Upper blush pink dome
+        m4.makeScale(s * 0.95, s * 0.85, s * 0.95);
+        m4.setPosition(x, 3.6 * s, z);
+        bushes2.setMatrixAt(i, m4);
+
+        // Scattered white flowers dotted on the bush surface
+        const whiteOffsets: [number, number, number][] = [
+          [1.5 * Math.cos(0.5), 2.5, 1.5 * Math.sin(0.5)],
+          [1.4 * Math.cos(2.4), 3.2, 1.4 * Math.sin(2.4)],
+          [1.3 * Math.cos(4.6), 2.3, 1.3 * Math.sin(4.6)],
+        ];
+        for (const [ox, oy, oz] of whiteOffsets) {
+          m4.makeScale(s, s, s);
+          m4.setPosition(x + ox * s, oy * s, z + oz * s);
+          flowers1.setMatrixAt(fIdx1++, m4);
+        }
+
+        // Scattered baby pink flowers
+        const pinkOffsets: [number, number, number][] = [
+          [1.4 * Math.cos(1.4), 3.4, 1.4 * Math.sin(1.4)],
+          [1.5 * Math.cos(3.5), 2.7, 1.5 * Math.sin(3.5)],
+          [1.3 * Math.cos(5.5), 3.1, 1.3 * Math.sin(5.5)],
+        ];
+        for (const [ox, oy, oz] of pinkOffsets) {
+          m4.makeScale(s, s, s);
+          m4.setPosition(x + ox * s, oy * s, z + oz * s);
+          flowers2.setMatrixAt(fIdx2++, m4);
+        }
+      }
+
+      this.treeGroup.add(trunks, bushes1, bushes2, flowers1, flowers2);
+    } else {
+      // Classic Farm Theme: traditional pines
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, flatShading: true });
+      const leavesMat = new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.85, flatShading: true });
+
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.4, 0.6, 3, 5), trunkMat, nTree);
+      const leaves = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 6.5, 6), leavesMat, nTree);
+      trunks.castShadow = true;
+      leaves.castShadow = true;
+
+      for (let i = 0; i < nTree; i++) {
+        const { x, z, s } = this.treeCoords[i];
+        m4.makeScale(s, s, s);
+        m4.setPosition(x, 1.5 * s, z);
+        trunks.setMatrixAt(i, m4);
+        m4.makeScale(s, s, s);
+        m4.setPosition(x, 5.5 * s, z);
+        leaves.setMatrixAt(i, m4);
+      }
+      this.treeGroup.add(trunks, leaves);
     }
-    this.scene.add(trunks, leaves);
   }
 
   buildMap(map: MapData): void {
@@ -1314,7 +1465,11 @@ export class WorldRenderer {
     }
   }
 
-  updateHazards(now: number): void {
+  updateHazards(
+    now: number,
+    parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void },
+    playerPos?: { x: number; z: number }
+  ): void {
     if (this.tex) {
       this.tex.waterMat.map!.offset.set(now * 0.000012, now * 0.000008);
       this.tex.rippleMat.map!.offset.set(-now * 0.00003, now * 0.00002);
@@ -1323,6 +1478,113 @@ export class WorldRenderer {
     for (const f of this.flames) {
       f.mesh.scale.y = 0.8 + 0.45 * Math.sin(now / 90 + f.idx * 1.7);
       f.mesh.scale.x = f.mesh.scale.z = 0.9 + 0.15 * Math.sin(now / 70 + f.idx);
+    }
+    this.updateElectricFence(now, parts, playerPos);
+  }
+
+  private updateElectricFence(
+    now: number,
+    parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void },
+    playerPos?: { x: number; z: number }
+  ): void {
+    const R = CFG.R;
+
+    // Ambient electric hum pulse along the entire fence wire rails
+    const hum = 0.5 + 0.35 * Math.sin(now / 130) + 0.15 * Math.sin(now / 41);
+    let flashEmissive = false;
+
+    // Trigger electric arc discharges every 1.2 to 2.2 seconds
+    if (now >= this.nextZapTime) {
+      this.nextZapTime = now + 1200 + Math.random() * 1000;
+      const inactive = this.electricArcs.filter((a) => !a.active);
+      const spawnCount = Math.min(inactive.length, Math.random() < 0.45 ? 2 : 1);
+      for (let i = 0; i < spawnCount; i++) {
+        const arc = inactive[i];
+        arc.active = true;
+        arc.startTime = now;
+        arc.duration = 220 + Math.random() * 180; // 220 - 400ms duration
+        arc.soundPlayed = false;
+
+        // Biased towards player angle 45% of the time so player witnesses the fence danger
+        if (playerPos && Math.random() < 0.45) {
+          const playerAngle = Math.atan2(playerPos.z, playerPos.x);
+          arc.angle = playerAngle + (Math.random() - 0.5) * 0.9;
+        } else {
+          arc.angle = Math.random() * Math.PI * 2;
+        }
+      }
+    }
+
+    for (const arc of this.electricArcs) {
+      if (!arc.active) continue;
+      const age = now - arc.startTime;
+      if (age >= arc.duration) {
+        arc.active = false;
+        arc.line.visible = false;
+        arc.glowLine.visible = false;
+        arc.coreSphere.visible = false;
+        continue;
+      }
+
+      flashEmissive = true;
+      arc.line.visible = true;
+      arc.glowLine.visible = true;
+      arc.coreSphere.visible = true;
+
+      const a = arc.angle;
+      const segs = 9;
+      const pts: number[] = [];
+      const glowPts: number[] = [];
+
+      // Generate violently flickering zigzag lightning arc between bottom (0.8) and top (1.6) rails
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const curA = a + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.05 : 0);
+        const curR = R + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.28 : 0);
+        const curY = 0.8 + t * 0.8 + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.25 : 0);
+
+        pts.push(Math.cos(curA) * curR, curY, Math.sin(curA) * curR);
+        glowPts.push(Math.cos(curA) * (curR + (Math.random() - 0.5) * 0.04), curY, Math.sin(curA) * (curR + (Math.random() - 0.5) * 0.04));
+      }
+
+      arc.line.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      arc.glowLine.geometry.setAttribute('position', new THREE.Float32BufferAttribute(glowPts, 3));
+
+      // Glowing core spark sphere at center of discharge
+      arc.coreSphere.position.set(Math.cos(a) * R, 1.2 + (Math.random() - 0.5) * 0.2, Math.sin(a) * R);
+      const coreScale = 0.8 + Math.random() * 0.6;
+      arc.coreSphere.scale.setScalar(coreScale);
+
+      // Sound effect if within hearing range of the player
+      if (!arc.soundPlayed && playerPos) {
+        const arcX = Math.cos(a) * R;
+        const arcZ = Math.sin(a) * R;
+        const dist = Math.hypot(playerPos.x - arcX, playerPos.z - arcZ);
+        if (dist < 40) {
+          const vol = Math.max(0.04, 0.18 * (1 - dist / 40));
+          sfxZap(vol);
+        }
+        arc.soundPlayed = true;
+      }
+
+      // Spark particles puffing outwards
+      if (parts && Math.random() < 0.65) {
+        const spkX = Math.cos(a) * R + (Math.random() - 0.5) * 0.4;
+        const spkY = 0.8 + Math.random() * 0.8;
+        const spkZ = Math.sin(a) * R + (Math.random() - 0.5) * 0.4;
+        const color = Math.random() < 0.5 ? 0x00f5ff : 0xfffa65;
+        parts.puff(spkX, spkY, spkZ, color, 0.5, 0.35, 1.2);
+      }
+    }
+
+    // Apply emissive intensity to rails (flashes up to 2.2 during zaps)
+    const targetEmissive = flashEmissive ? 2.2 : hum;
+    for (const rail of this.fenceRails) {
+      const mat = rail.material as THREE.MeshStandardMaterial;
+      if (mat) {
+        mat.emissiveIntensity = targetEmissive;
+        mat.emissive.setHex(flashEmissive ? 0x00f5ff : 0xaa9900);
+      }
     }
   }
 
