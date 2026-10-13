@@ -21,6 +21,7 @@ export class WsClient implements Transport {
   private autoSteerAttempts = 0;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
+  private badPingStreak = 0;
 
   // In-Game Zero-Downtime Hot Migration
   private migrationWs: WebSocket | null = null;
@@ -103,6 +104,18 @@ export class WsClient implements Transport {
             const sorted = [...this.rttWin].sort((a, b) => a - b);
             this.rttMin = sorted[0];
             this.rtt = sorted[Math.floor(sorted.length / 2)];
+
+            // Auto background hot migration check:
+            // If connected to non-fast node (e.g. MAD, CDG) or ping > 180ms for 3 consecutive pings,
+            // automatically trigger background hot migration to silently reconnect to SIN!
+            if (this.inGame && (!isFastColo(this.colo) || this.rttMin > 180)) {
+              this.badPingStreak++;
+              if (this.badPingStreak >= 3) {
+                this.triggerHotMigration();
+              }
+            } else {
+              this.badPingStreak = 0;
+            }
           }
         } else {
           if (msg.t === 'joined') {
@@ -142,14 +155,15 @@ export class WsClient implements Transport {
   public triggerHotMigration(): void {
     if (!this.inGame || isFastColo(this.colo) || this.closed || !this.sessionToken) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 10 seconds
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 10000) return;
+    // Throttle attempts: probe at most once every 6 seconds
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 6000) return;
     this.lastMigrationProbeTime = now;
-    console.log(`[WS] In-game high latency node detected (${this.colo}). Starting zero-downtime hot migration probe...`);
+    console.log(`[WS] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting zero-downtime hot migration probe...`);
 
+    const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}`;
     let probeSocket: WebSocket;
     try {
-      probeSocket = new WebSocket(this.url);
+      probeSocket = new WebSocket(probeUrl);
       this.migrationWs = probeSocket;
     } catch (e) {
       console.warn('[WS] Failed to create hot migration socket:', e);

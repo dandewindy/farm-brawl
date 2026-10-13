@@ -607,11 +607,15 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
     g.add(part(new THREE.SphereGeometry(0.02, 6, 4), 0x241e1c, 1.77, 1.28, z));
   }
 
-  // Tusks (2 white/ivory or gold curved tusks flanking trunk, pointing forward & upward)
-  for (const z of [-0.22, 0.22]) {
-    const tusk = part(new THREE.ConeGeometry(0.055, 0.44, 10), s.tusk ?? 0xf7f5f0, 1.48, 1.42, z, { roughness: 0.28, metalness: 0.12 });
-    tusk.rotation.z = -1.25;
-    tusk.rotation.y = z > 0 ? 0.16 : -0.16;
+  // Tusks: firmly rooted in lower mouth/cheeks flanking the trunk base, curving forward & upward
+  for (const z of [-0.15, 0.15]) {
+    // Fleshy cheek socket anchoring the tusk root
+    blob(g, s.body, 0.08, [1, 1, 1], 1.20, 1.34, z);
+
+    // Tusk cone starting at socket, pointing forward & upward
+    const tusk = part(new THREE.ConeGeometry(0.052, 0.42, 10), s.tusk ?? 0xf7f5f0, 1.40, 1.40, z > 0 ? 0.17 : -0.17, { roughness: 0.28, metalness: 0.12 });
+    tusk.rotation.z = -1.28;
+    tusk.rotation.y = z > 0 ? 0.12 : -0.12;
     g.add(tusk);
   }
 
@@ -642,7 +646,8 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
 
   g.add(tailGroup);
 
-  addEyes(g, 1.22, 1.72, 0.24, 0.065);
+  // Prominent cute eyes situated on the side temples of the head
+  addEyes(g, 1.26, 1.72, 0.35, 0.08);
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
@@ -1161,8 +1166,9 @@ export class AnimalRenderer {
 
     setRainbow(vis, isSuper, now);
 
-    // Continuous walking / dashing leg phase accumulation
-    vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12));
+    // Continuous walking / dashing leg phase accumulation (elephant has slower, heavier, majestic strides)
+    const legFreqMult = vis.species === 'elephant' ? 0.5 : 1.0;
+    vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12)) * legFreqMult;
     const r = radiusOf(mass);
     const sc = r * 1.35 * (isKing ? 1.2 : 1) * (isSuper ? 1.15 : 1);
 
@@ -1416,7 +1422,7 @@ export class AnimalRenderer {
     }
 
     if (vis.label) {
-      const isHiddenInWater = isWater && vis.species !== 'duck' && sinkProgress >= 0.85;
+      const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'dog' && sinkProgress >= 0.85;
       vis.label.visible = !isHiddenInWater;
       if (!isHiddenInWater) {
         const lh = 1.3 + r * 0.25;
