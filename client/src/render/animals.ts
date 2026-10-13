@@ -574,27 +574,44 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
   // Forehead brow / dome
   blob(g, s.body, 0.28, [0.85, 0.9, 1.15], 0.9, 1.95, 0);
 
-  // Trunk curling forward and up:
-  // Segment 1 (sloping down)
-  const t1 = part(new THREE.CylinderGeometry(0.18, 0.14, 0.38, 10), s.body, 1.32, 1.48, 0);
-  t1.rotation.z = -0.7;
-  g.add(t1);
-  // Segment 2 (forward)
-  const t2 = part(new THREE.CylinderGeometry(0.14, 0.11, 0.38, 10), s.body, 1.54, 1.25, 0);
-  t2.rotation.z = -1.25;
-  g.add(t2);
-  // Segment 3 (curling upwards)
-  const t3 = part(new THREE.CylinderGeometry(0.11, 0.08, 0.32, 10), s.body, 1.72, 1.15, 0);
-  t3.rotation.z = -2.1;
-  g.add(t3);
-  // Trunk tip
-  g.add(part(new THREE.SphereGeometry(0.085, 8, 6), s.body, 1.78, 1.28, 0));
+  // Trunk: continuous smooth tapering curve extending from face and curling up gracefully
+  const trunkNodes: [number, number, number][] = [
+    [1.24, 1.56, 0.18],  // Node 0: Base emerging from front face of head
+    [1.40, 1.36, 0.15],  // Node 1: Sloping down and forward
+    [1.52, 1.14, 0.125], // Node 2: Dropping towards chest level
+    [1.58, 0.92, 0.105], // Node 3: Lowest point, starting to curve forward
+    [1.70, 0.94, 0.09],  // Node 4: Curving forward and starting to lift
+    [1.82, 1.10, 0.078], // Node 5: Curling upwards
+    [1.80, 1.26, 0.068], // Node 6: Proud curled tip
+  ];
 
-  // Tusks (2 white/ivory or gold curved tusks)
+  // Spheres at all nodes to seal joints seamlessly
+  for (const [nx, ny, nr] of trunkNodes) {
+    g.add(part(new THREE.SphereGeometry(nr, 12, 10), s.body, nx, ny, 0));
+  }
+
+  // Tapered cylinder segments connecting consecutive nodes
+  for (let i = 0; i < trunkNodes.length - 1; i++) {
+    const [x0, y0, r0] = trunkNodes[i];
+    const [x1, y1, r1] = trunkNodes[i + 1];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    const segMesh = part(new THREE.CylinderGeometry(r1, r0, len, 12), s.body, (x0 + x1) / 2, (y0 + y1) / 2, 0);
+    segMesh.rotation.z = -Math.atan2(dx, dy);
+    g.add(segMesh);
+  }
+
+  // Nostrils at the curled tip
+  for (const z of [-0.026, 0.026]) {
+    g.add(part(new THREE.SphereGeometry(0.02, 6, 4), 0x241e1c, 1.77, 1.28, z));
+  }
+
+  // Tusks (2 white/ivory or gold curved tusks flanking trunk, pointing forward & upward)
   for (const z of [-0.22, 0.22]) {
-    const tusk = part(new THREE.ConeGeometry(0.06, 0.44, 8), s.tusk ?? 0xf7f5f0, 1.42, 1.35, z, { roughness: 0.3, metalness: 0.1 });
-    tusk.rotation.z = -1.85;
-    tusk.rotation.x = z > 0 ? 0.14 : -0.14;
+    const tusk = part(new THREE.ConeGeometry(0.055, 0.44, 10), s.tusk ?? 0xf7f5f0, 1.48, 1.42, z, { roughness: 0.28, metalness: 0.12 });
+    tusk.rotation.z = -1.25;
+    tusk.rotation.y = z > 0 ? 0.16 : -0.16;
     g.add(tusk);
   }
 
@@ -604,14 +621,28 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
     blob(g, s.innerEar ?? 0xdfb4b4, 0.28, [0.65, 1.05, 0.12], 0.80, 1.72, z > 0 ? z - 0.02 : z + 0.02, [0, z > 0 ? -0.25 : 0.25, -0.15]);
   }
 
-  // Tail
-  const tailStem = part(new THREE.CylinderGeometry(0.035, 0.025, 0.55, 6), s.body, -0.72, 1.25, 0);
-  tailStem.rotation.z = -0.25;
-  g.add(tailStem);
-  const tailTuft = part(new THREE.SphereGeometry(0.065, 8, 6), s.tuft ?? 0x2b2522, -0.84, 0.95, 0);
-  g.add(tailTuft);
+  // Elephant tail hanging from rear like cow tail - seamless connected group
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.70, 1.40, 0);
+  tailGroup.rotation.z = -0.25;
 
-  addEyes(g, 1.24, 1.75, 0.25, 0.07);
+  const stemLen = 0.50;
+  const tailStem = part(new THREE.CylinderGeometry(0.028, 0.022, stemLen, 8), s.body, 0, -stemLen / 2, 0);
+  tailGroup.add(tailStem);
+
+  const tuftLen = 0.24;
+  // Cone apex points up and nests inside the stem bottom tip
+  const tailTuft = part(new THREE.ConeGeometry(0.07, tuftLen, 8), s.tuft ?? 0x2b2522, 0, -stemLen - tuftLen * 0.4, 0);
+  tailGroup.add(tailTuft);
+
+  // Bushy end tuft to form a fluffy, lush tassel (identical style to cow tail)
+  const tuftEnd = part(new THREE.SphereGeometry(0.066, 8, 6), s.tuft ?? 0x2b2522, 0, -stemLen - tuftLen * 0.8, 0);
+  tuftEnd.scale.set(0.9, 1.25, 0.9);
+  tailGroup.add(tuftEnd);
+
+  g.add(tailGroup);
+
+  addEyes(g, 1.22, 1.72, 0.24, 0.065);
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
