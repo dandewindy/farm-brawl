@@ -8,8 +8,8 @@ export interface Env {
 }
 
 function getTargetLocationHint(_request: Request): string {
-  // Always lock all Durable Objects strictly to Asia-Pacific ('apac') for lowest latency in Vietnam (~30-40ms).
-  return 'apac';
+  // Always lock all Durable Objects strictly to Southeast Asia ('apac-se' - Singapore) for ~30-40ms latency in Vietnam.
+  return 'apac-se';
 }
 
 export default {
@@ -20,12 +20,12 @@ export default {
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const roomParam = url.searchParams.get('room') || 'pub-1';
       const hint = getTargetLocationHint(request);
-      // Route default rooms to fresh Asia-Pacific Durable Objects for ~30ms ping
+      // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-apac-v1';
+        targetRoomKey = 'pub-sin-sea2';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-apac-v1';
+        targetRoomKey = 'team-sin-sea2';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
@@ -55,9 +55,9 @@ export default {
       const hint = getTargetLocationHint(request);
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-apac-v1';
+        targetRoomKey = 'pub-sin-sea2';
       } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-apac-v1';
+        targetRoomKey = 'team-sin-sea2';
       }
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
