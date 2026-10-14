@@ -177,7 +177,6 @@ h1 .t1 { color: var(--paper); display: block; }
 .start-col-right {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   min-width: 0;
 }
 .sec-label {
@@ -189,15 +188,23 @@ h1 .t1 { color: var(--paper); display: block; }
   text-transform: uppercase;
   color: #ffd54f;
   text-align: left;
+  line-height: 16px;
+  height: 16px;
 }
 .play-btn-main {
   width: 100%;
-  padding: 12px 14px;
-  font-size: 19px;
+  height: 68px;
+  padding: 0 14px;
+  font-size: 20px;
+  font-weight: 800;
   letter-spacing: 0.05em;
   font-family: var(--f-display);
   border-radius: 12px;
-  margin-top: 10px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 /* Animal Carousel & Mystery Picker */
@@ -206,16 +213,18 @@ h1 .t1 { color: var(--paper); display: block; }
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  height: 58px;
   gap: 4px;
-  margin: 4px 0 10px;
+  margin: 0 0 8px;
+  box-sizing: border-box;
 }
 .sp-arrow-btn {
   width: 24px;
-  height: 66px;
+  height: 52px;
   background: transparent;
   border: none;
   color: var(--gold);
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -365,7 +374,7 @@ h1 .t1 { color: var(--paper); display: block; }
 
 /* 3D Animal & Skin Preview Showcase */
 #spPreviewWrap {
-  margin: 0;
+  margin: 28px 0 0 0;
   background: rgba(20, 16, 14, 0.65);
   border: 2px solid #3d3128;
   border-radius: 14px;
@@ -476,7 +485,8 @@ h1 .t1 { color: var(--paper); display: block; }
 .btn-red:hover { background: var(--red-hi); }
 .btn-red:active { transform: translateY(3px); box-shadow: 0 2px 0 #6e1a12; }
 .btn-ghost { width: 100%; margin-top: 10px; padding: 10px; font-weight: 700; color: var(--paper); background: transparent; border: 2px solid #4a3e36; border-radius: 12px; }
-#bestLine { min-height: 1.2em; margin: 10px 0 0; color: var(--gold); font-weight: 700; font-size: 14px; }
+#bestLine { margin: 6px 0 0; color: var(--gold); font-weight: 700; font-size: 14px; }
+#bestLine:empty { display: none; margin: 0; min-height: 0; }
 .how { margin: 12px 0 0; padding: 0; list-style: none; text-align: left; font-size: 13px; color: #cbbd9f; display: grid; gap: 4px; }
 .how li::before { content: '▸ '; color: var(--gold); }
 .mode-note { margin: 12px 0 0; font-size: 12px; color: #8f826c; }
@@ -2743,17 +2753,24 @@ body.mobile-phone #choiceCards .plank .d {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+  height: 58px;
   margin-bottom: 8px;
 }
 #modes button {
+  height: 58px;
   background: #2e2622;
   border: 2px solid #3a302a;
   border-radius: 10px;
-  padding: 8px 4px;
+  padding: 6px 4px;
   text-align: center;
   color: var(--paper);
   transition: border-color 0.12s, background 0.12s;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
 }
 #modes button.on {
   border-color: var(--gold);
@@ -2852,7 +2869,8 @@ body.mobile-phone #choiceCards .plank .d {
 /* Simple Gameplay Preview Box for FFA Mode */
 .ffa-preview-box {
   width: 100%;
-  margin: 4px 0 8px;
+  height: 68px;
+  margin: 0 0 8px;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid #3a302a;
@@ -2861,10 +2879,11 @@ body.mobile-phone #choiceCards .plank .d {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 .ffa-preview-img {
   width: 100%;
-  height: 85px;
+  height: 100%;
   object-fit: cover;
   object-position: center 35%;
   display: block;
@@ -3060,11 +3079,16 @@ body.mobile-phone #choiceCards .plank .d {
 
 /* Team Pick Styles */
 .team-pick-wrap {
-  margin: 10px 0 12px;
-  padding: 8px 12px;
+  height: 68px;
+  margin: 0 0 8px;
+  padding: 6px 12px;
   background: rgba(0, 0, 0, 0.25);
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .team-pick-label {
   display: block;

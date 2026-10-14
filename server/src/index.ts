@@ -23,7 +23,7 @@ export default {
       // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sin-sea2';
+        targetRoomKey = 'pub-sin-v10';
       } else if (roomParam === 'team-1') {
         targetRoomKey = 'team-sin-sea2';
       }
@@ -55,7 +55,7 @@ export default {
       const hint = getTargetLocationHint(request);
       let targetRoomKey = roomParam;
       if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sin-sea2';
+        targetRoomKey = 'pub-sin-v10';
       } else if (roomParam === 'team-1') {
         targetRoomKey = 'team-sin-sea2';
       }
