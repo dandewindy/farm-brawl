@@ -219,6 +219,12 @@ const vi = {
   barn_womenday_msg: 'Chúc chị em mgm ngày Phụ Nữ Việt Nam vui vẻ!',
   on: 'BẬT',
   off: 'TẮT',
+  disclaimerBtnTitle: 'Miễn trừ trách nhiệm / Disclaimer',
+  disclaimerTitle: 'TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM',
+  disclaimerP1: 'Trò chơi Farm Brawl được tạo ra nhằm mục đích giải trí và giao lưu trong quy mô nội bộ, hoàn toàn phi lợi nhuận và không nhằm mục đích kinh doanh.',
+  disclaimerP2: 'Trò chơi không có ý định phát hành hay phổ biến thương mại rộng rãi ra công chúng. Mọi tài nguyên âm thanh và hình ảnh được sử dụng phục vụ cho sự kiện nội bộ.',
+  disclaimerContactLbl: 'Mọi thắc mắc, đóng góp hoặc vấn đề bản quyền, xin vui lòng gửi về:',
+  disclaimerAgree: 'ĐỒNG Ý',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -441,6 +447,12 @@ const en: Record<keyof typeof vi, string> = {
   barn_womenday_msg: 'Happy Women\'s Day to all mgm ladies!',
   on: 'ON',
   off: 'OFF',
+  disclaimerBtnTitle: 'Disclaimer',
+  disclaimerTitle: 'DISCLAIMER',
+  disclaimerP1: 'Farm Brawl was created solely for internal entertainment and community bonding purposes, strictly non-profit and non-commercial.',
+  disclaimerP2: 'The game is not intended for broad public release or commercial distribution. All audiovisual assets are used exclusively for internal event activities.',
+  disclaimerContactLbl: 'For any inquiries, feedback, or copyright matters, please contact:',
+  disclaimerAgree: 'I AGREE',
 };
 
 export function formatTeamCount(count: number): string {

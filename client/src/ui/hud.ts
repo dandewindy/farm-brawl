@@ -169,6 +169,9 @@ export class HudManager {
   private readonly spNavNext: HTMLButtonElement | null;
   private readonly spRandomBtn: HTMLButtonElement | null;
   private readonly langToggle: HTMLButtonElement | null;
+  private readonly disclaimerBtn: HTMLButtonElement | null;
+  private readonly disclaimerModal: HTMLElement | null;
+  private readonly btnAgreeDisclaimer: HTMLButtonElement | null;
   private readonly nameEditBtn: HTMLButtonElement | null;
   private readonly ffaPreviewBox: HTMLElement | null;
   private readonly arenaPickerEl: HTMLElement | null;
@@ -292,6 +295,9 @@ export class HudManager {
     this.spNavNext = document.getElementById('spNavNext') as HTMLButtonElement | null;
     this.spRandomBtn = document.getElementById('spRandomBtn') as HTMLButtonElement | null;
     this.langToggle = document.getElementById('langToggle') as HTMLButtonElement | null;
+    this.disclaimerBtn = document.getElementById('disclaimerBtn') as HTMLButtonElement | null;
+    this.disclaimerModal = document.getElementById('disclaimerModal');
+    this.btnAgreeDisclaimer = document.getElementById('btnAgreeDisclaimer') as HTMLButtonElement | null;
     this.nameEditBtn = document.getElementById('nameEditBtn') as HTMLButtonElement | null;
     this.ffaPreviewBox = document.getElementById('ffaPreviewBox');
     this.arenaPickerEl = document.getElementById('arenaPicker');
@@ -594,10 +600,38 @@ export class HudManager {
         this.langToggle!.textContent = nextLang === 'vi' ? 'VI' : 'EN';
         this.langToggle!.title = nextLang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : 'Language: English';
         this.nameInput.placeholder = t('namePh');
+        if (this.disclaimerBtn) {
+          this.disclaimerBtn.title = t('disclaimerBtnTitle');
+        }
         updateAllButtons();
         this.updateTeamCounts(this.lastCount0, this.lastCount1);
         this.onChangeLanguage?.(nextLang);
         this.showToast(nextLang === 'vi' ? 'Đã chuyển sang Tiếng Việt' : 'Switched to English', 1000);
+      });
+    }
+
+    // Disclaimer modal
+    if (this.disclaimerBtn) {
+      this.disclaimerBtn.title = t('disclaimerBtnTitle');
+      this.disclaimerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showDisclaimer();
+      });
+    }
+
+    if (this.btnAgreeDisclaimer) {
+      this.btnAgreeDisclaimer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.hideDisclaimer();
+      });
+    }
+
+    if (this.disclaimerModal) {
+      this.disclaimerModal.addEventListener('pointerdown', (e) => {
+        const card = this.disclaimerModal?.querySelector('.center-modal-card');
+        if (card && !card.contains(e.target as Node)) {
+          this.hideDisclaimer();
+        }
       });
     }
 
@@ -1073,6 +1107,16 @@ export class HudManager {
     }
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.disclaimerModal && !this.disclaimerModal.hidden) {
+          this.hideDisclaimer();
+          return;
+        }
+        if (this.exitConfirmModal && !this.exitConfirmModal.hidden) {
+          this.exitConfirmModal.hidden = true;
+          return;
+        }
+      }
       if (this.choiceEl && !this.choiceEl.hidden && this.currentChoiceOptions.length) {
         if (e.key === '1' && this.currentChoiceOptions[0]) {
           this.pickChoice(this.currentChoiceOptions[0]);
@@ -1290,9 +1334,18 @@ export class HudManager {
     }
   }
 
+  showDisclaimer(): void {
+    if (this.disclaimerModal) this.disclaimerModal.hidden = false;
+  }
+
+  hideDisclaimer(): void {
+    if (this.disclaimerModal) this.disclaimerModal.hidden = true;
+  }
+
   showInGame(): void {
     this.startScreen.hidden = true;
     this.deathScreen.hidden = true;
+    if (this.disclaimerModal) this.disclaimerModal.hidden = true;
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
@@ -1318,6 +1371,7 @@ export class HudManager {
     }
     this.hudEl.hidden = true;
     this.deathScreen.hidden = true;
+    if (this.disclaimerModal) this.disclaimerModal.hidden = true;
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     const gameDrawer = document.getElementById('gameDrawerModal');
