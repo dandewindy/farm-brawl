@@ -22,6 +22,7 @@ export class WsClient implements Transport {
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
   private badPingStreak = 0;
+  private lastLobbyReconnectTime = 0;
 
   // In-Game Zero-Downtime Hot Migration
   private migrationWs: WebSocket | null = null;
@@ -107,16 +108,30 @@ export class WsClient implements Transport {
               this.rttMin = sorted[0];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
-              // Silent Lobby Steer:
-              // Before entering active gameplay, if connected to a distant node (like CDG, MAD),
-              // quietly reconnect once in the background while player is picking character in lobby.
-              if (!this.inGame && !isFastColo(this.colo) && this.autoSteerAttempts < 2) {
-                this.autoSteerAttempts++;
-                setTimeout(() => {
-                  if (!this.inGame && !this.closed) {
-                    this.forceReconnect();
-                  }
-                }, 400);
+              const isSlow = !isFastColo(this.colo) || s > 180;
+              if (isSlow) {
+                this.badPingStreak++;
+              } else {
+                this.badPingStreak = Math.max(0, this.badPingStreak - 1);
+              }
+
+              // 1. Silent Lobby Steer:
+              // While in lobby, if connected to a distant node (FRA, MAD, WAW...),
+              // quietly reconnect until a fast Asian node (SIN, HKG...) is acquired.
+              if (!this.inGame && !isFastColo(this.colo) && !this.closed) {
+                const now = performance.now();
+                if (now - this.lastLobbyReconnectTime > 2500) {
+                  this.lastLobbyReconnectTime = now;
+                  console.log(`[WS] Lobby on slow node (${this.colo}, ~${Math.round(this.rttMin)}ms). Auto-reconnecting to optimal edge...`);
+                  this.forceReconnect();
+                }
+              }
+
+              // 2. Active In-Game Hot Migration Watchdog:
+              // During live gameplay, if bad ping or non-APAC colo persists for 3+ pings (~1.5s),
+              // automatically trigger zero-downtime hot migration in the background!
+              if (this.inGame && this.badPingStreak >= 3 && !this.closed && this.sessionToken) {
+                this.triggerHotMigration();
               }
             }
           }
@@ -158,14 +173,15 @@ export class WsClient implements Transport {
   }
 
   public triggerHotMigration(): void {
-    if (!this.inGame || isFastColo(this.colo) || this.closed || !this.sessionToken) return;
+    if (!this.inGame || this.closed || !this.sessionToken) return;
+    if (isFastColo(this.colo) && this.rttMin <= 120) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 6 seconds
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 6000) return;
+    // Throttle attempts: probe at most once every 3.5 seconds
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 3500) return;
     this.lastMigrationProbeTime = now;
     console.log(`[WS] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting zero-downtime hot migration probe...`);
 
-    const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}`;
+    const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
     let probeSocket: WebSocket;
     try {
       probeSocket = new WebSocket(probeUrl);
@@ -192,8 +208,10 @@ export class WsClient implements Transport {
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'pong') {
           const probeColo = msg.colo;
-          console.log(`[WS] Hot migration probe response colo: ${probeColo}`);
-          if (isFastColo(probeColo)) {
+          const probeRtt = performance.now() - msg.c;
+          console.log(`[WS] Hot migration probe response colo: ${probeColo}, rtt: ${Math.round(probeRtt)}ms`);
+          const isBetter = isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65);
+          if (isBetter) {
             // Optimal edge node found! Hand over existing session token
             if (this.lastJoinMsg && this.sessionToken) {
               probeSocket.send(JSON.stringify({
@@ -205,7 +223,7 @@ export class WsClient implements Transport {
               this.migrationWs = null;
             }
           } else {
-            // Not optimal, quietly close probe
+            // Not optimal yet, quietly close probe
             probeSocket.close();
             this.migrationWs = null;
           }

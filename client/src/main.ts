@@ -1151,9 +1151,12 @@ function getClientId(): string {
       }
     }
   );
-  transport.onMigrationSuccess = (newColo) => {
-    hud.showToast(`🚀 Đã tự động chuyển mượt sang trạm ${newColo} (Ping thấp)!`);
-  };
+
+  if (transport) {
+    transport.onMigrationSuccess = (newColo) => {
+      hud.showToast(`⚡ Đã tự động chuyển sang trạm ${newColo} tối ưu!`);
+    };
+  }
 }
 
 const modeParam = params.get('mode');
