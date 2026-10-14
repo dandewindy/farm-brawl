@@ -1188,13 +1188,28 @@ export class WorldRenderer {
     }
     sg.textAlign = 'center';
     sg.textBaseline = 'middle';
+    sg.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    sg.shadowBlur = 6;
+    sg.shadowOffsetY = 2;
     const isWomenDay = getArenaTheme() === 'women_day';
-    sg.fillStyle = isWomenDay ? '#ff4081' : '#a5281b';
-    sg.font = '900 52px "Baloo 2", sans-serif';
-    sg.fillText(isWomenDay ? '🌸 ' + t('boardEyebrow') + ' 🌸' : t('boardEyebrow'), this.barnSignCanvas.width / 2, 70);
-    sg.fillStyle = isWomenDay ? '#ffe4ec' : '#f2ead7';
-    sg.font = '700 58px "Be Vietnam Pro", sans-serif';
-    sg.fillText(t('r_equal'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
+    if (isWomenDay) {
+      sg.fillStyle = '#ff4081';
+      sg.font = '900 52px "Baloo 2", sans-serif';
+      sg.fillText(t('barn_womenday_title'), this.barnSignCanvas.width / 2, 72);
+      sg.fillStyle = '#ffe4ec';
+      sg.font = '700 54px "Be Vietnam Pro", sans-serif';
+      sg.fillText(t('barn_womenday_msg'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
+    } else {
+      sg.fillStyle = '#a5281b';
+      sg.font = '900 52px "Baloo 2", sans-serif';
+      sg.fillText(t('boardEyebrow'), this.barnSignCanvas.width / 2, 70);
+      sg.fillStyle = '#f2ead7';
+      sg.font = '700 58px "Be Vietnam Pro", sans-serif';
+      sg.fillText(t('r_equal'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
+    }
+    sg.shadowColor = 'transparent';
+    sg.shadowBlur = 0;
+    sg.shadowOffsetY = 0;
     this.barnSignTex.needsUpdate = true;
   }
 

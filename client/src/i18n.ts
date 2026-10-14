@@ -215,6 +215,8 @@ const vi = {
   theme_women_day: 'Phụ Nữ VN (20/10)',
   theme_women_day_title: 'Phụ Nữ VN',
   theme_women_day_sub: '20/10',
+  barn_womenday_title: '🌸 20/10 🌸',
+  barn_womenday_msg: 'Chúc chị em mgm 20/10 vui vẻ!',
   on: 'BẬT',
   off: 'TẮT',
 };
@@ -435,6 +437,8 @@ const en: Record<keyof typeof vi, string> = {
   theme_women_day: 'VN Women\'s Day (Oct 20)',
   theme_women_day_title: 'VN Women\'s Day',
   theme_women_day_sub: 'Oct 20',
+  barn_womenday_title: '🌸 OCT 20 🌸',
+  barn_womenday_msg: 'Happy Women\'s Day to all MGM ladies!',
   on: 'ON',
   off: 'OFF',
 };
