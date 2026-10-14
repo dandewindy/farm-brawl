@@ -1197,8 +1197,8 @@ export class WorldRenderer {
       sg.font = '900 52px "Baloo 2", sans-serif';
       sg.fillText(t('barn_womenday_title'), this.barnSignCanvas.width / 2, 72);
       sg.fillStyle = '#ffe4ec';
-      sg.font = '700 54px "Be Vietnam Pro", sans-serif';
-      sg.fillText(t('barn_womenday_msg'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 60);
+      sg.font = '700 48px "Be Vietnam Pro", sans-serif';
+      sg.fillText(t('barn_womenday_msg'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 50);
     } else {
       sg.fillStyle = '#a5281b';
       sg.font = '900 52px "Baloo 2", sans-serif';
