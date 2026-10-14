@@ -923,7 +923,7 @@ export class WorldRenderer {
       glowMesh.visible = false;
       glowMesh.renderOrder = 19;
 
-      // High-voltage core spark ball at contact point (radius 0.7m)
+      // High-voltage core spark ball at contact point (radius reduced to 10%: 0.07m)
       const coreSphereMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
@@ -931,11 +931,11 @@ export class WorldRenderer {
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
-      const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), coreSphereMat);
+      const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), coreSphereMat);
       coreSphere.visible = false;
       coreSphere.renderOrder = 21;
 
-      // Wide glowing plasma halo (radius 1.6m)
+      // Tight glowing plasma halo (radius reduced to 10%: 0.16m)
       const haloMat = new THREE.MeshBasicMaterial({
         color: 0x00e5ff,
         transparent: true,
@@ -943,7 +943,7 @@ export class WorldRenderer {
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
-      const coreHalo = new THREE.Mesh(new THREE.SphereGeometry(1.6, 10, 8), haloMat);
+      const coreHalo = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), haloMat);
       coreHalo.visible = false;
       coreHalo.renderOrder = 18;
 
