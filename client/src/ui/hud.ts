@@ -568,7 +568,13 @@ export class HudManager {
 
     // Name input & pencil
     this.nameInput.placeholder = t('namePh');
-    this.nameInput.value = localStorage.getItem('fb_name') || '';
+    const savedName = localStorage.getItem('fb_name') || '';
+    if (savedName === 'Nông dân' || savedName === 'Farmer' || savedName === "mgm'y ngôk ngêk") {
+      this.nameInput.value = '';
+      try { localStorage.removeItem('fb_name'); } catch (_) {}
+    } else {
+      this.nameInput.value = savedName;
+    }
 
     if (this.nameEditBtn) {
       this.nameEditBtn.addEventListener('click', () => {
@@ -654,8 +660,13 @@ export class HudManager {
 
   private initEvents(): void {
     const play = () => {
-      const name = this.nameInput.value.trim() || t('defaultName');
-      localStorage.setItem('fb_name', name);
+      const inputName = this.nameInput.value.trim();
+      const name = inputName || t('defaultName');
+      if (inputName) {
+        try { localStorage.setItem('fb_name', inputName); } catch (_) {}
+      } else {
+        try { localStorage.removeItem('fb_name'); } catch (_) {}
+      }
       let chosenSpecies = this.selectedSpecies;
       let chosenSkin = this.mySkins[this.selectedSpecies] ?? 0;
       if (this.isRandomSelected) {
