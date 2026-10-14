@@ -349,6 +349,16 @@ h1 .t1 { color: var(--paper); display: block; }
   flex: 1;
   box-sizing: border-box;
 }
+
+/* On PC / desktop: hide combat guide in Friend mode to keep left and right columns balanced */
+body.is-pc.mode-friend #howBox {
+  display: none !important;
+}
+@media (min-width: 769px) {
+  body.mode-friend #howBox {
+    display: none !important;
+  }
+}
 .how-title {
   font-family: var(--f-display);
   font-size: 13px;

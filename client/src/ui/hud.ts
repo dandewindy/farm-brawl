@@ -1022,6 +1022,7 @@ export class HudManager {
               this.ffaPreviewBox.hidden = mode !== 'ffa';
             }
             document.body.classList.toggle('mode-team', mode === 'team');
+            document.body.classList.toggle('mode-friend', mode === 'friend');
             this.setSelectedTeam(this.selectedTeam);
             const startScreen = document.getElementById('start');
             if (startScreen && startScreen.scrollTop > 20) {
@@ -1049,6 +1050,8 @@ export class HudManager {
       });
       if (this.friendPanel) this.friendPanel.hidden = false;
       if (this.ffaPreviewBox) this.ffaPreviewBox.hidden = true;
+      document.body.classList.toggle('mode-team', false);
+      document.body.classList.toggle('mode-friend', true);
       if (this.joinRoomCode) this.joinRoomCode.value = cleanCode;
       if (this.createdRoomCode) this.createdRoomCode.textContent = cleanCode;
       if (this.createdRoomBox) this.createdRoomBox.hidden = false;
@@ -1312,6 +1315,8 @@ export class HudManager {
     this.isSpectating = false;
     document.body.classList.remove('spectating');
     document.body.classList.add('menu');
+    document.body.classList.toggle('mode-team', this.selectedMode === 'team');
+    document.body.classList.toggle('mode-friend', this.selectedMode === 'friend');
     this.startScreen.hidden = false;
     this.previewRenderer?.start();
     this.previewRenderer?.resize();
