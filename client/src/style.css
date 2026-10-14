@@ -508,29 +508,38 @@ h1 .t1 { color: var(--paper); display: block; }
   right: 14px;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(46, 38, 34, 0.85);
-  color: #dfd5c6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(31, 26, 23, 0.85);
+  color: #fff;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.15s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
   padding: 0;
   z-index: 5;
-  backdrop-filter: blur(4px);
 }
 
 .death-exit-btn:hover {
-  background: rgba(235, 64, 52, 0.25);
-  border-color: rgba(235, 64, 52, 0.6);
-  color: #ff6b6b;
-  transform: scale(1.08);
+  background: rgba(50, 42, 37, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+  transform: scale(1.05);
 }
 
 .death-exit-btn:active {
+  background: rgba(20, 16, 14, 0.98);
   transform: scale(0.95);
+}
+
+.death-exit-btn svg,
+#gameControls button svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 
@@ -1172,13 +1181,14 @@ body.touch #lb {
   transform: scale(0.95);
 }
 #gameControls .btn-exit-lobby {
-  background: rgba(185, 45, 35, 0.85);
-  border-color: rgba(255, 120, 100, 0.5);
+  background: rgba(31, 26, 23, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
   color: #fff;
 }
 #gameControls .btn-exit-lobby:hover {
-  background: rgba(220, 50, 40, 0.95);
-  border-color: rgba(255, 150, 130, 0.8);
+  background: rgba(50, 42, 37, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.05);
 }
 
 /* PC default: Burger button completely hidden, settings button shown */
