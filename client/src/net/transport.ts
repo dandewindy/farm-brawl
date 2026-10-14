@@ -11,10 +11,12 @@ export interface Transport {
   readonly rttMin: number;
   readonly colo?: string;
   inGame?: boolean;
+  isMigrating?: boolean;
   forceReconnect?(): void;
   triggerHotMigration?(): void;
   leaveGame?(): void;
   onMigrationSuccess?: (newColo: string) => void;
+  onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
 }
 
 export type Handler = (m: ServerMsg) => void;

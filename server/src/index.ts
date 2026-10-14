@@ -35,17 +35,23 @@ export default {
       return roomStub.fetch(request);
     }
 
-    // Health check endpoint
+    // Health check endpoint with zero-caching for rapid client watchdog probing
     if (url.pathname === '/api/health') {
       const cf = (request as any).cf;
+      const cfRay = request.headers.get('cf-ray') || '';
+      const edgeColo = cfRay.split('-')[1] || cf?.colo || 'unknown';
       return new Response(JSON.stringify({
         status: 'ok',
         time: Date.now(),
-        colo: cf?.colo ?? 'unknown',
+        colo: edgeColo,
         country: cf?.country ?? 'unknown',
         city: cf?.city ?? 'unknown',
       }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Access-Control-Allow-Origin': '*',
+        },
       });
     }
 

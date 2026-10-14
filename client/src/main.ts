@@ -1154,7 +1154,12 @@ function getClientId(): string {
 
   if (transport) {
     transport.onMigrationSuccess = (newColo) => {
-      hud.showToast(`⚡ Đã tự động chuyển sang trạm ${newColo} tối ưu!`);
+      hud.showToast(`⚡ Đã tự động chuyển sang trạm ${newColo} tối ưu!`, 3000);
+    };
+    transport.onMigrationStatus = (status, colo) => {
+      if (status === 'migrated') {
+        hud.showToast(`⚡ Đã tự động chuyển về máy chủ Singapore (${colo || 'SIN'})!`, 3000);
+      }
     };
   }
 }
@@ -1217,7 +1222,7 @@ function animate(now: number): void {
     fpsFrames = 0;
     lastFpsTime = now;
     const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
-    hud.updatePerf(currentFps, currentPing, transport?.colo);
+    hud.updatePerf(currentFps, currentPing, transport?.colo, transport?.isMigrating);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
       debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;

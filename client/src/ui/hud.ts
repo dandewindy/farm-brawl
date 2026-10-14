@@ -1454,7 +1454,7 @@ export class HudManager {
     this.koTxt.textContent = t('kos', { k: kills });
   }
 
-  updatePerf(fps: number, ping: number, colo?: string): void {
+  updatePerf(fps: number, ping: number, colo?: string, isMigrating = false): void {
     if (this.fpsVal) {
       this.fpsVal.textContent = String(fps);
       if (this.fpsDot) {
@@ -1468,16 +1468,24 @@ export class HudManager {
       }
     }
     if (this.coloVal && colo) {
-      this.coloVal.textContent = colo;
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
       const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|TPE|KUL|MNL|NRT|KIX|ICN)$/i.test(colo);
-      this.coloVal.className = `perf-colo ${isSin || isFast ? 'good' : 'warn'}`;
-      this.coloVal.title = isSin
-        ? `Trạm Singapore (SIN) tối ưu - Ping cực thấp (~${ping > 0 ? ping : 35}ms)`
-        : isFast
-        ? `Trạm ${colo} (Châu Á) - Tốc độ cao (~${ping > 0 ? ping : 50}ms)`
-        : `Trạm ${colo} - Đang định tuyến tới máy chủ Singapore`;
+      if (isMigrating) {
+        this.coloVal.textContent = `${colo} ⚡`;
+        this.coloVal.className = 'perf-colo warn';
+        this.coloVal.title = `Mắt thần đang tự động chuyển trạm sang Singapore (SIN)...`;
+      } else if (!isFast) {
+        this.coloVal.textContent = `${colo} 🔍`;
+        this.coloVal.className = 'perf-colo warn';
+        this.coloVal.title = `Trạm ${colo} (Xa) - Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
+      } else {
+        this.coloVal.textContent = colo;
+        this.coloVal.className = 'perf-colo good';
+        this.coloVal.title = isSin
+          ? `Trạm Singapore (SIN) tối ưu - Ping cực thấp (~${ping > 0 ? ping : 35}ms)`
+          : `Trạm ${colo} (Châu Á) - Tốc độ cao (~${ping > 0 ? ping : 50}ms)`;
+      }
     }
   }
 
