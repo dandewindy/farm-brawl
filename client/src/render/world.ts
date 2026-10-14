@@ -659,9 +659,10 @@ export class WorldRenderer {
   private readonly treeCoords: { x: number; z: number; s: number }[] = [];
   private readonly electricGroup = new THREE.Group();
   private readonly electricArcs: {
-    line: THREE.Line;
-    glowLine: THREE.Line;
+    coreMesh: THREE.Mesh;
+    glowMesh: THREE.Mesh;
     coreSphere: THREE.Mesh;
+    coreHalo: THREE.Mesh;
     active: boolean;
     startTime: number;
     duration: number;
@@ -852,14 +853,15 @@ export class WorldRenderer {
     }
     this.scene.add(instPosts);
 
-    // 2 glowing electric wire rails
+    // 2 glowing high-voltage electric wire rails
     for (const y of [0.8, 1.6]) {
-      const railGeo = new THREE.TorusGeometry(R, 0.08, 4, 256);
+      const railGeo = new THREE.TorusGeometry(R, 0.14, 6, 256);
       const railMat = new THREE.MeshStandardMaterial({
         color: 0xfff35c,
-        emissive: 0xaa9900,
-        roughness: 0.85,
-        flatShading: true,
+        emissive: 0x00bfff,
+        emissiveIntensity: 1.2,
+        roughness: 0.35,
+        metalness: 0.7,
       });
       const rail = new THREE.Mesh(railGeo, railMat);
       rail.rotation.x = Math.PI / 2;
@@ -870,47 +872,87 @@ export class WorldRenderer {
     this.buildElectricArcs();
   }
 
-  private buildElectricArcs(): void {
-    const arcCount = 6;
-    for (let i = 0; i < arcCount; i++) {
-      const geo = new THREE.BufferGeometry();
-      const positions = new Float32Array(30);
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  private createRibbonGeometry(segs: number): THREE.BufferGeometry {
+    const geo = new THREE.BufferGeometry();
+    const vCount = (segs + 1) * 2;
+    const positions = new Float32Array(vCount * 3);
+    const indices: number[] = [];
+    for (let i = 0; i < segs; i++) {
+      const a = i * 2;
+      const b = i * 2 + 1;
+      const c = (i + 1) * 2;
+      const d = (i + 1) * 2 + 1;
+      indices.push(a, b, c, b, d, c);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    return geo;
+  }
 
-      const lineMat = new THREE.LineBasicMaterial({
+  private buildElectricArcs(): void {
+    const arcCount = 10;
+    const segs = 8;
+    for (let i = 0; i < arcCount; i++) {
+      const coreGeo = this.createRibbonGeometry(segs);
+      const glowGeo = this.createRibbonGeometry(segs);
+
+      // Searing bright white core lightning ribbon
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      // Outer neon cyan electrical discharge glow ribbon
+      const glowMat = new THREE.MeshBasicMaterial({
         color: 0x00f5ff,
+        side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.95,
         blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
-      const glowMat = new THREE.LineBasicMaterial({
+
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      coreMesh.visible = false;
+      coreMesh.renderOrder = 20;
+
+      const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+      glowMesh.visible = false;
+      glowMesh.renderOrder = 19;
+
+      // High-voltage core spark ball at contact point (radius 0.7m)
+      const coreSphereMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
         opacity: 1.0,
         blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
-
-      const line = new THREE.Line(geo, lineMat);
-      line.visible = false;
-
-      const glowGeo = new THREE.BufferGeometry();
-      glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30), 3));
-      const glowLine = new THREE.Line(glowGeo, glowMat);
-      glowLine.visible = false;
-
-      const coreMat = new THREE.MeshBasicMaterial({
-        color: 0x80ffff,
-        transparent: true,
-        opacity: 0.9,
-      });
-      const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), coreMat);
+      const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), coreSphereMat);
       coreSphere.visible = false;
+      coreSphere.renderOrder = 21;
 
-      this.electricGroup.add(line, glowLine, coreSphere);
+      // Wide glowing plasma halo (radius 1.6m)
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const coreHalo = new THREE.Mesh(new THREE.SphereGeometry(1.6, 10, 8), haloMat);
+      coreHalo.visible = false;
+      coreHalo.renderOrder = 18;
+
+      this.electricGroup.add(coreMesh, glowMesh, coreSphere, coreHalo);
       this.electricArcs.push({
-        line,
-        glowLine,
+        coreMesh,
+        glowMesh,
         coreSphere,
+        coreHalo,
         active: false,
         startTime: 0,
         duration: 0,
@@ -1202,75 +1244,173 @@ export class WorldRenderer {
     const m4 = new THREE.Matrix4();
 
     if (theme === 'women_day') {
-      // 20/10 Vietnamese Women's Day: Romantic flowering reddish-pink shrub bushes with scattered blossoms!
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.85, flatShading: true });
-      // Main rich reddish-pink dome (hồng đỏ)
-      const bushMat1 = new THREE.MeshStandardMaterial({ color: 0xeb407a, roughness: 0.8, flatShading: true });
-      // Upper blush pink dome (hồng phấn)
-      const bushMat2 = new THREE.MeshStandardMaterial({ color: 0xf48fb1, roughness: 0.8, flatShading: true });
-      // Scattered white & soft pastel baby pink flower blossoms
-      const flowerWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, flatShading: true });
-      const flowerPinkMat = new THREE.MeshStandardMaterial({ color: 0xff80ab, roughness: 0.6, flatShading: true });
+      // 20/10 Vietnamese Women's Day: Alternating tall flowering canopy trees & lush flowering shrub bushes!
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.85, flatShading: true });
+      // Layered vibrant romantic foliage: rich crimson-magenta, coral-rose, and soft blush pink
+      const foliageMat1 = new THREE.MeshStandardMaterial({ color: 0xd81b60, roughness: 0.75, flatShading: true });
+      const foliageMat2 = new THREE.MeshStandardMaterial({ color: 0xec407a, roughness: 0.75, flatShading: true });
+      const foliageMat3 = new THREE.MeshStandardMaterial({ color: 0xf48fb1, roughness: 0.75, flatShading: true });
 
-      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.45, 1.8, 5), trunkMat, nTree);
-      const bushes1 = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.3, 1), bushMat1, nTree);
-      const bushes2 = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1.6, 1), bushMat2, nTree);
-      const flowers1 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 6, 5), flowerWhiteMat, nTree * 3);
-      const flowers2 = new THREE.InstancedMesh(new THREE.SphereGeometry(0.24, 6, 5), flowerPinkMat, nTree * 3);
+      // Prominent, radiant floral blossoms: snow white, vivid cherry blossom pink, and golden stamen dots
+      const flowerWhiteMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0x444444,
+        roughness: 0.35,
+        flatShading: true,
+      });
+      const flowerPinkMat = new THREE.MeshStandardMaterial({
+        color: 0xff4081,
+        emissive: 0x441122,
+        roughness: 0.4,
+        flatShading: true,
+      });
+      const flowerGoldMat = new THREE.MeshStandardMaterial({
+        color: 0xffeb3b,
+        emissive: 0x332200,
+        roughness: 0.35,
+        flatShading: true,
+      });
 
-      trunks.castShadow = true;
-      bushes1.castShadow = true;
-      bushes2.castShadow = true;
-      flowers1.castShadow = true;
-      flowers2.castShadow = true;
+      const nTall = Math.ceil(nTree / 2);
+      const nBush = nTree - nTall;
 
-      let fIdx1 = 0;
-      let fIdx2 = 0;
+      const trunksTall = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.65, 3.8, 6), trunkMat, nTall);
+      const trunksBush = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.48, 1.8, 5), trunkMat, nBush);
+      const canopyLower = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(3.0, 1), foliageMat1, nTree);
+      const canopyMid = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.3, 1), foliageMat2, nTree);
+      const canopyTop = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1.7, 1), foliageMat3, nTall);
+
+      // Plump prominent blossoms (radius 0.46m, 0.42m, 0.36m)
+      const flowersWhite = new THREE.InstancedMesh(new THREE.SphereGeometry(0.46, 7, 5), flowerWhiteMat, nTree * 4);
+      const flowersPink = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 7, 5), flowerPinkMat, nTree * 4);
+      const flowersGold = new THREE.InstancedMesh(new THREE.SphereGeometry(0.36, 6, 5), flowerGoldMat, nTree * 2);
+
+      trunksTall.castShadow = true;
+      trunksBush.castShadow = true;
+      canopyLower.castShadow = true;
+      canopyMid.castShadow = true;
+      canopyTop.castShadow = true;
+      flowersWhite.castShadow = true;
+      flowersPink.castShadow = true;
+      flowersGold.castShadow = true;
+
+      let tallIdx = 0;
+      let bushIdx = 0;
+      let fWhiteIdx = 0;
+      let fPinkIdx = 0;
+      let fGoldIdx = 0;
 
       for (let i = 0; i < nTree; i++) {
         const { x, z, s } = this.treeCoords[i];
+        const isTall = i % 2 === 0;
 
-        // Trunk
-        m4.makeScale(s, s, s);
-        m4.setPosition(x, 0.9 * s, z);
-        trunks.setMatrixAt(i, m4);
-
-        // Lower broad reddish-pink dome
-        m4.makeScale(s * 1.15, s * 0.9, s * 1.15);
-        m4.setPosition(x, 2.3 * s, z);
-        bushes1.setMatrixAt(i, m4);
-
-        // Upper blush pink dome
-        m4.makeScale(s * 0.95, s * 0.85, s * 0.95);
-        m4.setPosition(x, 3.6 * s, z);
-        bushes2.setMatrixAt(i, m4);
-
-        // Scattered white flowers dotted on the bush surface
-        const whiteOffsets: [number, number, number][] = [
-          [1.5 * Math.cos(0.5), 2.5, 1.5 * Math.sin(0.5)],
-          [1.4 * Math.cos(2.4), 3.2, 1.4 * Math.sin(2.4)],
-          [1.3 * Math.cos(4.6), 2.3, 1.3 * Math.sin(4.6)],
-        ];
-        for (const [ox, oy, oz] of whiteOffsets) {
+        if (isTall) {
+          // --- TALL FLOWERING CANOPY TREE (Tán cao và to hơn) ---
+          // Trunk reaches height 3.8, base at ground
           m4.makeScale(s, s, s);
-          m4.setPosition(x + ox * s, oy * s, z + oz * s);
-          flowers1.setMatrixAt(fIdx1++, m4);
-        }
+          m4.setPosition(x, 1.9 * s, z);
+          trunksTall.setMatrixAt(tallIdx++, m4);
 
-        // Scattered baby pink flowers
-        const pinkOffsets: [number, number, number][] = [
-          [1.4 * Math.cos(1.4), 3.4, 1.4 * Math.sin(1.4)],
-          [1.5 * Math.cos(3.5), 2.7, 1.5 * Math.sin(3.5)],
-          [1.3 * Math.cos(5.5), 3.1, 1.3 * Math.sin(5.5)],
-        ];
-        for (const [ox, oy, oz] of pinkOffsets) {
+          // Canopy 1: Broad lower crown (y = 4.5 * s)
+          m4.makeScale(s * 1.25, s * 0.95, s * 1.25);
+          m4.setPosition(x, 4.5 * s, z);
+          canopyLower.setMatrixAt(i, m4);
+          const r1 = 3.0 * 1.25 * s;
+
+          // Canopy 2: Mid crown (y = 6.2 * s)
+          m4.makeScale(s * 1.15, s * 0.9, s * 1.15);
+          m4.setPosition(x, 6.2 * s, z);
+          canopyMid.setMatrixAt(i, m4);
+          const r2 = 2.3 * 1.15 * s;
+
+          // Canopy 3: High crowning dome (y = 7.6 * s) - Total height ~8.6s!
+          m4.makeScale(s * 1.0, s * 0.85, s * 1.0);
+          m4.setPosition(x, 7.6 * s, z);
+          canopyTop.setMatrixAt(tallIdx - 1, m4);
+          const r3 = 1.7 * 1.0 * s;
+
+          // 10 prominent blossoms perched proudly on the outer canopy surface
+          const flowerSpots = [
+            { r: r2, cy: 6.2 * s, th: 0.4, ph: 0.55, type: 'w' },
+            { r: r2, cy: 6.2 * s, th: 2.1, ph: 0.65, type: 'w' },
+            { r: r3, cy: 7.6 * s, th: 3.6, ph: 0.75, type: 'w' },
+            { r: r3, cy: 7.6 * s, th: 5.2, ph: 0.85, type: 'w' },
+            { r: r2, cy: 6.2 * s, th: 1.2, ph: 0.60, type: 'p' },
+            { r: r2, cy: 6.2 * s, th: 4.5, ph: 0.50, type: 'p' },
+            { r: r3, cy: 7.6 * s, th: 0.8, ph: 0.80, type: 'p' },
+            { r: r3, cy: 7.6 * s, th: 2.7, ph: 0.70, type: 'p' },
+            { r: r3, cy: 7.6 * s, th: 1.8, ph: 0.92, type: 'g' },
+            { r: r2, cy: 6.2 * s, th: 3.3, ph: 0.55, type: 'g' },
+          ];
+
+          for (const sp of flowerSpots) {
+            const outR = sp.r + 0.16 * s;
+            const fx = x + Math.cos(sp.th) * Math.cos(sp.ph) * outR;
+            const fy = sp.cy + Math.sin(sp.ph) * outR;
+            const fz = z + Math.sin(sp.th) * Math.cos(sp.ph) * outR;
+            m4.makeScale(s, s, s);
+            m4.setPosition(fx, fy, fz);
+            if (sp.type === 'w') flowersWhite.setMatrixAt(fWhiteIdx++, m4);
+            else if (sp.type === 'p') flowersPink.setMatrixAt(fPinkIdx++, m4);
+            else flowersGold.setMatrixAt(fGoldIdx++, m4);
+          }
+        } else {
+          // --- BROAD FLOWERING SHRUB BUSH (Cây bụi tán tròn đầy đặn) ---
+          // Sturdy short trunk
           m4.makeScale(s, s, s);
-          m4.setPosition(x + ox * s, oy * s, z + oz * s);
-          flowers2.setMatrixAt(fIdx2++, m4);
+          m4.setPosition(x, 0.9 * s, z);
+          trunksBush.setMatrixAt(bushIdx++, m4);
+
+          // Canopy 1: Wide spreading base (y = 2.4 * s)
+          m4.makeScale(s * 1.35, s * 0.9, s * 1.35);
+          m4.setPosition(x, 2.4 * s, z);
+          canopyLower.setMatrixAt(i, m4);
+          const r1 = 3.0 * 1.35 * s;
+
+          // Canopy 2: Lush upper dome (y = 3.7 * s)
+          m4.makeScale(s * 1.15, s * 0.85, s * 1.15);
+          m4.setPosition(x, 3.7 * s, z);
+          canopyMid.setMatrixAt(i, m4);
+          const r2 = 2.3 * 1.15 * s;
+
+          // 10 prominent blossoms perched proudly on the outer shrub surface
+          const flowerSpots = [
+            { r: r1, cy: 2.4 * s, th: 0.5, ph: 0.40, type: 'w' },
+            { r: r2, cy: 3.7 * s, th: 1.9, ph: 0.70, type: 'w' },
+            { r: r1, cy: 2.4 * s, th: 3.4, ph: 0.45, type: 'w' },
+            { r: r2, cy: 3.7 * s, th: 5.0, ph: 0.80, type: 'w' },
+            { r: r1, cy: 2.4 * s, th: 1.3, ph: 0.45, type: 'p' },
+            { r: r2, cy: 3.7 * s, th: 2.8, ph: 0.65, type: 'p' },
+            { r: r1, cy: 2.4 * s, th: 4.2, ph: 0.40, type: 'p' },
+            { r: r2, cy: 3.7 * s, th: 5.9, ph: 0.75, type: 'p' },
+            { r: r2, cy: 3.7 * s, th: 0.9, ph: 0.88, type: 'g' },
+            { r: r1, cy: 2.4 * s, th: 2.5, ph: 0.50, type: 'g' },
+          ];
+
+          for (const sp of flowerSpots) {
+            const outR = sp.r + 0.16 * s;
+            const fx = x + Math.cos(sp.th) * Math.cos(sp.ph) * outR;
+            const fy = sp.cy + Math.sin(sp.ph) * outR;
+            const fz = z + Math.sin(sp.th) * Math.cos(sp.ph) * outR;
+            m4.makeScale(s, s, s);
+            m4.setPosition(fx, fy, fz);
+            if (sp.type === 'w') flowersWhite.setMatrixAt(fWhiteIdx++, m4);
+            else if (sp.type === 'p') flowersPink.setMatrixAt(fPinkIdx++, m4);
+            else flowersGold.setMatrixAt(fGoldIdx++, m4);
+          }
         }
       }
 
-      this.treeGroup.add(trunks, bushes1, bushes2, flowers1, flowers2);
+      this.treeGroup.add(
+        trunksTall,
+        trunksBush,
+        canopyLower,
+        canopyMid,
+        canopyTop,
+        flowersWhite,
+        flowersPink,
+        flowersGold
+      );
     } else {
       // Classic Farm Theme: traditional pines
       const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, flatShading: true });
@@ -1490,100 +1630,124 @@ export class WorldRenderer {
     const R = CFG.R;
 
     // Ambient electric hum pulse along the entire fence wire rails
-    const hum = 0.5 + 0.35 * Math.sin(now / 130) + 0.15 * Math.sin(now / 41);
+    const hum = 1.0 + 0.45 * Math.sin(now / 110) + 0.25 * Math.sin(now / 37);
     let flashEmissive = false;
 
-    // Trigger electric arc discharges every 1.2 to 2.2 seconds
+    // Trigger frequent energetic electric arc discharges (every 450ms - 850ms)
     if (now >= this.nextZapTime) {
-      this.nextZapTime = now + 1200 + Math.random() * 1000;
+      this.nextZapTime = now + 450 + Math.random() * 400;
       const inactive = this.electricArcs.filter((a) => !a.active);
-      const spawnCount = Math.min(inactive.length, Math.random() < 0.45 ? 2 : 1);
+      const spawnCount = Math.min(inactive.length, Math.random() < 0.65 ? 2 : 1);
       for (let i = 0; i < spawnCount; i++) {
         const arc = inactive[i];
         arc.active = true;
         arc.startTime = now;
-        arc.duration = 220 + Math.random() * 180; // 220 - 400ms duration
+        arc.duration = 260 + Math.random() * 200; // 260 - 460ms duration
         arc.soundPlayed = false;
 
-        // Biased towards player angle 45% of the time so player witnesses the fence danger
-        if (playerPos && Math.random() < 0.45) {
+        // Biased towards player angle 85% of the time when player is near fence (dist > 25)
+        if (playerPos && Math.hypot(playerPos.x, playerPos.z) > 25 && Math.random() < 0.85) {
           const playerAngle = Math.atan2(playerPos.z, playerPos.x);
-          arc.angle = playerAngle + (Math.random() - 0.5) * 0.9;
+          arc.angle = playerAngle + (Math.random() - 0.5) * 0.7;
         } else {
           arc.angle = Math.random() * Math.PI * 2;
         }
       }
     }
 
+    const segs = 8;
     for (const arc of this.electricArcs) {
       if (!arc.active) continue;
       const age = now - arc.startTime;
       if (age >= arc.duration) {
         arc.active = false;
-        arc.line.visible = false;
-        arc.glowLine.visible = false;
+        arc.coreMesh.visible = false;
+        arc.glowMesh.visible = false;
         arc.coreSphere.visible = false;
+        arc.coreHalo.visible = false;
         continue;
       }
 
       flashEmissive = true;
-      arc.line.visible = true;
-      arc.glowLine.visible = true;
+      arc.coreMesh.visible = true;
+      arc.glowMesh.visible = true;
       arc.coreSphere.visible = true;
+      arc.coreHalo.visible = true;
 
       const a = arc.angle;
-      const segs = 9;
-      const pts: number[] = [];
-      const glowPts: number[] = [];
+      const corePos = arc.coreMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const glowPos = arc.glowMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
 
-      // Generate violently flickering zigzag lightning arc between bottom (0.8) and top (1.6) rails
+      // Normal vector facing outwards/upwards for ribbon width
+      const nx = Math.cos(a);
+      const nz = Math.sin(a);
+
+      const coreW = 0.22;
+      const glowW = 0.58;
+
+      // Generate violently crackling zigzag lightning between top rail (1.6), bottom rail (0.8), and ground (0.0)
       for (let s = 0; s <= segs; s++) {
         const t = s / segs;
-        const curA = a + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.05 : 0);
-        const curR = R + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.28 : 0);
-        const curY = 0.8 + t * 0.8 + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.25 : 0);
+        const curA = a + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.09 : 0);
+        const curR = R + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.45 : 0);
+        const curY = 1.6 - t * 1.6 + (s > 0 && s < segs ? (Math.random() - 0.5) * 0.35 : 0);
 
-        pts.push(Math.cos(curA) * curR, curY, Math.sin(curA) * curR);
-        glowPts.push(Math.cos(curA) * (curR + (Math.random() - 0.5) * 0.04), curY, Math.sin(curA) * (curR + (Math.random() - 0.5) * 0.04));
+        const px = Math.cos(curA) * curR;
+        const py = Math.max(0.05, curY);
+        const pz = Math.sin(curA) * curR;
+
+        // Core ribbon vertices (width 0.44m)
+        const idx = s * 2;
+        corePos.setXYZ(idx, px - nx * coreW, py, pz - nz * coreW);
+        corePos.setXYZ(idx + 1, px + nx * coreW, py, pz + nz * coreW);
+
+        // Glow ribbon vertices (width 1.16m)
+        glowPos.setXYZ(idx, px - nx * glowW, py, pz - nz * glowW);
+        glowPos.setXYZ(idx + 1, px + nx * glowW, py, pz + nz * glowW);
       }
+      corePos.needsUpdate = true;
+      glowPos.needsUpdate = true;
 
-      arc.line.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-      arc.glowLine.geometry.setAttribute('position', new THREE.Float32BufferAttribute(glowPts, 3));
+      // Glowing plasma discharge orb at the contact point
+      arc.coreSphere.position.set(Math.cos(a) * R, 1.2 + (Math.random() - 0.5) * 0.25, Math.sin(a) * R);
+      const pulseScale = 0.85 + Math.random() * 0.55;
+      arc.coreSphere.scale.setScalar(pulseScale);
 
-      // Glowing core spark sphere at center of discharge
-      arc.coreSphere.position.set(Math.cos(a) * R, 1.2 + (Math.random() - 0.5) * 0.2, Math.sin(a) * R);
-      const coreScale = 0.8 + Math.random() * 0.6;
-      arc.coreSphere.scale.setScalar(coreScale);
+      arc.coreHalo.position.copy(arc.coreSphere.position);
+      arc.coreHalo.scale.setScalar(pulseScale * 1.4);
 
       // Sound effect if within hearing range of the player
       if (!arc.soundPlayed && playerPos) {
         const arcX = Math.cos(a) * R;
         const arcZ = Math.sin(a) * R;
         const dist = Math.hypot(playerPos.x - arcX, playerPos.z - arcZ);
-        if (dist < 40) {
-          const vol = Math.max(0.04, 0.18 * (1 - dist / 40));
+        if (dist < 55) {
+          const vol = Math.max(0.06, 0.25 * (1 - dist / 55));
           sfxZap(vol);
         }
         arc.soundPlayed = true;
       }
 
-      // Spark particles puffing outwards
-      if (parts && Math.random() < 0.65) {
-        const spkX = Math.cos(a) * R + (Math.random() - 0.5) * 0.4;
-        const spkY = 0.8 + Math.random() * 0.8;
-        const spkZ = Math.sin(a) * R + (Math.random() - 0.5) * 0.4;
-        const color = Math.random() < 0.5 ? 0x00f5ff : 0xfffa65;
-        parts.puff(spkX, spkY, spkZ, color, 0.5, 0.35, 1.2);
+      // Bright spark particles shower puffing outwards
+      if (parts) {
+        const count = Math.random() < 0.7 ? 2 : 1;
+        for (let p = 0; p < count; p++) {
+          const spkX = Math.cos(a) * R + (Math.random() - 0.5) * 0.5;
+          const spkY = 0.4 + Math.random() * 1.3;
+          const spkZ = Math.sin(a) * R + (Math.random() - 0.5) * 0.5;
+          const color = Math.random() < 0.4 ? 0xffffff : Math.random() < 0.7 ? 0x00f5ff : 0xfffa65;
+          parts.puff(spkX, spkY, spkZ, color, 0.75, 0.35, 2.2);
+        }
       }
     }
 
-    // Apply emissive intensity to rails (flashes up to 2.2 during zaps)
-    const targetEmissive = flashEmissive ? 2.2 : hum;
+    // Apply emissive intensity to rails (flashes up to 3.5 during zaps)
+    const targetEmissive = flashEmissive ? 3.5 : hum;
     for (const rail of this.fenceRails) {
       const mat = rail.material as THREE.MeshStandardMaterial;
       if (mat) {
         mat.emissiveIntensity = targetEmissive;
-        mat.emissive.setHex(flashEmissive ? 0x00f5ff : 0xaa9900);
+        mat.emissive.setHex(flashEmissive ? 0x00f5ff : 0x00bfff);
       }
     }
   }

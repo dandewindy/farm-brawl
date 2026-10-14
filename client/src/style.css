@@ -498,6 +498,41 @@ h1 .t1 { color: var(--paper); display: block; }
   flex: 1;
 }
 
+.card.notice {
+  position: relative;
+}
+
+.death-exit-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(46, 38, 34, 0.85);
+  color: #dfd5c6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+}
+
+.death-exit-btn:hover {
+  background: rgba(235, 64, 52, 0.25);
+  border-color: rgba(235, 64, 52, 0.6);
+  color: #ff6b6b;
+  transform: scale(1.08);
+}
+
+.death-exit-btn:active {
+  transform: scale(0.95);
+}
+
 
 /* ---------- HUD ---------- */
 .panel { background: rgba(31, 26, 23, .78); border-radius: 12px; backdrop-filter: blur(4px); }
@@ -2339,6 +2374,16 @@ body.mobile-phone #teamBar {
     padding: 8px 14px 8px !important;
     border-radius: 12px !important;
     margin: auto !important;
+  }
+  #death .death-exit-btn {
+    top: 8px !important;
+    right: 8px !important;
+    width: 28px !important;
+    height: 28px !important;
+  }
+  #death .death-exit-btn svg {
+    width: 16px !important;
+    height: 16px !important;
   }
   #death .stamp {
     font-size: 20px !important;

@@ -821,6 +821,10 @@ export class HudManager {
     if (drawerExitBtn) {
       drawerExitBtn.addEventListener('click', showExitPrompt);
     }
+    const deathExitBtn = document.getElementById('deathExitBtn');
+    if (deathExitBtn) {
+      deathExitBtn.addEventListener('click', showExitPrompt);
+    }
     if (this.btnCancelExit) {
       this.btnCancelExit.addEventListener('click', hideExitPrompt);
     }
