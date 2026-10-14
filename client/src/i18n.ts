@@ -213,6 +213,8 @@ const vi = {
   arenaLabel: 'CHỌN SÀN ĐẤU',
   theme_classic: 'Mặc định',
   theme_women_day: 'Phụ Nữ VN (20/10)',
+  theme_women_day_title: 'Phụ Nữ VN',
+  theme_women_day_sub: '20/10',
   on: 'BẬT',
   off: 'TẮT',
 };
@@ -431,6 +433,8 @@ const en: Record<keyof typeof vi, string> = {
   arenaLabel: 'ARENA THEME',
   theme_classic: 'Default',
   theme_women_day: 'VN Women\'s Day (Oct 20)',
+  theme_women_day_title: 'VN Women\'s Day',
+  theme_women_day_sub: 'Oct 20',
   on: 'ON',
   off: 'OFF',
 };
