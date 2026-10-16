@@ -262,9 +262,11 @@ export class GameRoom extends DurableObject {
 
       // Send initial world configuration & map
       const initMsg: ServerMsg = this.world.init();
-      const confirmedP = this.world.players.get(playerId);
-      if (confirmedP && !initMsg.players.some((p) => p.id === playerId)) {
-        initMsg.players.push(this.world.meta(confirmedP));
+      if (initMsg.t === 'init') {
+        const confirmedP = this.world.players.get(playerId);
+        if (confirmedP && !initMsg.players.some((p: any) => p.id === playerId)) {
+          initMsg.players.push(this.world.meta(confirmedP));
+        }
       }
       ws.send(JSON.stringify(initMsg));
 

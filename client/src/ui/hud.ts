@@ -223,7 +223,6 @@ export class HudManager {
   private readonly spSkinNext: HTMLElement | null;
   private readonly spNavPrev: HTMLButtonElement | null;
   private readonly spNavNext: HTMLButtonElement | null;
-  private readonly spRandomBtn: HTMLButtonElement | null;
   private readonly langToggle: HTMLButtonElement | null;
   private readonly disclaimerBtn: HTMLButtonElement | null;
   private readonly disclaimerModal: HTMLElement | null;
@@ -352,7 +351,6 @@ export class HudManager {
     this.spSkinNext = document.getElementById('spSkinNext');
     this.spNavPrev = document.getElementById('spNavPrev') as HTMLButtonElement | null;
     this.spNavNext = document.getElementById('spNavNext') as HTMLButtonElement | null;
-    this.spRandomBtn = document.getElementById('spRandomBtn') as HTMLButtonElement | null;
     this.langToggle = document.getElementById('langToggle') as HTMLButtonElement | null;
     this.disclaimerBtn = document.getElementById('disclaimerBtn') as HTMLButtonElement | null;
     this.disclaimerModal = document.getElementById('disclaimerModal');
@@ -1637,6 +1635,24 @@ export class HudManager {
     if (this.disclaimerModal) this.disclaimerModal.hidden = true;
   }
 
+  getPlayerName(): string {
+    const inputName = this.nameInput ? this.nameInput.value.trim() : '';
+    if (inputName) return inputName;
+    try {
+      const saved = localStorage.getItem('fb_name')?.trim();
+      if (saved) return saved;
+    } catch (_) {}
+    return t('defaultName');
+  }
+
+  getSelectedSpecies(): Species {
+    return this.selectedSpecies;
+  }
+
+  getSelectedSkin(): number {
+    return this.mySkins[this.selectedSpecies] ?? 0;
+  }
+
   isDeathScreenVisible(): boolean {
     return !this.deathScreen.hidden;
   }
@@ -2098,7 +2114,7 @@ export class HudManager {
 
   updateHof(hof: HofRow[]): void {
     const emojis: Record<Species, string> = {
-      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷',
+      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘',
     };
     if (this.hofList) this.hofList.innerHTML = '';
     if (this.drawerHofList) this.drawerHofList.innerHTML = '';

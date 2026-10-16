@@ -58,6 +58,7 @@ let wasDashing = false;
 let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 let deathScreenTimer: number | null = null;
+let isDeadAwaitingScreen = false;
 let missingMeTicks = 0;
 let localStunTimer = 0;
 let lockedAimA = 0;
@@ -175,6 +176,7 @@ hud.onExitLobby = () => {
   }
   predictor.on = false;
   gameState.alive = false;
+  isDeadAwaitingScreen = false;
   if (deathScreenTimer !== null) {
     clearTimeout(deathScreenTimer);
     deathScreenTimer = null;
@@ -405,7 +407,7 @@ function disablePseudoFs(): void {
 
 function lockLandscape(): void {
   try {
-    const ori = screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    const ori = (screen.orientation as any) || (screen as any).mozOrientation || (screen as any).msOrientation;
     if (ori && typeof ori.lock === 'function') {
       ori.lock('landscape').catch(() => {});
     }
@@ -414,7 +416,7 @@ function lockLandscape(): void {
 
 function unlockLandscape(): void {
   try {
-    const ori = screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    const ori = (screen.orientation as any) || (screen as any).mozOrientation || (screen as any).msOrientation;
     if (ori && typeof ori.unlock === 'function') {
       ori.unlock();
     }
@@ -723,6 +725,7 @@ const gameState = new GameState({
       clearTimeout(deathScreenTimer);
       deathScreenTimer = null;
     }
+    isDeadAwaitingScreen = false;
     missingMeTicks = 0;
     deathCamTarget = null;
     isSpectating = false;
@@ -782,28 +785,28 @@ const gameState = new GameState({
     }
     if (!seenMe) {
       predictor.on = false;
-      if (transport && transport.inGame && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
+      if (transport && transport.inGame && !isDeadAwaitingScreen && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
         missingMeTicks++;
-        if (missingMeTicks >= 20) {
+        if (missingMeTicks >= 40) {
           missingMeTicks = 0;
-          console.warn('[Watchdog] Character missing from server snapshots for >1s. Auto-recovering player...');
-          firstSpawn = true;
-          gameState.alive = true;
-          const name = hud.selectedName || 'Brawler';
-          const species = hud.selectedSpecies || 'chicken';
-          const skin = hud.selectedSkin || 0;
-          const team = hud.selectedMode === 'team' ? hud.selectedTeam : undefined;
-          const matchDuration = hud.selectedMode === 'friend' ? hud.getMatchDuration() : undefined;
-          transport.send({
-            t: 'join',
-            name,
-            species,
-            skin,
-            team,
-            matchDuration,
-            token: transport.sessionToken || undefined,
+          console.warn('[Watchdog] Character missing from server snapshots for >2s while in-game. Showing death screen...');
+          isDeadAwaitingScreen = false;
+          if (transport) transport.inGame = false;
+          gameState.alive = false;
+          hud.showDeath({
+            k: 'die',
+            id: gameState.myId,
+            by: 0,
+            cause: 'fence',
+            x: world.camTarget.x,
+            z: world.camTarget.z,
+            mass: gameState.myMass || CFG.START_MASS,
+            best: gameState.myMass || CFG.START_MASS,
+            kills: gameState.me.kills || 0,
+            alive: 0,
+            spoils: 0,
+            streak: 0,
           });
-          hud.showToast('⚡ Đã tự động phục hồi và đưa nhân vật trở lại trận đấu!', 2500);
         }
       }
     }
@@ -929,6 +932,8 @@ function handleGameEvent(ev: GameEvent): void {
         wasStunnedLastFrame = false;
         predictor.on = false;
         missingMeTicks = 0;
+        isDeadAwaitingScreen = true;
+        if (transport) transport.inGame = false;
         if (deathScreenTimer !== null) {
           clearTimeout(deathScreenTimer);
           deathScreenTimer = null;
@@ -938,7 +943,7 @@ function handleGameEvent(ev: GameEvent): void {
         deathScreenTimer = window.setTimeout(() => {
           deathScreenTimer = null;
           deathCamTarget = null;
-          if (transport) transport.inGame = false;
+          isDeadAwaitingScreen = false;
           hud.showDeath(ev, killerName);
         }, 1500);
       } else if (ev.by === myId) {
@@ -1425,9 +1430,9 @@ function animate(now: number): void {
     if (!meta && ent.id === gameState.myId) {
       meta = {
         id: gameState.myId,
-        name: hud.selectedName || 'Brawler',
-        species: hud.selectedSpecies || 'chicken',
-        skin: hud.selectedSkin || 0,
+        name: hud.getPlayerName(),
+        species: hud.getSelectedSpecies(),
+        skin: hud.getSelectedSkin(),
         bot: false,
         team: hud.selectedTeam,
       };

@@ -2,7 +2,7 @@
 // Cloudflare Durable Object. It knows nothing about rendering or networking: inputs in, snapshots out.
 import { thinkBot, newBrain, SPECIES_BOT_NAMES, SPECIES_NAMES_VI, type BotBrain } from './bots';
 import {
-  CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SPECIES, SUBSTEPS, TRAITS, radiusOf,
+  CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf,
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type MapData } from '../map';
@@ -364,7 +364,7 @@ export class World {
             p.name,
             Math.round(p.best ?? p.mass),
             p.totalKills ?? p.kills,
-            p.reign,
+            p.id === this.napoleonId ? Math.round(this.napoleonReign) : undefined,
           ]);
 
           const mvp = winnerPlayer
@@ -1072,13 +1072,6 @@ export class World {
       }
     }
     this.events.push({ k: 'rule', id: ruleId });
-  }
-
-  private pickRule(): void {
-    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball', 'till'];
-    const candidates = rules.filter((r) => r !== this.currentRule);
-    const pick = candidates[Math.floor(this.rnd() * candidates.length)] || 'twoleg';
-    this.applyRule(pick);
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {

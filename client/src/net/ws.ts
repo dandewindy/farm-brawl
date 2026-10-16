@@ -18,13 +18,11 @@ export class WsClient implements Transport {
   public rttMin = 0;
   public colo = '';
   public inGame = false;
-  private autoSteerAttempts = 0;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
   private badPingStreak = 0;
   private lastLobbyReconnectTime = 0;
   private currentPingDelay = 500;
-  private lastHttpProbeTime = 0;
 
   // In-Game Zero-Downtime Hot Migration
   public isMigrating = false;
@@ -398,7 +396,6 @@ export class WsClient implements Transport {
 
   public forceReconnect(): void {
     if (this.closed) return;
-    this.autoSteerAttempts = 0;
     this.stopPing();
     if (this.migrationWs) {
       try { this.migrationWs.close(); } catch (_) {}

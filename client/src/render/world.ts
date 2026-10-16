@@ -1330,7 +1330,6 @@ export class WorldRenderer {
           m4.makeScale(s * 1.25, s * 0.95, s * 1.25);
           m4.setPosition(x, 4.5 * s, z);
           canopyLower.setMatrixAt(i, m4);
-          const r1 = 3.0 * 1.25 * s;
 
           // Canopy 2: Mid crown (y = 6.2 * s)
           m4.makeScale(s * 1.15, s * 0.9, s * 1.15);
