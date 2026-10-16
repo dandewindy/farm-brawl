@@ -57,6 +57,8 @@ let gainTimer = 0;
 let wasDashing = false;
 let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
+let deathScreenTimer: number | null = null;
+let missingMeTicks = 0;
 let localStunTimer = 0;
 let lockedAimA = 0;
 let wasStunnedLastFrame = false;
@@ -173,6 +175,11 @@ hud.onExitLobby = () => {
   }
   predictor.on = false;
   gameState.alive = false;
+  if (deathScreenTimer !== null) {
+    clearTimeout(deathScreenTimer);
+    deathScreenTimer = null;
+  }
+  missingMeTicks = 0;
   deathCamTarget = null;
   localStunTimer = 0;
   animals.clear();
@@ -712,6 +719,11 @@ const gameState = new GameState({
     }
   },
   onJoined(_id, isReconnecting) {
+    if (deathScreenTimer !== null) {
+      clearTimeout(deathScreenTimer);
+      deathScreenTimer = null;
+    }
+    missingMeTicks = 0;
     deathCamTarget = null;
     isSpectating = false;
     spectateTargetId = null;
@@ -734,7 +746,8 @@ const gameState = new GameState({
     for (const [id, x, z, _a, mass, flags, _charge] of s.p) {
       if (id === gameState.myId && gameState.alive) {
         seenMe = true;
-        if (firstSpawn) {
+        missingMeTicks = 0;
+        if (firstSpawn || Math.hypot(x - world.camTarget.x, z - world.camTarget.z) > 40) {
           firstSpawn = false;
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
@@ -769,6 +782,30 @@ const gameState = new GameState({
     }
     if (!seenMe) {
       predictor.on = false;
+      if (transport && transport.inGame && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
+        missingMeTicks++;
+        if (missingMeTicks >= 20) {
+          missingMeTicks = 0;
+          console.warn('[Watchdog] Character missing from server snapshots for >1s. Auto-recovering player...');
+          firstSpawn = true;
+          gameState.alive = true;
+          const name = hud.selectedName || 'Brawler';
+          const species = hud.selectedSpecies || 'chicken';
+          const skin = hud.selectedSkin || 0;
+          const team = hud.selectedMode === 'team' ? hud.selectedTeam : undefined;
+          const matchDuration = hud.selectedMode === 'friend' ? hud.getMatchDuration() : undefined;
+          transport.send({
+            t: 'join',
+            name,
+            species,
+            skin,
+            team,
+            matchDuration,
+            token: transport.sessionToken || undefined,
+          });
+          hud.showToast('⚡ Đã tự động phục hồi và đưa nhân vật trở lại trận đấu!', 2500);
+        }
+      }
     }
 
     // King choice card options
@@ -891,9 +928,15 @@ function handleGameEvent(ev: GameEvent): void {
         localStunTimer = 0;
         wasStunnedLastFrame = false;
         predictor.on = false;
+        missingMeTicks = 0;
+        if (deathScreenTimer !== null) {
+          clearTimeout(deathScreenTimer);
+          deathScreenTimer = null;
+        }
         // Delay death screen to show death animation first
         deathCamTarget = { x: ev.x, z: ev.z };
-        setTimeout(() => {
+        deathScreenTimer = window.setTimeout(() => {
+          deathScreenTimer = null;
           deathCamTarget = null;
           if (transport) transport.inGame = false;
           hud.showDeath(ev, killerName);
@@ -1149,6 +1192,7 @@ function getClientId(): string {
     },
     (status) => {
       if (status === 'open') {
+        missingMeTicks = 0;
         if (targetRoom.startsWith('team-')) {
           transport?.send({ t: 'team_select', team: hud.selectedTeam });
         }
@@ -1157,6 +1201,7 @@ function getClientId(): string {
           : `Đã vào phòng trực tuyến: ${displayCode} 🌐`;
         hud.showToast(msg);
       } else if (status === 'reconnected') {
+        missingMeTicks = 0;
         if (targetRoom.startsWith('team-')) {
           transport?.send({ t: 'team_select', team: hud.selectedTeam });
         }

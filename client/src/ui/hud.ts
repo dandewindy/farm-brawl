@@ -1637,6 +1637,14 @@ export class HudManager {
     if (this.disclaimerModal) this.disclaimerModal.hidden = true;
   }
 
+  isDeathScreenVisible(): boolean {
+    return !this.deathScreen.hidden;
+  }
+
+  isLobbyVisible(): boolean {
+    return !this.startScreen.hidden;
+  }
+
   showInGame(): void {
     this.startScreen.hidden = true;
     this.deathScreen.hidden = true;

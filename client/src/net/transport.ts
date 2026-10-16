@@ -12,6 +12,7 @@ export interface Transport {
   readonly colo?: string;
   inGame?: boolean;
   isMigrating?: boolean;
+  sessionToken?: string | null;
   forceReconnect?(): void;
   triggerHotMigration?(): void;
   leaveGame?(): void;

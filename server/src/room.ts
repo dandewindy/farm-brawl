@@ -3,7 +3,7 @@ import { World } from '@shared/sim/world';
 import { TICK_MS, SKIN_COUNT } from '@shared/constants';
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 
-const GRACE_PERIOD_MS = 8000;
+const GRACE_PERIOD_MS = 15000;
 
 export class GameRoom extends DurableObject {
   private readonly world: World;

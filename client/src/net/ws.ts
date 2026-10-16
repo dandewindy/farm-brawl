@@ -12,7 +12,7 @@ export class WsClient implements Transport {
   private closed = false;
   private isReconnecting = false;
   private lastJoinMsg: (ClientMsg & { t: 'join' }) | null = null;
-  private sessionToken: string | null = null;
+  public sessionToken: string | null = null;
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
@@ -169,6 +169,10 @@ export class WsClient implements Transport {
     socket.onclose = (ev) => {
       if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally
       this.stopPing();
+      if (this.isMigrating || this.migrationWs !== null) {
+        // Handover handled cleanly by migration probe; ignore close of old socket
+        return;
+      }
       if (ev.reason === 'Handover') {
         // Handover handled cleanly by probeSocket
         return;
@@ -180,6 +184,7 @@ export class WsClient implements Transport {
 
     socket.onerror = () => {
       if (this.ws !== socket) return;
+      if (this.isMigrating || this.migrationWs !== null) return;
       this.onStatus?.('error');
     };
   }
@@ -272,6 +277,11 @@ export class WsClient implements Transport {
           this.ws = probeSocket;
           this.migrationWs = null;
           this.isMigrating = false;
+          this.isReconnecting = false;
+          if (this.reconnectTimer !== null) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
           if (msg.colo) this.colo = msg.colo;
           if (msg.token) {
             this.sessionToken = msg.token;
@@ -310,6 +320,10 @@ export class WsClient implements Transport {
       if (this.migrationWs === probeSocket) {
         this.migrationWs = null;
         this.isMigrating = false;
+        // If the main socket closed while probe was in progress, ensure we reconnect
+        if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
+          this.scheduleReconnect();
+        }
       }
     };
     probeSocket.onclose = cleanupProbe;
