@@ -792,6 +792,8 @@ export class HudManager {
         const inputVal = (this.joinRoomCode?.value || '').trim().toUpperCase();
         if (inputVal.length >= 3) {
           this.currentFriendCode = inputVal;
+          if (this.createdRoomCode) this.createdRoomCode.textContent = inputVal;
+          if (this.createdRoomBox) this.createdRoomBox.hidden = false;
         } else if (!this.currentFriendCode) {
           const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
           let res = '';
@@ -1207,6 +1209,26 @@ export class HudManager {
       }
     }
 
+    const applyRoomCode = (rawCode: string) => {
+      const code = rawCode.trim().toUpperCase();
+      if (code.length >= 3) {
+        this.currentFriendCode = code;
+        if (this.createdRoomCode) this.createdRoomCode.textContent = code;
+        if (this.createdRoomBox) this.createdRoomBox.hidden = false;
+        if (this.joinRoomCode) this.joinRoomCode.value = code;
+        if (this.roomStatusNotice) {
+          this.roomStatusNotice.textContent = `Đã chọn phòng: ${code}`;
+          this.roomStatusNotice.style.color = '#52c41a';
+        }
+        this.showToast(`Đã chọn phòng: ${code}`);
+      } else {
+        if (this.roomStatusNotice) {
+          this.roomStatusNotice.textContent = `Mã phòng ít nhất 3 ký tự!`;
+          this.roomStatusNotice.style.color = '#ff4d4f';
+        }
+      }
+    };
+
     if (this.joinRoomCode) {
       this.joinRoomCode.addEventListener('input', () => {
         if (this.joinRoomCode) {
@@ -1215,35 +1237,14 @@ export class HudManager {
       });
       this.joinRoomCode.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-          const code = this.joinRoomCode?.value.trim().toUpperCase() || '';
-          if (code.length >= 3) {
-            this.currentFriendCode = code;
-            if (this.roomStatusNotice) {
-              this.roomStatusNotice.textContent = `Đã chọn phòng: ${code}`;
-              this.roomStatusNotice.style.color = '#52c41a';
-            }
-            this.showToast(`Đã chọn phòng: ${code}`);
-          }
+          applyRoomCode(this.joinRoomCode?.value || '');
         }
       });
     }
 
     if (this.btnApplyCode) {
       this.btnApplyCode.addEventListener('click', () => {
-        const code = (this.joinRoomCode?.value || '').trim().toUpperCase();
-        if (code.length >= 3) {
-          this.currentFriendCode = code;
-          if (this.roomStatusNotice) {
-            this.roomStatusNotice.textContent = `Đã chọn phòng: ${code}`;
-            this.roomStatusNotice.style.color = '#52c41a';
-          }
-          this.showToast(`Đã chọn phòng: ${code}`);
-        } else {
-          if (this.roomStatusNotice) {
-            this.roomStatusNotice.textContent = `Mã phòng ít nhất 3 ký tự!`;
-            this.roomStatusNotice.style.color = '#ff4d4f';
-          }
-        }
+        applyRoomCode(this.joinRoomCode?.value || '');
       });
     }
 
