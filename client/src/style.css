@@ -3262,6 +3262,53 @@ body.mobile-phone #choiceCards .plank .d {
   color: #fff;
   font-weight: 700;
 }
+.time-custom-box {
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(255, 215, 0, 0.25);
+}
+.time-custom-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.time-custom-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  padding: 4px 6px;
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  text-align: center;
+}
+.time-custom-input:focus {
+  border-color: var(--gold);
+  background: rgba(0, 0, 0, 0.65);
+}
+.time-custom-btn {
+  padding: 4px 8px;
+  background: var(--gold);
+  color: #1a1614;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 11.5px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.1s, filter 0.15s;
+}
+.time-custom-btn:hover {
+  filter: brightness(1.1);
+}
+.time-custom-btn:active {
+  transform: scale(0.95);
+}
 #teamBar.friend-timer-only .tb {
   display: none !important;
 }
@@ -3500,23 +3547,189 @@ body.mobile-phone #choiceCards .plank .d {
 }
 .spec-btn.spec-play:hover { background: #73d13d; }
 
-/* Team Win Modal */
-#teamWinModal {
-  display: grid;
-  place-items: center;
-  z-index: 200;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(8px);
+/* Centered Modals for Team Win and Friend Match End */
+#teamWinModal,
+#friendResultModal,
+.friend-result-screen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 220 !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
 }
-.team-win-card {
-  max-width: 480px;
-  width: 90%;
+
+#teamWinModal[hidden],
+#friendResultModal[hidden] {
+  display: none !important;
+}
+
+.team-win-card,
+.friend-result-card {
+  position: relative !important;
+  margin: auto !important;
+  width: min(460px, 94vw) !important;
+  max-width: 460px !important;
   text-align: center;
-  padding: 24px 28px;
-  border: 3px solid var(--gold);
-  border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(232, 182, 65, 0.35);
-  animation: twPop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  padding: 22px 24px 18px !important;
+  border: 3px solid var(--gold) !important;
+  border-radius: 20px !important;
+  background: var(--ink) !important;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(232, 182, 65, 0.3) !important;
+  animation: twPop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Dedicated Friend Result Modal Styles */
+.fr-header {
+  margin-bottom: 12px;
+}
+.fr-trophy {
+  font-size: 38px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.fr-title {
+  font: 800 24px var(--f-display);
+  margin: 0 0 4px;
+  color: var(--gold);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.04em;
+}
+.fr-sub {
+  font-size: 13px;
+  color: #d8c9a8;
+  margin: 0;
+}
+.fr-board-wrap {
+  background: rgba(20, 16, 14, 0.65);
+  border: 1px solid rgba(224, 159, 62, 0.25);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+.fr-board-head {
+  display: flex;
+  align-items: center;
+  font-family: var(--f-display);
+  font-size: 11px;
+  font-weight: 800;
+  color: #a89a88;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.fr-th-rank {
+  width: 44px;
+  flex-shrink: 0;
+}
+.fr-th-name {
+  flex: 1;
+}
+.fr-th-stats {
+  text-align: right;
+  flex-shrink: 0;
+}
+.fr-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.fr-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  transition: background 0.12s ease;
+}
+.fr-rank {
+  width: 44px;
+  flex-shrink: 0;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 12.5px;
+  color: #a89a88;
+}
+.fr-name {
+  flex: 1;
+  font-weight: 700;
+  color: #f2ead7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fr-me-tag {
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(79, 195, 247, 0.2);
+  color: #4fc3f7;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(79, 195, 247, 0.35);
+}
+.fr-stats {
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: #e8dcb0;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Highlight Top 1 Player */
+.fr-item.fr-top1 {
+  background: linear-gradient(90deg, rgba(232, 182, 65, 0.24), rgba(232, 182, 65, 0.08)) !important;
+  border: 1.5px solid var(--gold) !important;
+  box-shadow: 0 2px 10px rgba(232, 182, 65, 0.25) !important;
+}
+.fr-item.fr-top1 .fr-rank {
+  color: var(--gold);
+  font-size: 13.5px;
+}
+.fr-item.fr-top1 .fr-name {
+  color: var(--gold);
+  font-size: 14.5px;
+  font-weight: 800;
+}
+.fr-item.fr-top1 .fr-stats {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* Local Player Row */
+.fr-item.fr-me {
+  border-color: rgba(79, 195, 247, 0.5);
+}
+
+.fr-continue-btn {
+  width: 100%;
+  font-size: 18px;
+  padding: 12px;
+  margin-bottom: 8px;
 }
 @keyframes twPop {
   0% { transform: scale(0.85); opacity: 0; }

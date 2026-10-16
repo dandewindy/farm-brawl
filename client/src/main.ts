@@ -1033,7 +1033,11 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'teamWin': {
       sfxReward();
-      hud.showTeamWinModal(ev.winner, ev.s0, ev.s1, ev.mvp);
+      if (hud.selectedMode === 'friend' || currentRoomName.startsWith('priv-') || currentRoomName.startsWith('friend-')) {
+        hud.showFriendResultModal(ev.ranks || gameState.lb, gameState.myId);
+      } else {
+        hud.showTeamWinModal(ev.winner, ev.s0, ev.s1, ev.mvp);
+      }
       break;
     }
     case 'map': {

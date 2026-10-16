@@ -289,17 +289,9 @@
                         <span class="t-badge">-</span>
                         <span class="t-text" data-i18n="time_none">Không giới hạn</span>
                       </button>
-                      <button type="button" class="time-opt" data-time="60">
-                        <span class="t-badge">1m</span>
-                        <span class="t-text" data-i18n="time_1m">1 phút</span>
-                      </button>
                       <button type="button" class="time-opt" data-time="120">
                         <span class="t-badge">2m</span>
                         <span class="t-text" data-i18n="time_2m">2 phút</span>
-                      </button>
-                      <button type="button" class="time-opt" data-time="180">
-                        <span class="t-badge">3m</span>
-                        <span class="t-text" data-i18n="time_3m">3 phút</span>
                       </button>
                       <button type="button" class="time-opt" data-time="300">
                         <span class="t-badge">5m</span>
@@ -309,6 +301,12 @@
                         <span class="t-badge">10m</span>
                         <span class="t-text" data-i18n="time_10m">10 phút</span>
                       </button>
+                      <div class="time-custom-box">
+                        <div class="time-custom-row">
+                          <input type="number" id="customTimeInput" class="time-custom-input" min="1" max="120" placeholder="Số phút..." />
+                          <button type="button" id="btnApplyCustomTime" class="time-custom-btn" data-i18n="time_set">Đặt</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -420,6 +418,44 @@
       <div class="death-actions-row">
         <button id="spectateBtn" class="btn-ghost" type="button">Xem</button>
         <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Friend Match End Results Modal -->
+  <div id="friendResultModal" class="screen friend-result-screen" hidden>
+    <div class="card friend-result-card">
+      <button id="friendExitBtn" type="button" class="death-exit-btn" title="Thoát ra sảnh" aria-label="Thoát ra sảnh">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"></path>
+          <path d="M2 20h20"></path>
+          <circle cx="14.5" cy="12" r="1.2" fill="currentColor" stroke="none"></circle>
+        </svg>
+      </button>
+
+      <div class="fr-header">
+        <div class="fr-trophy">⏱️</div>
+        <h2 id="frTitle" class="fr-title" data-i18n="friendResultTitle">KẾT QUẢ TRẬN ĐẤU</h2>
+        <p id="frSub" class="fr-sub" data-i18n="friendResultSub">Bảng xếp hạng chung cuộc</p>
+      </div>
+
+      <div class="fr-board-wrap">
+        <div class="fr-board-head">
+          <span class="fr-th-rank">#</span>
+          <span class="fr-th-name" data-i18n="frThPlayer">Người chơi</span>
+          <span class="fr-th-stats" data-i18n="frThStats">Thành tích</span>
+        </div>
+        <ol id="frList" class="fr-list">
+          <!-- dynamically populated rows -->
+        </ol>
+      </div>
+
+      <div id="frCountdown" class="tw-countdown" hidden>Vào trận sau <b id="frTimer">3</b>s...</div>
+
+      <button id="friendContinueBtn" class="btn-red fr-continue-btn" type="button" data-i18n="continue">TIẾP TỤC</button>
+      <div class="death-actions-row">
+        <button id="friendSpectateBtn" class="btn-ghost" type="button" data-i18n="spectate">Xem</button>
+        <button id="friendChangeBtn" class="btn-ghost" type="button" data-i18n="changeAnimal">Đổi con vật</button>
       </div>
     </div>
   </div>

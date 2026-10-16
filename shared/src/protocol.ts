@@ -97,6 +97,7 @@ export type GameEvent =
         kills: number;
         mass: number;
       };
+      ranks?: LeaderRow[];
     }
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }

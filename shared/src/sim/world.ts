@@ -355,18 +355,22 @@ export class World {
           this.matchEnded = true;
           this.matchEndTimer = 0;
 
-          // Determine winner & MVP in friend mode
-          let winnerPlayer: Player | null = null;
-          let bestScore = -1;
-          for (const p of this.players.values()) {
-            if (p.bot) continue;
-            const pScore = p.score || 0;
-            const pVal = pScore * 1000 + (p.mass || 0);
-            if (pVal > bestScore || !winnerPlayer) {
-              bestScore = pVal;
-              winnerPlayer = p;
-            }
-          }
+          // Determine winner & ranks in friend mode
+          const activeHumans = [...this.players.values()].filter((p) => !p.bot);
+          activeHumans.sort((a, b) => {
+            const aVal = (a.score || 0) * 1000 + (a.mass || 0);
+            const bVal = (b.score || 0) * 1000 + (b.mass || 0);
+            return bVal - aVal;
+          });
+          const winnerPlayer = activeHumans[0] || null;
+          const ranks = activeHumans.slice(0, 10).map((p): LeaderRow => [
+            p.id,
+            p.name,
+            Math.round(p.best ?? p.mass),
+            p.totalKills ?? p.kills,
+            p.reign,
+          ]);
+
           const mvp = winnerPlayer
             ? {
                 id: winnerPlayer.id,
@@ -386,6 +390,7 @@ export class World {
             s0: 0,
             s1: 0,
             mvp,
+            ranks,
           });
         }
       } else {

@@ -238,6 +238,17 @@ const vi = {
   friendWinTie: '⏱️ HẾT GIỜ THI ĐẤU!',
   friendWinSub: 'Chiến binh vô địch với {mass} kg & {k} hạ gục!',
   friendMvpHeader: '⭐ CHIẾN BINH XUẤT SẮC NHẤT ⭐',
+  time_custom_ph: 'Số phút...',
+  time_set: 'Đặt',
+  time_mins: '{m} phút',
+  friendResultTitle: 'KẾT QUẢ TRẬN ĐẤU',
+  friendResultSub: 'Bảng xếp hạng chung cuộc',
+  frThPlayer: 'Người chơi',
+  frThStats: 'Thành tích',
+  frYou: 'Bạn',
+  continue: 'TIẾP TỤC',
+  spectate: 'Xem',
+  changeAnimal: 'Đổi con vật',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -479,6 +490,17 @@ const en: Record<keyof typeof vi, string> = {
   friendWinTie: '⏱️ TIME\'S UP!',
   friendWinSub: 'Champion of the farm with {mass} kg & {k} KOs!',
   friendMvpHeader: '⭐ TOP CHAMPION ⭐',
+  time_custom_ph: 'Minutes...',
+  time_set: 'Set',
+  time_mins: '{m} mins',
+  friendResultTitle: 'MATCH RESULTS',
+  friendResultSub: 'Final Leaderboard',
+  frThPlayer: 'Player',
+  frThStats: 'Stats',
+  frYou: 'You',
+  continue: 'CONTINUE',
+  spectate: 'Spectate',
+  changeAnimal: 'Change Animal',
 };
 
 export function formatTeamCount(count: number): string {
