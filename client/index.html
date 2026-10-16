@@ -279,6 +279,38 @@
                   <span id="createdRoomCode">------</span>
                   <button type="button" id="btnCopyCode" class="btn-copy-ico" title="Sao chép mã">📋</button>
                   <button type="button" id="btnCopyLink" class="btn-copy-ico" title="Sao chép link mời">🔗</button>
+                  <div class="time-picker-wrap">
+                    <button type="button" id="btnMatchTime" class="btn-copy-ico btn-time-ico" title="Thời gian trận đấu">
+                      <span class="ico">⏱️</span><span id="matchTimeLabel" class="time-val">-</span>
+                    </button>
+                    <div id="matchTimeMenu" class="time-picker-menu" hidden>
+                      <div class="time-picker-header" data-i18n="matchTimeHeader">THỜI GIAN TRẬN</div>
+                      <button type="button" class="time-opt on" data-time="0">
+                        <span class="t-badge">-</span>
+                        <span class="t-text" data-i18n="time_none">Không giới hạn</span>
+                      </button>
+                      <button type="button" class="time-opt" data-time="60">
+                        <span class="t-badge">1m</span>
+                        <span class="t-text" data-i18n="time_1m">1 phút</span>
+                      </button>
+                      <button type="button" class="time-opt" data-time="120">
+                        <span class="t-badge">2m</span>
+                        <span class="t-text" data-i18n="time_2m">2 phút</span>
+                      </button>
+                      <button type="button" class="time-opt" data-time="180">
+                        <span class="t-badge">3m</span>
+                        <span class="t-text" data-i18n="time_3m">3 phút</span>
+                      </button>
+                      <button type="button" class="time-opt" data-time="300">
+                        <span class="t-badge">5m</span>
+                        <span class="t-text" data-i18n="time_5m">5 phút</span>
+                      </button>
+                      <button type="button" class="time-opt" data-time="600">
+                        <span class="t-badge">10m</span>
+                        <span class="t-text" data-i18n="time_10m">10 phút</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

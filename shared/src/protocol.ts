@@ -140,16 +140,18 @@ export interface Snapshot {
 }
 
 export type ServerMsg =
-  | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[] }
+  | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[]; matchDuration?: number }
   | { t: 'joined'; id: number; token?: string; colo?: string }
   | { t: 'pong'; c: number; colo?: string }
   | { t: 'team_counts'; c0: number; c1: number }
+  | { t: 'match_duration'; duration: number }
   | Snapshot;
 
 export type ClientMsg =
-  | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string }
+  | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string; matchDuration?: number }
   | { t: 'leave' }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }
   | { t: 'team_select'; team: number }
+  | { t: 'set_match_duration'; duration: number }
   | ({ t: 'input' } & Input);

@@ -225,6 +225,19 @@ const vi = {
   disclaimerP2: 'Trò chơi không có ý định phát hành hay phổ biến thương mại rộng rãi ra công chúng. Mọi tài nguyên âm thanh và hình ảnh được sử dụng phục vụ cho sự kiện nội bộ.',
   disclaimerContactLbl: 'Mọi thắc mắc, đóng góp hoặc vấn đề bản quyền, xin vui lòng gửi về:',
   disclaimerAgree: 'ĐỒNG Ý',
+  matchTimeHeader: 'THỜI GIAN TRẬN',
+  matchTimeTitle: 'Thời gian trận đấu',
+  time_none: 'Không giới hạn',
+  time_1m: '1 phút',
+  time_2m: '2 phút',
+  time_3m: '3 phút',
+  time_5m: '5 phút',
+  time_10m: '10 phút',
+  matchTimeToast: 'Đã đặt thời gian trận: {t}',
+  friendWinTitle: '🏆 {name} CHIẾN THẮNG!',
+  friendWinTie: '⏱️ HẾT GIỜ THI ĐẤU!',
+  friendWinSub: 'Chiến binh vô địch với {mass} kg & {k} hạ gục!',
+  friendMvpHeader: '⭐ CHIẾN BINH XUẤT SẮC NHẤT ⭐',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -453,6 +466,19 @@ const en: Record<keyof typeof vi, string> = {
   disclaimerP2: 'The game is not intended for broad public release or commercial distribution. All audiovisual assets are used exclusively for internal event activities.',
   disclaimerContactLbl: 'For any inquiries, feedback, or copyright matters, please contact:',
   disclaimerAgree: 'I AGREE',
+  matchTimeHeader: 'MATCH DURATION',
+  matchTimeTitle: 'Match duration',
+  time_none: 'Unlimited',
+  time_1m: '1 min',
+  time_2m: '2 mins',
+  time_3m: '3 mins',
+  time_5m: '5 mins',
+  time_10m: '10 mins',
+  matchTimeToast: 'Match duration set to: {t}',
+  friendWinTitle: '🏆 {name} WINS!',
+  friendWinTie: '⏱️ TIME\'S UP!',
+  friendWinSub: 'Champion of the farm with {mass} kg & {k} KOs!',
+  friendMvpHeader: '⭐ TOP CHAMPION ⭐',
 };
 
 export function formatTeamCount(count: number): string {

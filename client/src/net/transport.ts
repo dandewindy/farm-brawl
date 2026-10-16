@@ -58,10 +58,21 @@ export class LocalServer implements Transport {
           if (p.bot) this.world.removePlayer(id);
         }
       }
+      if (m.matchDuration !== undefined && this.world.matchDuration === 0) {
+        this.world.matchDuration = m.matchDuration;
+        this.world.matchClock = m.matchDuration;
+      }
       const me = this.world.players.get(this.myId);
       if (me) this.world.respawn(this.myId, m.name, m.species, m.skin, m.team);
       else this.myId = this.world.addPlayer(m.name, m.species, false, m.team, m.skin);
       this.onMsg({ t: 'joined', id: this.myId });
+    } else if (m.t === 'set_match_duration') {
+      const dur = Math.max(0, Math.floor(m.duration || 0));
+      this.world.matchDuration = dur;
+      this.world.matchClock = dur;
+      this.world.matchEnded = false;
+      this.world.matchEndTimer = 0;
+      this.onMsg({ t: 'match_duration', duration: dur });
     } else if (m.t === 'input') {
       this.world.setInput(this.myId, m);
     } else if (m.t === 'rule') {

@@ -101,9 +101,16 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
   if (transport) {
     transport.inGame = true;
     const team = mode === 'team' ? hud.selectedTeam : undefined;
-    transport.send({ t: 'join', name, species, skin, team });
+    const matchDuration = mode === 'friend' ? hud.getMatchDuration() : undefined;
+    transport.send({ t: 'join', name, species, skin, team, matchDuration });
   }
 });
+
+hud.onSetMatchDuration = (dur: number) => {
+  if (currentRoomName.startsWith('priv-') && transport) {
+    transport.send({ t: 'set_match_duration', duration: dur });
+  }
+};
 
 hud.onSelectMode = (mode) => {
   if (mode === 'team') {
@@ -1097,6 +1104,11 @@ function connectToRoom(targetRoom: string): void {
 
   if (isExplicitOffline) {
     transport = new LocalServer((m) => {
+      if ((m as any).t === 'match_duration') {
+        const md = m as any;
+        hud.setMatchDuration(md.duration, false);
+        return;
+      }
       gameState.handle(m);
     });
     return;
@@ -1124,6 +1136,11 @@ function getClientId(): string {
         hud.updateTeamCounts(tc.c0, tc.c1);
         return;
       }
+      if ((m as any).t === 'match_duration') {
+        const md = m as any;
+        hud.setMatchDuration(md.duration, false);
+        return;
+      }
       gameState.handle(m);
     },
     (status) => {
@@ -1147,7 +1164,14 @@ function getClientId(): string {
       } else if (status === 'error' && isViteDev && !fallbackLocal) {
         console.warn('Worker server not detected at port 8787. Falling back to LocalServer.');
         fallbackLocal = true;
-        transport = new LocalServer((m) => gameState.handle(m));
+        transport = new LocalServer((m) => {
+          if ((m as any).t === 'match_duration') {
+            const md = m as any;
+            hud.setMatchDuration(md.duration, false);
+            return;
+          }
+          gameState.handle(m);
+        });
       }
     }
   );

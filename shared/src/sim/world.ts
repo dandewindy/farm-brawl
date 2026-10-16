@@ -126,6 +126,7 @@ export class World {
   };
   teamScores: [number, number] = [0, 0];
   matchClock = 300;
+  matchDuration = 0;
   matchEnded = false;
   matchEndTimer = 0;
 
@@ -326,6 +327,64 @@ export class World {
             winner,
             s0: Math.round(this.teamScores[0]),
             s1: Math.round(this.teamScores[1]),
+            mvp,
+          });
+        }
+      } else {
+        // After 6s celebration, renew game with brand new map layout and items
+        this.matchEndTimer += DT;
+        if (this.matchEndTimer >= 6.0) {
+          this.renewGame();
+        }
+      }
+    } else if (this.mode === 'friend' && this.matchDuration > 0) {
+      const activePlayers = [...this.players.values()].filter((p) => !p.bot);
+      const canStartMatch = activePlayers.length >= 1;
+
+      if (!this.matchEnded) {
+        if (canStartMatch) {
+          this.matchClock = Math.max(0, this.matchClock - DT);
+          if (this.napoleonId > 0) {
+            const king = this.players.get(this.napoleonId);
+            if (king && king.alive) {
+              king.score = (king.score || 0) + DT * 10;
+            }
+          }
+        }
+        if (this.matchClock <= 0) {
+          this.matchEnded = true;
+          this.matchEndTimer = 0;
+
+          // Determine winner & MVP in friend mode
+          let winnerPlayer: Player | null = null;
+          let bestScore = -1;
+          for (const p of this.players.values()) {
+            if (p.bot) continue;
+            const pScore = p.score || 0;
+            const pVal = pScore * 1000 + (p.mass || 0);
+            if (pVal > bestScore || !winnerPlayer) {
+              bestScore = pVal;
+              winnerPlayer = p;
+            }
+          }
+          const mvp = winnerPlayer
+            ? {
+                id: winnerPlayer.id,
+                name: winnerPlayer.name,
+                team: 0,
+                species: winnerPlayer.species,
+                skin: winnerPlayer.skin,
+                score: Math.round(winnerPlayer.score || 0),
+                kills: winnerPlayer.totalKills ?? winnerPlayer.kills,
+                mass: Math.round(winnerPlayer.best ?? winnerPlayer.mass),
+              }
+            : undefined;
+
+          this.events.push({
+            k: 'teamWin',
+            winner: winnerPlayer ? winnerPlayer.id : -1,
+            s0: 0,
+            s1: 0,
             mvp,
           });
         }
@@ -1381,6 +1440,7 @@ export class World {
       players: [...this.players.values()].filter((p) => p.alive).map((p) => this.meta(p)),
       food: [...this.food.values()].map((f) => [f.id, r2(f.x), r2(f.z), f.k, Math.round(f.v * 10) / 10]),
       tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
+      matchDuration: this.matchDuration,
     };
   }
 
@@ -1455,6 +1515,8 @@ export class World {
         else if (o.team === 1) count1++;
       }
       snap.team = [Math.round(this.teamScores[0]), Math.round(this.teamScores[1]), Math.ceil(this.matchClock), count0, count1];
+    } else if (this.mode === 'friend' && this.matchDuration > 0) {
+      snap.team = [0, 0, Math.ceil(this.matchClock), 0, 0];
     }
     return snap;
   }
@@ -1468,7 +1530,7 @@ export class World {
     this.tools.clear();
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < 6; i++) this.spawnTool();
-    this.matchClock = 300;
+    this.matchClock = this.mode === 'friend' ? this.matchDuration : 300;
     this.teamScores = [0, 0];
     this.matchEnded = false;
     this.matchEndTimer = 0;

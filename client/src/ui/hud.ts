@@ -157,6 +157,11 @@ export class HudManager {
   private readonly joinRoomCode: HTMLInputElement | null;
   private readonly btnApplyCode: HTMLElement | null;
   private readonly roomStatusNotice: HTMLElement | null;
+  private readonly btnMatchTime: HTMLButtonElement | null;
+  private readonly matchTimeLabel: HTMLElement | null;
+  private readonly matchTimeMenu: HTMLElement | null;
+  private matchDuration = 0;
+  public onSetMatchDuration?: (dur: number) => void;
 
   private previewRenderer: AnimalPreviewRenderer | null = null;
   private readonly spPreviewTitle: HTMLElement | null;
@@ -281,6 +286,9 @@ export class HudManager {
     this.createdRoomCode = document.getElementById('createdRoomCode');
     this.btnCopyCode = document.getElementById('btnCopyCode');
     this.btnCopyLink = document.getElementById('btnCopyLink');
+    this.btnMatchTime = document.getElementById('btnMatchTime') as HTMLButtonElement | null;
+    this.matchTimeLabel = document.getElementById('matchTimeLabel');
+    this.matchTimeMenu = document.getElementById('matchTimeMenu');
     this.joinRoomCode = document.getElementById('joinRoomCode') as HTMLInputElement | null;
     this.btnApplyCode = document.getElementById('btnApplyCode');
     this.roomStatusNotice = document.getElementById('roomStatusNotice');
@@ -603,6 +611,7 @@ export class HudManager {
         if (this.disclaimerBtn) {
           this.disclaimerBtn.title = t('disclaimerBtnTitle');
         }
+        this.updateMatchTimeUI();
         updateAllButtons();
         this.updateTeamCounts(this.lastCount0, this.lastCount1);
         this.onChangeLanguage?.(nextLang);
@@ -931,13 +940,14 @@ export class HudManager {
     if (this.twContinueBtn) {
       const continueBtn = this.twContinueBtn;
       continueBtn.addEventListener('click', () => {
-        if (twCountdownTimer) return;
-        const myTeam = this.selectedTeam;
-        const otherTeam = myTeam === 0 ? 1 : 0;
-        const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
-        if (otherCount < 1) {
-          this.showCenterAlert(t('teamNeedPlayers'));
-          return;
+        if (this.selectedMode === 'team') {
+          const myTeam = this.selectedTeam;
+          const otherTeam = myTeam === 0 ? 1 : 0;
+          const otherCount = otherTeam === 0 ? this.lastCount0 : this.lastCount1;
+          if (otherCount < 1) {
+            this.showCenterAlert(t('teamNeedPlayers'));
+            return;
+          }
         }
 
         twCountdownSec = 3;
@@ -1002,10 +1012,39 @@ export class HudManager {
     if (this.btnCopyLink) {
       this.btnCopyLink.addEventListener('click', () => {
         if (this.currentFriendCode) {
-          const url = `${window.location.origin}${window.location.pathname}?room=priv-${this.currentFriendCode}`;
+          const timeParam = this.matchDuration > 0 ? `&time=${this.matchDuration}` : '';
+          const url = `${window.location.origin}${window.location.pathname}?room=priv-${this.currentFriendCode}${timeParam}`;
           navigator.clipboard.writeText(url);
           this.showToast(`Đã chép link mời: ${url} 🔗`);
         }
+      });
+    }
+
+    if (this.btnMatchTime && this.matchTimeMenu) {
+      this.updateMatchTimeUI();
+
+      this.btnMatchTime.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.matchTimeMenu!.hidden = !this.matchTimeMenu!.hidden;
+      });
+
+      window.addEventListener('pointerdown', (e) => {
+        if (!this.matchTimeMenu?.hidden) {
+          const wrap = this.btnMatchTime?.closest('.time-picker-wrap');
+          if (wrap && !wrap.contains(e.target as Node)) {
+            this.matchTimeMenu!.hidden = true;
+          }
+        }
+      });
+
+      this.matchTimeMenu.querySelectorAll<HTMLButtonElement>('.time-opt').forEach((opt) => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const dur = parseInt(opt.getAttribute('data-time') || '0', 10);
+          this.setMatchDuration(dur);
+          this.matchTimeMenu!.hidden = true;
+          this.onSetMatchDuration?.(dur);
+        });
       });
     }
 
@@ -1106,8 +1145,20 @@ export class HudManager {
       }
     }
 
+    const timeParam = urlParams.get('time');
+    if (timeParam) {
+      const dur = parseInt(timeParam, 10);
+      if (!isNaN(dur) && dur >= 0) {
+        this.setMatchDuration(dur, false);
+      }
+    }
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        if (this.matchTimeMenu && !this.matchTimeMenu.hidden) {
+          this.matchTimeMenu.hidden = true;
+          return;
+        }
         if (this.disclaimerModal && !this.disclaimerModal.hidden) {
           this.hideDisclaimer();
           return;
@@ -1235,13 +1286,67 @@ export class HudManager {
   public updateTeamBar(t0: number, t1: number, clockSec: number, count0?: number, count1?: number): void {
     if (this.teamBarEl) {
       this.teamBarEl.hidden = false;
-      document.body.classList.add('mode-team');
+      if (this.selectedMode === 'friend') {
+        this.teamBarEl.classList.add('friend-timer-only');
+        document.body.classList.remove('mode-team');
+      } else {
+        this.teamBarEl.classList.remove('friend-timer-only');
+        document.body.classList.add('mode-team');
+      }
     }
     if (this.ts0El) this.ts0El.textContent = String(t0);
     if (this.ts1El) this.ts1El.textContent = String(t1);
-    if (this.tClockEl) this.tClockEl.textContent = this.fmtTime(clockSec);
+    if (this.tClockEl) {
+      this.tClockEl.textContent = (this.selectedMode === 'friend' ? '⏱️ ' : '') + this.fmtTime(clockSec);
+    }
     if (count0 !== undefined && count1 !== undefined) {
       this.updateTeamCounts(count0, count1);
+    }
+  }
+
+  public getMatchDuration(): number {
+    return this.matchDuration;
+  }
+
+  public getMatchDurationText(dur: number): string {
+    if (dur <= 0) return t('time_none');
+    if (dur >= 60) {
+      const m = Math.floor(dur / 60);
+      const s = dur % 60;
+      return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    }
+    return `${dur}s`;
+  }
+
+  public setMatchDuration(dur: number, notify = true): void {
+    const prev = this.matchDuration;
+    this.matchDuration = Math.max(0, Math.floor(dur));
+    this.updateMatchTimeUI();
+    if (notify && prev !== this.matchDuration && this.matchDuration > 0) {
+      this.showToast(t('matchTimeToast', { t: this.getMatchDurationText(this.matchDuration) }));
+    }
+  }
+
+  public updateMatchTimeUI(): void {
+    const txt = this.matchDuration > 0 ? this.getMatchDurationText(this.matchDuration) : '-';
+    if (this.matchTimeLabel) {
+      this.matchTimeLabel.textContent = txt;
+    }
+    if (this.btnMatchTime) {
+      this.btnMatchTime.title = `${t('matchTimeTitle')}: ${txt}`;
+    }
+    if (this.matchTimeMenu) {
+      const header = this.matchTimeMenu.querySelector('.time-picker-header');
+      if (header) header.textContent = t('matchTimeHeader');
+      this.matchTimeMenu.querySelectorAll<HTMLButtonElement>('.time-opt').forEach((opt) => {
+        const d = parseInt(opt.getAttribute('data-time') || '0', 10);
+        opt.classList.toggle('on', d === this.matchDuration);
+        const tText = opt.querySelector('.t-text');
+        if (tText) {
+          const key = d === 0 ? 'time_none' : `time_${Math.floor(d / 60)}m`;
+          tText.textContent = t(key as any);
+        }
+      });
     }
   }
 
@@ -1350,8 +1455,11 @@ export class HudManager {
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
     document.body.classList.remove('spectating');
-    if (this.selectedMode !== 'team') {
-      if (this.teamBarEl) this.teamBarEl.hidden = true;
+    if (this.selectedMode !== 'team' && !(this.selectedMode === 'friend' && this.matchDuration > 0)) {
+      if (this.teamBarEl) {
+        this.teamBarEl.hidden = true;
+        this.teamBarEl.classList.remove('friend-timer-only');
+      }
       document.body.classList.remove('mode-team');
     }
     this.hudEl.hidden = false;
@@ -1373,6 +1481,10 @@ export class HudManager {
     this.deathScreen.hidden = true;
     if (this.disclaimerModal) this.disclaimerModal.hidden = true;
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
+    if (this.teamBarEl) {
+      this.teamBarEl.hidden = true;
+      this.teamBarEl.classList.remove('friend-timer-only');
+    }
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     const gameDrawer = document.getElementById('gameDrawerModal');
     if (gameDrawer) gameDrawer.hidden = true;
@@ -1478,34 +1590,82 @@ export class HudManager {
     document.body.classList.add('menu');
 
     if (this.teamWinModalEl) this.teamWinModalEl.hidden = false;
-    if (this.twTitleEl) {
-      if (winner === 0) {
-        this.twTitleEl.textContent = '🏆 ĐỘI A12 CHIẾN THẮNG!';
-        this.twTitleEl.style.color = '#4fc3f7';
-      } else if (winner === 1) {
-        this.twTitleEl.textContent = '🏆 ĐỘI WFM CHIẾN THẮNG!';
-        this.twTitleEl.style.color = '#f44336';
-      } else {
-        this.twTitleEl.textContent = '🤝 TRẬN ĐẤU HOÀ!';
-        this.twTitleEl.style.color = 'var(--gold)';
-      }
-    }
-    if (this.twScore0El) this.twScore0El.textContent = String(s0);
-    if (this.twScore1El) this.twScore1El.textContent = String(s1);
+    const isFriendMode = this.selectedMode === 'friend';
+    const scoreBox = this.teamWinModalEl?.querySelector('.tw-score-box') as HTMLElement | null;
+    const nextSection = this.teamWinModalEl?.querySelector('.tw-next-section') as HTMLElement | null;
+    const twSubEl = document.getElementById('twSub');
+    const mvpHeaderEl = this.teamWinModalEl?.querySelector('.tw-mvp-header') as HTMLElement | null;
 
-    if (this.twMvpBoxEl) {
-      if (mvp) {
-        this.twMvpBoxEl.hidden = false;
-        if (this.twMvpNameEl) {
-          const teamLabel = mvp.team === 0 ? 'Đội A12' : 'Đội WFM';
-          this.twMvpNameEl.textContent = `${mvp.name} (${teamLabel})`;
-          this.twMvpNameEl.style.color = mvp.team === 0 ? '#4fc3f7' : '#f44336';
+    if (scoreBox) scoreBox.hidden = isFriendMode;
+    if (nextSection) nextSection.hidden = isFriendMode;
+
+    if (isFriendMode) {
+      if (this.twTitleEl) {
+        if (mvp) {
+          this.twTitleEl.textContent = t('friendWinTitle', { name: mvp.name });
+          this.twTitleEl.style.color = 'var(--gold)';
+        } else {
+          this.twTitleEl.textContent = t('friendWinTie');
+          this.twTitleEl.style.color = '#fff';
         }
-        if (this.twMvpStatsEl) {
-          this.twMvpStatsEl.textContent = `${mvp.score} điểm · 💥 ${mvp.kills} hạ gục · ⚖️ ${mvp.mass} kg`;
+      }
+      if (twSubEl) {
+        if (mvp) {
+          twSubEl.textContent = t('friendWinSub', { mass: mvp.mass, k: mvp.kills });
+        } else {
+          twSubEl.textContent = '';
         }
-      } else {
-        this.twMvpBoxEl.hidden = true;
+      }
+      if (this.twMvpBoxEl) {
+        if (mvp) {
+          this.twMvpBoxEl.hidden = false;
+          if (mvpHeaderEl) mvpHeaderEl.textContent = t('friendMvpHeader');
+          if (this.twMvpNameEl) {
+            this.twMvpNameEl.textContent = mvp.name;
+            this.twMvpNameEl.style.color = 'var(--gold)';
+          }
+          if (this.twMvpStatsEl) {
+            const isVi = getLanguage() === 'vi';
+            this.twMvpStatsEl.textContent = `${mvp.score} ${isVi ? 'điểm' : 'pts'} · 💥 ${mvp.kills} ${isVi ? 'hạ gục' : 'KOs'} · ⚖️ ${mvp.mass} kg`;
+          }
+        } else {
+          this.twMvpBoxEl.hidden = true;
+        }
+      }
+    } else {
+      if (this.twTitleEl) {
+        if (winner === 0) {
+          this.twTitleEl.textContent = '🏆 ĐỘI A12 CHIẾN THẮNG!';
+          this.twTitleEl.style.color = '#4fc3f7';
+        } else if (winner === 1) {
+          this.twTitleEl.textContent = '🏆 ĐỘI WFM CHIẾN THẮNG!';
+          this.twTitleEl.style.color = '#f44336';
+        } else {
+          this.twTitleEl.textContent = '🤝 TRẬN ĐẤU HOÀ!';
+          this.twTitleEl.style.color = 'var(--gold)';
+        }
+      }
+      if (twSubEl) {
+        twSubEl.textContent = 'Thời gian thống trị nông trại vượt trội!';
+      }
+      if (this.twScore0El) this.twScore0El.textContent = String(s0);
+      if (this.twScore1El) this.twScore1El.textContent = String(s1);
+
+      if (this.twMvpBoxEl) {
+        if (mvp) {
+          this.twMvpBoxEl.hidden = false;
+          if (mvpHeaderEl) mvpHeaderEl.textContent = '⭐ CHIẾN BINH MVP XUẤT SẮC NHẤT ⭐';
+          if (this.twMvpNameEl) {
+            const teamLabel = mvp.team === 0 ? 'Đội A12' : 'Đội WFM';
+            this.twMvpNameEl.textContent = `${mvp.name} (${teamLabel})`;
+            this.twMvpNameEl.style.color = mvp.team === 0 ? '#4fc3f7' : '#f44336';
+          }
+          if (this.twMvpStatsEl) {
+            this.twMvpStatsEl.textContent = `${mvp.score} điểm · 💥 ${mvp.kills} hạ gục · ⚖️ ${mvp.mass} kg`;
+          }
+        } else {
+          this.twMvpBoxEl.hidden = true;
+        }
       }
     }
 
@@ -1515,7 +1675,9 @@ export class HudManager {
       this.twContinueBtn.innerHTML = 'TIẾP TỤC';
       this.twContinueBtn.style.opacity = '1';
     }
-    this.setSelectedTeam(this.selectedTeam);
+    if (!isFriendMode) {
+      this.setSelectedTeam(this.selectedTeam);
+    }
   }
 
   updateStats(mass: number, rank: number, total: number, kills: number): void {

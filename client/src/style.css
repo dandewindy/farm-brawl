@@ -1816,6 +1816,13 @@ body.mobile-phone #spPreviewWrap {
     font-size: 12px;
     border-radius: 6px;
   }
+  .btn-time-ico {
+    min-width: 36px;
+    padding: 0 5px !important;
+    font-size: 11px;
+  }
+  .btn-time-ico .ico { font-size: 12px; }
+  .btn-time-ico .time-val { font-size: 11px; }
   .fp-divider {
     margin: 3px 0;
     font-size: 8px;
@@ -2415,6 +2422,13 @@ body.mobile-phone #teamBar {
     font-size: 10px !important;
     border-radius: 5px !important;
   }
+  .btn-time-ico {
+    min-width: 30px !important;
+    padding: 0 4px !important;
+    font-size: 9.5px !important;
+  }
+  .btn-time-ico .ico { font-size: 10px !important; }
+  .btn-time-ico .time-val { font-size: 9.5px !important; }
   .fp-divider {
     margin: 1px 0 !important;
     font-size: 7px !important;
@@ -3147,6 +3161,126 @@ body.mobile-phone #choiceCards .plank .d {
 }
 .btn-copy-ico:active {
   transform: scale(0.92);
+}
+.time-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.btn-time-ico {
+  width: auto !important;
+  min-width: 44px;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--gold);
+}
+.btn-time-ico .ico {
+  font-size: 14px;
+}
+.btn-time-ico .time-val {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 800;
+}
+.time-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: linear-gradient(135deg, rgba(38, 28, 20, 0.98), rgba(26, 18, 12, 0.98));
+  border: 1.5px solid var(--gold);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 12px rgba(255, 201, 40, 0.25);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 155px;
+  animation: caPopIn 0.15s ease-out;
+}
+.time-picker-menu[hidden] {
+  display: none !important;
+}
+.time-picker-header {
+  font-family: var(--f-display);
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--gold);
+  text-align: center;
+  padding: 2px 0 4px;
+  letter-spacing: 0.06em;
+  border-bottom: 1px dashed rgba(255, 215, 0, 0.25);
+  margin-bottom: 2px;
+}
+.time-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #ddd4c4;
+  padding: 5px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  text-align: left;
+}
+.time-opt .t-badge {
+  font-family: var(--f-display);
+  font-weight: 800;
+  color: var(--gold);
+  min-width: 22px;
+}
+.time-opt .t-text {
+  font-size: 11.5px;
+  color: #d8c9a8;
+  flex: 1;
+  text-align: right;
+}
+.time-opt:hover {
+  background: rgba(255, 201, 40, 0.18);
+  border-color: var(--gold);
+  color: #fff;
+}
+.time-opt.on {
+  background: rgba(255, 201, 40, 0.25);
+  border-color: var(--gold);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(255, 201, 40, 0.2);
+}
+.time-opt.on .t-text {
+  color: #fff;
+  font-weight: 700;
+}
+#teamBar.friend-timer-only .tb {
+  display: none !important;
+}
+#teamBar.friend-timer-only {
+  gap: 0 !important;
+  padding: 4px 14px !important;
+  min-width: unset !important;
+  background: rgba(31, 26, 23, 0.88);
+  border: 1.5px solid var(--gold);
+  border-radius: 20px;
+}
+#teamBar.friend-timer-only #tClock {
+  font-size: 16px;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .room-btn-row {
   display: flex;

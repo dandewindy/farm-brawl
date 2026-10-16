@@ -97,6 +97,9 @@ export class GameRoom extends DurableObject {
 
     this.allSockets.add(ws);
     this.sendTeamCounts(ws);
+    if (this.world.matchDuration > 0) {
+      ws.send(JSON.stringify({ t: 'match_duration', duration: this.world.matchDuration }));
+    }
 
     ws.addEventListener('message', (event) => {
       try {
@@ -277,6 +280,13 @@ export class GameRoom extends DurableObject {
         }
       }
 
+      if (msg.matchDuration !== undefined && this.world.mode === 'friend' && this.world.matchDuration === 0) {
+        const dur = Math.max(0, Math.floor(msg.matchDuration));
+        this.world.matchDuration = dur;
+        this.world.matchClock = dur;
+        this.broadcastMatchDuration(dur);
+      }
+
       this.lobbyTeams.delete(ws);
       this.broadcastTeamCounts();
       this.startLoop();
@@ -303,6 +313,13 @@ export class GameRoom extends DurableObject {
         if (p) p.team = team;
       }
       this.broadcastTeamCounts();
+    } else if (msg.t === 'set_match_duration') {
+      const dur = Math.max(0, Math.floor(msg.duration || 0));
+      this.world.matchDuration = dur;
+      this.world.matchClock = dur;
+      this.world.matchEnded = false;
+      this.world.matchEndTimer = 0;
+      this.broadcastMatchDuration(dur);
     } else if (msg.t === 'input') {
       const playerId = this.sockets.get(ws);
       if (playerId) {
@@ -314,6 +331,15 @@ export class GameRoom extends DurableObject {
       const playerId = this.sockets.get(ws);
       if (playerId) {
         this.world.chooseRule(playerId, msg.id);
+      }
+    }
+  }
+
+  private broadcastMatchDuration(dur: number): void {
+    const payload = JSON.stringify({ t: 'match_duration', duration: dur });
+    for (const ws of this.allSockets) {
+      if (ws.readyState === 1) {
+        try { ws.send(payload); } catch (_) {}
       }
     }
   }
