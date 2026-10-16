@@ -924,7 +924,9 @@ function handleGameEvent(ev: GameEvent): void {
 
       if (ev.id === gameState.napoleonId && ev.id > 0) {
         sfxDethrone();
-        hud.showBanner(killerName ? t('overthrown', { killer: killerName }) : t('napFell', { name: victimName }), killerName ? t('overSubCrown') : t('overSub'));
+        if (!killerName) {
+          hud.showBanner(t('napFell', { name: victimName }), t('overSub'));
+        }
       }
 
       if (ev.id === myId) {
@@ -991,17 +993,25 @@ function handleGameEvent(ev: GameEvent): void {
       setMood(ev.id === myId ? 'napoleon' : 'normal');
       if (ev.id === myId) {
         sfxCrown();
-        hud.showBanner(t('youNap'), t('youNapSub'));
+        if (ev.usurped) {
+          hud.showBanner(t('youUsurped'), t('youUsurpedSub'));
+        } else {
+          hud.showBanner(t('youNap'), t('youNapSub'));
+        }
         hud.updateBoard(gameState.rule, gameState.reign, gameState.metas.get(myId)?.name || 'BẠN', true);
       } else if (ev.id > 0) {
         sfxCrown();
         const king = gameState.metas.get(ev.id);
         const name = king ? king.name : 'Ai đó';
-        hud.showBanner(t('napNew', { name }), t('napSub'));
+        if (ev.usurped) {
+          hud.showBanner(t('napUsurped', { name }), t('napUsurpedSub'));
+        } else {
+          hud.showBanner(t('napNew', { name }), t('napSub'));
+        }
         hud.updateBoard(gameState.rule, gameState.reign, name, false);
       } else {
         sfxDethrone();
-        hud.showToast('👑 Ngai vàng đã bị bỏ trống!');
+        hud.showToast(t('overSub'));
         hud.updateBoard(undefined, 0, undefined, false);
       }
       break;

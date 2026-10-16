@@ -989,6 +989,57 @@ describe('bonus weapons and tools', () => {
 
     expect(chick2.alive).toBe(true); // not crushed because elephant < 1000kg!
   });
+
+  it('killer of King immediately usurps the throne as replacement King', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('OldKing', 'pig');
+    const challengerId = w.addPlayer('Challenger', 'horse');
+    place(w, kingId, 0, 0, 80);
+    place(w, challengerId, 5, 0, 60);
+
+    w.napoleonId = kingId;
+    w.napoleonReign = 20;
+
+    const king = w.players.get(kingId)!;
+    const challenger = w.players.get(challengerId)!;
+
+    // Credit challenger as hitting the king
+    king.lastHitBy = challengerId;
+    king.lastHitT = w.time;
+
+    // Kill king
+    (w as any).kill(king, 'fence');
+
+    expect(king.alive).toBe(false);
+    // Challenger is now the new King!
+    expect(w.napoleonId).toBe(challengerId);
+    expect(w.podiumCaptor).toBe(challengerId);
+    expect(w.podiumProgress).toBe(1.0);
+    expect(w.kingChoice).not.toBeNull();
+    expect(challenger.score).toBeGreaterThanOrEqual(250);
+
+    // Verify events contain usurped napoleon event
+    const napEvent = w.events.find((e) => e.k === 'napoleon' && e.id === challengerId) as any;
+    expect(napEvent).toBeDefined();
+    expect(napEvent.usurped).toBe(true);
+  });
+
+  it('king dying with no killer leaves the throne vacant', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('LonelyKing', 'pig');
+    place(w, kingId, 0, 0, 80);
+    w.napoleonId = kingId;
+    w.napoleonReign = 15;
+
+    (w as any).kill(w.players.get(kingId)!, 'well');
+
+    expect(w.players.get(kingId)!.alive).toBe(false);
+    expect(w.napoleonId).toBe(0);
+    expect(w.podiumProgress).toBe(0);
+
+    const napEvent = w.events.find((e) => e.k === 'napoleon' && e.id === 0);
+    expect(napEvent).toBeDefined();
+  });
 });
 
 

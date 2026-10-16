@@ -1230,27 +1230,13 @@ export class World {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0;
-    if (p.id === this.napoleonId) {
-      const prevKing = this.players.get(this.napoleonId);
-      const dur = Math.round(this.napoleonReign);
-      if (dur >= 5 && prevKing) {
-        this.hof.push([prevKing.name, prevKing.species, dur]);
-        this.hof.sort((a, b) => b[2] - a[2]);
-        this.hof = this.hof.slice(0, 3);
-      }
-      this.napoleonId = 0;
-      this.napoleonReign = 0;
-      this.currentRule = '';
-      this.kingChoice = null;
-      this.podiumPhaseTimer = 30;
-      this.podiumWarned5s = false;
-      this.events.push({ k: 'napoleon', id: 0 });
-    }
+
+    const wasKing = (p.id === this.napoleonId && this.napoleonId > 0);
     const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
     const killer = credited && credited.alive && credited !== p ? credited : undefined;
     let spoils = 0;
     if (killer) {
-      const isKingKill = p.id === this.napoleonId;
+      const isKingKill = wasKing;
       const isSnowballTraitor = this.currentRule === 'snowball' && this.ranked.length > 1 && p.id === (this.ranked[0]?.id === this.napoleonId ? this.ranked[1]?.id : this.ranked[0]?.id);
       const mult = isSnowballTraitor ? 3.0 : isKingKill ? 1.5 : 1.0;
       spoils = Math.round(p.mass * CFG.KILL_SPOILS * mult);
@@ -1281,6 +1267,44 @@ export class World {
     });
     p.streak = 0;
     if (p.bot) p.respawnT = CFG.BOT_RESPAWN;
+
+    if (wasKing) {
+      const prevKing = this.players.get(p.id);
+      const dur = Math.round(this.napoleonReign);
+      if (dur >= 5 && prevKing) {
+        this.hof.push([prevKing.name, prevKing.species, dur]);
+        this.hof.sort((a, b) => b[2] - a[2]);
+        this.hof = this.hof.slice(0, 3);
+      }
+
+      if (killer) {
+        // Killer slays the King and usurps the throne as the new King!
+        this.napoleonId = killer.id;
+        this.napoleonReign = 0;
+        this.currentRule = '';
+        this.podiumCaptor = killer.id;
+        this.podiumProgress = 1.0;
+        this.podiumPhaseTimer = 30;
+        this.podiumWarned5s = false;
+        if (killer.team !== undefined) {
+          this.teamScores[killer.team] += 5; // +5 points for team for crown usurpation
+        }
+        killer.score = (killer.score || 0) + 250;
+        this.events.push({ k: 'napoleon', id: killer.id, usurped: true });
+        this.startKingChoice();
+      } else {
+        // King fell to hazards/environment with no killer credited - throne becomes vacant
+        this.napoleonId = 0;
+        this.napoleonReign = 0;
+        this.currentRule = '';
+        this.kingChoice = null;
+        this.podiumProgress = 0;
+        this.podiumCaptor = 0;
+        this.podiumPhaseTimer = 30;
+        this.podiumWarned5s = false;
+        this.events.push({ k: 'napoleon', id: 0 });
+      }
+    }
   }
 
   // ------------------------------------------------------------------ food

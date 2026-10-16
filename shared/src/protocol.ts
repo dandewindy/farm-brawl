@@ -74,7 +74,7 @@ export type GameEvent =
       spoils: number;
       streak: number;
     }
-  | { k: 'napoleon'; id: number }
+  | { k: 'napoleon'; id: number; usurped?: boolean }
   | { k: 'rule'; id: string }
   | { k: 'tool'; id: number; kind: ToolKind; x: number; z: number }
   | { k: 'song'; id: number; nap: number }
