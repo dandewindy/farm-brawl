@@ -108,11 +108,7 @@ export class World {
   currentRule = '';
   ruleTimer = 0;
   kingChoice: { options: string[]; expireT: number } | null = null;
-  hof: [string, Species, number][] = [
-    ['Vua', 'pig', 35],
-    ['Snowball', 'pig', 22],
-    ['Boxer', 'horse', 16],
-  ];
+  hof: [string, Species, number][] = [];
   tillTruck = {
     active: false,
     x: 0,
@@ -1469,6 +1465,24 @@ export class World {
         | (o.flyT > 0 ? FLAG.FLYING : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
+    let hofList = this.hof;
+    if (this.napoleonId) {
+      const curKing = this.players.get(this.napoleonId);
+      const curDur = Math.round(this.napoleonReign);
+      if (curKing && curDur >= 5) {
+        const copy: [string, Species, number][] = [...this.hof];
+        const exIdx = copy.findIndex(([name]) => name === curKing.name);
+        if (exIdx >= 0) {
+          if (curDur > copy[exIdx][2]) {
+            copy[exIdx] = [curKing.name, curKing.species, curDur];
+          }
+        } else {
+          copy.push([curKing.name, curKing.species, curDur]);
+        }
+        copy.sort((a, b) => b[2] - a[2]);
+        hofList = copy.slice(0, 3);
+      }
+    }
     const snap: Snapshot = {
       t: 's',
       tick: this.tick,
@@ -1481,7 +1495,7 @@ export class World {
       nap: this.napoleonId,
       rule: this.currentRule,
       reign: Math.round(this.napoleonReign),
-      hof: this.hof,
+      hof: hofList,
       podShield: [this.podiumShield, Math.ceil(this.podiumPhaseTimer)],
     };
     if (this.tillTruck.active) {
@@ -1547,6 +1561,7 @@ export class World {
     this.podiumShield = true;
     this.podiumPhaseTimer = 30;
     this.podiumWarned5s = false;
+    this.hof = [];
 
     // Respawns bots at new free spots (in FFA); in team/friend mode no bots exist
     if (this.mode === 'team' || this.mode === 'friend') {

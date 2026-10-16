@@ -788,9 +788,7 @@ const gameState = new GameState({
     if (gameState.lb.length) {
       hud.updateLeaderboard(gameState.lb, gameState.myId, gameState.napoleonId);
     }
-    if (gameState.hof.length) {
-      hud.updateHof(gameState.hof);
-    }
+    hud.updateHof(gameState.hof);
     if (s.team) {
       hud.updateTeamBar(s.team[0], s.team[1], s.team[2], s.team[3], s.team[4]);
     }
@@ -1045,6 +1043,8 @@ function handleGameEvent(ev: GameEvent): void {
       corpses.setMap(ev.map);
       animals.clear();
       tools.clear();
+      gameState.hof = [];
+      hud.updateHof([]);
       hud.showToast('🌾 Trận đấu mới! Bản đồ & thức ăn đã được làm mới!');
       break;
     }
@@ -1095,15 +1095,15 @@ function connectToRoom(targetRoom: string): void {
     ? `${window.location.origin}${window.location.pathname}?room=priv-${displayCode}`
     : (isTeam ? `${window.location.origin}${window.location.pathname}?mode=team&room=${targetRoom}` : undefined);
 
-  if (isTeam) {
+  if (isTeam || isPrivate) {
     hud.setTeamRoomBadge(displayCode, inviteUrl);
-    hud.hideRoomTag();
-  } else {
-    hud.hideTeamRoomBadge();
     hud.setRoomTag(
       isPrivate ? `${displayCode} 📋` : `Phòng ${displayCode}`,
       inviteUrl
     );
+  } else {
+    hud.hideTeamRoomBadge();
+    hud.setRoomTag(`Phòng ${displayCode}`, inviteUrl);
   }
 
   if (isExplicitOffline) {

@@ -17,6 +17,44 @@ export interface FloatingText {
 
 const _projVec = new THREE.Vector3();
 
+/**
+ * Rock-solid clipboard copy function that works across desktop & mobile browsers.
+ * Uses synchronous execCommand('copy') with textarea during the user gesture event,
+ * and calls modern navigator.clipboard.writeText in parallel.
+ */
+export function copyTextToClipboard(text: string): boolean {
+  if (!text) return false;
+  let copied = false;
+
+  // 1. Synchronous execCommand copy with temporary textarea
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.left = '-9999px';
+    el.style.top = '-9999px';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    el.setSelectionRange(0, text.length);
+    copied = document.execCommand('copy');
+    document.body.removeChild(el);
+  } catch (_) {
+    copied = false;
+  }
+
+  // 2. Also invoke navigator.clipboard.writeText for modern browsers
+  if (navigator.clipboard && window.isSecureContext && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(text).then(() => {
+      copied = true;
+    }).catch(() => {});
+  }
+
+  return copied;
+}
+
 export class HudManager {
   private readonly massEl: HTMLElement;
   private readonly rankTxt: HTMLElement;
@@ -1073,21 +1111,42 @@ export class HudManager {
     }
 
     if (this.btnCopyCode) {
-      this.btnCopyCode.addEventListener('click', () => {
-        if (this.currentFriendCode) {
-          navigator.clipboard.writeText(this.currentFriendCode);
-          this.showToast(`Đã sao chép: ${this.currentFriendCode} 📋`);
+      this.btnCopyCode.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = this.currentFriendCode || this.createdRoomCode?.textContent?.trim() || this.joinRoomCode?.value.trim().toUpperCase() || '';
+        if (code && code !== '------') {
+          copyTextToClipboard(code);
+          this.showToast(`Đã sao chép mã phòng: ${code} 📋`);
+        } else {
+          this.showToast(getLanguage() === 'en' ? 'No room code to copy!' : 'Chưa có mã phòng để sao chép!');
         }
       });
     }
 
     if (this.btnCopyLink) {
-      this.btnCopyLink.addEventListener('click', () => {
-        if (this.currentFriendCode) {
+      this.btnCopyLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = this.currentFriendCode || this.createdRoomCode?.textContent?.trim() || this.joinRoomCode?.value.trim().toUpperCase() || '';
+        if (code && code !== '------') {
           const timeParam = this.matchDuration > 0 ? `&time=${this.matchDuration}` : '';
-          const url = `${window.location.origin}${window.location.pathname}?room=priv-${this.currentFriendCode}${timeParam}`;
-          navigator.clipboard.writeText(url);
-          this.showToast(`Đã chép link mời: ${url} 🔗`);
+          const url = `${window.location.origin}${window.location.pathname}?room=priv-${code}${timeParam}`;
+          copyTextToClipboard(url);
+          this.showToast(t('copiedRoomLink'));
+        } else {
+          this.showToast(getLanguage() === 'en' ? 'No room code to create link!' : 'Chưa có mã phòng để tạo link!');
+        }
+      });
+    }
+
+    if (this.createdRoomCode) {
+      this.createdRoomCode.style.cursor = 'pointer';
+      this.createdRoomCode.title = getLanguage() === 'en' ? 'Click to copy room code' : 'Bấm để sao chép mã phòng';
+      this.createdRoomCode.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = this.currentFriendCode || this.createdRoomCode?.textContent?.trim() || '';
+        if (code && code !== '------') {
+          copyTextToClipboard(code);
+          this.showToast(`Đã sao chép mã phòng: ${code} 📋`);
         }
       });
     }
@@ -1472,10 +1531,11 @@ export class HudManager {
       this.roomTagEl.textContent = name;
       if (inviteUrl) {
         this.roomTagEl.style.cursor = 'pointer';
-        this.roomTagEl.title = `Bấm để sao chép link phòng ${name}`;
-        this.roomTagEl.onclick = () => {
-          navigator.clipboard.writeText(inviteUrl);
-          this.showToast(`Đã sao chép: ${name}`);
+        this.roomTagEl.title = `Bấm để sao chép link phòng: ${inviteUrl}`;
+        this.roomTagEl.onclick = (e) => {
+          e.stopPropagation();
+          copyTextToClipboard(inviteUrl);
+          this.showToast(t('copiedRoomLink'));
         };
       } else {
         this.roomTagEl.style.cursor = 'default';
@@ -1492,17 +1552,30 @@ export class HudManager {
     if (this.teamRoomBadgeEl && this.trbCodeEl) {
       this.teamRoomBadgeEl.hidden = false;
       this.trbCodeEl.textContent = code;
+      this.trbCodeEl.style.cursor = 'pointer';
+      this.trbCodeEl.title = getLanguage() === 'en' ? 'Click to copy code' : 'Bấm để sao chép mã phòng';
+      this.trbCodeEl.onclick = (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(code);
+        this.showToast(t('copiedRoomCode'));
+      };
     }
     if (this.drawerTeamRoomBadgeEl && this.drawerTrbCodeEl) {
       this.drawerTeamRoomBadgeEl.hidden = false;
       this.drawerTrbCodeEl.textContent = code;
+      this.drawerTrbCodeEl.style.cursor = 'pointer';
+      this.drawerTrbCodeEl.title = getLanguage() === 'en' ? 'Click to copy code' : 'Bấm để sao chép mã phòng';
+      this.drawerTrbCodeEl.onclick = (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(code);
+        this.showToast(t('copiedRoomCode'));
+      };
     }
-    const onCopy = () => {
+    const onCopy = (e?: Event) => {
+      e?.stopPropagation();
       const textToCopy = inviteUrl || code;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(textToCopy).catch(() => {});
-      }
-      this.showToast(t('copiedRoomLink'));
+      copyTextToClipboard(textToCopy);
+      this.showToast(inviteUrl ? t('copiedRoomLink') : t('copiedRoomCode'));
       if (this.trbCopyBtnEl) {
         this.trbCopyBtnEl.classList.add('copied');
         setTimeout(() => this.trbCopyBtnEl?.classList.remove('copied'), 1000);
@@ -1617,6 +1690,7 @@ export class HudManager {
     this.startScreen.hidden = false;
     this.previewRenderer?.start();
     this.previewRenderer?.resize();
+    this.updateHof([]);
     this.updateSpeciesUI?.();
   }
 
@@ -2019,6 +2093,18 @@ export class HudManager {
     };
     if (this.hofList) this.hofList.innerHTML = '';
     if (this.drawerHofList) this.drawerHofList.innerHTML = '';
+
+    const hasRecords = Boolean(hof && hof.length > 0);
+    const hofEl = document.getElementById('hof');
+    if (hofEl) {
+      hofEl.hidden = !hasRecords;
+    }
+    const drawerHofCol = document.getElementById('drawerHofCol') || (this.drawerHofList?.closest('.drawer-col') as HTMLElement | null);
+    if (drawerHofCol) {
+      drawerHofCol.hidden = !hasRecords;
+    }
+
+    if (!hasRecords) return;
 
     for (const [name, sp, dur] of hof) {
       const createHofRow = () => {

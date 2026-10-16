@@ -3824,8 +3824,12 @@ body.spectating #lb {
   pointer-events: auto !important;
   z-index: 15;
 }
-body.spectating #hof {
+body.spectating #hof:not([hidden]) {
   display: block !important;
+}
+#hof[hidden],
+#drawerHofCol[hidden] {
+  display: none !important;
 }
 body.spectating #lbList li {
   cursor: pointer !important;
