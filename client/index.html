@@ -25,10 +25,10 @@
   <!-- Spectator Bar HUD -->
   <div id="spectateBar" hidden>
     <div class="spectate-pill">
-      <span class="spectate-badge">ĐANG XEM</span>
+      <span class="spectate-badge" data-i18n="spectatingBadge">ĐANG XEM</span>
       <span id="spectateName" class="spectate-target">--</span>
-      <button type="button" id="specNextBtn" class="spec-btn" title="Xem người khác (ngẫu nhiên)">🎲</button>
-      <button type="button" id="specPlayBtn" class="spec-btn spec-play" title="Tham gia trận đấu">⚔️ Chơi lại</button>
+      <button type="button" id="specNextBtn" class="spec-btn" data-i18n-title="specNext" title="Xem người khác (ngẫu nhiên)">🎲</button>
+      <button type="button" id="specPlayBtn" class="spec-btn spec-play" data-i18n="specPlay" title="Tham gia trận đấu">⚔️ Chơi lại</button>
     </div>
   </div>
 
@@ -424,7 +424,7 @@
       <p id="deathBest"></p>
       <!-- Team Pick on Death Screen (visible in team mode) -->
       <div id="deathTeamPick" class="team-pick-wrap" hidden>
-        <span class="team-pick-label">CHỌN ĐỘI KẾ TIẾP:</span>
+        <span class="team-pick-label" data-i18n="nextTeamPickLabel">CHỌN ĐỘI KẾ TIẾP:</span>
         <div class="team-pick-btns">
           <button type="button" class="btn-team btn-team-0 on" data-team="0">A12 <span class="t-count" id="deathCount0">(0 người)</span></button>
           <button type="button" class="btn-team btn-team-1" data-team="1">WFM <span class="t-count" id="deathCount1">(0 người)</span></button>
@@ -433,7 +433,7 @@
       <div id="deathCountdown" class="tw-countdown" hidden>Hồi sinh trong <b id="deathTimer">3</b>s...</div>
       <button id="again" class="btn-red" type="button" data-i18n="again"></button>
       <div class="death-actions-row">
-        <button id="spectateBtn" class="btn-ghost" type="button">Xem</button>
+        <button id="spectateBtn" class="btn-ghost" type="button" data-i18n="spectate">Xem</button>
         <button id="change" class="btn-ghost" type="button" data-i18n="change"></button>
       </div>
     </div>
@@ -505,14 +505,14 @@
       </div>
 
       <div class="tw-next-section">
-        <span class="team-pick-label">CHỌN ĐỘI CHO TRẬN KẾ TIẾP:</span>
+        <span class="team-pick-label" data-i18n="nextRoundTeamPickLabel">CHỌN ĐỘI CHO TRẬN KẾ TIẾP:</span>
         <div class="team-pick-btns">
           <button type="button" class="btn-team btn-team-0 on" id="twPick0" data-team="0">A12 <span class="t-count" id="twCount0">(0 người)</span></button>
           <button type="button" class="btn-team btn-team-1" id="twPick1" data-team="1">WFM <span class="t-count" id="twCount1">(0 người)</span></button>
         </div>
       </div>
       
-      <button id="twContinueBtn" class="btn-red tw-btn" type="button">TIẾP TỤC</button>
+      <button id="twContinueBtn" class="btn-red tw-btn" type="button" data-i18n="continue">TIẾP TỤC</button>
       <div id="twCountdown" class="tw-countdown" hidden>Vào trận sau <b id="twTimer">3</b>s...</div>
     </div>
   </div>

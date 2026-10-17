@@ -146,19 +146,19 @@ hud.onChangeLanguage = () => {
 hud.onReconnect = () => {
   if (transport?.inGame) {
     if (transport?.colo === 'SIN') {
-      hud.showToast('✅ Bạn đang ở trạm Singapore (SIN) tối ưu nhất (~35ms)!');
+      hud.showToast(t('coloSinToast'));
       return;
     }
     if (transport?.colo === 'HKG') {
-      hud.showToast('✅ Bạn đang ở trạm Hồng Kông (HKG) nhanh và ổn định (~75ms)!');
+      hud.showToast(t('coloHkgToast'));
       return;
     }
-    hud.showToast('🔍 Đang dò tìm tuyến mạng Singapore/HKG tối ưu trong nền...');
+    hud.showToast(t('coloProbingToast'));
     transport?.triggerHotMigration?.();
     return;
   }
   if (transport?.forceReconnect) {
-    hud.showToast('🔄 Đang đổi sang tuyến mạng tối ưu (SIN/HKG)...');
+    hud.showToast(t('coloSwitchingToast'));
     transport.forceReconnect();
   }
 };
@@ -203,11 +203,11 @@ function pickRandomSpectateTarget(): void {
       const [targetId, ent] = anyEnts[Math.floor(Math.random() * anyEnts.length)];
       spectateTargetId = targetId;
       const meta = gameState.metas.get(targetId);
-      hud.updateSpectatorTarget(meta ? meta.name : 'Người chơi', Math.round(ent.mass));
+      hud.updateSpectatorTarget(meta ? meta.name : t('playerDefault'), Math.round(ent.mass));
       return;
     }
     spectateTargetId = null;
-    hud.updateSpectatorTarget('Chưa có người chơi', 0);
+    hud.updateSpectatorTarget(t('noPlayer'), 0);
     return;
   }
   const pool = living.filter(([id]) => id !== spectateTargetId);
@@ -215,7 +215,7 @@ function pickRandomSpectateTarget(): void {
   const [chosenId, ent] = candidates[Math.floor(Math.random() * candidates.length)];
   spectateTargetId = chosenId;
   const meta = gameState.metas.get(chosenId);
-  hud.updateSpectatorTarget(meta ? meta.name : 'Người chơi', Math.round(ent.mass));
+  hud.updateSpectatorTarget(meta ? meta.name : t('playerDefault'), Math.round(ent.mass));
 }
 
 hud.onStartSpectating = () => {
@@ -244,7 +244,7 @@ hud.onSelectSpectateTarget = (id: number) => {
   document.body.classList.remove('menu');
   const targetEnt = gameState.ents.get(id);
   const targetMeta = gameState.metas.get(id);
-  const playerName = targetMeta ? targetMeta.name : 'Người chơi';
+  const playerName = targetMeta ? targetMeta.name : t('playerDefault');
   const playerMass = targetEnt ? Math.round(targetEnt.mass) : 0;
   hud.updateSpectatorTarget(playerName, playerMass);
 };
@@ -1096,7 +1096,7 @@ function handleGameEvent(ev: GameEvent): void {
       });
       if (!ev.bot && ev.id !== myId) {
         const teamTag = ev.team !== undefined ? ` [${ev.team === 0 ? 'A12' : 'WFM'}]` : '';
-        hud.addFeed(`👋 ${ev.name}${teamTag} đã vào nông trại!`, false);
+        hud.addFeed(t('feedJoined', { name: ev.name, teamTag }), false);
       }
       break;
     }
@@ -1135,14 +1135,14 @@ function handleGameEvent(ev: GameEvent): void {
       tools.clear();
       gameState.hof = [];
       hud.updateHof([]);
-      hud.showToast('🌾 Trận đấu mới! Bản đồ & thức ăn đã được làm mới!');
+      hud.showToast(t('mapResetToast'));
       break;
     }
     case 'podBlast': {
       sfxPodBlast();
       foodParts.burst(ev.x, 1.2, ev.z, 0x00e5ff, 45, 24, 6, 1.2);
       foodParts.burst(ev.x, 1.2, ev.z, 0xffffff, 25, 18, 5, 0.9);
-      hud.showToast('💥 Chưa có Vua! Bục phát sóng đẩy lùi mọi con vật!');
+      hud.showToast(t('podBlastToast'));
       const me = gameState.ents.get(myId);
       const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
       if (dist < 32) {
@@ -1153,9 +1153,9 @@ function handleGameEvent(ev: GameEvent): void {
     case 'podWarn': {
       sfxPodWarning();
       if (ev.willShield) {
-        hud.showToast(`⚠️ Bục tranh Vua sẽ đóng sau ${ev.left}s!`);
+        hud.showToast(t('podCloseWarn', { s: ev.left }));
       } else {
-        hud.showToast(`⚠️ Bục tranh Vua sẽ mở sau ${ev.left}s!`);
+        hud.showToast(t('podOpenWarn', { s: ev.left }));
       }
       break;
     }
@@ -1188,12 +1188,12 @@ function connectToRoom(targetRoom: string): void {
   if (isTeam || isPrivate) {
     hud.setTeamRoomBadge(displayCode, inviteUrl);
     hud.setRoomTag(
-      isPrivate ? `${displayCode} 📋` : `Phòng ${displayCode}`,
+      isPrivate ? `${displayCode} 📋` : t('roomTag', { code: displayCode }),
       inviteUrl
     );
   } else {
     hud.hideTeamRoomBadge();
-    hud.setRoomTag(`Phòng ${displayCode}`, inviteUrl);
+    hud.setRoomTag(t('roomTag', { code: displayCode }), inviteUrl);
   }
 
   if (isExplicitOffline) {
@@ -1244,18 +1244,18 @@ function getClientId(): string {
           transport?.send({ t: 'team_select', team: hud.selectedTeam });
         }
         const msg = isPrivate
-          ? `Đã vào phòng bạn bè: ${displayCode} (Không có bot) 👥`
-          : `Đã vào phòng trực tuyến: ${displayCode} 🌐`;
+          ? t('joinedPrivRoom', { code: displayCode })
+          : t('joinedPubRoom', { code: displayCode });
         hud.showToast(msg);
       } else if (status === 'reconnected') {
         missingMeTicks = 0;
         if (targetRoom.startsWith('team-')) {
           transport?.send({ t: 'team_select', team: hud.selectedTeam });
         }
-        hud.showToast('⚡ Đã kết nối lại thành công!');
+        hud.showToast(t('reconnectedToast'));
       } else if (status === 'closed') {
         if (gameState.alive) {
-          hud.showToast('⚠️ Mất kết nối, đang tự động kết nối lại...');
+          hud.showToast(t('disconnectedToast'));
         }
       } else if (status === 'error' && isViteDev && !fallbackLocal) {
         console.warn('Worker server not detected at port 8787. Falling back to LocalServer.');
@@ -1274,11 +1274,11 @@ function getClientId(): string {
 
   if (transport) {
     transport.onMigrationSuccess = (newColo) => {
-      hud.showToast(`⚡ Đã tự động chuyển sang trạm ${newColo} tối ưu!`, 3000);
+      hud.showToast(t('migratedToast', { colo: newColo }), 3000);
     };
     transport.onMigrationStatus = (status, colo) => {
       if (status === 'migrated') {
-        hud.showToast(`⚡ Đã tự động chuyển về máy chủ Singapore (${colo || 'SIN'})!`, 3000);
+        hud.showToast(t('migratedSinToast', { colo: colo || 'SIN' }), 3000);
       }
     };
   }

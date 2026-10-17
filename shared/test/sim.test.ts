@@ -1180,6 +1180,62 @@ describe('bonus weapons and tools', () => {
     expect(womendayOffers).toBeGreaterThan(30);
     expect(womendayOffers).toBeLessThan(100);
   });
+
+  it('friend mode match timer counts down even if creator leaves', () => {
+    const w = emptyWorld();
+    w.mode = 'friend';
+    w.matchDuration = 120;
+    w.matchClock = 120;
+
+    const idCreator = w.addPlayer('Creator', 'pig');
+    const idFriend = w.addPlayer('Friend', 'cow');
+    w.spawn(w.players.get(idCreator)!);
+    w.spawn(w.players.get(idFriend)!);
+
+    // Initial tick with both players: timer counts down
+    run(w, 20); // 1 second
+    expect(w.matchClock).toBeLessThan(120);
+    const clockAfter1s = w.matchClock;
+
+    // Creator leaves: creator player removed from world
+    w.removePlayer(idCreator);
+    expect(w.players.size).toBe(1);
+
+    // Timer MUST continue running with only Friend in the room
+    run(w, 20); // another 1 second
+    expect(w.matchClock).toBeLessThan(clockAfter1s);
+
+    // Snapshot for Friend sends the countdown time
+    const snap = w.snapshotFor(idFriend);
+    expect(snap.team).toBeDefined();
+    expect(snap.team![2]).toBe(Math.ceil(w.matchClock));
+  });
+
+  it('friend mode match timer expires and renews game for next round', () => {
+    const w = emptyWorld();
+    w.mode = 'friend';
+    w.matchDuration = 60;
+    w.matchClock = 0.1; // almost finished
+
+    const idFriend = w.addPlayer('Friend', 'cow');
+    w.spawn(w.players.get(idFriend)!);
+
+    // Step until match ends
+    let sawTeamWin = false;
+    for (let i = 0; i < 4; i++) {
+      w.step();
+      if (w.events.some((e) => e.k === 'teamWin')) sawTeamWin = true;
+      w.flush();
+    }
+    expect(w.matchEnded).toBe(true);
+    expect(sawTeamWin).toBe(true);
+
+    // After 6s end celebration, renewGame resets clock back to matchDuration and resumes
+    run(w, 140);
+    expect(w.matchEnded).toBe(false);
+    expect(w.matchClock).toBeLessThanOrEqual(60);
+    expect(w.matchClock).toBeGreaterThan(55);
+  });
 });
 
 

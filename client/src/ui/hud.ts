@@ -832,12 +832,12 @@ export class HudManager {
         if (playCountdownTimer) return;
         playCountdownSec = 3;
         this.playBtn.disabled = true;
-        this.playBtn.innerHTML = `VÀO NÔNG TRẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
+        this.playBtn.innerHTML = `${t('play')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
 
         playCountdownTimer = setInterval(() => {
           playCountdownSec--;
           if (this.playBtn) {
-            this.playBtn.innerHTML = `VÀO NÔNG TRẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
+            this.playBtn.innerHTML = `${t('play')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${playCountdownSec}s</span>)`;
           }
           if (playCountdownSec <= 0) {
             stopPlayCountdown();
@@ -885,12 +885,12 @@ export class HudManager {
       deathCountdownSec = 3;
       if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
       this.againBtn.disabled = true;
-      this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
+      this.againBtn.innerHTML = `${t('again')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
 
       this.deathCountdownTimer = setInterval(() => {
         deathCountdownSec--;
         if (this.againBtn) {
-          this.againBtn.innerHTML = `CHƠI LẠI (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
+          this.againBtn.innerHTML = `${t('again')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${deathCountdownSec}s</span>)`;
         }
         if (deathCountdownSec <= 0) {
           stopDeathCountdown();
@@ -1062,16 +1062,16 @@ export class HudManager {
 
         twCountdownSec = 3;
         continueBtn.disabled = true;
-        continueBtn.innerHTML = `TIẾP TỤC (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
+        continueBtn.innerHTML = `${t('continue')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
 
         twCountdownTimer = setInterval(() => {
           twCountdownSec--;
-          continueBtn.innerHTML = `TIẾP TỤC (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
+          continueBtn.innerHTML = `${t('continue')} (<span style="color: #ffd700; font-weight: 800; font-size: 1.15em;">${twCountdownSec}s</span>)`;
           if (twCountdownSec <= 0) {
             clearInterval(twCountdownTimer);
             twCountdownTimer = null;
             continueBtn.disabled = false;
-            continueBtn.innerHTML = 'TIẾP TỤC';
+            continueBtn.innerHTML = t('continue');
             if (this.twCountdownEl) this.twCountdownEl.hidden = true;
             if (this.teamWinModalEl) this.teamWinModalEl.hidden = true;
             play();
@@ -1103,10 +1103,10 @@ export class HudManager {
         if (this.createdRoomBox) this.createdRoomBox.hidden = false;
         if (this.joinRoomCode) this.joinRoomCode.value = res;
         if (this.roomStatusNotice) {
-          this.roomStatusNotice.textContent = `Đã tạo phòng ${res}! Bấm Chơi để bắt đầu.`;
+          this.roomStatusNotice.textContent = t('createdRoomMsg', { res });
           this.roomStatusNotice.style.color = '#52c41a';
         }
-        this.showToast(`Đã tạo phòng riêng: ${res}! 🎲`);
+        this.showToast(t('createdRoomToast', { res }));
       });
     }
 
@@ -1116,7 +1116,7 @@ export class HudManager {
         const code = this.currentFriendCode || this.createdRoomCode?.textContent?.trim() || this.joinRoomCode?.value.trim().toUpperCase() || '';
         if (code && code !== '------') {
           copyTextToClipboard(code);
-          this.showToast(`Đã sao chép mã phòng: ${code} 📋`);
+          this.showToast(t('copiedRoomCodeToast', { code }));
         } else {
           this.showToast(getLanguage() === 'en' ? 'No room code to copy!' : 'Chưa có mã phòng để sao chép!');
         }
@@ -1737,6 +1737,12 @@ export class HudManager {
       this.againBtn.innerHTML = t('again');
       this.againBtn.style.opacity = '1';
     }
+    if (this.spectateBtn) {
+      this.spectateBtn.textContent = t('spectate');
+    }
+    if (this.changeBtn) {
+      this.changeBtn.textContent = t('change');
+    }
 
     const titleEl = document.getElementById('deathTitle')!;
     const causeEl = document.getElementById('deathCause')!;
@@ -1820,18 +1826,18 @@ export class HudManager {
 
     if (this.twTitleEl) {
       if (winner === 0) {
-        this.twTitleEl.textContent = '🏆 ĐỘI A12 CHIẾN THẮNG!';
+        this.twTitleEl.textContent = t('team0WinTitle');
         this.twTitleEl.style.color = '#4fc3f7';
       } else if (winner === 1) {
-        this.twTitleEl.textContent = '🏆 ĐỘI WFM CHIẾN THẮNG!';
+        this.twTitleEl.textContent = t('team1WinTitle');
         this.twTitleEl.style.color = '#f44336';
       } else {
-        this.twTitleEl.textContent = '🤝 TRẬN ĐẤU HOÀ!';
+        this.twTitleEl.textContent = t('teamTieTitle');
         this.twTitleEl.style.color = 'var(--gold)';
       }
     }
     if (twSubEl) {
-      twSubEl.textContent = 'Thời gian thống trị nông trại vượt trội!';
+      twSubEl.textContent = t('teamDominanceSub');
     }
     if (this.twScore0El) this.twScore0El.textContent = String(s0);
     if (this.twScore1El) this.twScore1El.textContent = String(s1);
@@ -1839,14 +1845,14 @@ export class HudManager {
     if (this.twMvpBoxEl) {
       if (mvp) {
         this.twMvpBoxEl.hidden = false;
-        if (mvpHeaderEl) mvpHeaderEl.textContent = '⭐ CHIẾN BINH MVP XUẤT SẮC NHẤT ⭐';
+        if (mvpHeaderEl) mvpHeaderEl.textContent = t('mvpHeader');
         if (this.twMvpNameEl) {
-          const teamLabel = mvp.team === 0 ? 'Đội A12' : 'Đội WFM';
+          const teamLabel = mvp.team === 0 ? t('team0') : t('team1');
           this.twMvpNameEl.textContent = `${mvp.name} (${teamLabel})`;
           this.twMvpNameEl.style.color = mvp.team === 0 ? '#4fc3f7' : '#f44336';
         }
         if (this.twMvpStatsEl) {
-          this.twMvpStatsEl.textContent = `${mvp.score} điểm · 💥 ${mvp.kills} hạ gục · ⚖️ ${mvp.mass} kg`;
+          this.twMvpStatsEl.textContent = t('mvpStats', { score: mvp.score, kills: mvp.kills, mass: mvp.mass });
         }
       } else {
         this.twMvpBoxEl.hidden = true;
@@ -1856,7 +1862,7 @@ export class HudManager {
     if (this.twCountdownEl) this.twCountdownEl.hidden = true;
     if (this.twContinueBtn) {
       this.twContinueBtn.disabled = false;
-      this.twContinueBtn.innerHTML = 'TIẾP TỤC';
+      this.twContinueBtn.innerHTML = t('continue');
       this.twContinueBtn.style.opacity = '1';
     }
     this.setSelectedTeam(this.selectedTeam);
@@ -2042,16 +2048,16 @@ export class HudManager {
     if (shieldActive) {
       this.podiumBadgeEl.classList.add('shield-on');
       this.ptIconEl.textContent = '🛡️';
-      this.ptTxtEl.textContent = `Khóa: ${timerSec}s`;
+      this.ptTxtEl.textContent = t('podLockTimer', { s: timerSec });
       if (timerSec <= 5) this.podiumBadgeEl.classList.add('warn');
     } else if (hasKing) {
       this.podiumBadgeEl.classList.add('has-king');
       this.ptIconEl.textContent = '👑';
-      this.ptTxtEl.textContent = 'Vua tại vị';
+      this.ptTxtEl.textContent = t('kingOnPodium');
     } else {
       this.podiumBadgeEl.classList.add('shield-off');
       this.ptIconEl.textContent = '⚔️';
-      this.ptTxtEl.textContent = `Tranh Vua: ${timerSec}s`;
+      this.ptTxtEl.textContent = (getLanguage() === 'en' ? 'Claim King: ' : 'Tranh Vua: ') + `${timerSec}s`;
       if (timerSec <= 5) this.podiumBadgeEl.classList.add('warn');
     }
   }

@@ -153,13 +153,34 @@ export class GameRoom extends DurableObject {
         }
       }
       this.broadcastTeamCounts();
-      if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
-        this.stopLoop();
-      }
+      this.checkRoomEmpty();
     };
 
     ws.addEventListener('close', onCloseOrError);
     ws.addEventListener('error', onCloseOrError);
+  }
+
+  private checkRoomEmpty(): void {
+    if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
+      this.stopLoop();
+      // If private or friend room, clear all state immediately to free system resources
+      if (this.world.mode === 'friend') {
+        for (const [id] of [...this.world.players.entries()]) {
+          this.world.removePlayer(id);
+        }
+        this.world.matchDuration = 0;
+        this.world.matchClock = 0;
+        this.world.matchEnded = false;
+        this.world.matchEndTimer = 0;
+        this.world.napoleonId = 0;
+        this.lobbyTeams.clear();
+        this.clientSockets.clear();
+        this.socketClientIds.clear();
+        this.playerTokens.clear();
+        this.clientPlayerIds.clear();
+        this.disconnectedPlayers.clear();
+      }
+    }
   }
 
   private onMessage(ws: WebSocket, msg: ClientMsg, edgeColo: string, cid = ''): void {
@@ -179,7 +200,7 @@ export class GameRoom extends DurableObject {
           playerId = entry.playerId;
           this.sockets.set(ws, playerId);
           if (!existingPlayer.alive) {
-            this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
+            this.world.respawn(playerId, msg.name, msg.species, msg.skin, this.world.mode === 'friend' ? undefined : msg.team);
           }
         }
       }
@@ -204,11 +225,19 @@ export class GameRoom extends DurableObject {
         }
       }
 
-      // 3. Fallback: reclaim by client ID (cid) if sessionToken was lost
+      // 3. Fallback: reclaim by client ID (cid) if sessionToken was lost or mismatched
       if (!playerId && cid && this.clientPlayerIds.has(cid)) {
         const candidatePid = this.clientPlayerIds.get(cid)!;
         if (this.world.players.has(candidatePid)) {
           playerId = candidatePid;
+          // Clear any disconnected entry for this player
+          for (const [tok, entry] of this.disconnectedPlayers.entries()) {
+            if (entry.playerId === playerId) {
+              this.disconnectedPlayers.delete(tok);
+              if (!sessionToken) sessionToken = tok;
+              break;
+            }
+          }
           for (const [oldWs, pid] of this.sockets.entries()) {
             if (pid === playerId && oldWs !== ws) {
               this.sockets.delete(oldWs);
@@ -221,10 +250,48 @@ export class GameRoom extends DurableObject {
         }
       }
 
+      // 4. Fallback for private/friend rooms: reclaim unattached player with matching name
+      if (!playerId && (this.world.mode === 'friend' || this.world.mode === 'team') && msg.name) {
+        const trimmedName = msg.name.trim().slice(0, 16);
+        for (const [pId, p] of this.world.players.entries()) {
+          if (!p.bot && p.name === trimmedName) {
+            const isAttached = [...this.sockets.values()].includes(pId);
+            if (!isAttached) {
+              playerId = pId;
+              for (const [tok, entry] of this.disconnectedPlayers.entries()) {
+                if (entry.playerId === playerId) {
+                  this.disconnectedPlayers.delete(tok);
+                  if (!sessionToken) sessionToken = tok;
+                  break;
+                }
+              }
+              this.sockets.set(ws, playerId);
+              break;
+            }
+          }
+        }
+      }
+
       if (!playerId) {
         // Brand new player or grace period expired
-        sessionToken = crypto.randomUUID();
-        playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
+        // Crucial ghost-cleanup: If cid previously had any orphaned player still in world, remove it!
+        if (cid && this.clientPlayerIds.has(cid)) {
+          const oldPid = this.clientPlayerIds.get(cid)!;
+          if (this.world.players.has(oldPid)) {
+            this.world.removePlayer(oldPid);
+          }
+          this.clientPlayerIds.delete(cid);
+        }
+        if (sessionToken) {
+          for (const [tok, entry] of this.disconnectedPlayers.entries()) {
+            if (tok === sessionToken) {
+              this.disconnectedPlayers.delete(tok);
+              this.world.removePlayer(entry.playerId);
+            }
+          }
+        }
+        sessionToken = sessionToken || crypto.randomUUID();
+        playerId = this.world.addPlayer(msg.name, msg.species, false, this.world.mode === 'friend' ? undefined : msg.team, msg.skin);
         this.sockets.set(ws, playerId);
         this.playerTokens.set(playerId, sessionToken);
       } else {
@@ -236,18 +303,21 @@ export class GameRoom extends DurableObject {
         }
         const existingPlayer = this.world.players.get(playerId);
         if (existingPlayer) {
-          if (!existingPlayer.alive || !msg.token) {
-            existingPlayer.alive = false;
-            this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
+          if (!existingPlayer.alive) {
+            this.world.respawn(playerId, msg.name, msg.species, msg.skin, this.world.mode === 'friend' ? undefined : msg.team);
           } else {
-            // Player is alive and has valid sessionToken (hot handover/reconnect): preserve exact position, velocity & mass!
+            // Player is alive (reconnect / hot handover): PRESERVE EXACT POSITION, MASS & KING STATUS!
             if (msg.name) existingPlayer.name = msg.name.slice(0, 16);
             if (msg.species) existingPlayer.species = msg.species;
             if (msg.skin !== undefined) existingPlayer.skin = msg.skin % SKIN_COUNT;
-            if (msg.team !== undefined) existingPlayer.team = msg.team;
+            if (this.world.mode === 'friend') {
+              existingPlayer.team = undefined;
+            } else if (msg.team !== undefined) {
+              existingPlayer.team = msg.team;
+            }
           }
         } else {
-          playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
+          playerId = this.world.addPlayer(msg.name, msg.species, false, this.world.mode === 'friend' ? undefined : msg.team, msg.skin);
           this.sockets.set(ws, playerId);
           this.playerTokens.set(playerId, sessionToken);
         }
@@ -256,11 +326,11 @@ export class GameRoom extends DurableObject {
       // 100% guarantee that player exists and is alive upon join
       const currentP = this.world.players.get(playerId);
       if (!currentP) {
-        playerId = this.world.addPlayer(msg.name, msg.species, false, msg.team, msg.skin);
+        playerId = this.world.addPlayer(msg.name, msg.species, false, this.world.mode === 'friend' ? undefined : msg.team, msg.skin);
         this.sockets.set(ws, playerId);
         this.playerTokens.set(playerId, sessionToken);
       } else if (!currentP.alive) {
-        this.world.respawn(playerId, msg.name, msg.species, msg.skin, msg.team);
+        this.world.respawn(playerId, msg.name, msg.species, msg.skin, this.world.mode === 'friend' ? undefined : msg.team);
       }
 
       if (cid && playerId) {
@@ -311,9 +381,7 @@ export class GameRoom extends DurableObject {
       }
       this.lobbyTeams.delete(ws);
       this.broadcastTeamCounts();
-      if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
-        this.stopLoop();
-      }
+      this.checkRoomEmpty();
     } else if (msg.t === 'team_select') {
       const team = msg.team === 1 ? 1 : 0;
       this.lobbyTeams.set(ws, team);
@@ -412,7 +480,7 @@ export class GameRoom extends DurableObject {
 
   private scheduleNextTick(): void {
     if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
-      this.stopLoop();
+      this.checkRoomEmpty();
       return;
     }
     const now = performance.now();
@@ -440,6 +508,10 @@ export class GameRoom extends DurableObject {
             if (pid === entry.playerId) this.clientPlayerIds.delete(c);
           }
         }
+      }
+      if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
+        this.checkRoomEmpty();
+        return;
       }
     }
 

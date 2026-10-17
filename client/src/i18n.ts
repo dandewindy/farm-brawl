@@ -298,6 +298,40 @@ const vi = {
   continue: 'TIẾP TỤC',
   spectate: 'Xem',
   changeAnimal: 'Đổi con vật',
+  spectatingBadge: 'ĐANG XEM',
+  specPlay: '⚔️ Chơi lại',
+  specNext: 'Xem người khác (ngẫu nhiên)',
+  nextTeamPickLabel: 'CHỌN ĐỘI KẾ TIẾP:',
+  nextRoundTeamPickLabel: 'CHỌN ĐỘI CHO TRẬN KẾ TIẾP:',
+  podCloseWarn: '⚠️ Bục tranh Vua sẽ đóng sau {s}s!',
+  podOpenWarn: '⚠️ Bục tranh Vua sẽ mở sau {s}s!',
+  podBlastToast: '💥 Chưa có Vua! Bục phát sóng đẩy lùi mọi con vật!',
+  mapResetToast: '🌾 Trận đấu mới! Bản đồ & thức ăn đã được làm mới!',
+  feedJoined: '👋 {name}{teamTag} đã vào nông trại!',
+  joinedPrivRoom: 'Đã vào phòng bạn bè: {code} (Không có bot) 👥',
+  joinedPubRoom: 'Đã vào phòng trực tuyến: {code} 🌐',
+  reconnectedToast: '⚡ Đã kết nối lại thành công!',
+  disconnectedToast: '⚠️ Mất kết nối, đang tự động kết nối lại...',
+  migratedToast: '⚡ Đã tự động chuyển sang trạm {colo} tối ưu!',
+  migratedSinToast: '⚡ Đã tự động chuyển về máy chủ Singapore ({colo})!',
+  coloSinToast: '⚡ Bạn đang ở trạm Singapore (SIN) tối ưu nhất (~35ms)!',
+  coloHkgToast: '⚡ Bạn đang ở trạm Hồng Kông (HKG) nhanh và ổn định (~75ms)!',
+  coloProbingToast: '🔍 Đang dò tìm tuyến mạng Singapore/HKG tối ưu trong nền...',
+  coloSwitchingToast: '⚡ Đang đổi sang tuyến mạng tối ưu (SIN/HKG)...',
+  playerDefault: 'Người chơi',
+  noPlayer: 'Chưa có người chơi',
+  roomTag: 'Phòng {code}',
+  team0WinTitle: '🏆 ĐỘI A12 CHIẾN THẮNG!',
+  team1WinTitle: '🏆 ĐỘI WFM CHIẾN THẮNG!',
+  teamTieTitle: '⏱️ TRẬN ĐẤU HOÀ!',
+  teamDominanceSub: 'Thời gian thống trị nông trại vượt trội!',
+  mvpHeader: '⭐ CHIẾN BINH MVP XUẤT SẮC NHẤT ⭐',
+  mvpStats: '{score} điểm • ⚔️ {kills} hạ gục • ⚖️ {mass} kg',
+  createdRoomMsg: 'Đã tạo phòng {res}! Bấm Chơi để bắt đầu.',
+  createdRoomToast: 'Đã tạo phòng riêng: {res}! 🎲',
+  copiedRoomCodeToast: 'Đã sao chép mã phòng: {code} 📋',
+  podLockTimer: 'Khóa: {s}s',
+  kingOnPodium: 'Vua tại vị',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -599,6 +633,40 @@ const en: Record<keyof typeof vi, string> = {
   continue: 'CONTINUE',
   spectate: 'Spectate',
   changeAnimal: 'Change Animal',
+  spectatingBadge: 'SPECTATING',
+  specPlay: '⚔️ Play Again',
+  specNext: 'Spectate someone else (random)',
+  nextTeamPickLabel: 'CHOOSE NEXT TEAM:',
+  nextRoundTeamPickLabel: 'CHOOSE TEAM FOR NEXT ROUND:',
+  podCloseWarn: '⚠️ King podium closing in {s}s!',
+  podOpenWarn: '⚠️ King podium opening in {s}s!',
+  podBlastToast: '💥 No King! The podium shockwave repelled all animals!',
+  mapResetToast: '🌾 New match! Map & food have been refreshed!',
+  feedJoined: '👋 {name}{teamTag} entered the farm!',
+  joinedPrivRoom: 'Joined friend room: {code} (No bots) 👥',
+  joinedPubRoom: 'Joined online room: {code} 🌐',
+  reconnectedToast: '⚡ Reconnected successfully!',
+  disconnectedToast: '⚠️ Disconnected, auto-reconnecting...',
+  migratedToast: '⚡ Automatically migrated to optimal node {colo}!',
+  migratedSinToast: '⚡ Automatically routed to Singapore server ({colo})!',
+  coloSinToast: '⚡ Connected to optimal Singapore (SIN) node (~35ms)!',
+  coloHkgToast: '⚡ Connected to fast Hong Kong (HKG) node (~75ms)!',
+  coloProbingToast: '🔍 Probing optimal Singapore/HKG routes in background...',
+  coloSwitchingToast: '⚡ Switching to optimal route (SIN/HKG)...',
+  playerDefault: 'Player',
+  noPlayer: 'No players',
+  roomTag: 'Room {code}',
+  team0WinTitle: '🏆 TEAM A12 VICTORY!',
+  team1WinTitle: '🏆 TEAM WFM VICTORY!',
+  teamTieTitle: '⏱️ MATCH TIED!',
+  teamDominanceSub: 'Outstanding farm reign time!',
+  mvpHeader: '⭐ OUTSTANDING MVP FIGHTER ⭐',
+  mvpStats: '{score} pts • ⚔️ {kills} KOs • ⚖️ {mass} kg',
+  createdRoomMsg: 'Created room {res}! Press Play to start.',
+  createdRoomToast: 'Created private room: {res}! 🎲',
+  copiedRoomCodeToast: 'Copied room code: {code} 📋',
+  podLockTimer: 'Locked: {s}s',
+  kingOnPodium: 'Reigning King',
 };
 
 export function formatTeamCount(count: number): string {
@@ -661,10 +729,18 @@ export function t(key: TextKey | string, vars: Record<string, string | number> =
   return s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
 }
 
-/** fill every [data-i18n] element */
+/** fill every [data-i18n], [data-i18n-title], and [data-i18n-ph] element */
 export function applyTexts(root: ParentNode = document): void {
   for (const el of root.querySelectorAll<HTMLElement>('[data-i18n]')) {
     const key = el.dataset.i18n;
     if (key) el.textContent = t(key);
+  }
+  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-title]')) {
+    const key = el.dataset.i18nTitle;
+    if (key) el.title = t(key);
+  }
+  for (const el of root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-i18n-ph]')) {
+    const key = el.dataset.i18nPh;
+    if (key) el.placeholder = t(key);
   }
 }

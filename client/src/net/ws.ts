@@ -37,7 +37,19 @@ export class WsClient implements Transport {
     private readonly onMsg: Handler,
     private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void
   ) {
+    try {
+      this.sessionToken = sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) || sessionStorage.getItem('fb_session_token');
+    } catch (_) {}
     this.connect();
+  }
+
+  private getRoomKey(): string {
+    try {
+      const u = new URL(this.url);
+      return u.searchParams.get('room') || 'pub-1';
+    } catch {
+      return 'pub-1';
+    }
   }
 
   private connect(): void {
@@ -153,6 +165,10 @@ export class WsClient implements Transport {
           if (msg.colo) this.colo = msg.colo;
           if (msg.token) {
             this.sessionToken = msg.token;
+            try {
+              sessionStorage.setItem(`fb_tok_${this.getRoomKey()}`, msg.token);
+              sessionStorage.setItem('fb_session_token', msg.token);
+            } catch (_) {}
             if (this.lastJoinMsg) {
               this.lastJoinMsg.token = msg.token;
             }
@@ -381,6 +397,10 @@ export class WsClient implements Transport {
     this.sessionToken = null;
     this.lastJoinMsg = null;
     this.queue.length = 0;
+    try {
+      sessionStorage.removeItem(`fb_tok_${this.getRoomKey()}`);
+      sessionStorage.removeItem('fb_session_token');
+    } catch (_) {}
     if (this.migrationWs) {
       try { this.migrationWs.close(); } catch (_) {}
       this.migrationWs = null;

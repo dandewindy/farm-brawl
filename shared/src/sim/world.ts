@@ -289,8 +289,7 @@ export class World {
     this.fillBots();
 
     // Team mode match clock & scoring
-    const hasTeams = this.mode === 'team' || [...this.players.values()].some((p) => p.team !== undefined);
-    if (hasTeams) {
+    if (this.mode === 'team') {
       // Clean up any remaining bots in team mode
       for (const [id, p] of this.players.entries()) {
         if (p.bot) this.removePlayer(id);
@@ -1651,8 +1650,7 @@ export class World {
           : null,
       };
     }
-    const hasTeams = [...this.players.values()].some((o) => o.team !== undefined);
-    if (hasTeams) {
+    if (this.mode === 'team') {
       let count0 = 0;
       let count1 = 0;
       for (const o of this.players.values()) {
