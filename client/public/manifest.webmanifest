@@ -1,0 +1,33 @@
+{
+  "name": "Farm Brawl – Vua Nông Trại",
+  "short_name": "Farm Brawl",
+  "description": "Game .io nhiều người chơi: húc đối thủ vào hàng rào điện, chiếm bục và trở thành Vua Nông Trại.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "landscape",
+  "background_color": "#1f1a17",
+  "theme_color": "#1f1a17",
+  "categories": ["games", "action"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1684,7 +1684,7 @@ body.mobile-phone #spPreviewWrap {
     align-items: center;
     gap: 5px;
   }
-  #disclaimerBtn, #mute, #startFsBtn, #langToggle {
+  #disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn {
     width: 30px;
     height: 28px;
     min-width: 30px;
@@ -2281,7 +2281,7 @@ body.mobile-phone #teamBar {
   .wall-top-right {
     gap: 4px;
   }
-  #disclaimerBtn, #mute, #startFsBtn, #langToggle {
+  #disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn {
     width: 28px;
     height: 26px;
     min-width: 28px;
@@ -2895,7 +2895,7 @@ body.mobile-phone #choiceCards .plank .d {
   align-items: center;
   gap: 8px;
 }
-#disclaimerBtn, #mute, #startFsBtn, #langToggle {
+#disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn {
   background: #2e2622;
   border: 1px solid #4a3e36;
   color: var(--paper);
@@ -2915,12 +2915,12 @@ body.mobile-phone #choiceCards .plank .d {
   padding: 0;
   box-sizing: border-box;
 }
-#disclaimerBtn:hover, #mute:hover, #startFsBtn:hover, #langToggle:hover {
+#disclaimerBtn:hover, #mute:hover, #startFsBtn:hover, #langToggle:hover, #pwaInstallBtn:hover {
   background: #3e322a;
   border-color: var(--gold);
   transform: scale(1.05);
 }
-#disclaimerBtn:active, #mute:active, #startFsBtn:active, #langToggle:active {
+#disclaimerBtn:active, #mute:active, #startFsBtn:active, #langToggle:active, #pwaInstallBtn:active {
   transform: scale(0.96);
 }
 #disclaimerBtn {
@@ -2931,6 +2931,66 @@ body.mobile-phone #choiceCards .plank .d {
 #langToggle {
   color: var(--gold);
   font-size: 13px;
+}
+#pwaInstallBtn {
+  color: #ffd84a;
+}
+#pwaInstallBtn.installed {
+  display: none !important;
+}
+
+/* PWA Install Guide Modal */
+.pwa-card {
+  max-width: min(92vw, 420px);
+  padding: 22px 24px;
+}
+.pwa-intro {
+  font-size: 13.5px;
+  color: #ddd4c4;
+  margin: 0 0 14px 0;
+  line-height: 1.45;
+}
+.pwa-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.pwa-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 215, 74, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.pwa-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #1f1a17;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.pwa-step-content {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #f2ead7;
+}
+.pwa-step-content b {
+  color: #ffd84a;
+}
+.pwa-share-svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-top: -2px;
 }
 #modes {
   display: grid;

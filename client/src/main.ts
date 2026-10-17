@@ -88,9 +88,39 @@ input.onReleaseRam = (held: number) => {
   }
 };
 
+// Detect device types & standalone WebApp mode
+const isIPad = (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) || /iPad/.test(navigator.userAgent);
+const isMobilePhone = /Android|iPhone|iPod/i.test(navigator.userAgent);
+const isPC = !isIPad && !isMobilePhone;
+const isTouchDevice = isIPad || isMobilePhone || navigator.maxTouchPoints > 0;
+
+function isStandaloneApp(): boolean {
+  return !!(
+    (window.navigator as any).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches
+  );
+}
+
+if (isIPad) {
+  document.body.classList.add('ipad');
+} else if (isMobilePhone) {
+  document.body.classList.add('mobile-phone');
+}
+if (isPC) {
+  document.body.classList.add('is-pc');
+}
+
+let userWantsFs = isStandaloneApp();
+
 const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
   firstSpawn = true;
+  if (isTouchDevice) {
+    userWantsFs = true;
+    enablePseudoFs();
+    lockLandscape();
+  }
   if (mode === 'friend') {
     const code = (roomCode || 'BRAWL').toUpperCase();
     const privRoom = `priv-${code}`;
@@ -398,8 +428,6 @@ function isFsActive(): boolean {
   );
 }
 
-let userWantsFs = false;
-
 function updateFsIcon(): void {
   const active = isFsActive() || userWantsFs;
   if (fsBtn) {
@@ -526,20 +554,6 @@ document.addEventListener('fullscreenchange', handleFsChange);
 document.addEventListener('webkitfullscreenchange', handleFsChange);
 updateFsIcon();
 
-// Detect device types
-const isIPad = (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) || /iPad/.test(navigator.userAgent);
-const isMobilePhone = /Android|iPhone|iPod/i.test(navigator.userAgent);
-const isPC = !isIPad && !isMobilePhone;
-
-if (isIPad) {
-  document.body.classList.add('ipad');
-} else if (isMobilePhone) {
-  document.body.classList.add('mobile-phone');
-}
-if (isPC) {
-  document.body.classList.add('is-pc');
-}
-
 // Anti-Zoom & Touch Gesture Lock (iPad & Mobile Chrome/Safari)
 document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
@@ -554,12 +568,16 @@ window.addEventListener('touchstart', (e) => {
   if (e.touches.length > 0) {
     touchStartClientY = e.touches[0].clientY;
     const target = e.target as HTMLElement | null;
-    const isInteractive = target?.closest('button, input, select, textarea, a, .drawer-modal, .card, #gameControls, #netPerf');
-    // If in fullscreen on iPad or touching in top edge zone, cancel default touch to prevent system exit gesture
-    if (!isInteractive && e.cancelable && (userWantsFs || isIPad)) {
-      if (e.touches[0].clientY < 80) {
+    const isInteractive = target?.closest('button, input, select, textarea, a, .drawer-modal, .card, #gameControls, #netPerf, #pwaModal, .center-modal-card');
+    // If on touch device, cancel default touch in top edge zone (<75px) to prevent system swipe-down gesture
+    if (!isInteractive && e.cancelable && isTouchDevice) {
+      if (e.touches[0].clientY < 75) {
         e.preventDefault();
       }
+    }
+    // If during live game, ensure Safari URL bar collapses back to minimal UI
+    if (transport && transport.inGame && (window.scrollY !== 0 || window.scrollX !== 0)) {
+      try { window.scrollTo(0, 0); } catch (_) {}
     }
   }
 }, { passive: false });
@@ -575,7 +593,7 @@ window.addEventListener('touchmove', (e) => {
   const dy = currentY - touchStartClientY;
 
   const target = e.target as HTMLElement | null;
-  const isScrollable = target?.closest('.drawer-cols, .sp-palette, .screen');
+  const isScrollable = target?.closest('.drawer-cols, .sp-palette, .screen, .center-modal-card, .pwa-card');
 
   if (isScrollable) {
     const el = isScrollable as HTMLElement;
@@ -620,6 +638,51 @@ function bindFastTap(el: HTMLElement | null, handler: (e: Event) => void): void 
 
 if (fsBtn) bindFastTap(fsBtn, toggleFs);
 if (startFsBtn) bindFastTap(startFsBtn, toggleFs);
+
+// PWA Standalone & Install Modal Management
+const pwaInstallBtn = document.getElementById('pwaInstallBtn') as HTMLButtonElement | null;
+const pwaModal = document.getElementById('pwaModal') as HTMLElement | null;
+const pwaCloseBtn = document.getElementById('pwaCloseBtn') as HTMLButtonElement | null;
+
+let deferredInstallPrompt: any = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (pwaInstallBtn && !isStandaloneApp()) {
+    pwaInstallBtn.hidden = false;
+  }
+});
+
+if (isStandaloneApp()) {
+  userWantsFs = true;
+  enablePseudoFs();
+  if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
+} else if (pwaInstallBtn) {
+  pwaInstallBtn.hidden = false;
+  bindFastTap(pwaInstallBtn, async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        pwaInstallBtn.style.display = 'none';
+      }
+      deferredInstallPrompt = null;
+    } else if (pwaModal) {
+      pwaModal.hidden = false;
+    }
+  });
+}
+
+if (pwaCloseBtn && pwaModal) {
+  bindFastTap(pwaCloseBtn, () => {
+    pwaModal.hidden = true;
+  });
+  pwaModal.addEventListener('click', (e) => {
+    if (e.target === pwaModal) {
+      pwaModal.hidden = true;
+    }
+  });
+}
 
 // Mobile & iPad Burger Drawer Modal
 const burgerBtn = document.getElementById('burgerBtn');

@@ -6,9 +6,16 @@
   <title>Farm Brawl – Vua Nông Trại</title>
   <meta name="description" content="Game .io nhiều người chơi: húc đối thủ vào hàng rào điện, chiếm bục và trở thành Vua Nông Trại.">
   <meta name="theme-color" content="#1f1a17">
+  <!-- Apple Web App & PWA Standalone Mode (Khóa cứng Fullscreen 100%) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Farm Brawl">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23a5281b'/%3E%3Cpath d='M12 44 L16 22 L26 32 L32 16 L38 32 L48 22 L52 44 Z' fill='%23e8b641'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Be+Vietnam+Pro:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css">
 </head>
@@ -225,6 +232,40 @@
     </div>
   </div>
 
+  <!-- PWA Standalone / Install Guide Modal -->
+  <div id="pwaModal" class="center-modal-wrap" hidden>
+    <div class="center-modal-card pwa-card">
+      <div class="cm-icon">📲</div>
+      <h3 class="cm-title" data-i18n="pwaTitle">CHƠI TRÀN MÀN HÌNH 100%</h3>
+      <div class="pwa-body">
+        <p class="pwa-intro" data-i18n="pwaIntro">Khóa cứng toàn màn hình, không thanh địa chỉ, không bookmark khi vuốt màn hình:</p>
+        <div class="pwa-steps">
+          <div class="pwa-step">
+            <span class="pwa-step-num">1</span>
+            <div class="pwa-step-content">
+              <span data-i18n="pwaStep1">Bấm biểu tượng <b>Chia sẻ</b> (<svg class="pwa-share-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> hoặc <b>⋯</b>) trên thanh công cụ trình duyệt.</span>
+            </div>
+          </div>
+          <div class="pwa-step">
+            <span class="pwa-step-num">2</span>
+            <div class="pwa-step-content">
+              <span data-i18n="pwaStep2">Cuộn xuống chọn <b>"Thêm vào MH chính"</b> (Add to Home Screen ➕).</span>
+            </div>
+          </div>
+          <div class="pwa-step">
+            <span class="pwa-step-num">3</span>
+            <div class="pwa-step-content">
+              <span data-i18n="pwaStep3">Mở game từ biểu tượng ngoài màn hình chính để trải nghiệm khóa cứng toàn màn hình!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cm-actions" style="margin-top: 16px;">
+        <button id="pwaCloseBtn" type="button" class="btn-red cm-btn-agree" data-i18n="pwaGotIt">ĐÃ HIỂU</button>
+      </div>
+    </div>
+  </div>
+
   <!-- King commandment cards selection overlay -->
   <div id="choice" hidden>
     <h3><span data-i18n="choiceTitle">Vua, hãy sửa một điều răn</span> <span id="choiceLeft"></span></h3>
@@ -240,6 +281,7 @@
           </button>
         </div>
         <div class="wall-top-right">
+          <button id="pwaInstallBtn" type="button" title="Cài App Tràn Màn Hình (Khóa cứng 100%)" data-i18n-title="pwaBtnTitle"><span class="ico">📲</span></button>
           <button id="startFsBtn" type="button" title="Toàn màn hình / Fullscreen"><span class="ico">⛶</span></button>
           <button id="mute" type="button" title="Âm thanh / Sound"><span class="ico">🔊</span></button>
           <button id="langToggle" type="button" title="Ngôn ngữ / Language">VI</button>
