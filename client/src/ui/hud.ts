@@ -132,6 +132,9 @@ export class HudManager {
   public selectedMode: 'ffa' | 'team' | 'friend' = 'ffa';
   public selectedTeam: number = 0;
   public isSpectating = false;
+  public isPlayerAlive = false;
+  private activeSpecies: Species = 'pig';
+  private activeSkin = 0;
 
   private readonly startTeamPickEl: HTMLElement | null;
   private readonly deathTeamPickEl: HTMLElement | null;
@@ -786,6 +789,8 @@ export class HudManager {
         }
         chosenSkin = Math.floor(Math.random() * 4);
       }
+      this.activeSpecies = chosenSpecies;
+      this.activeSkin = chosenSkin;
       if (this.selectedMode === 'friend') {
         const inputVal = (this.joinRoomCode?.value || '').trim().toUpperCase();
         if (inputVal.length >= 3) {
@@ -973,6 +978,7 @@ export class HudManager {
         this.hudEl.hidden = false;
         if (this.spectateBarEl) this.spectateBarEl.hidden = false;
         this.isSpectating = true;
+        this.updateSpecPlayBtn();
         this.onStartSpectating?.();
       });
     }
@@ -986,6 +992,7 @@ export class HudManager {
         this.hudEl.hidden = false;
         if (this.spectateBarEl) this.spectateBarEl.hidden = false;
         this.isSpectating = true;
+        this.updateSpecPlayBtn();
         this.onStartSpectating?.();
       });
     }
@@ -1032,6 +1039,11 @@ export class HudManager {
         document.body.classList.remove('spectating');
         if (this.spectateBarEl) this.spectateBarEl.hidden = true;
         this.onStopSpectating?.();
+        if (this.isPlayerAlive) {
+          this.deathScreen.hidden = true;
+          this.hudEl.hidden = false;
+          return;
+        }
         if (this.selectedMode === 'team') {
           this.deathScreen.hidden = false;
           this.hudEl.hidden = true;
@@ -1323,6 +1335,15 @@ export class HudManager {
         }
         if (this.exitConfirmModal && !this.exitConfirmModal.hidden) {
           this.exitConfirmModal.hidden = true;
+          return;
+        }
+        if (this.isSpectating && this.isPlayerAlive) {
+          this.isSpectating = false;
+          document.body.classList.remove('spectating');
+          if (this.spectateBarEl) this.spectateBarEl.hidden = true;
+          this.onStopSpectating?.();
+          this.deathScreen.hidden = true;
+          this.hudEl.hidden = false;
           return;
         }
         if (this.friendResultModalEl && !this.friendResultModalEl.hidden) {
@@ -1646,11 +1667,22 @@ export class HudManager {
   }
 
   getSelectedSpecies(): Species {
-    return this.selectedSpecies;
+    return this.activeSpecies || this.selectedSpecies;
   }
 
   getSelectedSkin(): number {
-    return this.mySkins[this.selectedSpecies] ?? 0;
+    return this.activeSkin ?? (this.mySkins[this.selectedSpecies] ?? 0);
+  }
+
+  public updateSpecPlayBtn(): void {
+    if (!this.specPlayBtn) return;
+    if (this.isPlayerAlive) {
+      this.specPlayBtn.textContent = t('specReturn');
+      this.specPlayBtn.title = getLanguage() === 'en' ? 'Return to your character' : 'Quay lại điều khiển con vật của bạn';
+    } else {
+      this.specPlayBtn.textContent = t('specPlay');
+      this.specPlayBtn.title = getLanguage() === 'en' ? 'Join battle' : 'Tham gia trận đấu';
+    }
   }
 
   isDeathScreenVisible(): boolean {
@@ -1670,6 +1702,7 @@ export class HudManager {
     this.stopFrCountdown();
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
+    this.isPlayerAlive = true;
     document.body.classList.remove('spectating');
     if (this.selectedMode !== 'team' && !(this.selectedMode === 'friend' && this.matchDuration > 0)) {
       if (this.teamBarEl) {
@@ -1708,6 +1741,7 @@ export class HudManager {
     if (gameDrawer) gameDrawer.hidden = true;
     if (this.exitConfirmModal) this.exitConfirmModal.hidden = true;
     this.isSpectating = false;
+    this.isPlayerAlive = false;
     document.body.classList.remove('spectating');
     document.body.classList.add('menu');
     document.body.classList.toggle('mode-team', this.selectedMode === 'team');
@@ -1725,6 +1759,7 @@ export class HudManager {
     this.hudEl.hidden = true;
     if (this.spectateBarEl) this.spectateBarEl.hidden = true;
     this.isSpectating = false;
+    this.isPlayerAlive = false;
     document.body.classList.remove('spectating');
     document.body.classList.add('menu');
 
@@ -2106,7 +2141,9 @@ export class HudManager {
       li.dataset.playerId = String(id);
       li.setAttribute('data-player-id', String(id));
       li.style.cursor = 'pointer';
-      li.title = `Bấm để xem góc nhìn của ${name}`;
+      li.title = id === myId
+        ? (getLanguage() === 'en' ? 'Your animal (Click to return)' : 'Con vật của bạn (Bấm để quay lại)')
+        : (getLanguage() === 'en' ? `Click to spectate ${name}` : `Bấm để xem góc nhìn của ${name}`);
       li.classList.toggle('me', id === myId);
       const isKing = id === napoleonId && id > 0;
       li.classList.toggle('nap', isKing);

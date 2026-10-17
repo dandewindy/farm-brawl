@@ -138,6 +138,7 @@ hud.onChangeLanguage = () => {
   syncStatsUi();
   world.updateBarnSign();
   hud.updateTeamCounts(hud.lastCount0, hud.lastCount1);
+  hud.updateSpecPlayBtn();
   const kingMeta = gameState.metas.get(gameState.napoleonId);
   const kingName = kingMeta ? kingMeta.name : undefined;
   hud.updateBoard(gameState.rule, gameState.reign, kingName, gameState.napoleonId === gameState.myId);
@@ -208,6 +209,7 @@ function pickRandomSpectateTarget(): void {
       spectateTargetId = targetId;
       const meta = gameState.metas.get(targetId);
       hud.updateSpectatorTarget(meta ? meta.name : t('playerDefault'), Math.round(ent.mass));
+      world.snapCamera(ent.x, ent.z, ent.mass);
       return;
     }
     spectateTargetId = null;
@@ -220,13 +222,18 @@ function pickRandomSpectateTarget(): void {
   spectateTargetId = chosenId;
   const meta = gameState.metas.get(chosenId);
   hud.updateSpectatorTarget(meta ? meta.name : t('playerDefault'), Math.round(ent.mass));
+  world.snapCamera(ent.x, ent.z, ent.mass);
 }
 
 hud.onStartSpectating = () => {
   isSpectating = true;
+  hud.isSpectating = true;
   document.body.classList.add('spectating');
   const hudEl = document.getElementById('hud');
   if (hudEl) hudEl.hidden = false;
+  hud.updateSpecPlayBtn();
+  input.cancelRam();
+  chargeStop();
   pickRandomSpectateTarget();
 };
 
@@ -235,6 +242,12 @@ hud.onNextSpectating = () => {
 };
 
 hud.onSelectSpectateTarget = (id: number) => {
+  if (id === gameState.myId) {
+    if (isSpectating) {
+      hud.onStopSpectating?.();
+    }
+    return;
+  }
   isSpectating = true;
   spectateTargetId = id;
   hud.isSpectating = true;
@@ -243,20 +256,38 @@ hud.onSelectSpectateTarget = (id: number) => {
   if (hudEl) hudEl.hidden = false;
   const specBar = document.getElementById('spectateBar');
   if (specBar) specBar.hidden = false;
+  hud.updateSpecPlayBtn();
   const deathEl = document.getElementById('death');
   if (deathEl) deathEl.hidden = true;
   document.body.classList.remove('menu');
+  input.cancelRam();
+  chargeStop();
   const targetEnt = gameState.ents.get(id);
   const targetMeta = gameState.metas.get(id);
   const playerName = targetMeta ? targetMeta.name : t('playerDefault');
   const playerMass = targetEnt ? Math.round(targetEnt.mass) : 0;
   hud.updateSpectatorTarget(playerName, playerMass);
+  if (targetEnt) {
+    world.snapCamera(targetEnt.x, targetEnt.z, targetEnt.mass);
+  }
 };
 
 hud.onStopSpectating = () => {
   isSpectating = false;
   spectateTargetId = null;
+  hud.isSpectating = false;
   document.body.classList.remove('spectating');
+  const specBar = document.getElementById('spectateBar');
+  if (specBar) specBar.hidden = true;
+  const hudEl = document.getElementById('hud');
+  if (hudEl) hudEl.hidden = false;
+  if (hud.isPlayerAlive && gameState.alive) {
+    const me = gameState.ents.get(gameState.myId);
+    if (me) {
+      predictor.reset(me.x, me.z);
+      world.snapCamera(me.x, me.z, me.mass);
+    }
+  }
 };
 
 // Click on 3D animal or floating name in spectator mode to follow that player
@@ -734,6 +765,7 @@ const gameState = new GameState({
     deathCamTarget = null;
     isSpectating = false;
     spectateTargetId = null;
+    hud.isPlayerAlive = true;
     hud.showInGame();
     if (!isReconnecting) {
       hud.showBanner(t('welcome'), t('welcomeSub'));
@@ -754,7 +786,7 @@ const gameState = new GameState({
       if (id === gameState.myId && gameState.alive) {
         seenMe = true;
         missingMeTicks = 0;
-        if (firstSpawn || Math.hypot(x - world.camTarget.x, z - world.camTarget.z) > 40) {
+        if (firstSpawn || (!isSpectating && Math.hypot(x - world.camTarget.x, z - world.camTarget.z) > 40)) {
           firstSpawn = false;
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
@@ -797,6 +829,9 @@ const gameState = new GameState({
           isDeadAwaitingScreen = false;
           if (transport) transport.inGame = false;
           gameState.alive = false;
+          hud.isPlayerAlive = false;
+          isSpectating = false;
+          spectateTargetId = null;
           hud.showDeath({
             k: 'die',
             id: gameState.myId,
@@ -939,6 +974,10 @@ function handleGameEvent(ev: GameEvent): void {
         predictor.on = false;
         missingMeTicks = 0;
         isDeadAwaitingScreen = true;
+        isSpectating = false;
+        spectateTargetId = null;
+        gameState.alive = false;
+        hud.isPlayerAlive = false;
         if (transport) transport.inGame = false;
         if (deathScreenTimer !== null) {
           clearTimeout(deathScreenTimer);
@@ -1386,17 +1425,18 @@ function animate(now: number): void {
     const myX = predictor.on ? predictor.x : (me ? me.x : 0);
     const myZ = predictor.on ? predictor.z : (me ? me.z : 0);
 
-    if (isStunned) {
+    if (isStunned || isSpectating) {
       input.cancelRam();
     }
 
     // Precise 3D raycasted aiming
     input.computeAim(world.camera, myX, myZ, myMass);
 
-    const stepFlags = me ? (isStunned ? (me.flags | FLAG.STUN) : me.flags) : (isStunned ? FLAG.STUN : 0);
-    const stepAimA = isStunned ? lockedAimA : input.aimA;
-    const stepAimMove = isStunned ? false : input.aimMove;
-    const stepHolding = isStunned ? false : input.holding;
+    const isLocked = isStunned || isSpectating;
+    const stepFlags = me ? (isLocked ? (me.flags | FLAG.STUN) : me.flags) : (isLocked ? FLAG.STUN : 0);
+    const stepAimA = isStunned ? lockedAimA : (isSpectating ? lastSentInput.a : input.aimA);
+    const stepAimMove = isLocked ? false : input.aimMove;
+    const stepHolding = isLocked ? false : input.holding;
 
     // Authoritative client physics prediction step
     if (myMeta && me) {
@@ -1419,10 +1459,12 @@ function animate(now: number): void {
       );
     }
 
-    // Rate-limited input transmission (completely locked while stunned)
+    // Rate-limited input transmission (completely locked while stunned or spectating)
     let inp = input.getInput();
     if (isStunned) {
       inp = { a: lockedAimA, mv: false, btn: false };
+    } else if (isSpectating) {
+      inp = { a: lastSentInput.a, mv: false, btn: false };
     }
     const btnChanged = inp.btn !== lastSentInput.btn;
     const mvChanged = inp.mv !== lastSentInput.mv;
