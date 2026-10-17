@@ -1017,9 +1017,26 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'rule': {
+      gameState.rule = ev.id;
       repaint();
       hud.showRuleBanner(ev.id);
-      hud.updateBoard(ev.id, gameState.reign);
+      const kingMeta = gameState.metas.get(gameState.napoleonId);
+      hud.updateBoard(ev.id, gameState.reign, kingMeta?.name, gameState.napoleonId === gameState.myId);
+      break;
+    }
+    case 'flowerBloom': {
+      sfxReward();
+      hud.showToast(t('flowerBloomToast'), 5000);
+      hud.showBanner(t('r_womenday'), t('d_womenday'));
+      setTimeout(() => {
+        for (const f of gameState.food.values()) {
+          if (f.k === 8) {
+            foodParts.burst(f.x, 1.2, f.z, 0xff4081, 14, 8, 8, 1.2);
+            foodParts.burst(f.x, 1.4, f.z, 0xffd700, 10, 6, 7, 0.9);
+            foodParts.fluff(f.x, f.z, 0xff69b4, 8);
+          }
+        }
+      }, 50);
       break;
     }
     case 'tool': {

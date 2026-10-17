@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CFG, FOOD_KG, type FoodKind } from '@shared/constants';
 import type { FoodItem } from '../game/state';
 import { getArenaTheme, type ArenaTheme } from '../theme';
@@ -126,17 +127,31 @@ export class FoodAndParticleRenderer {
     watermelonGeo.rotateZ(Math.PI / 2);
     watermelonGeo.scale(1.26, 0.94, 0.94);
 
-    // 8: Giant Flower (Hoa khổng lồ) - Large blossoming flower matching watermelon size
-    const flowerProfile = [
-      new THREE.Vector2(0.12, -0.2), // base
-      new THREE.Vector2(0.55, -0.05),
-      new THREE.Vector2(1.15, 0.12),  // broad petal flare
-      new THREE.Vector2(1.05, 0.22),  // curled petal rim
-      new THREE.Vector2(0.48, 0.18),  // inner petal bowl
-      new THREE.Vector2(0.02, 0.16),  // center base
-    ];
-    const giantFlowerGeo = new THREE.LatheGeometry(flowerProfile, 14);
-    giantFlowerGeo.scale(1.1, 1.15, 1.1);
+    // 8: Giant Flower (Hoa khổng lồ) - Large multi-petal blooming blossom matching watermelon scale
+    const flowerPetals: THREE.BufferGeometry[] = [];
+    // Outer petal ring: 8 broad oval petals angled outward
+    for (let i = 0; i < 8; i++) {
+      const g = new THREE.SphereGeometry(0.55, 10, 8);
+      g.scale(1.3, 0.28, 0.65);
+      g.translate(0.75, 0.08, 0);
+      g.rotateZ(0.22);
+      g.rotateY((i / 8) * Math.PI * 2);
+      flowerPetals.push(g);
+    }
+    // Inner petal ring: 6 cup petals angled more steeply upward
+    for (let i = 0; i < 6; i++) {
+      const g = new THREE.SphereGeometry(0.42, 8, 6);
+      g.scale(1.1, 0.26, 0.55);
+      g.translate(0.48, 0.18, 0);
+      g.rotateZ(0.42);
+      g.rotateY((i / 6) * Math.PI * 2 + 0.26);
+      flowerPetals.push(g);
+    }
+    // Calyx / stem base: green tapered base supporting the flower
+    const flowerCalyx = new THREE.CylinderGeometry(0.4, 0.18, 0.38, 10).translate(0, -0.08, 0);
+    flowerPetals.push(flowerCalyx);
+
+    const giantFlowerGeo = BufferGeometryUtils.mergeGeometries(flowerPetals)!;
 
     const geos = [
       cornCobGeo,
@@ -167,8 +182,13 @@ export class FoodAndParticleRenderer {
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.2, metalness: 0.25, flatShading: true }),
       // 7: Watermelon - striped green
       new THREE.MeshStandardMaterial({ map: createWatermelonTexture(), roughness: 0.45 }),
-      // 8: Giant Flower - bright radiant rose pink with gentle velvet roughness
-      new THREE.MeshStandardMaterial({ color: 0xff2d78, emissive: 0x440822, roughness: 0.38, flatShading: true }),
+      // 8: Giant Flower - bright radiant rose magenta, double-sided, lush velvet finish
+      new THREE.MeshStandardMaterial({
+        color: 0xff2d78,
+        emissive: 0x440822,
+        roughness: 0.32,
+        side: THREE.DoubleSide,
+      }),
     ];
 
     for (let i = 0; i < geos.length; i++) {
@@ -261,11 +281,16 @@ export class FoodAndParticleRenderer {
     this.scene.add(melonStemMesh);
     this.foodTops[7] = melonStemMesh;
 
-    // 8: Giant Flower center (Nhuỵ hoa vàng óng)
-    const flowerCenterGeo = new THREE.SphereGeometry(0.50, 14, 10);
-    flowerCenterGeo.scale(1.0, 0.65, 1.0);
-    flowerCenterGeo.translate(0, 0.22, 0);
-    const flowerCenterMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x664400, roughness: 0.28 });
+    // 8: Giant Flower center (Nhuỵ hoa vàng óng tỏa sáng)
+    const flowerCenterGeo = new THREE.SphereGeometry(0.58, 16, 12);
+    flowerCenterGeo.scale(1.0, 0.60, 1.0);
+    flowerCenterGeo.translate(0, 0.28, 0);
+    const flowerCenterMat = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      emissive: 0x664400,
+      metalness: 0.25,
+      roughness: 0.25,
+    });
     const flowerCenterMesh = new THREE.InstancedMesh(flowerCenterGeo, flowerCenterMat, this.maxFoodPerKind);
     flowerCenterMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     flowerCenterMesh.frustumCulled = false;
@@ -409,19 +434,19 @@ export class FoodAndParticleRenderer {
         // Giant Flower: large blossoming flower resting gracefully, gentle bobbing and slow regal rotation
         this.dummy.position.set(f.x, onPod + 0.38 * sz + Math.sin(tt * 2.2 + seed) * 0.08, f.z);
         this.dummy.rotation.set(0, seed + tt * 0.4, 0);
-        if (Math.random() < 0.12 && this.particles.length < this.maxParticles) {
+        if (Math.random() < 0.22 && this.particles.length < this.maxParticles) {
           this.particles.push({
-            x: f.x + (Math.random() - 0.5) * 2.2,
-            y: onPod + 0.4 + Math.random() * 1.5,
-            z: f.z + (Math.random() - 0.5) * 2.2,
-            vx: 0,
-            vy: 0.8 + Math.random() * 0.8,
-            vz: 0,
-            life: 0.7,
-            maxLife: 0.7,
-            color: new THREE.Color(Math.random() < 0.5 ? 0xff4081 : 0xffd700),
-            size: 0.45,
-            g: 0,
+            x: f.x + (Math.random() - 0.5) * 2.5,
+            y: onPod + 0.4 + Math.random() * 1.6,
+            z: f.z + (Math.random() - 0.5) * 2.5,
+            vx: (Math.random() - 0.5) * 0.4,
+            vy: 0.7 + Math.random() * 0.7,
+            vz: (Math.random() - 0.5) * 0.4,
+            life: 0.85,
+            maxLife: 0.85,
+            color: new THREE.Color(Math.random() < 0.6 ? 0xff4081 : 0xffd700),
+            size: 0.55,
+            g: -0.2,
           });
         }
       } else if (k === 7) {
@@ -444,8 +469,8 @@ export class FoodAndParticleRenderer {
         this.dummy.rotateZ(Math.PI / 4);
       }
 
-      // Golden corn has a gentle pulsating glow size
-      const pulse = k === 2 ? 1 + Math.sin(tt * 6 + seed) * 0.12 : 1;
+      // Golden corn and giant flowers have a gentle pulsating glow size
+      const pulse = k === 2 ? 1 + Math.sin(tt * 6 + seed) * 0.12 : (k === 8 ? 1 + Math.sin(tt * 3 + seed) * 0.08 : 1);
       this.dummy.scale.setScalar(grow * sz * pulse);
       this.dummy.updateMatrix();
 
@@ -456,7 +481,7 @@ export class FoodAndParticleRenderer {
 
       // Render ground shadow disc under food item
       if (nShadow < this.maxFoodTotal) {
-        const shadowScale = grow * sz * (k === 6 ? 3.4 : (k === 7 || k === 8) ? 2.6 : k === 4 ? 2.0 : 1.0);
+        const shadowScale = grow * sz * (k === 6 ? 3.4 : (k === 7 || k === 8) ? 3.0 : k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
         this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);

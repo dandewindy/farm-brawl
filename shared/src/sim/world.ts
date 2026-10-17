@@ -1175,16 +1175,20 @@ export class World {
         }
       }
     } else if (ruleId === 'womenday') {
-      // 11. Event rule: spawn many giant flowers (kind 8) simultaneously
-      const count = 35;
-      for (let i = 0; i < count; i++) {
+      // 11. Event rule: spawn many giant flowers (kind 8) simultaneously on open ground
+      let spawned = 0;
+      for (let attempt = 0; attempt < 150 && spawned < 40; attempt++) {
         const ang = this.rnd() * Math.PI * 2;
-        const dist = 5 + this.rnd() * 52;
+        const dist = 5 + this.rnd() * (CFG.R - 8);
         const fx = Math.cos(ang) * dist;
         const fz = Math.sin(ang) * dist;
+        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(fx - hx, fz - hz) < hr + 1.0)) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(fx - wx, fz - wz) < wr + 2.0)) continue;
+        if (this.map.fire?.some(([cx, cz, cr]) => Math.hypot(fx - cx, fz - cz) < cr + 2.0)) continue;
         this.addFood(fx, fz, 8, FOOD_KG[8]);
-        this.events.push({ k: 'superFood', x: r2(fx), z: r2(fz) });
+        spawned++;
       }
+      this.events.push({ k: 'flowerBloom' });
     }
     this.events.push({ k: 'rule', id: ruleId });
   }

@@ -1144,14 +1144,16 @@ describe('bonus weapons and tools', () => {
     expect(p2.mass).toBe(m2Before + ev2.roll);
   });
 
-  it('womenday rule spawns 35 giant flowers (kind 8, 11kg each)', () => {
+  it('womenday rule spawns giant flowers (kind 8, 11kg each) with single flowerBloom event and no superFood spam', () => {
     const w = emptyWorld();
     w.theme = 'women_day';
     w.applyRule('womenday');
 
     const flowers = [...w.food.values()].filter((f) => f.k === 8);
-    expect(flowers.length).toBe(35);
+    expect(flowers.length).toBe(40);
     expect(flowers[0].v).toBe(11);
+    expect(w.events.filter((e) => e.k === 'flowerBloom').length).toBe(1);
+    expect(w.events.filter((e) => e.k === 'superFood').length).toBe(0);
   });
 
   it('event rule womenday is eligible only in women_day theme with 30% chance', () => {

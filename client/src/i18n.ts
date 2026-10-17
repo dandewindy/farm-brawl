@@ -170,6 +170,7 @@ const vi = {
   d_dice: 'Lắc xúc xắc may mắn, xúc xắc bao nhiêu điểm nhận bấy nhiêu kg!',
   r_womenday: 'NGÀY PHỤ NỮ VIỆT NAM VUI VẺ',
   d_womenday: 'Hàng loạt hoa khổng lồ nở rộ khắp chiến trường, ăn hoa to nhận ngay 11kg!',
+  flowerBloomToast: '🌸 NGÀY PHỤ NỮ VIỆT NAM VUI VẺ: Hàng loạt hoa khổng lồ nở rộ khắp trang trại! 🌸',
   diceWon: '🎲 {roll} ĐIỂM! +{roll} KG',
   r_corn: 'BẮP LÀ CỦA HEO',
   d_corn: 'Heo và Vua ăn bắp gấp 3, con khác chỉ được ⅓',
@@ -179,6 +180,32 @@ const vi = {
   d_twoleg: 'Gà và vịt bị húc văng xa gấp đôi',
   r_fourleg: 'BỐN CHÂN TỐT',
   d_fourleg: 'Con vật bốn chân húc mạnh gấp rưỡi, Vua mạnh thêm 80%',
+  q_poultry: 'THẾ GIỚI GIA CẦM',
+  q_titan: 'TITAN ĐẠI CHIẾN',
+  q_equal: 'CHÚNG SINH BÌNH ĐẲNG',
+  q_tax: 'THU THUẾ',
+  q_sunday: 'HỌP NGÀY CHỦ NHẬT',
+  q_snowball: 'LỆNH TRUY NÃ',
+  q_till: 'ÔNG TILL QUAY LẠI',
+  q_dice: 'ĐỔ XÚC SẮC',
+  q_womenday: 'NGÀY PHỤ NỮ VIỆT NAM VUI VẺ',
+  q_corn: 'BẮP LÀ CỦA HEO',
+  q_squealer: 'SQUEALER TUYÊN TRUYỀN',
+  q_twoleg: 'HAI CHÂN LÀ KẺ THÙ',
+  q_fourleg: 'BỐN CHÂN TỐT',
+  poultry: 'THẾ GIỚI GIA CẦM',
+  titan: 'TITAN ĐẠI CHIẾN',
+  equal: 'CHÚNG SINH BÌNH ĐẲNG',
+  tax: 'THU THUẾ',
+  sunday: 'HỌP NGÀY CHỦ NHẬT',
+  snowball: 'LỆNH TRUY NÃ',
+  till: 'ÔNG TILL QUAY LẠI',
+  dice: 'ĐỔ XÚC SẮC',
+  womenday: 'NGÀY PHỤ NỮ VIỆT NAM VUI VẺ',
+  corn: 'BẮP LÀ CỦA HEO',
+  squealer: 'SQUEALER TUYÊN TRUYỀN',
+  twoleg: 'HAI CHÂN LÀ KẺ THÙ',
+  fourleg: 'BỐN CHÂN TỐT',
   noNap: 'CHƯA CÓ VUA NÔNG TRẠI',
   noNapDesc: 'Đứng một mình trên bục để nắm quyền',
   reignYou: 'Bạn đã tại vị {t}',
@@ -444,6 +471,7 @@ const en: Record<keyof typeof vi, string> = {
   d_dice: 'All animals roll the lucky dice to receive bonus kg matching your roll!',
   r_womenday: 'HAPPY VN WOMEN\'S DAY',
   d_womenday: 'Giant blooming flowers spawn across the arena, eat them for 11kg!',
+  flowerBloomToast: '🌸 HAPPY VIETNAMESE WOMEN\'S DAY: Giant blooming flowers have blossomed across the arena! 🌸',
   diceWon: '🎲 {roll} POINTS! +{roll} KG',
   r_corn: 'CORN BELONGS TO PIGS',
   d_corn: 'Pigs & King gain 3x from corn, others get ⅓',
@@ -453,6 +481,32 @@ const en: Record<keyof typeof vi, string> = {
   d_twoleg: 'Chickens and ducks are knocked twice as far',
   r_fourleg: 'FOUR LEGS GOOD',
   d_fourleg: 'Four-legged animals ram 50% harder, King 80% harder',
+  q_poultry: 'POULTRY WORLD',
+  q_titan: 'TITAN CLASH',
+  q_equal: 'ALL BEINGS ARE EQUAL',
+  q_tax: 'TAXATION',
+  q_sunday: 'SUNDAY MEETING',
+  q_snowball: 'WANTED ORDER',
+  q_till: 'FARMER TILL RETURNS',
+  q_dice: 'ROLL THE DICE',
+  q_womenday: 'HAPPY VN WOMEN\'S DAY',
+  q_corn: 'CORN BELONGS TO PIGS',
+  q_squealer: 'SQUEALER PROPAGANDA',
+  q_twoleg: 'TWO LEGS ARE ENEMIES',
+  q_fourleg: 'FOUR LEGS GOOD',
+  poultry: 'POULTRY WORLD',
+  titan: 'TITAN CLASH',
+  equal: 'ALL BEINGS ARE EQUAL',
+  tax: 'TAXATION',
+  sunday: 'SUNDAY MEETING',
+  snowball: 'WANTED ORDER',
+  till: 'FARMER TILL RETURNS',
+  dice: 'ROLL THE DICE',
+  womenday: 'HAPPY VN WOMEN\'S DAY',
+  corn: 'CORN BELONGS TO PIGS',
+  squealer: 'SQUEALER PROPAGANDA',
+  twoleg: 'TWO LEGS ARE ENEMIES',
+  fourleg: 'FOUR LEGS GOOD',
   noNap: 'NO FARM KING YET',
   noNapDesc: 'Stand alone on the podium to seize power',
   reignYou: 'You have reigned {t}',
@@ -576,8 +630,34 @@ export function toggleLanguage(): Lang {
 export type TextKey = keyof typeof vi;
 
 export function t(key: TextKey | string, vars: Record<string, string | number> = {}): string {
+  if (!key) return '';
   const dict = currentLang === 'en' ? en : vi;
-  const s = (dict as Record<string, string>)[key] ?? (vi as Record<string, string>)[key] ?? key;
+  let s = (dict as Record<string, string>)[key] ?? (vi as Record<string, string>)[key];
+  if (!s) {
+    // 1. Alias lookup for 'q_' prefix -> check 'r_' then 'd_'
+    if (key.startsWith('q_')) {
+      const sub = key.slice(2);
+      s = (dict as Record<string, string>)[`r_${sub}`]
+        ?? (vi as Record<string, string>)[`r_${sub}`]
+        ?? (dict as Record<string, string>)[`d_${sub}`]
+        ?? (vi as Record<string, string>)[`d_${sub}`];
+    }
+    // 2. Direct rule lookup if key has no prefix -> check 'r_'
+    if (!s && ((dict as Record<string, string>)[`r_${key}`] || (vi as Record<string, string>)[`r_${key}`])) {
+      s = (dict as Record<string, string>)[`r_${key}`] ?? (vi as Record<string, string>)[`r_${key}`];
+    }
+    // 3. Fallback for 'd_' prefix if desc key was missing -> check 'r_'
+    if (!s && key.startsWith('d_')) {
+      const sub = key.slice(2);
+      s = (dict as Record<string, string>)[`r_${sub}`] ?? (vi as Record<string, string>)[`r_${sub}`];
+    }
+    // 4. Fallback for 'r_' prefix if title key was missing -> check direct key
+    if (!s && key.startsWith('r_')) {
+      const sub = key.slice(2);
+      s = (dict as Record<string, string>)[sub] ?? (vi as Record<string, string>)[sub];
+    }
+  }
+  s = s ?? key;
   return s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
 }
 

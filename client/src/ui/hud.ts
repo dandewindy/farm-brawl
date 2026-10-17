@@ -2198,6 +2198,7 @@ export class HudManager {
   }
 
   showRuleBanner(ruleId: string): void {
+    if (!ruleId) return;
     const ruleTitle = t(`r_${ruleId}`);
     const ruleDesc = t(`d_${ruleId}`);
     this.showBanner(t('ruleNew', { rule: ruleTitle }), ruleDesc);
