@@ -123,10 +123,15 @@ export class WsClient implements Transport {
               this.rttMin = sorted[0];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
-              const isSlow = !isFastColo(this.colo) || s > 110;
-              if (isSlow) {
+              const onFastNode = isFastColo(this.colo);
+              const isSlow = !onFastNode || this.rttMin > 140;
+
+              if (onFastNode && (this.rttMin <= 110 || this.rtt <= 110)) {
+                // Ping is good on SIN/HKG: immediately reset bad ping streak to 0
+                this.badPingStreak = 0;
+              } else if (isSlow) {
                 // If non-fast node detected (e.g. FRA, MAD, ORD, SJC, NRT), jump straight to alert threshold
-                this.badPingStreak = !isFastColo(this.colo) ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
+                this.badPingStreak = !onFastNode ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
@@ -139,21 +144,25 @@ export class WsClient implements Transport {
               }
 
               // 1. Silent Lobby Steer:
-              // While in lobby, if connected to a distant node (MAD, FRA, ORD, NRT, SJC...) or ping > 90ms,
-              // aggressively auto-reconnect every 900ms until a fast Asian node (SIN, HKG...) is acquired.
-              if (!this.inGame && (!isFastColo(this.colo) || this.rttMin > 90) && !this.closed) {
-                const now = performance.now();
-                if (now - this.lastLobbyReconnectTime > 900) {
-                  this.lastLobbyReconnectTime = now;
-                  console.log(`[WS Watchdog] Lobby on slow/distant node (${this.colo}, ~${Math.round(this.rttMin)}ms). Auto-reconnecting...`);
-                  this.forceReconnect();
+              // While in lobby, steer away ONLY if connected to a genuinely distant non-Asian node (FRA, MAD, ORD...)
+              // OR if ping is unacceptably high (> 180ms) with at least 2 samples.
+              // If connected to a fast Asian node (SIN, HKG, HAN, SGN, BKK, KUL...) with ping <= 130ms, NEVER auto-reconnect!
+              const isGoodAsianNode = onFastNode && this.rttMin <= 130;
+              if (!this.inGame && !isGoodAsianNode && !this.closed) {
+                if (this.rttWin.length >= 2 && (!onFastNode || this.rttMin > 180)) {
+                  const now = performance.now();
+                  if (now - this.lastLobbyReconnectTime > 3000) {
+                    this.lastLobbyReconnectTime = now;
+                    console.log(`[WS Watchdog] Lobby on slow/distant node (${this.colo}, ~${Math.round(this.rttMin)}ms). Auto-reconnecting...`);
+                    this.forceReconnect();
+                  }
                 }
               }
 
               // 2. Active In-Game Hot Migration Watchdog:
-              // During live gameplay, if bad ping streak >= 2 or non-APAC node detected,
+              // During live gameplay, if bad ping streak >= 3 and NOT on a good Asian node,
               // automatically trigger zero-downtime hot migration!
-              if (this.inGame && this.badPingStreak >= 2 && !this.closed) {
+              if (this.inGame && this.badPingStreak >= 3 && !isGoodAsianNode && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -206,22 +215,27 @@ export class WsClient implements Transport {
 
   public triggerHotMigration(): void {
     if (!this.inGame || this.closed) return;
-    if (isFastColo(this.colo) && this.rttMin <= 100) return;
+    // Strict Guard: If currently on an optimal Asian node (SIN, HKG, etc.) with good ping (<= 110ms), NEVER migrate!
+    if (isFastColo(this.colo) && (this.rttMin <= 110 || this.rtt <= 110)) {
+      this.isMigrating = false;
+      this.badPingStreak = 0;
+      return;
+    }
     const now = performance.now();
-    // Throttle attempts: probe at most once every 2.0 seconds
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 2000) return;
+    // Throttle attempts: probe at most once every 3.0 seconds
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 3000) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
     this.onMigrationStatus?.('probing', this.colo);
     console.log(`[WS Watchdog] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting zero-downtime hot migration probe...`);
 
-    // Escalation: If we are stuck on an extreme overseas node (MAD, FRA, ORD, SJC, etc.) with ping > 200ms,
-    // or if prior probe attempts didn't find a better route because of browser connection pooling,
-    // actively break the bad connection and reconnect!
-    if (this.probeAttempts >= 2 || (!isFastColo(this.colo) && this.rttMin > 200)) {
+    // Escalation: ONLY escalate to active hot reconnect if we are genuinely stuck on an extreme overseas node (MAD, FRA, ORD, SJC, etc.)
+    // with ping > 250ms AND multiple probe attempts have failed.
+    // If we are on a fast Asian node (SIN/HKG), NEVER forcibly kill the active in-game WebSocket!
+    if (!isFastColo(this.colo) && this.rttMin > 250 && this.probeAttempts >= 3) {
       this.probeAttempts = 0;
       this.isMigrating = false;
-      console.log(`[WS Watchdog] Escalating to active hot reconnect away from ${this.colo} (~${Math.round(this.rttMin)}ms)...`);
+      console.log(`[WS Watchdog] Escalating to active hot reconnect away from distant ${this.colo} (~${Math.round(this.rttMin)}ms)...`);
       this.forceReconnect();
       return;
     }
@@ -247,7 +261,8 @@ export class WsClient implements Transport {
         this.isMigrating = false;
         this.probeAttempts++;
         this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= 2) {
+        // Only escalate to forceReconnect if stranded on a non-fast distant node (>250ms)
+        if (!isFastColo(this.colo) && this.rttMin > 250 && this.probeAttempts >= 3) {
           this.probeAttempts = 0;
           this.forceReconnect();
         }
@@ -274,7 +289,13 @@ export class WsClient implements Transport {
           const probeColo = msg.colo;
           const probeRtt = performance.now() - msg.c;
           console.log(`[WS Watchdog] Hot migration probe response colo: ${probeColo}, rtt: ${Math.round(probeRtt)}ms`);
-          const isBetter = isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65);
+          const currentlyFast = isFastColo(this.colo);
+          // If already on a fast Asian node (SIN/HKG), ONLY switch if the probe is ALSO fast AND significantly better (at least 25% lower latency)
+          // If on a slow/distant node (FRA/MAD/ORD...), switch if probe is a fast Asian node OR has at least 35% lower latency
+          const isBetter = currentlyFast
+            ? (isFastColo(probeColo) && probeRtt > 0 && probeRtt < this.rttMin * 0.75)
+            : (isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65));
+
           if (isBetter) {
             this.probeAttempts = 0;
             // Optimal edge node found! Hand over existing session token
@@ -298,10 +319,11 @@ export class WsClient implements Transport {
             this.isMigrating = false;
             this.probeAttempts++;
             this.onMigrationStatus?.('failed', this.colo);
-            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/2).`);
-            if (this.probeAttempts >= 2) {
+            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/3).`);
+            // Only escalate to forceReconnect if stranded on a non-fast distant node (>250ms)
+            if (!isFastColo(this.colo) && this.rttMin > 250 && this.probeAttempts >= 3) {
               this.probeAttempts = 0;
-              console.log(`[WS Watchdog] Breaking stale connection to ${this.colo}. Performing active route renegotiation...`);
+              console.log(`[WS Watchdog] Breaking distant connection to ${this.colo}. Performing active route renegotiation...`);
               this.forceReconnect();
             }
           }

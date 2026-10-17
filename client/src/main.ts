@@ -14,7 +14,7 @@ import { GameState } from './game/state';
 import { applyTexts, t } from './i18n';
 import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
-import { WsClient } from './net/ws';
+import { isFastColo, WsClient } from './net/ws';
 import { registerFriendRoom } from './net/firebase';
 import { AnimalRenderer } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
@@ -146,19 +146,15 @@ hud.onChangeLanguage = () => {
 
 hud.onReconnect = () => {
   if (transport?.inGame) {
-    if (transport?.colo === 'SIN') {
-      hud.showToast(t('coloSinToast'));
-      return;
-    }
-    if (transport?.colo === 'HKG' && transport.rttMin <= 80) {
-      hud.showToast(t('coloHkgToast'));
+    if (isFastColo(transport?.colo) && transport.rttMin <= 100) {
+      hud.showToast(transport?.colo === 'SIN' ? t('coloSinToast') : t('coloHkgToast'));
       return;
     }
     hud.showToast(t('coloSwitchingToast'));
-    if (transport?.forceReconnect) {
-      transport.forceReconnect();
-    } else if (transport?.triggerHotMigration) {
+    if (transport?.triggerHotMigration) {
       transport.triggerHotMigration();
+    } else if (transport?.forceReconnect) {
+      transport.forceReconnect();
     }
     return;
   }
@@ -823,7 +819,7 @@ const gameState = new GameState({
     }
     if (!seenMe) {
       predictor.on = false;
-      if (transport && transport.inGame && !isDeadAwaitingScreen && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
+      if (transport && transport.inGame && gameState.alive && gameState.myId > 0 && !isDeadAwaitingScreen && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
         missingMeTicks++;
         if (missingMeTicks >= 40) {
           missingMeTicks = 0;
