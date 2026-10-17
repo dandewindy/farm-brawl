@@ -1980,7 +1980,7 @@ export class HudManager {
     if (this.coloVal && colo) {
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
-      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|TPE|KUL|MNL|NRT|KIX|ICN)$/i.test(colo);
+      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL)$/i.test(colo);
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';

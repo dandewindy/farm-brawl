@@ -149,12 +149,16 @@ hud.onReconnect = () => {
       hud.showToast(t('coloSinToast'));
       return;
     }
-    if (transport?.colo === 'HKG') {
+    if (transport?.colo === 'HKG' && transport.rttMin <= 80) {
       hud.showToast(t('coloHkgToast'));
       return;
     }
-    hud.showToast(t('coloProbingToast'));
-    transport?.triggerHotMigration?.();
+    hud.showToast(t('coloSwitchingToast'));
+    if (transport?.forceReconnect) {
+      transport.forceReconnect();
+    } else if (transport?.triggerHotMigration) {
+      transport.triggerHotMigration();
+    }
     return;
   }
   if (transport?.forceReconnect) {

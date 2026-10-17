@@ -3,7 +3,7 @@ import type { Handler, Transport } from './transport';
 
 export function isFastColo(colo?: string): boolean {
   if (!colo) return false;
-  return /^(SIN|HKG|HAN|SGN|DAD|BKK|TPE|KUL|MNL|NRT|KIX|ICN)$/i.test(colo);
+  return /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL)$/i.test(colo);
 }
 
 export class WsClient implements Transport {
@@ -28,6 +28,7 @@ export class WsClient implements Transport {
   public isMigrating = false;
   private migrationWs: WebSocket | null = null;
   private lastMigrationProbeTime = 0;
+  private probeAttempts = 0;
   private migrationRetryTimer: number | null = null;
   public onMigrationSuccess?: (newColo: string) => void;
   public onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
@@ -122,9 +123,9 @@ export class WsClient implements Transport {
               this.rttMin = sorted[0];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
-              const isSlow = !isFastColo(this.colo) || s > 160;
+              const isSlow = !isFastColo(this.colo) || s > 110;
               if (isSlow) {
-                // If European/US node detected (e.g. FRA, WAW, MAD, MXP), jump straight to alert threshold
+                // If non-fast node detected (e.g. FRA, MAD, ORD, SJC, NRT), jump straight to alert threshold
                 this.badPingStreak = !isFastColo(this.colo) ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
@@ -138,21 +139,21 @@ export class WsClient implements Transport {
               }
 
               // 1. Silent Lobby Steer:
-              // While in lobby, if connected to a distant node (FRA, MAD, WAW...),
-              // quietly reconnect every 1.8s until a fast Asian node (SIN, HKG...) is acquired.
-              if (!this.inGame && !isFastColo(this.colo) && !this.closed) {
+              // While in lobby, if connected to a distant node (MAD, FRA, ORD, NRT, SJC...) or ping > 90ms,
+              // aggressively auto-reconnect every 900ms until a fast Asian node (SIN, HKG...) is acquired.
+              if (!this.inGame && (!isFastColo(this.colo) || this.rttMin > 90) && !this.closed) {
                 const now = performance.now();
-                if (now - this.lastLobbyReconnectTime > 1800) {
+                if (now - this.lastLobbyReconnectTime > 900) {
                   this.lastLobbyReconnectTime = now;
-                  console.log(`[WS Watchdog] Lobby on slow node (${this.colo}, ~${Math.round(this.rttMin)}ms). Auto-reconnecting...`);
+                  console.log(`[WS Watchdog] Lobby on slow/distant node (${this.colo}, ~${Math.round(this.rttMin)}ms). Auto-reconnecting...`);
                   this.forceReconnect();
                 }
               }
 
               // 2. Active In-Game Hot Migration Watchdog:
-              // During live gameplay, if bad ping or non-APAC colo detected,
-              // automatically trigger zero-downtime hot migration in the background!
-              if (this.inGame && this.badPingStreak >= 2 && !this.closed && this.sessionToken) {
+              // During live gameplay, if bad ping streak >= 2 or non-APAC node detected,
+              // automatically trigger zero-downtime hot migration!
+              if (this.inGame && this.badPingStreak >= 2 && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -204,15 +205,26 @@ export class WsClient implements Transport {
   }
 
   public triggerHotMigration(): void {
-    if (!this.inGame || this.closed || !this.sessionToken) return;
-    if (isFastColo(this.colo) && this.rttMin <= 120) return;
+    if (!this.inGame || this.closed) return;
+    if (isFastColo(this.colo) && this.rttMin <= 100) return;
     const now = performance.now();
-    // Throttle attempts: probe at most once every 3.0 seconds
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 3000) return;
+    // Throttle attempts: probe at most once every 2.0 seconds
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 2000) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
     this.onMigrationStatus?.('probing', this.colo);
     console.log(`[WS Watchdog] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting zero-downtime hot migration probe...`);
+
+    // Escalation: If we are stuck on an extreme overseas node (MAD, FRA, ORD, SJC, etc.) with ping > 200ms,
+    // or if prior probe attempts didn't find a better route because of browser connection pooling,
+    // actively break the bad connection and reconnect!
+    if (this.probeAttempts >= 2 || (!isFastColo(this.colo) && this.rttMin > 200)) {
+      this.probeAttempts = 0;
+      this.isMigrating = false;
+      console.log(`[WS Watchdog] Escalating to active hot reconnect away from ${this.colo} (~${Math.round(this.rttMin)}ms)...`);
+      this.forceReconnect();
+      return;
+    }
 
     const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
     let probeSocket: WebSocket;
@@ -226,16 +238,21 @@ export class WsClient implements Transport {
       return;
     }
 
-    // Auto-timeout probe socket if it hangs or takes longer than 2.5s
+    // Auto-timeout probe socket if it hangs or takes longer than 2.0s
     const probeTimeout = window.setTimeout(() => {
       if (this.migrationWs === probeSocket) {
         console.warn('[WS Watchdog] Probe socket connection timed out.');
         try { probeSocket.close(); } catch (_) {}
         this.migrationWs = null;
         this.isMigrating = false;
+        this.probeAttempts++;
         this.onMigrationStatus?.('failed', this.colo);
+        if (this.probeAttempts >= 2) {
+          this.probeAttempts = 0;
+          this.forceReconnect();
+        }
       }
-    }, 2500);
+    }, 2000);
 
     let pendingInit: ServerMsg | null = null;
 
@@ -259,11 +276,12 @@ export class WsClient implements Transport {
           console.log(`[WS Watchdog] Hot migration probe response colo: ${probeColo}, rtt: ${Math.round(probeRtt)}ms`);
           const isBetter = isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65);
           if (isBetter) {
+            this.probeAttempts = 0;
             // Optimal edge node found! Hand over existing session token
-            if (this.lastJoinMsg && this.sessionToken) {
+            if (this.lastJoinMsg) {
               probeSocket.send(JSON.stringify({
                 ...this.lastJoinMsg,
-                token: this.sessionToken,
+                token: this.sessionToken || undefined,
               }));
             } else {
               clearTimeout(probeTimeout);
@@ -278,7 +296,14 @@ export class WsClient implements Transport {
             probeSocket.close();
             this.migrationWs = null;
             this.isMigrating = false;
+            this.probeAttempts++;
             this.onMigrationStatus?.('failed', this.colo);
+            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/2).`);
+            if (this.probeAttempts >= 2) {
+              this.probeAttempts = 0;
+              console.log(`[WS Watchdog] Breaking stale connection to ${this.colo}. Performing active route renegotiation...`);
+              this.forceReconnect();
+            }
           }
         } else if (msg.t === 'init') {
           // Buffer init so it can be delivered right before joined
@@ -286,6 +311,7 @@ export class WsClient implements Transport {
         } else if (msg.t === 'joined') {
           // Handover acknowledged by server! Seamlessly swap active socket
           clearTimeout(probeTimeout);
+          this.probeAttempts = 0;
           console.log(`[WS Watchdog] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'}`);
           const oldWs = this.ws;
           this.ws = probeSocket;
@@ -417,6 +443,8 @@ export class WsClient implements Transport {
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();
+    this.probeAttempts = 0;
+    this.isMigrating = false;
     if (this.migrationWs) {
       try { this.migrationWs.close(); } catch (_) {}
       this.migrationWs = null;
@@ -442,7 +470,7 @@ export class WsClient implements Transport {
       if (!this.closed) {
         this.connect();
       }
-    }, 100);
+    }, 80);
   }
 
   close(): void {
