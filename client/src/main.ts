@@ -192,6 +192,7 @@ hud.onExitLobby = () => {
   animals.clear();
   tools.clear();
   corpses.clear();
+  gameState.food.clear();
   hud.returnToLobby();
   hud.showToast(t('exitLobbyToast'));
 };
@@ -754,6 +755,7 @@ const gameState = new GameState({
       }
       tools.clear();
     }
+    tools.sync(gameState.tools ? Array.from(gameState.tools.values()) : []);
   },
   onJoined(_id, isReconnecting) {
     if (deathScreenTimer !== null) {

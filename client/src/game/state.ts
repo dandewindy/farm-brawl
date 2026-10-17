@@ -84,11 +84,16 @@ export class GameState {
       this.tick = m.tick;
       const isReconnecting = this.alive && this.myId > 0;
       if (!isReconnecting) {
-        this.metas.clear(); this.ents.clear(); this.food.clear(); this.tools.clear();
+        this.metas.clear();
+        this.ents.clear();
       }
-      for (const p of m.players) this.metas.set(p.id, p);
+      // Food and tools must ALWAYS be authoritatively synced to server's state on init.
+      // This eliminates ghost items that were eaten or collected while disconnected / switching networks.
+      this.food.clear();
       for (const f of m.food) this.addFood(f, true);
+      this.tools.clear();
       if (m.tools) for (const t of m.tools) this.tools.set(t[0], t);
+      for (const p of m.players) this.metas.set(p.id, p);
       this.hooks.onInit(m.map, isReconnecting);
     } else if (m.t === 'joined') {
       const isReconnecting = this.alive && this.myId === m.id;
