@@ -50,6 +50,7 @@ export interface Player extends Body {
   lastEatT: number;
   squishT: number;
   team?: number;
+  origSpecies?: Species;
   ai: BotBrain | null;
 }
 
@@ -95,6 +96,8 @@ export class World {
   foodEnabled: boolean;
   /** game mode: ffa, team, or friend */
   mode: 'ffa' | 'team' | 'friend';
+  /** arena theme: classic, women_day, etc. */
+  theme: string = 'classic';
 
   /** Podium capture & protective shield system */
   podiumCaptor = 0;
@@ -176,12 +179,26 @@ export class World {
     this.spawn(p);
   }
 
+  clearRule(): void {
+    if (this.currentRule === 'poultry') {
+      for (const p of this.players.values()) {
+        if (p.origSpecies) {
+          p.species = p.origSpecies;
+          delete p.origSpecies;
+          this.events.push({ k: 'join', ...this.meta(p) });
+        }
+      }
+    }
+    this.currentRule = '';
+    this.ruleTimer = 0;
+  }
+
   removePlayer(id: number): void {
     if (!this.players.delete(id)) return;
     if (id === this.napoleonId) {
       this.napoleonId = 0;
       this.napoleonReign = 0;
-      this.currentRule = '';
+      this.clearRule();
       this.kingChoice = null;
       this.podiumPhaseTimer = 30;
       this.podiumWarned5s = false;
@@ -205,7 +222,16 @@ export class World {
 
   private spawn(p: Player): void {
     const [x, z] = this.freeSpot();
-    const spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
+    if (this.currentRule === 'poultry') {
+      if (!p.origSpecies) p.origSpecies = p.species;
+      p.species = this.rnd() < 0.5 ? 'chicken' : 'duck';
+    }
+    let spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
+    if (this.currentRule === 'titan') {
+      spawnMass = 1000;
+    } else if (this.currentRule === 'equal') {
+      spawnMass = p.id === this.napoleonId ? 100 : 30;
+    }
     Object.assign(p, {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: spawnMass, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
@@ -418,7 +444,7 @@ export class World {
           p.pressed = false;
           p.btnLatch = false;
         }
-        const tillSpeedMult = this.tillTruck.active ? 1.5 : 1.0;
+        const tillSpeedMult = (this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0;
         stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
         if (p.slowT > 0) {
           p.vx *= 0.85;
@@ -709,8 +735,19 @@ export class World {
     if (this.napoleonId > 0) {
       this.napoleonReign += DT;
       this.ruleTimer -= DT;
-      if (this.ruleTimer <= 0 && !this.kingChoice) {
-        this.startKingChoice();
+      if (this.ruleTimer <= 0) {
+        if (this.currentRule === 'poultry') {
+          for (const p of this.players.values()) {
+            if (p.origSpecies) {
+              p.species = p.origSpecies;
+              delete p.origSpecies;
+              this.events.push({ k: 'join', ...this.meta(p) });
+            }
+          }
+        }
+        if (!this.kingChoice) {
+          this.startKingChoice();
+        }
       }
 
       // King rule choice timer: bot king picks after 1.5s, or timeout
@@ -741,11 +778,11 @@ export class World {
       }
     }
 
-    // Rule: "equal" (All animals are equal, non-kings converge to 30kg, King boosted)
+    // Rule: "equal" (All animals are equal, non-kings converge to 30kg, King boosted to 100kg)
     if (this.currentRule === 'equal') {
       for (const p of alive) {
         if (p.id === this.napoleonId) {
-          p.mass = Math.max(p.mass, 65);
+          p.mass = Math.max(p.mass, 100);
         } else if (Math.abs(p.mass - 30) > 0.5) {
           p.mass += (30 - p.mass) * 0.05 * DT;
         }
@@ -800,14 +837,24 @@ export class World {
             // Near outer electric fence: steer strongly back toward center
             desiredAngle = Math.atan2(-tz, -tx);
           } else {
-            // Actively hunt and chase nearest living animal
+            // Actively hunt and chase nearest living animal: PRIORITIZE ENEMIES (non-King)
             let bestDist = Infinity;
             let targetP: Player | null = null;
             for (const p of alive) {
+              if (p.id === this.napoleonId) continue;
               const d = Math.hypot(p.x - tx, p.z - tz);
               if (d < bestDist) {
                 bestDist = d;
                 targetP = p;
+              }
+            }
+            if (!targetP) {
+              for (const p of alive) {
+                const d = Math.hypot(p.x - tx, p.z - tz);
+                if (d < bestDist) {
+                  bestDist = d;
+                  targetP = p;
+                }
               }
             }
             if (targetP) {
@@ -859,8 +906,7 @@ export class World {
         if (this.tillTruck.exiting && distFromCenter > 74) {
           this.tillTruck.active = false;
           this.tillTruck.exiting = false;
-          this.currentRule = '';
-          this.ruleTimer = 0;
+          this.clearRule();
         }
       }
     } else {
@@ -1027,9 +1073,15 @@ export class World {
   }
 
   startKingChoice(): void {
-    const rules = ['twoleg', 'fourleg', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball', 'till'];
-    const candidates = rules.filter((r) => r !== this.currentRule);
-    const shuffled = [...candidates].sort(() => this.rnd() - 0.5);
+    const baseRules = ['poultry', 'titan', 'corn', 'equal', 'sunday', 'tax', 'squealer', 'snowball', 'till', 'dice'];
+    const candidates = baseRules.filter((r) => r !== this.currentRule);
+    let shuffled = [...candidates].sort(() => this.rnd() - 0.5);
+
+    // Event rule: 30% chance for "NGÀY PHỤ NỮ VIỆT NAM VUI VẺ" in women_day theme
+    if (this.theme === 'women_day' && this.currentRule !== 'womenday' && this.rnd() < 0.30) {
+      shuffled = ['womenday', ...shuffled.filter((r) => r !== 'womenday')];
+    }
+
     this.kingChoice = {
       options: shuffled.slice(0, 3),
       expireT: this.time + 10.0,
@@ -1043,16 +1095,59 @@ export class World {
   }
 
   applyRule(ruleId: string): void {
+    // Revert previous poultry rule if switching away
+    if (this.currentRule === 'poultry' && ruleId !== 'poultry') {
+      for (const p of this.players.values()) {
+        if (p.origSpecies) {
+          p.species = p.origSpecies;
+          delete p.origSpecies;
+          this.events.push({ k: 'join', ...this.meta(p) });
+        }
+      }
+    }
     this.currentRule = ruleId;
     this.ruleTimer = 30;
     this.kingChoice = null;
-    if (ruleId === 'equal') {
+
+    if (ruleId === 'poultry') {
+      // 1. Thế giới gia cầm: all animals transform into chicken or duck
+      for (const p of this.players.values()) {
+        if (!p.origSpecies) p.origSpecies = p.species;
+        p.species = this.rnd() < 0.5 ? 'chicken' : 'duck';
+        this.events.push({ k: 'join', ...this.meta(p) });
+      }
+    } else if (ruleId === 'titan') {
+      // 2. Titan đại chiến: all animals increase to 1000kg regardless of prior size
       for (const p of this.players.values()) {
         if (p.alive) {
-          if (p.id === this.napoleonId) p.mass = Math.max(p.mass, 65);
+          p.mass = 1000;
+        }
+      }
+    } else if (ruleId === 'equal') {
+      // 3. Chúng sinh bình đẳng: all animals 30kg, King 100kg
+      for (const p of this.players.values()) {
+        if (p.alive) {
+          if (p.id === this.napoleonId) p.mass = 100;
           else p.mass = 30;
         }
       }
+    } else if (ruleId === 'sunday') {
+      // 5. Họp ngày chủ nhật: summon & teleport all animals to podium except King
+      const [podX, podZ] = this.map.podium;
+      const others = [...this.players.values()].filter((p) => p.alive && p.id !== this.napoleonId);
+      const total = others.length;
+      for (let i = 0; i < total; i++) {
+        const p = others[i];
+        const ang = (i / Math.max(1, total)) * Math.PI * 2;
+        const dist = 1.8 + (i % 3) * 1.5;
+        p.x = podX + Math.cos(ang) * dist;
+        p.z = podZ + Math.sin(ang) * dist;
+        p.vx = 0;
+        p.vz = 0;
+        p.dashT = 0;
+        p.charging = false;
+      }
+      this.events.push({ k: 'podBlast', x: podX, z: podZ });
     } else if (ruleId === 'squealer') {
       const king = this.players.get(this.napoleonId);
       if (king && king.alive) {
@@ -1060,7 +1155,7 @@ export class World {
         king.power = 1.35;
       }
     } else if (ruleId === 'till') {
-      this.tillTruck.timer = 1.0; // Quick initial entrance for Till's tractor
+      this.tillTruck.timer = 1.0;
       this.tillTruck.active = false;
       this.tillTruck.exiting = false;
       this.tillTruck.sweepT = 14.0;
@@ -1069,6 +1164,26 @@ export class World {
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2;
         this.addFood(podX + Math.cos(ang) * 2.5, podZ + Math.sin(ang) * 2.5, 2, 6);
+      }
+    } else if (ruleId === 'dice') {
+      // 10. Đổ xúc sắc: roll 1..6 points, add matching kg to each player
+      for (const p of this.players.values()) {
+        if (p.alive) {
+          const roll = Math.floor(this.rnd() * 6) + 1;
+          p.mass += roll;
+          this.events.push({ k: 'dice', id: p.id, roll });
+        }
+      }
+    } else if (ruleId === 'womenday') {
+      // 11. Event rule: spawn many giant flowers (kind 8) simultaneously
+      const count = 35;
+      for (let i = 0; i < count; i++) {
+        const ang = this.rnd() * Math.PI * 2;
+        const dist = 5 + this.rnd() * 52;
+        const fx = Math.cos(ang) * dist;
+        const fz = Math.sin(ang) * dist;
+        this.addFood(fx, fz, 8, FOOD_KG[8]);
+        this.events.push({ k: 'superFood', x: r2(fx), z: r2(fz) });
       }
     }
     this.events.push({ k: 'rule', id: ruleId });
@@ -1079,19 +1194,9 @@ export class World {
     const ramFactor = TRAITS[att.species].ram ?? 1.0;
     let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX * 1.3);
 
-    // Rule: "twoleg" (Two legs bad - chickens and ducks fly twice as far when hit)
-    if (this.currentRule === 'twoleg' && (vic.species === 'chicken' || vic.species === 'duck')) {
-      k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 2.0);
-    }
-
-    // Rule: "fourleg" (Four legs good - 4-legged animals ram 50% harder, King 80% harder)
-    if (this.currentRule === 'fourleg') {
-      const isFourLeg = att.species === 'sheep' || att.species === 'horse' || att.species === 'cow' || att.species === 'pig' || att.species === 'dog' || att.species === 'elephant';
-      if (att.id === this.napoleonId) {
-        k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
-      } else if (isFourLeg) {
-        k = Math.min(CFG.KNOCKBACK_MAX * 1.5, k * 1.5);
-      }
+    // Rule: "titan" (Titan clash - colossal impacts)
+    if (this.currentRule === 'titan') {
+      k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 1.4);
     }
 
     // Rule: "squealer" (Propaganda empowers King with 1.8x ram force)
@@ -1281,7 +1386,7 @@ export class World {
         // Killer slays the King and usurps the throne as the new King!
         this.napoleonId = killer.id;
         this.napoleonReign = 0;
-        this.currentRule = '';
+        this.clearRule();
         this.podiumCaptor = killer.id;
         this.podiumProgress = 1.0;
         this.podiumPhaseTimer = 30;
@@ -1296,7 +1401,7 @@ export class World {
         // King fell to hazards/environment with no killer credited - throne becomes vacant
         this.napoleonId = 0;
         this.napoleonReign = 0;
-        this.currentRule = '';
+        this.clearRule();
         this.kingChoice = null;
         this.podiumProgress = 0;
         this.podiumCaptor = 0;

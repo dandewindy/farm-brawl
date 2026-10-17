@@ -126,6 +126,18 @@ export class FoodAndParticleRenderer {
     watermelonGeo.rotateZ(Math.PI / 2);
     watermelonGeo.scale(1.26, 0.94, 0.94);
 
+    // 8: Giant Flower (Hoa khổng lồ) - Large blossoming flower matching watermelon size
+    const flowerProfile = [
+      new THREE.Vector2(0.12, -0.2), // base
+      new THREE.Vector2(0.55, -0.05),
+      new THREE.Vector2(1.15, 0.12),  // broad petal flare
+      new THREE.Vector2(1.05, 0.22),  // curled petal rim
+      new THREE.Vector2(0.48, 0.18),  // inner petal bowl
+      new THREE.Vector2(0.02, 0.16),  // center base
+    ];
+    const giantFlowerGeo = new THREE.LatheGeometry(flowerProfile, 14);
+    giantFlowerGeo.scale(1.1, 1.15, 1.1);
+
     const geos = [
       cornCobGeo,
       appleGeo,
@@ -135,6 +147,7 @@ export class FoodAndParticleRenderer {
       turnipGeo,
       rainbowCandyGeo,
       watermelonGeo,
+      giantFlowerGeo,
     ];
 
     const mats = [
@@ -154,9 +167,11 @@ export class FoodAndParticleRenderer {
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.2, metalness: 0.25, flatShading: true }),
       // 7: Watermelon - striped green
       new THREE.MeshStandardMaterial({ map: createWatermelonTexture(), roughness: 0.45 }),
+      // 8: Giant Flower - bright radiant rose pink with gentle velvet roughness
+      new THREE.MeshStandardMaterial({ color: 0xff2d78, emissive: 0x440822, roughness: 0.38, flatShading: true }),
     ];
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < geos.length; i++) {
       const cap = i === 6 ? 8 : this.maxFoodPerKind;
       const mesh = new THREE.InstancedMesh(geos[i], mats[i], cap);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -245,6 +260,18 @@ export class FoodAndParticleRenderer {
     melonStemMesh.count = 0;
     this.scene.add(melonStemMesh);
     this.foodTops[7] = melonStemMesh;
+
+    // 8: Giant Flower center (Nhuỵ hoa vàng óng)
+    const flowerCenterGeo = new THREE.SphereGeometry(0.50, 14, 10);
+    flowerCenterGeo.scale(1.0, 0.65, 1.0);
+    flowerCenterGeo.translate(0, 0.22, 0);
+    const flowerCenterMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x664400, roughness: 0.28 });
+    const flowerCenterMesh = new THREE.InstancedMesh(flowerCenterGeo, flowerCenterMat, this.maxFoodPerKind);
+    flowerCenterMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    flowerCenterMesh.frustumCulled = false;
+    flowerCenterMesh.count = 0;
+    this.scene.add(flowerCenterMesh);
+    this.foodTops[8] = flowerCenterMesh;
 
 
     // Soft dark circular shadows under all food items
@@ -338,7 +365,7 @@ export class FoodAndParticleRenderer {
   }
 
   updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {
-    const counts = [0, 0, 0, 0, 0, 0, 0, 0];
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     let nShadow = 0;
     const tt = now / 1000;
     const podX = podiumPos ? podiumPos[0] : 0;
@@ -346,7 +373,7 @@ export class FoodAndParticleRenderer {
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
-      if (k < 0 || k > 7) continue;
+      if (k < 0 || k > 8) continue;
       const maxForThis = k === 6 ? 8 : this.maxFoodPerKind;
       if (counts[k] >= maxForThis) continue;
 
@@ -375,6 +402,25 @@ export class FoodAndParticleRenderer {
             maxLife: 0.9,
             color: this.rainbowColObjects[cIdx],
             size: 0.65,
+            g: 0,
+          });
+        }
+      } else if (k === 8) {
+        // Giant Flower: large blossoming flower resting gracefully, gentle bobbing and slow regal rotation
+        this.dummy.position.set(f.x, onPod + 0.38 * sz + Math.sin(tt * 2.2 + seed) * 0.08, f.z);
+        this.dummy.rotation.set(0, seed + tt * 0.4, 0);
+        if (Math.random() < 0.12 && this.particles.length < this.maxParticles) {
+          this.particles.push({
+            x: f.x + (Math.random() - 0.5) * 2.2,
+            y: onPod + 0.4 + Math.random() * 1.5,
+            z: f.z + (Math.random() - 0.5) * 2.2,
+            vx: 0,
+            vy: 0.8 + Math.random() * 0.8,
+            vz: 0,
+            life: 0.7,
+            maxLife: 0.7,
+            color: new THREE.Color(Math.random() < 0.5 ? 0xff4081 : 0xffd700),
+            size: 0.45,
             g: 0,
           });
         }
@@ -410,14 +456,14 @@ export class FoodAndParticleRenderer {
 
       // Render ground shadow disc under food item
       if (nShadow < this.maxFoodTotal) {
-        const shadowScale = grow * sz * (k === 6 ? 3.4 : k === 7 ? 2.6 : k === 4 ? 2.0 : 1.0);
+        const shadowScale = grow * sz * (k === 6 ? 3.4 : (k === 7 || k === 8) ? 2.6 : k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
         this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);
       }
     }
 
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < this.foodMeshes.length; k++) {
       this.foodMeshes[k].count = counts[k];
       this.foodMeshes[k].instanceMatrix.needsUpdate = true;
       if (this.foodTops[k as FoodKind]) {

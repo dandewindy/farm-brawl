@@ -99,6 +99,7 @@ export type GameEvent =
       };
       ranks?: LeaderRow[];
     }
+  | { k: 'dice'; id: number; roll: number }
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };
@@ -149,7 +150,7 @@ export type ServerMsg =
   | Snapshot;
 
 export type ClientMsg =
-  | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string; matchDuration?: number }
+  | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string; matchDuration?: number; theme?: string }
   | { t: 'leave' }
   | { t: 'ping'; c: number }
   | { t: 'rule'; id: string }

@@ -840,17 +840,25 @@ describe('bonus weapons and tools', () => {
     }
     expect(w.tillTruck.active).toBe(true);
 
-    // Measure movement with tractor active
+    // Non-King player does NOT get the +50% speed buff during Till rule
     p.vx = 0;
     p.vz = 0;
-    p.x = 20; // safe from tractor
+    p.x = 20;
     p.z = 20;
     p.input = { a: 0, mv: true, btn: false };
     w.step();
-    const tillVx = p.vx;
+    expect(p.vx / normalVx).toBeCloseTo(1.0, 1);
 
-    // Till active velocity should be ~1.5x of normal
-    expect(tillVx / normalVx).toBeCloseTo(1.5, 1);
+    // Only King gets the +50% speed buff
+    w.napoleonId = p.id;
+    p.vx = 0;
+    p.vz = 0;
+    p.x = 20;
+    p.z = 20;
+    p.input = { a: 0, mv: true, btn: false };
+    w.step();
+    const kingTillVx = p.vx;
+    expect(kingTillVx / normalVx).toBeCloseTo(1.5, 1);
   });
 
   it('mud slows dash speed and shortens dash range for non-pig animals, but pig is immune', () => {
@@ -1039,6 +1047,136 @@ describe('bonus weapons and tools', () => {
 
     const napEvent = w.events.find((e) => e.k === 'napoleon' && e.id === 0);
     expect(napEvent).toBeDefined();
+  });
+
+  it('poultry rule transforms animals into chickens or ducks, and restores original species when rule ends', () => {
+    const w = emptyWorld();
+    const p1Id = w.addPlayer('P1', 'cow');
+    const p2Id = w.addPlayer('P2', 'horse');
+    const p1 = place(w, p1Id, 10, 10, 50);
+    const p2 = place(w, p2Id, -10, -10, 50);
+
+    expect(p1.species).toBe('cow');
+    expect(p2.species).toBe('horse');
+
+    w.applyRule('poultry');
+    expect(w.currentRule).toBe('poultry');
+    expect(['chicken', 'duck']).toContain(p1.species);
+    expect(['chicken', 'duck']).toContain(p2.species);
+    expect(p1.origSpecies).toBe('cow');
+    expect(p2.origSpecies).toBe('horse');
+
+    w.clearRule();
+    expect(w.currentRule).toBe('');
+    expect(p1.species).toBe('cow');
+    expect(p2.species).toBe('horse');
+    expect(p1.origSpecies).toBeUndefined();
+  });
+
+  it('titan rule sets all animals to 1000kg regardless of prior size', () => {
+    const w = emptyWorld();
+    const p1 = place(w, w.addPlayer('Small', 'chicken'), 10, 10, 15);
+    const p2 = place(w, w.addPlayer('Big', 'cow'), -10, -10, 120);
+
+    w.applyRule('titan');
+    expect(p1.mass).toBe(1000);
+    expect(p2.mass).toBe(1000);
+  });
+
+  it('equal rule sets non-kings to 30kg and King to 100kg', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('King', 'pig');
+    const subId = w.addPlayer('Subject', 'sheep');
+    const king = place(w, kingId, 0, 0, 60);
+    const sub = place(w, subId, 15, 15, 90);
+    w.napoleonId = kingId;
+
+    w.applyRule('equal');
+    expect(king.mass).toBe(100);
+    expect(sub.mass).toBe(30);
+  });
+
+  it('sunday rule summons and teleports non-king animals to the podium', () => {
+    const w = emptyWorld();
+    const kingId = w.addPlayer('King', 'pig');
+    const sub1Id = w.addPlayer('Sub1', 'sheep');
+    const sub2Id = w.addPlayer('Sub2', 'dog');
+    const king = place(w, kingId, 0, 0, 100);
+    const sub1 = place(w, sub1Id, 45, 45, 40);
+    const sub2 = place(w, sub2Id, -45, -45, 40);
+    w.napoleonId = kingId;
+
+    const [podX, podZ] = w.map.podium;
+    w.applyRule('sunday');
+
+    // Non-kings should now be positioned on/around the podium
+    const dist1 = Math.hypot(sub1.x - podX, sub1.z - podZ);
+    const dist2 = Math.hypot(sub2.x - podX, sub2.z - podZ);
+    expect(dist1).toBeLessThan(7);
+    expect(dist2).toBeLessThan(7);
+
+    // King position is NOT teleported
+    expect(king.x).toBe(0);
+    expect(king.z).toBe(0);
+  });
+
+  it('dice rule rolls 1..6 points and adds matching kg to every living player', () => {
+    const w = emptyWorld();
+    const p1 = place(w, w.addPlayer('P1', 'dog'), 10, 10, 30);
+    const p2 = place(w, w.addPlayer('P2', 'pig'), -10, -10, 50);
+
+    const m1Before = p1.mass;
+    const m2Before = p2.mass;
+
+    w.applyRule('dice');
+
+    const diceEvents = w.events.filter((e) => e.k === 'dice') as any[];
+    expect(diceEvents.length).toBe(2);
+
+    const ev1 = diceEvents.find((e) => e.id === p1.id);
+    const ev2 = diceEvents.find((e) => e.id === p2.id);
+    expect(ev1.roll).toBeGreaterThanOrEqual(1);
+    expect(ev1.roll).toBeLessThanOrEqual(6);
+    expect(p1.mass).toBe(m1Before + ev1.roll);
+
+    expect(ev2.roll).toBeGreaterThanOrEqual(1);
+    expect(ev2.roll).toBeLessThanOrEqual(6);
+    expect(p2.mass).toBe(m2Before + ev2.roll);
+  });
+
+  it('womenday rule spawns 35 giant flowers (kind 8, 11kg each)', () => {
+    const w = emptyWorld();
+    w.theme = 'women_day';
+    w.applyRule('womenday');
+
+    const flowers = [...w.food.values()].filter((f) => f.k === 8);
+    expect(flowers.length).toBe(35);
+    expect(flowers[0].v).toBe(11);
+  });
+
+  it('event rule womenday is eligible only in women_day theme with 30% chance', () => {
+    // In classic theme, womenday should never appear in king choice
+    const wClassic = emptyWorld();
+    wClassic.theme = 'classic';
+    for (let i = 0; i < 50; i++) {
+      wClassic.currentRule = '';
+      wClassic.startKingChoice();
+      expect(wClassic.kingChoice!.options).not.toContain('womenday');
+    }
+
+    // In women_day theme, womenday appears in options with ~30% probability
+    const wEvent = emptyWorld();
+    wEvent.theme = 'women_day';
+    let womendayOffers = 0;
+    for (let i = 0; i < 200; i++) {
+      wEvent.currentRule = '';
+      wEvent.startKingChoice();
+      if (wEvent.kingChoice!.options.includes('womenday')) {
+        womendayOffers++;
+      }
+    }
+    expect(womendayOffers).toBeGreaterThan(30);
+    expect(womendayOffers).toBeLessThan(100);
   });
 });
 

@@ -52,6 +52,9 @@ export class LocalServer implements Transport {
 
   send(m: ClientMsg): void {
     if (m.t === 'join') {
+      if (m.theme) {
+        this.world.theme = m.theme;
+      }
       if (m.team !== undefined) {
         this.world.mode = 'team';
         this.world.botsEnabled = false;

@@ -1064,6 +1064,10 @@ export class AnimalRenderer {
 
   getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
     let vis = this.visuals.get(id);
+    if (vis && meta && vis.species !== meta.species) {
+      this.remove(id);
+      vis = undefined;
+    }
     if (!vis && meta) {
       const isMe = id === this.myId;
       vis = this.buildAnimal(meta, isMe);

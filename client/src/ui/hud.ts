@@ -2319,4 +2319,49 @@ export class HudManager {
       }
     }
   }
+
+  showDiceRoll(roll: number): void {
+    const overlay = document.getElementById('diceOverlay');
+    const cube = document.getElementById('diceCube');
+    const resultWrap = document.getElementById('diceResult');
+    const resultText = document.getElementById('diceResultText');
+    if (!overlay || !cube) return;
+
+    const faceAngles: Record<number, [number, number]> = {
+      1: [0, 0],
+      2: [0, -90],
+      3: [0, -180],
+      4: [0, 90],
+      5: [-90, 0],
+      6: [90, 0],
+    };
+    const [targetX, targetY] = faceAngles[roll] || [0, 0];
+    const spinX = 720 * 2 + targetX;
+    const spinY = 1080 * 2 + targetY;
+
+    if (resultWrap) resultWrap.hidden = true;
+    overlay.hidden = false;
+
+    cube.style.transition = 'none';
+    cube.style.transform = 'rotateX(45deg) rotateY(45deg) rotateZ(30deg) scale(0.6)';
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        cube.style.transition = 'transform 2.0s cubic-bezier(0.12, 0.85, 0.25, 1.0)';
+        cube.style.transform = `rotateX(${spinX}deg) rotateY(${spinY}deg) rotateZ(360deg) scale(1.15)`;
+      });
+    });
+
+    setTimeout(() => {
+      if (resultWrap && resultText) {
+        resultText.textContent = t('diceWon', { roll });
+        resultWrap.hidden = false;
+      }
+      setTimeout(() => {
+        overlay.hidden = true;
+        if (resultWrap) resultWrap.hidden = true;
+      }, 2000);
+    }, 2000);
+  }
 }
+

@@ -36,6 +36,11 @@ export class GameRoom extends DurableObject {
       }
     }
 
+    const themeParam = url.searchParams.get('theme');
+    if (themeParam) {
+      this.world.theme = themeParam;
+    }
+
     if (isTeam && this.allSockets.size === 0) {
       // Clear any orphaned players from inactive team sessions
       for (const [id] of [...this.world.players.entries()]) {
@@ -159,6 +164,9 @@ export class GameRoom extends DurableObject {
 
   private onMessage(ws: WebSocket, msg: ClientMsg, edgeColo: string, cid = ''): void {
     if (msg.t === 'join') {
+      if (msg.theme) {
+        this.world.theme = msg.theme;
+      }
       let playerId = this.sockets.get(ws);
       let sessionToken = msg.token;
 

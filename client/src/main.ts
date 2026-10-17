@@ -23,7 +23,7 @@ import { MinimapRenderer } from './render/minimap';
 import { ToolRenderer } from './render/tools';
 import { WorldRenderer } from './render/world';
 import { HudManager } from './ui/hud';
-import { onThemeChange } from './theme';
+import { getArenaTheme, onThemeChange } from './theme';
 
 // Apply translations to static HTML tags
 applyTexts();
@@ -105,7 +105,7 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     transport.inGame = true;
     const team = mode === 'team' ? hud.selectedTeam : undefined;
     const matchDuration = mode === 'friend' ? hud.getMatchDuration() : undefined;
-    transport.send({ t: 'join', name, species, skin, team, matchDuration });
+    transport.send({ t: 'join', name, species, skin, team, matchDuration, theme: getArenaTheme() });
   }
 });
 
@@ -1087,6 +1087,20 @@ function handleGameEvent(ev: GameEvent): void {
       animals.remove(ev.id);
       break;
     }
+    case 'dice': {
+      if (ev.id === myId) {
+        hud.showDiceRoll(ev.roll);
+        sfxReward();
+      }
+      const ent = gameState.ents.get(ev.id);
+      const pos = animals.getPosition(ev.id);
+      const mass = ent ? ent.mass : CFG.START_MASS;
+      if (pos) {
+        hud.floatText(`+${ev.roll} kg 🎲`, 'big', ev.id, { x: pos.x, z: pos.z, mass });
+        foodParts.burst(pos.x, 1.0, pos.z, 0xffd700, 15, 12, 5, 0.8);
+      }
+      break;
+    }
     case 'teamWin': {
       sfxReward();
       if (hud.selectedMode === 'friend' || currentRoomName.startsWith('priv-') || currentRoomName.startsWith('friend-')) {
@@ -1188,7 +1202,7 @@ function getClientId(): string {
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = isViteDev ? 'localhost:8787' : window.location.host;
-  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}`;
+  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
 
   transport = new WsClient(
     wsUrl,
