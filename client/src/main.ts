@@ -492,25 +492,28 @@ function toggleFs(): void {
     userWantsFs = true;
     enablePseudoFs(); // immediately lock pseudo fullscreen so layout doesn't shift
     lockLandscape();
-    const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
-                (docEl.webkitRequestFullscreen && docEl.webkitRequestFullscreen()) ||
-                (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
-                (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
-    if (req && typeof req.then === 'function') {
-      req.then(() => lockLandscape()).catch(() => {});
+    // On iOS & iPadOS: DO NOT call native webkitRequestFullscreen because Apple binds the "swipe down to exit" OS gesture to it!
+    // Pseudo-fullscreen (100vw x 100dvh with fixed body) keeps the game 100% full without triggering Apple's exit gesture!
+    if (!isIPad && !isMobilePhone) {
+      const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
+                  (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
+                  (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
+      if (req && typeof req.then === 'function') {
+        req.then(() => lockLandscape()).catch(() => {});
+      }
     }
   } else {
     userWantsFs = false;
     disablePseudoFs();
     unlockLandscape();
-    if (doc.exitFullscreen) {
-      doc.exitFullscreen().catch(() => {});
-    } else if (doc.webkitExitFullscreen) {
-      doc.webkitExitFullscreen();
-    } else if (doc.mozCancelFullScreen) {
-      doc.mozCancelFullScreen();
-    } else if (doc.msExitFullscreen) {
-      doc.msExitFullscreen();
+    if (!isIPad && !isMobilePhone) {
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen().catch(() => {});
+      } else if (doc.mozCancelFullScreen) {
+        doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
     }
   }
   setTimeout(updateFsIcon, 100);
