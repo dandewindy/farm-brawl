@@ -1113,7 +1113,8 @@ function handleGameEvent(ev: GameEvent): void {
       const pos = animals.getPosition(ev.id);
       const mass = ent ? ent.mass : CFG.START_MASS;
       if (pos) {
-        hud.floatText(`+${ev.roll} kg 🎲`, 'big', ev.id, { x: pos.x, z: pos.z, mass });
+        const bonusKg = ev.roll * 100;
+        hud.floatText(`+${bonusKg} kg 🎲`, 'big', ev.id, { x: pos.x, z: pos.z, mass });
         foodParts.burst(pos.x, 1.0, pos.z, 0xffd700, 15, 12, 5, 0.8);
       }
       break;

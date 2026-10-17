@@ -2355,7 +2355,8 @@ export class HudManager {
 
     setTimeout(() => {
       if (resultWrap && resultText) {
-        resultText.textContent = t('diceWon', { roll });
+        const kg = roll * 100;
+        resultText.textContent = t('diceWon', { roll, kg });
         resultWrap.hidden = false;
       }
       setTimeout(() => {

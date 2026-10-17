@@ -1166,11 +1166,11 @@ export class World {
         this.addFood(podX + Math.cos(ang) * 2.5, podZ + Math.sin(ang) * 2.5, 2, 6);
       }
     } else if (ruleId === 'dice') {
-      // 10. Đổ xúc sắc: roll 1..6 points, add matching kg to each player
+      // 10. Đổ xúc sắc: roll 1..6 points, add roll * 100 kg to each player
       for (const p of this.players.values()) {
         if (p.alive) {
           const roll = Math.floor(this.rnd() * 6) + 1;
-          p.mass += roll;
+          p.mass += roll * 100;
           this.events.push({ k: 'dice', id: p.id, roll });
         }
       }

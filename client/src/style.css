@@ -3878,19 +3878,25 @@ body.spectating #lbList li:hover {
   border-radius: 10px;
 }
 
-/* 3D Dice Roll Animation */
+/* 3D Dice Roll Animation - Compact, Non-intrusive, Transparent, Non-blocking */
 .dice-overlay {
   position: fixed;
-  inset: 0;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  pointer-events: none;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
+  justify-content: flex-start;
+  z-index: 50;
+  pointer-events: none !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   animation: diceFadeIn 0.3s ease-out;
+}
+.dice-overlay * {
+  pointer-events: none !important;
 }
 @keyframes diceFadeIn {
   from { opacity: 0; }
@@ -3898,9 +3904,9 @@ body.spectating #lbList li:hover {
 }
 
 .dice-scene {
-  width: 90px;
-  height: 90px;
-  perspective: 700px;
+  width: 70px;
+  height: 70px;
+  perspective: 600px;
 }
 
 .dice-cube {
@@ -3913,76 +3919,77 @@ body.spectating #lbList li:hover {
 
 .dice-face {
   position: absolute;
-  width: 90px;
-  height: 90px;
+  width: 70px;
+  height: 70px;
   background: #ffffff;
-  border: 3px solid #e0e0e0;
-  border-radius: 18px;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 2px solid #e0e0e0;
+  border-radius: 14px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 0, 0, 0.45);
   box-sizing: border-box;
   display: grid;
-  padding: 12px;
+  padding: 8px;
 }
 
-.face-1 { transform: rotateY(0deg) translateZ(45px); place-items: center; }
-.face-2 { transform: rotateY(90deg) translateZ(45px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.face-1 { transform: rotateY(0deg) translateZ(35px); place-items: center; }
+.face-2 { transform: rotateY(90deg) translateZ(35px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .face-2 .dot:nth-child(1) { grid-column: 1; grid-row: 1; justify-self: start; align-self: start; }
 .face-2 .dot:nth-child(2) { grid-column: 2; grid-row: 2; justify-self: end; align-self: end; }
 
-.face-3 { transform: rotateY(180deg) translateZ(45px); grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+.face-3 { transform: rotateY(180deg) translateZ(35px); grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
 .face-3 .dot:nth-child(1) { grid-column: 1; grid-row: 1; justify-self: start; align-self: start; }
 .face-3 .dot:nth-child(2) { grid-column: 2; grid-row: 2; justify-self: center; align-self: center; }
 .face-3 .dot:nth-child(3) { grid-column: 3; grid-row: 3; justify-self: end; align-self: end; }
 
-.face-4 { transform: rotateY(-90deg) translateZ(45px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.face-4 { transform: rotateY(-90deg) translateZ(35px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .face-4 .dot:nth-child(1) { justify-self: start; align-self: start; }
 .face-4 .dot:nth-child(2) { justify-self: end; align-self: start; }
 .face-4 .dot:nth-child(3) { justify-self: start; align-self: end; }
 .face-4 .dot:nth-child(4) { justify-self: end; align-self: end; }
 
-.face-5 { transform: rotateX(90deg) translateZ(45px); grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+.face-5 { transform: rotateX(90deg) translateZ(35px); grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
 .face-5 .dot:nth-child(1) { grid-column: 1; grid-row: 1; justify-self: start; align-self: start; }
 .face-5 .dot:nth-child(2) { grid-column: 3; grid-row: 1; justify-self: end; align-self: start; }
 .face-5 .dot:nth-child(3) { grid-column: 2; grid-row: 2; justify-self: center; align-self: center; }
 .face-5 .dot:nth-child(4) { grid-column: 1; grid-row: 3; justify-self: start; align-self: end; }
 .face-5 .dot:nth-child(5) { grid-column: 3; grid-row: 3; justify-self: end; align-self: end; }
 
-.face-6 { transform: rotateX(-90deg) translateZ(45px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+.face-6 { transform: rotateX(-90deg) translateZ(35px); grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
 .face-6 .dot:nth-child(odd) { justify-self: start; align-self: center; }
 .face-6 .dot:nth-child(even) { justify-self: end; align-self: center; }
 
 .dice-face .dot {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
   background: #222222;
   border-radius: 50%;
-  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .face-1 .dot {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   background: #e53935;
 }
 
 .dice-result {
-  margin-top: 32px;
+  margin-top: 12px;
   animation: dicePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .dice-result-text {
-  font: 900 26px var(--f-display);
+  font: 900 20px var(--f-display);
   color: #fff176;
-  background: rgba(30, 24, 18, 0.92);
-  border: 3px solid #ffd54f;
-  padding: 10px 28px;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 213, 79, 0.4);
+  background: rgba(30, 24, 18, 0.94);
+  border: 2px solid #ffd54f;
+  padding: 6px 20px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 16px rgba(255, 213, 79, 0.35);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 @keyframes dicePop {
   0% { transform: scale(0.4); opacity: 0; }
-  70% { transform: scale(1.15); opacity: 1; }
+  70% { transform: scale(1.12); opacity: 1; }
   100% { transform: scale(1.0); opacity: 1; }
 }
 

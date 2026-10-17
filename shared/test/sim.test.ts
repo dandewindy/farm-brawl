@@ -1137,11 +1137,11 @@ describe('bonus weapons and tools', () => {
     const ev2 = diceEvents.find((e) => e.id === p2.id);
     expect(ev1.roll).toBeGreaterThanOrEqual(1);
     expect(ev1.roll).toBeLessThanOrEqual(6);
-    expect(p1.mass).toBe(m1Before + ev1.roll);
+    expect(p1.mass).toBe(m1Before + ev1.roll * 100);
 
     expect(ev2.roll).toBeGreaterThanOrEqual(1);
     expect(ev2.roll).toBeLessThanOrEqual(6);
-    expect(p2.mass).toBe(m2Before + ev2.roll);
+    expect(p2.mass).toBe(m2Before + ev2.roll * 100);
   });
 
   it('womenday rule spawns giant flowers (kind 8, 11kg each) with single flowerBloom event and no superFood spam', () => {
