@@ -673,6 +673,7 @@ export class WorldRenderer {
   private readonly flames: FlameInfo[] = [];
   private blades: THREE.Group | null = null;
   private sun: THREE.DirectionalLight | null = null;
+  public shadowsEnabled = true;
   private tillTruck: TractorData | null = null;
   private tillSmokeT = 0;
   private truckCurrentX = 0;
@@ -695,7 +696,10 @@ export class WorldRenderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+
+    const savedShadows = typeof localStorage !== 'undefined' ? localStorage.getItem('fb_shadows') : null;
+    this.shadowsEnabled = savedShadows !== '0';
+    this.renderer.shadowMap.enabled = this.shadowsEnabled;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene = new THREE.Scene();
@@ -766,7 +770,7 @@ export class WorldRenderer {
 
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
     sun.position.set(30, 65, 22);
-    sun.castShadow = true;
+    sun.castShadow = this.shadowsEnabled;
     sun.shadow.mapSize.set(1024, 1024);
     const d = 60;
     sun.shadow.camera.left = -d;
@@ -810,6 +814,31 @@ export class WorldRenderer {
     warn.position.y = 0.02;
     warn.receiveShadow = true;
     this.scene.add(warn);
+  }
+
+  setShadowsEnabled(enabled: boolean): void {
+    if (this.shadowsEnabled === enabled && this.renderer.shadowMap.enabled === enabled) return;
+    this.shadowsEnabled = enabled;
+    this.renderer.shadowMap.enabled = enabled;
+    if (this.sun) {
+      this.sun.castShadow = enabled;
+    }
+    if (enabled) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+    // Update materials to compile with/without shadows cleanly without errors
+    this.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => {
+            if (m) m.needsUpdate = true;
+          });
+        } else if (mesh.material) {
+          mesh.material.needsUpdate = true;
+        }
+      }
+    });
   }
 
   setTheme(theme: ArenaTheme): void {

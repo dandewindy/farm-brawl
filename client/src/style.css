@@ -829,6 +829,7 @@ body.is-pc.mode-friend #howBox {
   display: flex;
   gap: 8px;
   flex: 1;
+  flex-wrap: wrap;
 }
 .drawer-btn {
   display: inline-flex;
@@ -2307,6 +2308,9 @@ body.mobile-phone #teamBar {
     right: max(8px, env(safe-area-inset-right)) !important;
     left: auto !important;
     width: 220px !important;
+    max-height: calc(100vh - 48px) !important;
+    max-height: calc(100dvh - 48px) !important;
+    overflow-y: auto !important;
     padding: 6px 8px 8px !important;
     border-radius: 10px !important;
     z-index: 60 !important;

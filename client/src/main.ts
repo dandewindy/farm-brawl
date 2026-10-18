@@ -162,6 +162,7 @@ hud.onChangeLanguage = () => {
   syncAudioUi();
   syncBoardUi();
   syncStatsUi();
+  syncShadowUi();
   world.updateBarnSign();
   hud.updateTeamCounts(hud.lastCount0, hud.lastCount1);
   hud.updateSpecPlayBtn();
@@ -735,6 +736,7 @@ const startBurgerMenu = document.getElementById('startBurgerMenu') as HTMLElemen
 const startBurgerClose = document.getElementById('startBurgerClose') as HTMLButtonElement | null;
 const sbmMute = document.getElementById('sbmMute') as HTMLButtonElement | null;
 const sbmLang = document.getElementById('sbmLang') as HTMLButtonElement | null;
+const sbmShadow = document.getElementById('sbmShadow') as HTMLButtonElement | null;
 const sbmPwa = document.getElementById('sbmPwa') as HTMLButtonElement | null;
 const sbmDisclaimer = document.getElementById('sbmDisclaimer') as HTMLButtonElement | null;
 
@@ -744,6 +746,7 @@ if (startBurgerBtn && startBurgerMenu) {
     e.stopPropagation();
     startBurgerMenu.hidden = !startBurgerMenu.hidden;
     syncAudioUi();
+    syncShadowUi();
     const curL = getLanguage();
     const sbmLangVal = document.getElementById('sbmLangVal');
     if (sbmLangVal) sbmLangVal.textContent = curL === 'vi' ? 'Tiếng Việt' : 'English';
@@ -786,6 +789,16 @@ if (sbmLang) {
   });
 }
 
+if (sbmShadow) {
+  sbmShadow.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showShadows = !showShadows;
+    try { localStorage.setItem('fb_shadows', showShadows ? '1' : '0'); } catch (_) {}
+    syncShadowUi();
+  });
+}
+
 if (sbmPwa) {
   sbmPwa.addEventListener('click', (e) => {
     e.preventDefault();
@@ -821,6 +834,7 @@ const drawerCloseBtn = document.getElementById('drawerCloseBtn');
 const drawerBackdrop = document.getElementById('drawerBackdrop');
 const drawerBoardToggle = document.getElementById('drawerBoardToggle');
 const drawerStatsToggle = document.getElementById('drawerStatsToggle');
+const drawerShadowToggle = document.getElementById('drawerShadowToggle');
 
 // PC Settings Menu
 const pcSettingsBtn = document.getElementById('pcSettingsBtn');
@@ -828,10 +842,12 @@ const pcSettingsMenu = document.getElementById('pcSettingsMenu');
 const pcToggleBoard = document.getElementById('pcToggleBoard') as HTMLInputElement | null;
 const pcToggleStats = document.getElementById('pcToggleStats') as HTMLInputElement | null;
 const pcToggleLb = document.getElementById('pcToggleLb') as HTMLInputElement | null;
+const pcToggleShadow = document.getElementById('pcToggleShadow') as HTMLInputElement | null;
 
 let showBoard = localStorage.getItem('fb_show_board') !== '0';
 let showStats = localStorage.getItem('fb_show_stats') !== '0';
 let showLb = localStorage.getItem('fb_show_lb') !== '0';
+let showShadows = localStorage.getItem('fb_shadows') !== '0';
 
 function syncBoardUi(): void {
   hud.setBoardVisible(showBoard);
@@ -858,11 +874,38 @@ function syncLbUi(): void {
   if (pcToggleLb) pcToggleLb.checked = showLb;
 }
 
+function syncShadowUi(): void {
+  world.setShadowsEnabled(showShadows);
+
+  // 1. Lobby Burger item:
+  const sbmShadowVal = document.getElementById('sbmShadowVal');
+  const sbmShadowIcon = document.getElementById('sbmShadowIcon');
+  if (sbmShadowVal) {
+    sbmShadowVal.textContent = showShadows ? t('shadow_on') : t('shadow_off');
+  }
+  if (sbmShadowIcon) {
+    sbmShadowIcon.textContent = showShadows ? '🌗' : '☀️';
+  }
+
+  // 2. In-Game Drawer button (for touch / iPad / iPhone):
+  if (drawerShadowToggle) {
+    const lbl = drawerShadowToggle.querySelector('.lbl') || drawerShadowToggle;
+    lbl.textContent = `${t('shadowSetting')}: ${showShadows ? t('on') : t('off')}`;
+    drawerShadowToggle.classList.toggle('off', !showShadows);
+  }
+
+  // 3. PC Settings Checkbox:
+  if (pcToggleShadow) {
+    pcToggleShadow.checked = showShadows;
+  }
+}
+
 if (burgerBtn && gameDrawerModal) {
   bindFastTap(burgerBtn, () => {
     gameDrawerModal.hidden = false;
     syncBoardUi();
     syncStatsUi();
+    syncShadowUi();
   });
 }
 
@@ -883,6 +926,12 @@ bindFastTap(drawerStatsToggle, () => {
   showStats = !showStats;
   try { localStorage.setItem('fb_show_stats', showStats ? '1' : '0'); } catch (_) {}
   syncStatsUi();
+});
+
+bindFastTap(drawerShadowToggle, () => {
+  showShadows = !showShadows;
+  try { localStorage.setItem('fb_shadows', showShadows ? '1' : '0'); } catch (_) {}
+  syncShadowUi();
 });
 
 // PC Settings controls
@@ -922,6 +971,14 @@ if (pcToggleLb) {
   });
 }
 
+if (pcToggleShadow) {
+  pcToggleShadow.addEventListener('change', () => {
+    showShadows = pcToggleShadow.checked;
+    try { localStorage.setItem('fb_shadows', showShadows ? '1' : '0'); } catch (_) {}
+    syncShadowUi();
+  });
+}
+
 if (muteInGameBtn) {
   bindFastTap(muteInGameBtn, handleAudioToggle);
 }
@@ -930,6 +987,7 @@ if (muteInGameBtn) {
 syncAudioUi();
 syncBoardUi();
 syncStatsUi();
+syncShadowUi();
 syncLbUi();
 
 let firstSpawn = true;
