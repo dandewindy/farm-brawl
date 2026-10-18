@@ -98,7 +98,7 @@ function isStandaloneApp(): boolean {
   return !!(
     (window.navigator as any).standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches ||
-    window.matchMedia('(display-mode: fullscreen)').matches
+    window.matchMedia('(display-mode: minimal-ui)').matches
   );
 }
 
@@ -111,14 +111,10 @@ if (isPC) {
   document.body.classList.add('is-pc');
 }
 
-let userWantsFs = isStandaloneApp();
-
 const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
   firstSpawn = true;
   if (isTouchDevice) {
-    userWantsFs = true;
-    enablePseudoFs();
     lockLandscape();
   }
   if (mode === 'friend') {
@@ -172,6 +168,7 @@ hud.onChangeLanguage = () => {
   const kingMeta = gameState.metas.get(gameState.napoleonId);
   const kingName = kingMeta ? kingMeta.name : undefined;
   hud.updateBoard(gameState.rule, gameState.reign, kingName, gameState.napoleonId === gameState.myId);
+  updateFsIcon();
 };
 
 hud.onReconnect = () => {
@@ -418,18 +415,50 @@ const startFsBtn = document.getElementById('startFsBtn') as HTMLButtonElement | 
 const muteInGameBtn = document.getElementById('muteInGame') as HTMLButtonElement | null;
 let isPseudoFs = false;
 
-function isFsActive(): boolean {
+function getFullscreenElement(): Element | null {
   const doc = document as any;
-  return isPseudoFs || !!(
+  return (
     doc.fullscreenElement ||
     doc.webkitFullscreenElement ||
+    doc.webkitCurrentFullScreenElement ||
     doc.mozFullScreenElement ||
-    doc.msFullscreenElement
+    doc.msFullscreenElement ||
+    null
   );
 }
 
+function isNativeFsActive(): boolean {
+  return getFullscreenElement() !== null;
+}
+
+function canNativeFullscreen(): boolean {
+  const docEl = document.documentElement as any;
+  const doc = document as any;
+  return !!(
+    doc.fullscreenEnabled ||
+    doc.webkitFullscreenEnabled ||
+    doc.mozFullScreenEnabled ||
+    doc.msFullscreenEnabled ||
+    docEl.requestFullscreen ||
+    docEl.webkitRequestFullscreen ||
+    docEl.webkitRequestFullScreen ||
+    docEl.mozRequestFullScreen ||
+    docEl.msRequestFullscreen
+  );
+}
+
+function isFsActive(): boolean {
+  if (isNativeFsActive()) return true;
+  if (!canNativeFullscreen() || isStandaloneApp()) {
+    return isPseudoFs;
+  }
+  return false;
+}
+
 function updateFsIcon(): void {
-  const active = isFsActive() || userWantsFs;
+  const active = isFsActive();
+  const enterTitle = t('fullscreen') || 'Toàn màn hình';
+  const exitTitle = 'Thu nhỏ màn hình';
   if (fsBtn) {
     const enterEl = fsBtn.querySelector('.fs-icon-enter') as HTMLElement | null;
     const exitEl = fsBtn.querySelector('.fs-icon-exit') as HTMLElement | null;
@@ -439,12 +468,12 @@ function updateFsIcon(): void {
     } else {
       fsBtn.textContent = active ? '⤢' : '⛶';
     }
-    fsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+    fsBtn.title = active ? exitTitle : enterTitle;
   }
   if (startFsBtn) {
     const ico = startFsBtn.querySelector('.ico');
     if (ico) ico.textContent = active ? '⤢' : '⛶';
-    startFsBtn.title = active ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
+    startFsBtn.title = active ? exitTitle : enterTitle;
   }
 }
 
@@ -483,71 +512,68 @@ function unlockLandscape(): void {
   } catch (_e) {}
 }
 
-function toggleFs(): void {
-  const doc = document as any;
-  const docEl = document.documentElement as any;
-  const active = isFsActive() || userWantsFs;
+async function toggleFs(): Promise<void> {
+  const active = isFsActive();
 
   if (!active) {
-    userWantsFs = true;
-    enablePseudoFs(); // immediately lock pseudo fullscreen so layout doesn't shift
+    enablePseudoFs();
     lockLandscape();
-    // On iOS & iPadOS: DO NOT call native webkitRequestFullscreen because Apple binds the "swipe down to exit" OS gesture to it!
-    // Pseudo-fullscreen (100vw x 100dvh with fixed body) keeps the game 100% full without triggering Apple's exit gesture!
-    if (!isIPad && !isMobilePhone) {
-      const req = (docEl.requestFullscreen && docEl.requestFullscreen()) ||
-                  (docEl.mozRequestFullScreen && docEl.mozRequestFullScreen()) ||
-                  (docEl.msRequestFullscreen && docEl.msRequestFullscreen());
-      if (req && typeof req.then === 'function') {
-        req.then(() => lockLandscape()).catch(() => {});
+
+    const docEl = document.documentElement as any;
+    const reqFn =
+      docEl.requestFullscreen ||
+      docEl.webkitRequestFullscreen ||
+      docEl.webkitRequestFullScreen ||
+      docEl.mozRequestFullScreen ||
+      docEl.msRequestFullscreen;
+
+    if (typeof reqFn === 'function') {
+      try {
+        const res = reqFn.call(docEl);
+        if (res && typeof res.then === 'function') {
+          await res;
+        }
+      } catch (err) {
+        console.warn('Fullscreen request failed or was blocked:', err);
       }
     }
   } else {
-    userWantsFs = false;
-    disablePseudoFs();
-    unlockLandscape();
-    if (!isIPad && !isMobilePhone) {
-      if (doc.exitFullscreen) {
-        doc.exitFullscreen().catch(() => {});
-      } else if (doc.mozCancelFullScreen) {
-        doc.mozCancelFullScreen();
-      } else if (doc.msExitFullscreen) {
-        doc.msExitFullscreen();
+    const doc = document as any;
+    const exitFn =
+      doc.exitFullscreen ||
+      doc.webkitExitFullscreen ||
+      doc.webkitCancelFullScreen ||
+      doc.mozCancelFullScreen ||
+      doc.msExitFullscreen;
+
+    if (typeof exitFn === 'function' && isNativeFsActive()) {
+      try {
+        const res = exitFn.call(doc);
+        if (res && typeof res.then === 'function') {
+          await res;
+        }
+      } catch (err) {
+        console.warn('Native exitFullscreen error:', err);
       }
     }
+
+    if (!isStandaloneApp()) {
+      disablePseudoFs();
+      unlockLandscape();
+    }
   }
-  setTimeout(updateFsIcon, 100);
+  setTimeout(updateFsIcon, 80);
 }
 
 function handleFsChange(): void {
-  const doc = document as any;
-  const hasNative = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-  if (hasNative) {
-    lockLandscape();
-  }
-
-  if (!hasNative) {
-    if (userWantsFs) {
-      // Involuntary exit from iPadOS system gesture (swipe down to exit):
-      // Keep pseudo-fullscreen LOCKED so game stays full 100% viewport!
-      enablePseudoFs();
-      // On next user interaction, silently re-request native fullscreen
-      const reenter = () => {
-        if (userWantsFs) {
-          const docEl = document.documentElement as any;
-          const req = docEl.requestFullscreen?.() || docEl.webkitRequestFullscreen?.();
-          if (req?.catch) req.catch(() => {});
-        }
-        window.removeEventListener('touchend', reenter);
-        window.removeEventListener('pointerup', reenter);
-      };
-      window.addEventListener('touchend', reenter, { once: true });
-      window.addEventListener('pointerup', reenter, { once: true });
-    } else {
-      disablePseudoFs();
-    }
-  } else {
+  if (isNativeFsActive()) {
     enablePseudoFs();
+    lockLandscape();
+  } else {
+    if (!isStandaloneApp()) {
+      disablePseudoFs();
+      unlockLandscape();
+    }
   }
   updateFsIcon();
   window.dispatchEvent(new Event('resize'));
@@ -555,6 +581,8 @@ function handleFsChange(): void {
 
 document.addEventListener('fullscreenchange', handleFsChange);
 document.addEventListener('webkitfullscreenchange', handleFsChange);
+document.addEventListener('mozfullscreenchange', handleFsChange);
+document.addEventListener('MSFullscreenChange', handleFsChange);
 updateFsIcon();
 
 // Anti-Zoom & Touch Gesture Lock (iPad & Mobile Chrome/Safari)
@@ -639,8 +667,20 @@ function bindFastTap(el: HTMLElement | null, handler: (e: Event) => void): void 
   });
 }
 
-if (fsBtn) bindFastTap(fsBtn, toggleFs);
-if (startFsBtn) bindFastTap(startFsBtn, toggleFs);
+if (fsBtn) {
+  fsBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFs();
+  });
+}
+if (startFsBtn) {
+  startFsBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFs();
+  });
+}
 
 // PWA Standalone & Install Modal Management
 const pwaInstallBtn = document.getElementById('pwaInstallBtn') as HTMLButtonElement | null;
@@ -657,7 +697,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 if (isStandaloneApp()) {
-  userWantsFs = true;
   enablePseudoFs();
   if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
 } else if (pwaInstallBtn) {

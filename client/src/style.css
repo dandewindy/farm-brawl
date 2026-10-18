@@ -2914,6 +2914,7 @@ body.mobile-phone #choiceCards .plank .d {
   letter-spacing: 0.04em;
   padding: 0;
   box-sizing: border-box;
+  touch-action: manipulation;
 }
 #disclaimerBtn:hover, #mute:hover, #startFsBtn:hover, #langToggle:hover, #pwaInstallBtn:hover {
   background: #3e322a;
