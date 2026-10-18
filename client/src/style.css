@@ -2262,25 +2262,27 @@ body.mobile-phone #teamBar {
     box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
   }
   .wall-top {
-    position: absolute;
-    top: 6px;
-    left: 10px;
-    right: 10px;
-    margin: 0;
-    z-index: 2;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    pointer-events: none;
+    position: fixed !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    margin: 0 !important;
+    z-index: 50 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    pointer-events: none !important;
   }
   .wall-top-left {
     display: none !important;
   }
   .wall-top-right {
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    pointer-events: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
   }
   #disclaimerBtn, #pwaInstallBtn, #mute, #langToggle {
     display: none !important;
@@ -2292,13 +2294,20 @@ body.mobile-phone #teamBar {
     min-width: 32px !important;
     font-size: 15px !important;
     border-radius: 7px !important;
+    background: rgba(46, 38, 34, 0.85) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
   }
   .start-burger-dropdown {
-    top: 38px !important;
-    right: 6px !important;
+    position: fixed !important;
+    top: max(42px, calc(env(safe-area-inset-top) + 38px)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    left: auto !important;
     width: 220px !important;
     padding: 6px 8px 8px !important;
     border-radius: 10px !important;
+    z-index: 60 !important;
   }
   .sbm-item {
     padding: 4px 8px !important;
@@ -2321,7 +2330,7 @@ body.mobile-phone #teamBar {
     justify-content: center !important;
     gap: 12px !important;
     margin: 0 0 4px !important;
-    padding-right: 76px !important;
+    padding-right: 0 !important;
   }
   .start-header-row .slogan {
     display: none !important;
@@ -2734,6 +2743,21 @@ body.mobile-phone #teamBar {
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+  }
+
+  /* Scale PWA Install Guide Modal to 75% on mobile landscape to prevent cropping */
+  #pwaModal {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 6px !important;
+  }
+  #pwaModal .pwa-card {
+    transform: scale(0.75) !important;
+    transform-origin: center center !important;
+    max-height: 96vh !important;
+    max-height: 96dvh !important;
+    overflow-y: auto !important;
+    margin: auto !important;
   }
 }
 
@@ -3157,6 +3181,21 @@ body.mobile-phone #choiceCards .plank .d {
   display: inline-block;
   vertical-align: middle;
   margin-top: -2px;
+}
+@media (max-height: 540px) {
+  #pwaModal {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px;
+  }
+  #pwaModal .pwa-card {
+    transform: scale(0.75);
+    transform-origin: center center;
+    max-height: 96vh;
+    max-height: 96dvh;
+    overflow-y: auto;
+    margin: auto;
+  }
 }
 #modes {
   display: grid;
