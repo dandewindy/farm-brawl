@@ -2095,6 +2095,12 @@ body.ipad #teamBar:not([hidden]) ~ #hud #board {
   top: calc(5vh + 48px) !important;
 }
 
+/* Eliminate backdrop-filter blur on iPad in-game panels to prevent WebKit compositor stalls */
+body.ipad .panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Mobile Phone rules (body:not(.ipad):not(.is-pc) & body.mobile-phone):
    Dồn sát mép viền tối đa (không bị chồng chéo thanh thời gian hay nút X) */
 body:not(.ipad):not(.is-pc) #stats,

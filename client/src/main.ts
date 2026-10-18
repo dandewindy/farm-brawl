@@ -1600,6 +1600,8 @@ let fpsFrames = 0;
 let lastFpsTime = performance.now();
 let currentFps = 60;
 let lastRenderTime = 0;
+let lowFpsStreakSeconds = 0;
+let shownLpmHint = false;
 
 if (showDebug) {
   debugEl = document.createElement('div');
@@ -1616,11 +1618,11 @@ function animate(now: number): void {
     lastRenderTime = now;
   }
 
-  // High-refresh display throttling: prevent runaway 300+ FPS on 240Hz/360Hz displays
-  // Using 11.0ms (~90 FPS cap) guarantees that standard 60Hz (16.6ms) and 75Hz (13.3ms) monitors NEVER drop a single frame,
-  // while capping 144Hz/240Hz/360Hz monitors from wasting GPU cycles.
+  // High-refresh display throttling: only needed on PC with 240Hz/360Hz monitors.
+  // On mobile & iPad/tablet (where displays are hardware VSync capped to 60Hz/120Hz),
+  // NEVER drop frames to avoid triggering WebKit/CADisplayLink 30Hz step-down!
   const elapsed = now - lastRenderTime;
-  if (elapsed < 11.0) {
+  if (isPC && elapsed < 7.0) {
     return;
   }
 
@@ -1638,6 +1640,19 @@ function animate(now: number): void {
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
       debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;
+    }
+
+    // Detect if iOS / iPadOS Low Power Mode is locking Safari to 30 FPS
+    if ((isIPad || /iPhone|iPad|iPod/i.test(navigator.userAgent)) && !shownLpmHint && transport?.inGame) {
+      if (currentFps <= 31) {
+        lowFpsStreakSeconds += 0.5;
+        if (lowFpsStreakSeconds >= 6.0) {
+          shownLpmHint = true;
+          hud.showToast(t('lowPowerModeHint'), 6000);
+        }
+      } else {
+        lowFpsStreakSeconds = 0;
+      }
     }
   }
 
