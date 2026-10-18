@@ -3095,7 +3095,10 @@ body.mobile-phone #choiceCards .plank .d {
 #pwaInstallBtn {
   color: #ffd84a;
 }
-#pwaInstallBtn.installed {
+#pwaInstallBtn.installed,
+body.is-pc #pwaInstallBtn,
+body:not(.touch):not(.ipad):not(.mobile-phone) #pwaInstallBtn,
+body.is-pc #sbmPwa {
   display: none !important;
 }
 #startBurgerBtn {

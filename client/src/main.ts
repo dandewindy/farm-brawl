@@ -695,13 +695,13 @@ let deferredInstallPrompt: any = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (pwaInstallBtn && !isStandaloneApp()) {
+  if (pwaInstallBtn && !isStandaloneApp() && !isPC) {
     pwaInstallBtn.hidden = false;
   }
 });
 
-if (isStandaloneApp()) {
-  enablePseudoFs();
+if (isStandaloneApp() || isPC) {
+  if (isStandaloneApp()) enablePseudoFs();
   if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
 } else if (pwaInstallBtn) {
   pwaInstallBtn.hidden = false;

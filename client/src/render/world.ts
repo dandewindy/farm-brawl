@@ -653,27 +653,22 @@ function getDeviceInfo(): { isIPad: boolean; isMobile: boolean; dpr: number } {
 export function getOptimalPixelRatio(): number {
   const { isIPad, isMobile, dpr } = getDeviceInfo();
   if (isIPad) {
-    // iPad Gen 9 & other Retina iPads (2160x1620, CSS 1080x810):
-    // 1.0 DPR yields full native 1080x810 CSS resolution (0.87M pixels vs 1.97M pixels at 1.5 DPR).
-    // Cutting 56% fillrate ensures iPadOS WebKit CADisplayLink stays rock-solid at 60 FPS!
-    return Math.min(dpr, 1.0);
+    // iPad (e.g. iPad Gen 9: 2160x1620 Retina, CSS 1080x810):
+    // 1.4 DPR gives 1512x1134 high resolution with 4x MSAA antialiasing.
+    // Models, horns, fences, and edges are silky smooth with zero jaggedness (hết răng cưa)!
+    return Math.min(dpr, 1.4);
   }
   if (isMobile) {
-    // Mobile phones (CSS viewport ~390px): 1.25 DPR gives crisp rendering without thermal throttling
-    return Math.min(dpr, 1.25);
+    // Mobile phones (CSS viewport ~390px): 1.5 DPR gives crisp Retina rendering with zero jaggies
+    return Math.min(dpr, 1.5);
   }
   // PC / Desktop:
   return Math.min(dpr, 1.5);
 }
 
 export function shouldEnableAntialias(): boolean {
-  const { isMobile, dpr } = getDeviceInfo();
-  // On high-DPI Retina screens (dpr >= 2 on iPad/mobile), individual pixels are sub-millimeter (264-460 PPI).
-  // 4x MSAA is visually indistinguishable to the human eye, but costs 4x color/depth sample bandwidth in Metal VRAM.
-  // Disabling MSAA on high-DPI mobile/iPad frees up 75% of framebuffer bandwidth, keeping frame times well below 16.6ms.
-  if (isMobile && dpr >= 2) {
-    return false;
-  }
+  // Always enable hardware MSAA antialiasing across all devices (PC, iPad, mobile)
+  // so low-poly 3D animal models, horns, fences, and borders are silky-smooth without jagged edges (hết răng cưa).
   return true;
 }
 
