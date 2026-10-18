@@ -17,6 +17,9 @@ export interface FloatingText {
 
 const _projVec = new THREE.Vector3();
 
+export const SELECTABLE_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
+export const TOTAL_CAROUSEL_ITEMS = SELECTABLE_SPECIES.length + 1; // 6 animals + 1 random '?' = 7
+
 /**
  * Rock-solid clipboard copy function that works across desktop & mobile browsers.
  * Uses synchronous execCommand('copy') with textarea during the user gesture event,
@@ -425,9 +428,6 @@ export class HudManager {
       elephant: [0x828892, 0xf2ede4, 0x6d5e54, 0x607d8b],
     };
 
-    const SELECTABLE_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
-    const TOTAL_CAROUSEL_ITEMS = SELECTABLE_SPECIES.length + 1; // 6 animals + 1 random '?' = 7
-
     SPECIES.forEach((sp) => {
       const saved = localStorage.getItem(`fb_skin_${sp}`);
       if (saved !== null) {
@@ -436,28 +436,11 @@ export class HudManager {
       }
     });
 
-    const updateCarousel = () => {
-      const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
-      const style = window.getComputedStyle(this.speciesContainer);
-      const gap = parseFloat(style.gap) || 8;
-      const step = firstBtn ? firstBtn.offsetWidth + gap : 74;
-      const viewportWidth = this.speciesContainer.parentElement?.clientWidth || 214;
-      const visibleCount = Math.max(1, Math.floor((viewportWidth + gap) / step));
-      const maxIndex = Math.max(0, TOTAL_CAROUSEL_ITEMS - visibleCount);
-      this.carouselIndex = Math.max(0, Math.min(this.carouselIndex, maxIndex));
-
-      this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * step}px)`;
-      if (this.spNavPrev) {
-        this.spNavPrev.disabled = this.carouselIndex <= 0;
-        this.spNavPrev.style.opacity = this.carouselIndex <= 0 ? '0.2' : '1';
-      }
-      if (this.spNavNext) {
-        this.spNavNext.disabled = this.carouselIndex >= maxIndex;
-        this.spNavNext.style.opacity = this.carouselIndex >= maxIndex ? '0.2' : '1';
-      }
-    };
-    window.addEventListener('resize', updateCarousel);
-    window.addEventListener('orientationchange', () => setTimeout(updateCarousel, 120));
+    window.addEventListener('resize', () => this.updateCarousel());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.updateCarousel(), 80);
+      setTimeout(() => this.updateCarousel(), 250);
+    });
 
     const updateAllButtons = () => {
       if (this.isRandomSelected) {
@@ -617,22 +600,73 @@ export class HudManager {
       });
     }
 
-    // Carousel navigation
+    // Carousel navigation with loopable cyclic wrap-around
     if (this.spNavPrev) {
       this.spNavPrev.addEventListener('click', (e) => {
         e.stopPropagation();
+        const maxIndex = this.getMaxCarouselIndex();
         if (this.carouselIndex > 0) {
           this.carouselIndex--;
-          updateCarousel();
+        } else {
+          // Loop around to end (where Random '?' is)
+          this.carouselIndex = maxIndex;
         }
+        this.updateCarousel();
       });
     }
     if (this.spNavNext) {
       this.spNavNext.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.carouselIndex++;
-        updateCarousel();
+        const maxIndex = this.getMaxCarouselIndex();
+        if (this.carouselIndex < maxIndex) {
+          this.carouselIndex++;
+        } else {
+          // Loop around to start (Pig)
+          this.carouselIndex = 0;
+        }
+        this.updateCarousel();
       });
+    }
+
+    // Touch swipe gesture support on carousel viewport for iPhone / iPad
+    const carouselViewport = this.speciesContainer.parentElement;
+    if (carouselViewport) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      carouselViewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      carouselViewport.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length > 0) {
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(dx) > 25 && Math.abs(dx) > Math.abs(dy)) {
+            const maxIndex = this.getMaxCarouselIndex();
+            if (dx < 0) {
+              if (this.carouselIndex < maxIndex) this.carouselIndex++;
+              else this.carouselIndex = 0;
+            } else {
+              if (this.carouselIndex > 0) this.carouselIndex--;
+              else this.carouselIndex = maxIndex;
+            }
+            this.updateCarousel();
+          }
+        }
+      }, { passive: true });
+    }
+
+    // ResizeObserver for rock-solid reactive carousel layout updates
+    if (typeof ResizeObserver !== 'undefined' && carouselViewport) {
+      const ro = new ResizeObserver(() => {
+        if (!this.startScreen.hidden) {
+          this.updateCarousel();
+        }
+      });
+      ro.observe(carouselViewport);
     }
 
     // Scroll carousel so selected species is initially visible
@@ -641,7 +675,8 @@ export class HudManager {
       if (selIdx < this.carouselIndex) this.carouselIndex = selIdx;
       else if (selIdx >= this.carouselIndex + 5) this.carouselIndex = selIdx - 4;
     }
-    updateCarousel();
+    this.updateCarousel();
+    requestAnimationFrame(() => this.updateCarousel());
 
     updateAllButtons();
 
@@ -1751,6 +1786,8 @@ export class HudManager {
     this.previewRenderer?.resize();
     this.updateHof([]);
     this.updateSpeciesUI?.();
+    this.updateCarousel();
+    requestAnimationFrame(() => this.updateCarousel());
   }
 
   showDeath(ev: Extract<GameEvent, { k: 'die' }>, killerName?: string): void {
@@ -2407,6 +2444,54 @@ export class HudManager {
         if (resultWrap) resultWrap.hidden = true;
       }, 2000);
     }, 2000);
+  }
+
+  public getMaxCarouselIndex(): number {
+    const firstBtn = this.speciesContainer?.querySelector('button') as HTMLElement | null;
+    const isLandscape = window.matchMedia('(orientation: landscape) and (max-height: 540px)').matches;
+    const defaultBtnWidth = isLandscape ? 42 : 52;
+    const defaultGap = isLandscape ? 4 : 6;
+
+    const measuredBtnWidth = firstBtn && firstBtn.offsetWidth > 20 ? firstBtn.offsetWidth : defaultBtnWidth;
+    const style = this.speciesContainer ? window.getComputedStyle(this.speciesContainer) : null;
+    const measuredGap = style ? (parseFloat(style.gap) || defaultGap) : defaultGap;
+    const step = measuredBtnWidth + measuredGap;
+
+    const parentWidth = this.speciesContainer?.parentElement?.clientWidth;
+    const defaultViewport = isLandscape ? 226 : 284;
+    const viewportWidth = parentWidth && parentWidth > 50 ? parentWidth : defaultViewport;
+
+    const visibleCount = Math.max(1, Math.min(TOTAL_CAROUSEL_ITEMS - 1, Math.floor((viewportWidth + measuredGap) / step)));
+    return Math.max(1, TOTAL_CAROUSEL_ITEMS - visibleCount);
+  }
+
+  public updateCarousel(): void {
+    if (!this.speciesContainer) return;
+    const maxIndex = this.getMaxCarouselIndex();
+    this.carouselIndex = Math.max(0, Math.min(this.carouselIndex, maxIndex));
+
+    const firstBtn = this.speciesContainer.querySelector('button') as HTMLElement | null;
+    const isLandscape = window.matchMedia('(orientation: landscape) and (max-height: 540px)').matches;
+    const defaultBtnWidth = isLandscape ? 42 : 52;
+    const defaultGap = isLandscape ? 4 : 6;
+    const measuredBtnWidth = firstBtn && firstBtn.offsetWidth > 20 ? firstBtn.offsetWidth : defaultBtnWidth;
+    const style = window.getComputedStyle(this.speciesContainer);
+    const measuredGap = parseFloat(style.gap) || defaultGap;
+    const step = measuredBtnWidth + measuredGap;
+
+    this.speciesContainer.style.transform = `translateX(-${this.carouselIndex * step}px)`;
+
+    // Keep arrows always clearly visible and interactive (loopable navigation)
+    if (this.spNavPrev) {
+      this.spNavPrev.disabled = false;
+      this.spNavPrev.style.opacity = '1';
+      this.spNavPrev.style.pointerEvents = 'auto';
+    }
+    if (this.spNavNext) {
+      this.spNavNext.disabled = false;
+      this.spNavNext.style.opacity = '1';
+      this.spNavNext.style.pointerEvents = 'auto';
+    }
   }
 }
 
