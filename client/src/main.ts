@@ -11,7 +11,7 @@ import {
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState } from './game/state';
-import { applyTexts, t } from './i18n';
+import { applyTexts, getLanguage, t } from './i18n';
 import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
 import { isFastColo, WsClient } from './net/ws';
@@ -169,6 +169,9 @@ hud.onChangeLanguage = () => {
   const kingName = kingMeta ? kingMeta.name : undefined;
   hud.updateBoard(gameState.rule, gameState.reign, kingName, gameState.napoleonId === gameState.myId);
   updateFsIcon();
+  const curL = getLanguage();
+  const sbmLangVal = document.getElementById('sbmLangVal');
+  if (sbmLangVal) sbmLangVal.textContent = curL === 'vi' ? 'Tiếng Việt' : 'English';
 };
 
 hud.onReconnect = () => {
@@ -399,6 +402,10 @@ function syncAudioUi(): void {
     startMuteBtn.innerHTML = `<span class="ico">${ico}</span>`;
     startMuteBtn.title = txt;
   }
+  const sbmMuteIcon = document.getElementById('sbmMuteIcon');
+  if (sbmMuteIcon) sbmMuteIcon.textContent = ico;
+  const sbmMuteVal = document.getElementById('sbmMuteVal');
+  if (sbmMuteVal) sbmMuteVal.textContent = txt;
 }
 
 function handleAudioToggle(): void {
@@ -459,22 +466,18 @@ function updateFsIcon(): void {
   const active = isFsActive();
   const enterTitle = t('fullscreen') || 'Toàn màn hình';
   const exitTitle = 'Thu nhỏ màn hình';
-  if (fsBtn) {
-    const enterEl = fsBtn.querySelector('.fs-icon-enter') as HTMLElement | null;
-    const exitEl = fsBtn.querySelector('.fs-icon-exit') as HTMLElement | null;
+  [fsBtn, startFsBtn].forEach((btn) => {
+    if (!btn) return;
+    const enterEl = btn.querySelector('.fs-icon-enter') as HTMLElement | null;
+    const exitEl = btn.querySelector('.fs-icon-exit') as HTMLElement | null;
     if (enterEl && exitEl) {
-      enterEl.style.display = active ? 'none' : '';
-      exitEl.style.display = active ? '' : 'none';
+      enterEl.style.display = active ? 'none' : 'inline-flex';
+      exitEl.style.display = active ? 'inline-flex' : 'none';
     } else {
-      fsBtn.textContent = active ? '⤢' : '⛶';
+      btn.textContent = active ? '⤢' : '⛶';
     }
-    fsBtn.title = active ? exitTitle : enterTitle;
-  }
-  if (startFsBtn) {
-    const ico = startFsBtn.querySelector('.ico');
-    if (ico) ico.textContent = active ? '⤢' : '⛶';
-    startFsBtn.title = active ? exitTitle : enterTitle;
-  }
+    btn.title = active ? exitTitle : enterTitle;
+  });
 }
 
 function enablePseudoFs(): void {
@@ -723,6 +726,91 @@ if (pwaCloseBtn && pwaModal) {
     if (e.target === pwaModal) {
       pwaModal.hidden = true;
     }
+  });
+}
+
+// Lobby Burger Menu
+const startBurgerBtn = document.getElementById('startBurgerBtn') as HTMLButtonElement | null;
+const startBurgerMenu = document.getElementById('startBurgerMenu') as HTMLElement | null;
+const startBurgerClose = document.getElementById('startBurgerClose') as HTMLButtonElement | null;
+const sbmMute = document.getElementById('sbmMute') as HTMLButtonElement | null;
+const sbmLang = document.getElementById('sbmLang') as HTMLButtonElement | null;
+const sbmPwa = document.getElementById('sbmPwa') as HTMLButtonElement | null;
+const sbmDisclaimer = document.getElementById('sbmDisclaimer') as HTMLButtonElement | null;
+
+if (startBurgerBtn && startBurgerMenu) {
+  startBurgerBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startBurgerMenu.hidden = !startBurgerMenu.hidden;
+    syncAudioUi();
+    const curL = getLanguage();
+    const sbmLangVal = document.getElementById('sbmLangVal');
+    if (sbmLangVal) sbmLangVal.textContent = curL === 'vi' ? 'Tiếng Việt' : 'English';
+  });
+}
+
+if (startBurgerClose && startBurgerMenu) {
+  startBurgerClose.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startBurgerMenu.hidden = true;
+  });
+}
+
+window.addEventListener('click', (e) => {
+  if (startBurgerMenu && !startBurgerMenu.hidden) {
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('#startBurgerMenu') && !target?.closest('#startBurgerBtn')) {
+      startBurgerMenu.hidden = true;
+    }
+  }
+});
+
+if (sbmMute) {
+  sbmMute.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleAudioToggle();
+  });
+}
+
+if (sbmLang) {
+  sbmLang.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const langBtn = document.getElementById('langToggle');
+    if (langBtn) {
+      langBtn.click();
+    }
+  });
+}
+
+if (sbmPwa) {
+  sbmPwa.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (startBurgerMenu) startBurgerMenu.hidden = true;
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then((choice: any) => {
+        if (choice && choice.outcome === 'accepted') {
+          if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
+        }
+        deferredInstallPrompt = null;
+      });
+    } else if (pwaModal) {
+      pwaModal.hidden = false;
+    }
+  });
+}
+
+if (sbmDisclaimer) {
+  sbmDisclaimer.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (startBurgerMenu) startBurgerMenu.hidden = true;
+    hud.showDisclaimer();
   });
 }
 

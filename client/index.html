@@ -83,8 +83,16 @@
     </aside>
     <div id="gameControls">
       <button id="fsBtn" type="button" title="Toàn màn hình">
-        <span class="fs-icon-enter">⛶</span>
-        <span class="fs-icon-exit" style="display:none;">⤢</span>
+        <span class="fs-icon-enter">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </span>
+        <span class="fs-icon-exit" style="display:none;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+          </svg>
+        </span>
       </button>
       <button id="muteInGame" type="button" title="Âm thanh">🔊</button>
       <!-- Burger Menu Button for Touch / Mobile / iPad -->
@@ -281,10 +289,74 @@
           </button>
         </div>
         <div class="wall-top-right">
-          <button id="pwaInstallBtn" type="button" title="Cài App Tràn Màn Hình (Khóa cứng 100%)" data-i18n-title="pwaBtnTitle"><span class="ico">📲</span></button>
-          <button id="startFsBtn" type="button" title="Toàn màn hình / Fullscreen"><span class="ico">⛶</span></button>
+          <button id="pwaInstallBtn" type="button" title="Cài App Tràn Màn Hình (Khóa cứng 100%)" data-i18n-title="pwaBtnTitle">
+            <span class="ico">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="3"/>
+                <line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3"/>
+              </svg>
+            </span>
+          </button>
+          <button id="startFsBtn" type="button" title="Toàn màn hình / Fullscreen" aria-label="Toàn màn hình">
+            <span class="fs-icon-enter">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </span>
+            <span class="fs-icon-exit" style="display:none;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+              </svg>
+            </span>
+          </button>
           <button id="mute" type="button" title="Âm thanh / Sound"><span class="ico">🔊</span></button>
           <button id="langToggle" type="button" title="Ngôn ngữ / Language">VI</button>
+          <button id="startBurgerBtn" type="button" class="btn-top-burger" title="Cài đặt & Tùy chọn" aria-label="Menu">
+            <span class="ico">☰</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Lobby Burger Dropdown Menu -->
+      <div id="startBurgerMenu" class="start-burger-dropdown panel" hidden>
+        <div class="sbm-header">
+          <span class="sbm-title" data-i18n="menuTitle">CÀI ĐẶT & TÙY CHỌN</span>
+          <button type="button" id="startBurgerClose" class="sbm-close" title="Đóng">✕</button>
+        </div>
+        <div class="sbm-list">
+          <button type="button" id="sbmMute" class="sbm-item">
+            <span class="sbm-icon" id="sbmMuteIcon">🔊</span>
+            <div class="sbm-info">
+              <span class="sbm-name" data-i18n="sound">Âm thanh</span>
+              <span class="sbm-val" id="sbmMuteVal" data-i18n="audio_all">Bật tất cả</span>
+            </div>
+          </button>
+          <button type="button" id="sbmLang" class="sbm-item">
+            <span class="sbm-icon">🌐</span>
+            <div class="sbm-info">
+              <span class="sbm-name" data-i18n="language">Ngôn ngữ</span>
+              <span class="sbm-val" id="sbmLangVal">Tiếng Việt</span>
+            </div>
+          </button>
+          <button type="button" id="sbmPwa" class="sbm-item">
+            <span class="sbm-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="3"/>
+                <line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3"/>
+              </svg>
+            </span>
+            <div class="sbm-info">
+              <span class="sbm-name" data-i18n="pwaItemTitle">Cài đặt App</span>
+              <span class="sbm-val" data-i18n="pwaItemSub">Khóa cứng 100% toàn màn hình</span>
+            </div>
+          </button>
+          <button type="button" id="sbmDisclaimer" class="sbm-item">
+            <span class="sbm-icon">📜</span>
+            <div class="sbm-info">
+              <span class="sbm-name" data-i18n="disclaimerTitleShort">Miễn trừ trách nhiệm</span>
+              <span class="sbm-val" data-i18n="disclaimerSub">Phi lợi nhuận &amp; Bản quyền</span>
+            </div>
+          </button>
         </div>
       </div>
       <div class="start-header-row">
@@ -407,6 +479,7 @@
             </div>
             <button type="button" id="spNavNext" class="sp-arrow-btn" title="Kế tiếp">›</button>
           </div>
+          <p class="sp-skin-hint" data-i18n="skinHint">Nhấn 2 lần để đổi skin</p>
 
           <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>
           <p id="bestLine"></p>
@@ -442,8 +515,6 @@
           </div>
         </div>
       </div>
-
-      <p class="mode-note" data-i18n="offlineNote"></p>
     </div>
   </div>
 

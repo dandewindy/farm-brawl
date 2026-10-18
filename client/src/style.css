@@ -2269,58 +2269,85 @@ body.mobile-phone #teamBar {
     margin: 0;
     z-index: 2;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     pointer-events: none;
   }
-  .wall-top-left, .wall-top-right {
+  .wall-top-left {
+    display: none !important;
+  }
+  .wall-top-right {
     pointer-events: auto;
     display: flex;
     align-items: center;
+    gap: 6px;
   }
-  .wall-top-right {
-    gap: 4px;
+  #disclaimerBtn, #pwaInstallBtn, #mute, #langToggle {
+    display: none !important;
   }
-  #disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn {
-    width: 28px;
-    height: 26px;
-    min-width: 28px;
-    font-size: 12px;
-    border-radius: 6px;
+  #startFsBtn, #startBurgerBtn {
+    display: inline-flex !important;
+    width: 32px !important;
+    height: 30px !important;
+    min-width: 32px !important;
+    font-size: 15px !important;
+    border-radius: 7px !important;
   }
-  #disclaimerBtn {
-    font-size: 14px;
+  .start-burger-dropdown {
+    top: 38px !important;
+    right: 6px !important;
+    width: 220px !important;
+    padding: 6px 8px 8px !important;
+    border-radius: 10px !important;
+  }
+  .sbm-item {
+    padding: 4px 8px !important;
+    gap: 8px !important;
+  }
+  .sbm-icon {
+    font-size: 14px !important;
+    min-width: 18px !important;
+  }
+  .sbm-name {
+    font-size: 11px !important;
+  }
+  .sbm-val {
+    font-size: 9px !important;
   }
   .start-header-row {
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 10px !important;
-    margin: 0 0 3px !important;
+    gap: 12px !important;
+    margin: 0 0 4px !important;
+    padding-right: 76px !important;
   }
   .start-header-row .slogan {
     display: none !important;
   }
   .start-header-row .title-row {
-    font-size: 17px !important;
-    gap: 5px !important;
+    font-size: 24px !important;
+    gap: 6px !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
+    text-shadow: 0 2px 0 var(--red) !important;
   }
   .start-header-row .name-box {
     margin: 0 !important;
-    width: min(170px, 46%) !important;
+    width: min(200px, 45%) !important;
     flex-shrink: 0 !important;
   }
   .name-box #name {
-    padding: 2px 22px 2px 8px !important;
-    font-size: 11px !important;
-    height: 24px !important;
+    padding: 3px 26px 3px 10px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    height: 30px !important;
+    border-radius: 8px !important;
   }
   .name-pencil {
-    font-size: 10px !important;
-    right: 4px !important;
+    font-size: 12px !important;
+    right: 6px !important;
   }
   .start-cols {
     grid-template-columns: 1fr 1fr !important;
@@ -2329,7 +2356,7 @@ body.mobile-phone #teamBar {
     align-items: start !important;
   }
   .start-col-left, .start-col-right {
-    gap: 2px !important;
+    gap: 1px !important;
     height: auto !important;
   }
   .how-box {
@@ -2341,11 +2368,13 @@ body.mobile-phone #teamBar {
   }
   .sec-label {
     font-size: 8.5px !important;
-    margin: 1px 0 2px !important;
+    margin: 0 0 2px !important;
+    height: auto !important;
+    line-height: 1.1 !important;
   }
   #modes {
     gap: 3px !important;
-    margin-bottom: 2px !important;
+    margin: 0 0 2px !important;
   }
   #modes button {
     padding: 2px 1px !important;
@@ -2479,7 +2508,7 @@ body.mobile-phone #teamBar {
   .btn-arena[data-arena="classic"] .txt-main { font-size: 10.5px !important; }
   .btn-arena .txt-sub { font-size: 8.5px !important; }
   .sp-carousel-row {
-    margin: 1px 0 2px !important;
+    margin: 0 0 1px !important;
     gap: 4px !important;
     width: 100% !important;
     justify-content: center !important;
@@ -2525,13 +2554,25 @@ body.mobile-phone #teamBar {
     width: 14px !important;
     height: 42px !important;
   }
+  .sp-skin-hint {
+    font-size: 8.5px !important;
+    font-weight: 700 !important;
+    color: #ffd54f !important;
+    text-align: center !important;
+    margin: 1px 0 2px !important;
+    letter-spacing: 0.02em !important;
+    line-height: 1.1 !important;
+  }
   .play-btn-main {
     width: 100% !important;
-    padding: 4px 8px !important;
-    font-size: 13px !important;
-    margin-top: 1px !important;
+    padding: 6px 10px !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    margin-top: 2px !important;
     margin-bottom: 2px !important;
-    border-radius: 6px !important;
+    border-radius: 7px !important;
+    box-shadow: 0 3px 0 #73170e, 0 4px 10px rgba(0, 0, 0, 0.4) !important;
   }
   #bestLine {
     font-size: 9.5px !important;
@@ -2895,7 +2936,7 @@ body.mobile-phone #choiceCards .plank .d {
   align-items: center;
   gap: 8px;
 }
-#disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn {
+#disclaimerBtn, #mute, #startFsBtn, #langToggle, #pwaInstallBtn, #startBurgerBtn {
   background: #2e2622;
   border: 1px solid #4a3e36;
   color: var(--paper);
@@ -2916,13 +2957,22 @@ body.mobile-phone #choiceCards .plank .d {
   box-sizing: border-box;
   touch-action: manipulation;
 }
-#disclaimerBtn:hover, #mute:hover, #startFsBtn:hover, #langToggle:hover, #pwaInstallBtn:hover {
+#disclaimerBtn:hover, #mute:hover, #startFsBtn:hover, #langToggle:hover, #pwaInstallBtn:hover, #startBurgerBtn:hover {
   background: #3e322a;
   border-color: var(--gold);
   transform: scale(1.05);
 }
-#disclaimerBtn:active, #mute:active, #startFsBtn:active, #langToggle:active, #pwaInstallBtn:active {
+#disclaimerBtn:active, #mute:active, #startFsBtn:active, #langToggle:active, #pwaInstallBtn:active, #startBurgerBtn:active {
   transform: scale(0.96);
+}
+#fsBtn svg, #startFsBtn svg, #pwaInstallBtn svg {
+  display: block;
+}
+#fsBtn .fs-icon-enter, #fsBtn .fs-icon-exit,
+#startFsBtn .fs-icon-enter, #startFsBtn .fs-icon-exit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 #disclaimerBtn {
   color: var(--gold);
@@ -2938,6 +2988,121 @@ body.mobile-phone #choiceCards .plank .d {
 }
 #pwaInstallBtn.installed {
   display: none !important;
+}
+#startBurgerBtn {
+  color: var(--gold);
+  font-size: 16px;
+  display: none;
+}
+.start-burger-dropdown {
+  position: absolute;
+  top: 42px;
+  right: 10px;
+  width: 250px;
+  max-width: calc(100vw - 20px);
+  background: rgba(30, 24, 20, 0.96);
+  border: 1.5px solid #4a3e36;
+  border-radius: 12px;
+  padding: 8px 10px 10px;
+  z-index: 100;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  animation: fadeInDown 0.15s ease-out;
+}
+.sbm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.sbm-title {
+  font-family: var(--f-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+}
+.sbm-close {
+  background: none;
+  border: none;
+  color: #a89f91;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.sbm-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.sbm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sbm-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(45, 36, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+  touch-action: manipulation;
+}
+.sbm-item:hover {
+  background: rgba(65, 52, 43, 0.95);
+  border-color: var(--gold);
+  transform: translateX(2px);
+}
+.sbm-item:active {
+  transform: scale(0.98);
+}
+.sbm-icon {
+  font-size: 16px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+}
+.sbm-icon svg {
+  display: block;
+}
+.sbm-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.sbm-name {
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.sbm-val {
+  font-size: 10px;
+  color: #c4b9a5;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+.sp-skin-hint {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd54f;
+  text-align: center;
+  margin: 2px 0 6px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 /* PWA Install Guide Modal */
