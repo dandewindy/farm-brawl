@@ -11,11 +11,12 @@ export interface FriendRoomMeta {
   updatedAt: number;
 }
 
-const FIREBASE_API_KEY = 'AIzaSyBDgKuwPN1fUZ2sSv4PmfcsQe-OBepjk5U';
-const FIRESTORE_PROJECT_ID = 'farm-arena-game';
-const FIRESTORE_DATABASE_ID = 'farmarena';
+const FIREBASE_API_KEY = (import.meta as any).env?.VITE_FIREBASE_API_KEY || '';
+const FIRESTORE_PROJECT_ID = (import.meta as any).env?.VITE_FIRESTORE_PROJECT_ID || 'farm-arena-game';
+const FIRESTORE_DATABASE_ID = (import.meta as any).env?.VITE_FIRESTORE_DATABASE_ID || 'farmarena';
 
-function getFirestoreDocUrl(code: string): string {
+function getFirestoreDocUrl(code: string): string | null {
+  if (!FIREBASE_API_KEY) return null;
   return `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/rooms/${encodeURIComponent(code)}?key=${FIREBASE_API_KEY}`;
 }
 
@@ -34,20 +35,22 @@ export async function registerFriendRoom(code: string, host: string, players = 1
 
   try {
     const fsUrl = getFirestoreDocUrl(normCode);
-    await fetch(fsUrl, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fields: {
-          code: { stringValue: normCode },
-          host: { stringValue: roomData.host },
-          players: { integerValue: String(players) },
-          max: { integerValue: '12' },
-          createdAt: { integerValue: String(now) },
-          updatedAt: { integerValue: String(now) },
-        },
-      }),
-    });
+    if (fsUrl) {
+      await fetch(fsUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            code: { stringValue: normCode },
+            host: { stringValue: roomData.host },
+            players: { integerValue: String(players) },
+            max: { integerValue: '12' },
+            createdAt: { integerValue: String(now) },
+            updatedAt: { integerValue: String(now) },
+          },
+        }),
+      });
+    }
   } catch (err) {
     console.warn('[Firestore] Failed to write room metadata:', err);
   }
@@ -62,21 +65,23 @@ export async function registerFriendRoom(code: string, host: string, players = 1
 export async function getFriendRoomInfo(code: string): Promise<FriendRoomMeta | null> {
   const normCode = code.toUpperCase().trim();
 
-  // 1. Try Firestore REST API directly
+  // 1. Try Firestore REST API directly if configured
   try {
     const fsUrl = getFirestoreDocUrl(normCode);
-    const res = await fetch(fsUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.fields) {
-        return {
-          code: data.fields.code?.stringValue || normCode,
-          host: data.fields.host?.stringValue || 'Bạn bè',
-          players: Number(data.fields.players?.integerValue || 1),
-          max: Number(data.fields.max?.integerValue || 12),
-          createdAt: Number(data.fields.createdAt?.integerValue || Date.now()),
-          updatedAt: Number(data.fields.updatedAt?.integerValue || Date.now()),
-        };
+    if (fsUrl) {
+      const res = await fetch(fsUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.fields) {
+          return {
+            code: data.fields.code?.stringValue || normCode,
+            host: data.fields.host?.stringValue || 'Bạn bè',
+            players: Number(data.fields.players?.integerValue || 1),
+            max: Number(data.fields.max?.integerValue || 12),
+            createdAt: Number(data.fields.createdAt?.integerValue || Date.now()),
+            updatedAt: Number(data.fields.updatedAt?.integerValue || Date.now()),
+          };
+        }
       }
     }
   } catch (err) {
@@ -116,6 +121,8 @@ export async function deleteFriendRoom(code: string): Promise<void> {
   const normCode = code.toUpperCase().trim();
   try {
     const fsUrl = getFirestoreDocUrl(normCode);
-    await fetch(fsUrl, { method: 'DELETE' });
+    if (fsUrl) {
+      await fetch(fsUrl, { method: 'DELETE' });
+    }
   } catch {}
 }
