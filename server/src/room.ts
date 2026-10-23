@@ -485,18 +485,19 @@ export class GameRoom extends DurableObject {
     }
     const now = performance.now();
     let ticksRun = 0;
-    // Catch-up: run all due ticks (up to 3 per pass) to maintain precise 20.0 TPS
-    while (now >= this.nextTickTime && ticksRun < 3) {
+    // Catch-up: run all due ticks (up to 4 per pass) to maintain exact 20.0 TPS
+    while (performance.now() + 2 >= this.nextTickTime && ticksRun < 4) {
       this.nextTickTime += TICK_MS;
       ticksRun++;
-      const isLast = (now < this.nextTickTime) || (ticksRun >= 3);
+      const isLast = (performance.now() + 2 < this.nextTickTime) || (ticksRun >= 4);
       this.tick(isLast);
     }
-    // If nextTickTime is still far behind (e.g. initial start or pause > 150ms), resync
-    if (now - this.nextTickTime > TICK_MS * 2) {
-      this.nextTickTime = now + TICK_MS;
+    const nowAfter = performance.now();
+    // If nextTickTime is still far behind (e.g. hibernation or long pause > 100ms), resync
+    if (nowAfter - this.nextTickTime > TICK_MS * 2) {
+      this.nextTickTime = nowAfter + TICK_MS;
     }
-    const delay = Math.max(1, Math.round(this.nextTickTime - performance.now()));
+    const delay = Math.max(1, Math.floor(this.nextTickTime - nowAfter));
     this.loopTimer = setTimeout(() => {
       this.scheduleNextTick();
     }, delay);
