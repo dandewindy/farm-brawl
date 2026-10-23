@@ -1040,8 +1040,8 @@ const gameState = new GameState({
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
         }
-        const rttBaseline = transport ? (transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
-        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, rttBaseline);
+        const currentRtt = transport ? transport.rtt : 0;
+        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, currentRtt);
 
         hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
         // Mass change tracking with accumulator matching original game
@@ -1512,7 +1512,7 @@ function getClientId(): string {
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = isViteDev ? 'localhost:8787' : window.location.host;
-  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}&_t=${Date.now()}`;
+  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
 
   transport = new WsClient(
     wsUrl,
@@ -1601,7 +1601,6 @@ let lastFpsTime = performance.now();
 let currentFps = 60;
 let lastRenderTime = 0;
 let lowFpsStreakSeconds = 0;
-let lastReportedPing = 0;
 let shownLpmHint = false;
 
 if (showDebug) {
@@ -1636,9 +1635,7 @@ function animate(now: number): void {
     currentFps = Math.min(60, Math.round((fpsFrames * 1000) / (now - lastFpsTime)));
     fpsFrames = 0;
     lastFpsTime = now;
-    const rawPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
-    if (rawPing > 0) lastReportedPing = rawPing;
-    const currentPing = rawPing > 0 ? rawPing : lastReportedPing;
+    const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
     hud.updatePerf(currentFps, currentPing, transport?.colo, transport?.isMigrating);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);

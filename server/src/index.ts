@@ -30,16 +30,11 @@ export default {
         targetRoomKey = `${roomParam}-sin2`;
       }
 
-      const cf = (request as any).cf;
-      const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = cfRay.split('-')[1] || cf?.colo || 'SIN';
-      url.searchParams.set('colo', edgeColo);
-
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      // Pass request with edge colo attached to preserve WebSocket upgrade headers
-      return roomStub.fetch(new Request(url.toString(), request));
+      // Pass native request directly to preserve WebSocket upgrade headers and zero-copy piping
+      return roomStub.fetch(request);
     }
 
     // Health check endpoint with zero-caching for rapid client watchdog probing

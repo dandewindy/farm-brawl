@@ -2052,15 +2052,15 @@ export class HudManager {
     if (this.coloVal && colo) {
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
-      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo);
+      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL)$/i.test(colo);
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Trạm ${colo} (Đang tối ưu kết nối...)`;
+        this.coloVal.title = `Mắt thần đang tự động chuyển trạm sang Singapore (SIN)...`;
       } else if (!isFast) {
-        this.coloVal.textContent = `${colo} 🌐`;
+        this.coloVal.textContent = `${colo} 🔍`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Trạm ${colo} (Tuyến quốc tế Cloudflare)`;
+        this.coloVal.title = `Trạm ${colo} (Xa) - Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
       } else {
         this.coloVal.textContent = colo;
         this.coloVal.className = 'perf-colo good';
