@@ -64,7 +64,8 @@ export class WsClient implements Transport {
 
     let socket: WebSocket;
     try {
-      socket = new WebSocket(this.url);
+      const connectUrl = this.url + (this.url.includes('?') ? '&' : '?') + '_r=' + Date.now();
+      socket = new WebSocket(connectUrl);
       this.ws = socket;
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
@@ -124,44 +125,40 @@ export class WsClient implements Transport {
               this.rttMin = sorted[0];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
+              const isSin = this.colo === 'SIN';
               const onFastNode = isFastColo(this.colo);
-              const isSlow = !onFastNode || this.rttMin > 140;
+              // A route is optimal if connected to Singapore (SIN) with good ping, or any node with <= 55ms ping
+              const isOptimal = (isSin && this.rttMin <= 75) || this.rttMin <= 55;
 
-              if (onFastNode) {
-                // When connected to any fast Asian node, reset lobby steer attempts
+              if (isOptimal) {
                 this.lobbySteerAttempts = 0;
-              }
-
-              if (onFastNode && (this.rttMin <= 120 || this.rtt <= 120)) {
-                // Ping is good on Asian nodes: immediately reset bad ping streak to 0
                 this.badPingStreak = 0;
-              } else if (isSlow) {
-                // If non-fast node detected (e.g. FRA, MAD, ORD, SJC), jump to alert threshold
-                this.badPingStreak = !onFastNode ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
+              } else if (!onFastNode || this.rttMin > 100) {
+                this.badPingStreak = Math.min(6, this.badPingStreak + 1);
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // 1. Silent Lobby Steer (Max 2 attempts, only for truly distant non-Asian nodes):
-              // If connected to an Asian node (SIN, HKG, HAN, SGN, TPE, etc.), NEVER auto-reconnect in lobby!
-              // Even if ping is higher due to mobile 4G/WiFi conditions, keeping a stable connection is critical.
-              // Only steer if landed on a distant overseas PoP (e.g. FRA, MAD, ORD, SJC) with ping > 200ms.
-              if (!this.inGame && !onFastNode && this.rttMin > 200 && !this.closed) {
-                if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
+              // 1. Silent Lobby Steer (Max 3 attempts):
+              // If in lobby and NOT on an optimal Singapore / low-ping route (e.g. landed on HKG with high ping > 65ms,
+              // or landed on a distant overseas node):
+              // Automatically steer (reconnect) to seek Singapore (SIN) where ping for Vietnam is ~30-40ms!
+              if (!this.inGame && !isOptimal && !this.closed) {
+                if (this.rttWin.length >= 2 && this.lobbySteerAttempts < 3) {
                   const now = performance.now();
-                  if (now - this.lastLobbyReconnectTime > 6000) {
+                  if (now - this.lastLobbyReconnectTime > 3500) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
-                    console.log(`[WS Watchdog] Lobby on distant non-Asian node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/2 to find Asian route...`);
+                    console.log(`[WS Watchdog] Seeking Singapore (SIN) low-ping route (currently on ${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/3...`);
                     this.forceReconnect();
                   }
                 }
               }
 
               // 2. Active In-Game Hot Migration Watchdog:
-              // During live gameplay: NEVER trigger hot migration if on an Asian node (SIN, HKG, etc.)!
-              // Opening duplicate sockets in-game during combat causes network contention & ping spikes.
-              if (this.inGame && this.badPingStreak >= 5 && !onFastNode && !this.closed) {
+              // During live gameplay: If ping is consistently poor (badPingStreak >= 4 and rttMin > 90) and NOT on optimal SIN,
+              // probe zero-downtime hot migration in background to find a Singapore route!
+              if (this.inGame && this.badPingStreak >= 4 && !isOptimal && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -214,8 +211,8 @@ export class WsClient implements Transport {
 
   public triggerHotMigration(): void {
     if (!this.inGame || this.closed) return;
-    // Strict Guard: If currently on any Asian node (SIN, HKG, etc.), NEVER migrate during gameplay!
-    if (isFastColo(this.colo)) {
+    // Strict Guard: If currently on Singapore with optimal ping (<= 75ms), NEVER migrate!
+    if (this.colo === 'SIN' && this.rttMin <= 75) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;
@@ -279,7 +276,9 @@ export class WsClient implements Transport {
           const currentlyFast = isFastColo(this.colo);
           // If already on a fast Asian node (SIN/HKG), ONLY switch if the probe is ALSO fast AND significantly better (at least 25% lower latency)
           // If on a slow/distant node (FRA/MAD/ORD...), switch if probe is a fast Asian node OR has at least 35% lower latency
-          const isBetter = currentlyFast
+          const isBetter = probeColo === 'SIN'
+            ? (probeRtt > 0 && probeRtt < this.rttMin - 10)
+            : currentlyFast
             ? (isFastColo(probeColo) && probeRtt > 0 && probeRtt < this.rttMin * 0.75)
             : (isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65));
 

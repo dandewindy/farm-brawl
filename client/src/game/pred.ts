@@ -87,7 +87,10 @@ export class ClientPredictor {
     clockOff: number | null,
     rtt: number
   ): void {
-    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - (rtt * 0.75) : null;
+    // Exactly when the input that produced this server tick was sent:
+    // (serverTick * TICK_MS) arrived at client at (clockOff + snapTick * TICK_MS).
+    // The input was sent one round trip (rttMin) + half tick server queuing delay earlier.
+    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - (rtt + TICK_MS * 0.5) : null;
     const then = this.on && targetTime !== null ? this.predAt(targetTime) : null;
 
     if (!then || Math.hypot(x - then.x, z - then.z) > 10) {
@@ -103,13 +106,15 @@ export class ClientPredictor {
     const rawEz = z - then.z;
     const dist = Math.hypot(rawEx, rawEz);
 
-    // Deadzone: under 0.35m discrepancy is normal clock jitter, do not jerk the player!
-    if (dist < 0.35) {
-      this.ex *= 0.75;
-      this.ez *= 0.75;
+    // Deadzone: under 0.65m discrepancy is normal 20 Hz tick arrival quantization (50ms * 10m/s = 0.5m),
+    // NEVER jerk or displace the player for normal tick discretization!
+    if (dist < 0.65) {
+      this.ex *= 0.7;
+      this.ez *= 0.7;
     } else {
-      this.ex = rawEx * 0.65;
-      this.ez = rawEz * 0.65;
+      // Gentle correction for genuine external knockbacks (rams, collisions)
+      this.ex = rawEx * 0.5;
+      this.ez = rawEz * 0.5;
     }
 
     const isServerStun = (flags & 8) !== 0;
@@ -341,11 +346,6 @@ export class ClientPredictor {
     this.z += cz;
     this.ex -= cx;
     this.ez -= cz;
-
-    for (const s of this.hist) {
-      s.x += cx;
-      s.z += cz;
-    }
 
     this.hist.push({ t: now, x: this.x, z: this.z, vx: this.vx, vz: this.vz });
     if (this.hist.length > 2 && this.hist[0].t < now - 1500) {
