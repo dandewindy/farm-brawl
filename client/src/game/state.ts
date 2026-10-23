@@ -184,8 +184,9 @@ export class GameState {
     this.clockOff = this.clockOff === null ? lo : this.clockOff + (lo - this.clockOff) * 0.15;
     const late = this.clockWin.map((v) => v - lo).sort((a, b) => a - b);
     this.lateAvg = late[Math.floor(late.length * 0.85)] || 0;
-    // Proper 2-tick interpolation buffer (100ms - 160ms) to guarantee remote animals NEVER hitch, coast, or teleport
-    const want = Math.min(160, Math.max(100, TICK_MS * 2 + this.lateAvg));
+    // Adaptive interpolation delay: smoothly scales from 55ms (clean 30ms fiber) up to 125ms (cafe wifi / 4G jitter)
+    // Ensures remote animals NEVER hitch, coast, or teleport even with network latency fluctuations
+    const want = Math.min(125, Math.max(55, TICK_MS + 6 + this.lateAvg * 0.5));
     this.interpDelay += (want - this.interpDelay) * (want > this.interpDelay ? 0.35 : 0.10);
   }
 

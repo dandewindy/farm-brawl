@@ -483,26 +483,19 @@ export class GameRoom extends DurableObject {
       this.checkRoomEmpty();
       return;
     }
-    let ticksRun = 0;
-    // Catch-up: run all due ticks (up to 4 per pass) to maintain exact 20.0 TPS
-    while (performance.now() + 2 >= this.nextTickTime && ticksRun < 4) {
-      this.nextTickTime += TICK_MS;
-      ticksRun++;
-      const isLast = (performance.now() + 2 < this.nextTickTime) || (ticksRun >= 4);
-      this.tick(isLast);
+    const now = performance.now();
+    this.nextTickTime += TICK_MS;
+    if (now - this.nextTickTime > TICK_MS * 2) {
+      this.nextTickTime = now + TICK_MS;
     }
-    const nowAfter = performance.now();
-    // If nextTickTime is still far behind (e.g. hibernation or long pause > 100ms), resync
-    if (nowAfter - this.nextTickTime > TICK_MS * 2) {
-      this.nextTickTime = nowAfter + TICK_MS;
-    }
-    const delay = Math.max(1, Math.floor(this.nextTickTime - nowAfter));
+    const delay = Math.max(0, Math.round(this.nextTickTime - now));
     this.loopTimer = setTimeout(() => {
+      this.tick();
       this.scheduleNextTick();
     }, delay);
   }
 
-  private tick(broadcast = true): void {
+  private tick(): void {
     // Clean up expired disconnected sessions
     if (this.disconnectedPlayers.size > 0) {
       const now = performance.now();
@@ -524,15 +517,13 @@ export class GameRoom extends DurableObject {
 
     this.world.step();
 
-    if (broadcast && this.sockets.size > 0) {
-      // Broadcast authoritative snapshot to all human players
-      for (const [ws, playerId] of this.sockets.entries()) {
-        try {
-          const snap = this.world.snapshotFor(playerId);
-          ws.send(JSON.stringify(snap));
-        } catch {
-          // Socket error handled in close event listener
-        }
+    // Broadcast authoritative snapshot to all human players
+    for (const [ws, playerId] of this.sockets.entries()) {
+      try {
+        const snap = this.world.snapshotFor(playerId);
+        ws.send(JSON.stringify(snap));
+      } catch {
+        // Socket error handled in close event listener
       }
     }
 

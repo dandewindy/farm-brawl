@@ -87,10 +87,10 @@ export class ClientPredictor {
     clockOff: number | null,
     rtt: number
   ): void {
-    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - rtt : null;
+    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - (rtt * 0.75) : null;
     const then = this.on && targetTime !== null ? this.predAt(targetTime) : null;
 
-    if (!then || Math.hypot(x - then.x, z - then.z) > 6) {
+    if (!then || Math.hypot(x - then.x, z - then.z) > 10) {
       if (this.on) this.resets++;
       this.reset(x, z);
       this.sx = x;
@@ -103,14 +103,13 @@ export class ClientPredictor {
     const rawEz = z - then.z;
     const dist = Math.hypot(rawEx, rawEz);
 
-    // Deadzone: under 0.6m discrepancy is normal packet arrival jitter, do not jerk the player!
-    if (dist < 0.6) {
-      this.ex *= 0.7;
-      this.ez *= 0.7;
+    // Deadzone: under 0.35m discrepancy is normal clock jitter, do not jerk the player!
+    if (dist < 0.35) {
+      this.ex *= 0.75;
+      this.ez *= 0.75;
     } else {
-      // Smooth error blending instead of harsh teleport snap
-      this.ex += (rawEx - this.ex) * 0.35;
-      this.ez += (rawEz - this.ez) * 0.35;
+      this.ex = rawEx * 0.65;
+      this.ez = rawEz * 0.65;
     }
 
     const isServerStun = (flags & 8) !== 0;
