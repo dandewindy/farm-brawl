@@ -483,7 +483,6 @@ export class GameRoom extends DurableObject {
       this.checkRoomEmpty();
       return;
     }
-    const now = performance.now();
     let ticksRun = 0;
     // Catch-up: run all due ticks (up to 4 per pass) to maintain exact 20.0 TPS
     while (performance.now() + 2 >= this.nextTickTime && ticksRun < 4) {

@@ -2056,11 +2056,11 @@ export class HudManager {
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
+        this.coloVal.title = `Trạm ${colo} (Đang tối ưu kết nối...)`;
       } else if (!isFast) {
-        this.coloVal.textContent = `${colo} 🔍`;
+        this.coloVal.textContent = `${colo} 🌐`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Trạm ${colo} (Xa) - Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
+        this.coloVal.title = `Trạm ${colo} (Tuyến quốc tế Cloudflare)`;
       } else {
         this.coloVal.textContent = colo;
         this.coloVal.className = 'perf-colo good';
