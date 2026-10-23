@@ -142,13 +142,6 @@ export class WsClient implements Transport {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // Dynamic retune of ping frequency: if slow, ping 2x faster (250ms) to rapidly detect route fixes
-              const targetDelay = isSlow ? 250 : 500;
-              if (targetDelay !== this.currentPingDelay) {
-                this.currentPingDelay = targetDelay;
-                this.startPing();
-              }
-
               // 1. Silent Lobby Steer (Max 2 attempts, only for truly distant non-Asian nodes):
               // If connected to an Asian node (SIN, HKG, HAN, SGN, TPE, etc.), NEVER auto-reconnect in lobby!
               // Even if ping is higher due to mobile 4G/WiFi conditions, keeping a stable connection is critical.
@@ -166,10 +159,9 @@ export class WsClient implements Transport {
               }
 
               // 2. Active In-Game Hot Migration Watchdog:
-              // During live gameplay, if bad ping streak >= 3 and NOT on an Asian node,
-              // automatically trigger zero-downtime hot migration!
-              const isGoodAsianNode = onFastNode && this.rttMin <= 150;
-              if (this.inGame && this.badPingStreak >= 3 && !isGoodAsianNode && !this.closed) {
+              // During live gameplay: NEVER trigger hot migration if on an Asian node (SIN, HKG, etc.)!
+              // Opening duplicate sockets in-game during combat causes network contention & ping spikes.
+              if (this.inGame && this.badPingStreak >= 5 && !onFastNode && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -222,8 +214,8 @@ export class WsClient implements Transport {
 
   public triggerHotMigration(): void {
     if (!this.inGame || this.closed) return;
-    // Strict Guard: If currently on an optimal Asian node (SIN, HKG, etc.) with good ping (<= 150ms), NEVER migrate!
-    if (isFastColo(this.colo) && (this.rttMin <= 150 || this.rtt <= 150)) {
+    // Strict Guard: If currently on any Asian node (SIN, HKG, etc.), NEVER migrate during gameplay!
+    if (isFastColo(this.colo)) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;

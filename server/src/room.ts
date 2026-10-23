@@ -484,18 +484,25 @@ export class GameRoom extends DurableObject {
       return;
     }
     const now = performance.now();
-    this.nextTickTime += TICK_MS;
+    let ticksRun = 0;
+    // Catch-up: run all due ticks (up to 3 per pass) to maintain precise 20.0 TPS
+    while (now >= this.nextTickTime && ticksRun < 3) {
+      this.nextTickTime += TICK_MS;
+      ticksRun++;
+      const isLast = (now < this.nextTickTime) || (ticksRun >= 3);
+      this.tick(isLast);
+    }
+    // If nextTickTime is still far behind (e.g. initial start or pause > 150ms), resync
     if (now - this.nextTickTime > TICK_MS * 2) {
       this.nextTickTime = now + TICK_MS;
     }
-    const delay = Math.max(0, Math.round(this.nextTickTime - now));
+    const delay = Math.max(1, Math.round(this.nextTickTime - performance.now()));
     this.loopTimer = setTimeout(() => {
-      this.tick();
       this.scheduleNextTick();
     }, delay);
   }
 
-  private tick(): void {
+  private tick(broadcast = true): void {
     // Clean up expired disconnected sessions
     if (this.disconnectedPlayers.size > 0) {
       const now = performance.now();
@@ -517,13 +524,15 @@ export class GameRoom extends DurableObject {
 
     this.world.step();
 
-    // Broadcast authoritative snapshot to all human players
-    for (const [ws, playerId] of this.sockets.entries()) {
-      try {
-        const snap = this.world.snapshotFor(playerId);
-        ws.send(JSON.stringify(snap));
-      } catch {
-        // Socket error handled in close event listener
+    if (broadcast && this.sockets.size > 0) {
+      // Broadcast authoritative snapshot to all human players
+      for (const [ws, playerId] of this.sockets.entries()) {
+        try {
+          const snap = this.world.snapshotFor(playerId);
+          ws.send(JSON.stringify(snap));
+        } catch {
+          // Socket error handled in close event listener
+        }
       }
     }
 
