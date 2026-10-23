@@ -2046,17 +2046,17 @@ export class HudManager {
     if (this.pingVal) {
       this.pingVal.textContent = ping > 0 ? String(ping) : '--';
       if (this.pingDot) {
-        this.pingDot.className = `perf-dot ${ping > 0 ? (ping <= 70 ? 'good' : ping <= 140 ? 'warn' : 'bad') : 'good'}`;
+        this.pingDot.className = `perf-dot ${ping > 0 ? (ping <= 60 ? 'good' : ping <= 90 ? 'warn' : 'bad') : 'good'}`;
       }
     }
     if (this.coloVal && colo) {
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
-      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL)$/i.test(colo);
+      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo);
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Mắt thần đang tự động chuyển trạm sang Singapore (SIN)...`;
+        this.coloVal.title = `Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
       } else if (!isFast) {
         this.coloVal.textContent = `${colo} 🔍`;
         this.coloVal.className = 'perf-colo warn';
