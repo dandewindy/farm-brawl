@@ -17,12 +17,12 @@ export interface PredSample {
   z: number;
   vx: number;
   vz: number;
+  dashing: boolean;
 }
 
 export class ClientPredictor {
   on = false;
 
-  // Authoritative physical simulation state (simulated forward by client physics)
   simX = 0;
   simZ = 0;
   vx = 0;
@@ -37,12 +37,9 @@ export class ClientPredictor {
   holdT = 0;
   podShieldActive = true;
 
-  // Visual render position (simulated position + smoothly decaying error offset)
-  // Guarantees 100% butter-smooth rendering without jitter/wobble
   x = 0;
   z = 0;
 
-  // Error offset vector (decays smoothly to 0 via exponential smoothing)
   errorX = 0;
   errorZ = 0;
 
@@ -53,18 +50,16 @@ export class ClientPredictor {
     return this.errorZ;
   }
 
-  // History buffer for time-accurate snapshot reconciliation
   readonly hist: PredSample[] = [];
 
-  // Server state tracking
   sx = 0;
   sz = 0;
   sTick = -9;
   resets = 0;
   kicks = 0;
 
-  // Dash grace window tracking (prevents pre-dash server snapshots from snapping the player backward)
   private lastDashLaunchTime = 0;
+  private lastDashEndTime = 0;
 
   reset(x = 0, z = 0): void {
     this.on = true;
@@ -87,6 +82,7 @@ export class ClientPredictor {
     this.plow = false;
     this.holdT = 0;
     this.lastDashLaunchTime = 0;
+    this.lastDashEndTime = 0;
   }
 
   setStun(duration = 1.5): void {
@@ -95,9 +91,10 @@ export class ClientPredictor {
     this.dashT = 0;
     this.flyT = 0;
     this.plow = false;
+    this.holdT = 0;
   }
 
-  predAt(t: number): { x: number; z: number; vx: number; vz: number } | null {
+  predAt(t: number): { x: number; z: number; vx: number; vz: number; dashing: boolean } | null {
     const h = this.hist;
     if (!h.length) return null;
     if (t <= h[0].t) return h[0];
@@ -110,6 +107,7 @@ export class ClientPredictor {
           z: a.z + (b.z - a.z) * k,
           vx: a.vx + (b.vx - a.vx) * k,
           vz: a.vz + (b.vz - a.vz) * k,
+          dashing: a.dashing || b.dashing,
         };
       }
     }
@@ -127,95 +125,105 @@ export class ClientPredictor {
     if (!this.on) return;
 
     const now = performance.now();
+    const isServerStun = (flags & 8) !== 0;
 
-    // 1. Dash Grace & Phase Windows:
-    // When the player launches a dash locally:
-    // - Pre-dash window: Server has not received the dash command yet (!serverIsDashing).
-    //   Do NOT let pre-dash snapshots pull the player backward!
-    // - Mid-dash & Post-dash window: Client and server are executing the same dash.
-    //   Because the client starts the dash earlier than the server, the client finishes earlier.
-    //   Do NOT let late server-dashing snapshots pull the player around!
-    const timeSinceDash = now - this.lastDashLaunchTime;
+    // 0. Nếu Server báo bị Stun hoặc va chạm mạnh, ưu tiên xử lý ngay cả khi đang trong cửa sổ Dash
+    if (isServerStun && !this.stunned) {
+      this.setStun(1.5);
+      if (this.sTick === snapTick - 1) {
+        this.kicks++;
+        this.vx = (serverX - this.sx) / 0.05;
+        this.vz = (serverZ - this.sz) / 0.05;
+      }
+    } else if (!isServerStun && this.stunT <= 0) {
+      this.stunned = false;
+    }
+
+    // 1. Cửa sổ bảo vệ pha Húc (Dash Phase Windows):
+    const timeSinceLaunch = now - this.lastDashLaunchTime;
+    const timeSinceEnd = now - this.lastDashEndTime;
     const serverIsDashing = (flags & 1) !== 0;
-    const safeGraceMs = Math.max(250, (rtt > 0 ? rtt : 35) * 2 + 100);
+    const safeGraceMs = Math.max(220, (rtt > 0 ? rtt : 35) * 1.8 + 90);
 
-    if (this.dashT > 0 && !serverIsDashing && timeSinceDash < safeGraceMs) {
+    // Pha 1 (Pre-dash): Client vừa phóng đi nhưng gói tin chưa kịp xử lý trên Server
+    if (!isServerStun && this.dashT > 0 && !serverIsDashing && timeSinceLaunch < safeGraceMs) {
       this.sx = serverX;
       this.sz = serverZ;
       this.sTick = snapTick;
       return;
     }
 
-    if (this.dashT <= 0 && serverIsDashing && timeSinceDash < safeGraceMs) {
+    // Pha 3 (Post-dash): Client vừa kết thúc cú húc nhưng snapshot trả về vẫn thuộc cuối cú húc trên Server
+    // (Tính theo lastDashEndTime thay vì lastDashLaunchTime!)
+    if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < safeGraceMs) {
       this.sx = serverX;
       this.sz = serverZ;
       this.sTick = snapTick;
       return;
     }
 
-    // 2. Sample predicted history at the exact historical timestamp:
-    // One round-trip (RTT) + average server tick queuing delay (TICK_MS / 2 = 25ms).
-    // This accurately aligns the client's past input timeline with the server snapshot!
+    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot:
     const transitDelay = Math.max(20, Math.min(250, (rtt > 0 ? rtt : 35) + 25));
     const targetTime = now - transitDelay;
     const then = this.predAt(targetTime);
 
-    // 3. Huge discrepancy check (respawn, teleport, map warp, or > 5.5m):
-    const currentDist = Math.hypot(serverX - this.simX, serverZ - this.simZ);
-    if (!then || currentDist > 5.5) {
+    if (!then) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
     }
 
-    // 4. Calculate error against historical predicted position at that timestamp:
+    // 3. Tính sai số thực tế tại cùng một mốc thời gian lịch sử (KHÔNG so serverX quá khứ với simX hiện tại ở ngưỡng 5.5m!)
     const dx = serverX - then.x;
     const dz = serverZ - then.z;
     const errorDist = Math.hypot(dx, dz);
 
-    // 5. Deadzone & Visual Error Smoothing (Glenn Fiedler / Gabriel Gambetta model):
-    // Under 0.30m is sub-tick interpolation variance between 20Hz server and 60-144Hz client.
-    // Zero jitter: do not touch simulation position.
-    if (errorDist > 0.30 && errorDist <= 3.5) {
-      const adjustX = dx * 0.4;
-      const adjustZ = dz * 0.4;
+    // Nếu sai số lịch sử > 9.0m (hồi sinh, dịch chuyển tức thời, kẹt tường lớn): reset cứng
+    if (errorDist > 9.0) {
+      this.resets++;
+      this.reset(serverX, serverZ);
+      return;
+    }
+
+    // 4. Hòa giải mượt (Smooth Reconciliation):
+    // Trong lúc đang Dash (hoặc mẫu lịch sử thuộc pha Dash), sai số lượng tử hóa tick 50ms của Server (25ms * 50m/s = ~1.25m)
+    // là hoàn toàn bình thường -> nới deadzone lên 1.8m để không bị kéo giật giữa cú húc!
+    const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 180;
+    const deadzone = inDashWindow && !isServerStun ? 1.8 : 0.28;
+
+    if (errorDist > deadzone && errorDist <= 3.8) {
+      const gain = inDashWindow ? 0.25 : 0.4;
+      const adjustX = dx * gain;
+      const adjustZ = dz * gain;
+
       this.simX += adjustX;
       this.simZ += adjustZ;
 
-      // Crucial: offset visual error by the negative of adjustment so that
-      // render position (simX + errorX) DOES NOT JUMP!
+      // Bù trừ vào errorX/errorZ để vị trí hiển thị (simX + errorX) KHÔNG NHẢY BẬC 1 pixel nào!
       this.errorX -= adjustX;
       this.errorZ -= adjustZ;
 
-      // Adjust history buffer
       for (const s of this.hist) {
         s.x += adjustX;
         s.z += adjustZ;
       }
-    } else if (errorDist > 3.5) {
-      // Discrepancy > 3.5m: snap simulation state and smoothly decay visual transition
-      this.simX = serverX;
-      this.simZ = serverZ;
-      this.errorX = Math.max(-2, Math.min(2, then.x - serverX));
-      this.errorZ = Math.max(-2, Math.min(2, then.z - serverZ));
-      this.hist.length = 0;
-    }
+    } else if (errorDist > 3.8) {
+      // Bị người chơi khác húc văng hoặc lệch lớn:
+      // Dịch chuyển simX theo toàn bộ độ lệch lịch sử (dx, dz) thay vì gán lùi về tọa độ quá khứ serverX!
+      const prevRenderX = this.simX + this.errorX;
+      const prevRenderZ = this.simZ + this.errorZ;
 
-    // 6. Synchronize Stun & Knockback:
-    const isServerStun = (flags & 8) !== 0;
-    if (isServerStun) {
-      if (!this.stunned) {
-        this.setStun(1.5);
-        if (this.sTick === snapTick - 1) {
-          this.kicks++;
-          this.vx = (serverX - this.sx) / 0.05;
-          this.vz = (serverZ - this.sz) / 0.05;
-          this.dashT = 0;
-          this.flyT = 0;
-        }
+      this.simX += dx;
+      this.simZ += dz;
+
+      // Giữ nguyên vị trí hiển thị hiện tại rồi cho hội tụ mũ mượt mà về simX mới
+      this.errorX = Math.max(-4.5, Math.min(4.5, prevRenderX - this.simX));
+      this.errorZ = Math.max(-4.5, Math.min(4.5, prevRenderZ - this.simZ));
+
+      for (const s of this.hist) {
+        s.x += dx;
+        s.z += dz;
       }
-    } else if (this.stunT <= 0) {
-      this.stunned = false;
     }
 
     this.sx = serverX;
@@ -224,13 +232,14 @@ export class ClientPredictor {
   }
 
   predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false): void {
-    if (!this.on || this.stunned || this.stunT > 0) return;
+    if (!this.on || this.stunned || this.stunT > 0 || this.dashT > 0) return;
     if (map) {
       const terrain = terrainAt(map, this.simX, this.simZ);
       if (terrain === 1) return; // Cannot dash in water
     }
 
-    this.lastDashLaunchTime = performance.now();
+    const now = performance.now();
+    this.lastDashLaunchTime = now;
 
     if (isSuper) {
       this.plow = true;
@@ -239,16 +248,21 @@ export class ClientPredictor {
       this.a = aimA;
       this.dashT = 0.55;
       this.flyT = 0.55;
+      this.holdT = 0;
+      this.lastDashEndTime = now + 550;
       return;
     }
 
+    const effectiveHeld = this.mass >= 20 ? held : 0;
     const terrain = map ? terrainAt(map, this.simX, this.simZ) : 0;
-    const d = dashParams(species, held, terrain);
+    const d = dashParams(species, effectiveHeld, terrain);
     this.vx = Math.cos(aimA) * d.speed;
     this.vz = Math.sin(aimA) * d.speed;
     this.a = aimA;
     this.dashT = d.time;
     this.plow = d.plow;
+    this.holdT = 0;
+    this.lastDashEndTime = now + d.time * 1000;
   }
 
   step(
@@ -265,21 +279,26 @@ export class ClientPredictor {
     _myId: number,
     _snapTick: number,
     _rtt: number,
-    speedMult = 1.0
+    speedMult = 1.0,
+    myCd = 0
   ): void {
     if (!this.on || !map) return;
 
     this.mass = myMass;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
-    if (holding && !stun && myMass >= 20) {
+
+    // Đồng bộ 100% với handleButton() trên Server: không tích lực và không làm chậm khi đang cooldown hoặc đang dash!
+    const canCharge = !stun && this.dashT <= 0 && myCd <= 0.05 && myMass >= 20;
+    if (holding && canCharge) {
       this.holdT = Math.min(CFG.CHARGE_MAX + 0.5, this.holdT + dt);
     } else {
       this.holdT = 0;
     }
-    const charging = !stun && holding && this.holdT >= CFG.CHARGE_SLOW_AFTER && myMass >= 20;
+    const charging = canCharge && holding && this.holdT >= CFG.CHARGE_SLOW_AFTER;
     const canMove = !stun && aimMove;
 
-    // Substep simulation at 25ms max for rock-solid numerical stability matching server
+    const wasDashing = this.dashT > 0;
+
     for (let left = dt; left > 1e-4;) {
       const h = Math.min(left, 0.025);
       left -= h;
@@ -305,7 +324,7 @@ export class ClientPredictor {
         btn: holding,
       };
 
-      // Exact 100% identical pure shared physics simulation
+      // stepMove đã bao gồm cả xoay hướng khi di chuyển lẫn khi đứng gồng/ngắm
       stepMove(body, inputObj, h, species, terrain, speedMult);
 
       this.simX = body.x;
@@ -316,10 +335,10 @@ export class ClientPredictor {
       this.dashT = body.dashT;
       this.stunT = body.stunT;
 
-      // Smooth aim turning when stationary or charging
-      if (!stun && this.dashT <= 0 && (!canMove || holding)) {
-        this.a += wrapAngle(aimA - this.a) * Math.min(1, 12 * h);
-        this.a = wrapAngle(this.a);
+      // Chỉ xoay thêm khi đứng yên ngắm chuột mà không giữ nút (vì charging đã được xoay trong stepMove)
+      if (!stun && this.dashT <= 0 && !canMove && !charging) {
+        const turnK = 1 - Math.exp(-12 * h);
+        this.a = wrapAngle(this.a + wrapAngle(aimA - this.a) * turnK);
       }
 
       if (this.dashT <= 0) {
@@ -329,7 +348,6 @@ export class ClientPredictor {
         this.stunned = false;
       }
 
-      // Hay collision (identical to server collideHay)
       const hayHit = collideHay(body, map.hay);
       if (hayHit) {
         this.simX = body.x;
@@ -341,7 +359,6 @@ export class ClientPredictor {
         this.plow = false;
       }
 
-      // Podium barrier collision
       if (this.podShieldActive && map.podium) {
         const [podX, podZ] = map.podium;
         const dx = this.simX - podX;
@@ -366,7 +383,6 @@ export class ClientPredictor {
         }
       }
 
-      // Electric fence boundary clamp
       const distCenter = Math.hypot(this.simX, this.simZ);
       const pr = radiusOf(myMass);
       const limit = CFG.R - pr * 0.3 - 0.5;
@@ -385,22 +401,30 @@ export class ClientPredictor {
       }
     }
 
-    // Record sample in history buffer
-    this.hist.push({ t: now, x: this.simX, z: this.simZ, vx: this.vx, vz: this.vz });
+    if (wasDashing && this.dashT <= 0) {
+      this.lastDashEndTime = now;
+    }
+
+    this.hist.push({
+      t: now,
+      x: this.simX,
+      z: this.simZ,
+      vx: this.vx,
+      vz: this.vz,
+      dashing: this.dashT > 0,
+    });
     if (this.hist.length > 2 && this.hist[0].t < now - 1500) {
       let cut = 0;
       while (cut < this.hist.length - 2 && this.hist[cut].t < now - 1500) cut++;
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    // Exponential decay of visual error offset (smoothly converges over ~100ms without jitter)
-    const decay = Math.exp(-12.0 * dt);
+    const decay = Math.exp(-14.0 * dt);
     this.errorX *= decay;
     this.errorZ *= decay;
-    if (Math.abs(this.errorX) < 0.003) this.errorX = 0;
-    if (Math.abs(this.errorZ) < 0.003) this.errorZ = 0;
+    if (Math.abs(this.errorX) < 0.002) this.errorX = 0;
+    if (Math.abs(this.errorZ) < 0.002) this.errorZ = 0;
 
-    // Visual render coordinates = physics state + visual error offset
     this.x = this.simX + this.errorX;
     this.z = this.simZ + this.errorZ;
   }

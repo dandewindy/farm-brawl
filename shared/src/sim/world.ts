@@ -23,6 +23,9 @@ export interface Player extends Body {
   input: Input;
   /** a press seen since the last tick (so taps shorter than a tick still count) */
   btnLatch: boolean;
+  /** a release seen since the last tick (so button releases are never swallowed) */
+  releaseLatch: boolean;
+  releaseAimA: number;
   /** the button went down while a dash was available */
   pressed: boolean;
   holdT: number;
@@ -159,7 +162,7 @@ export class World {
       skin: skin !== undefined ? (skin % SKIN_COUNT) : Math.floor(this.rnd() * SKIN_COUNT),
       bot, alive: false,
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
-      input: { a: 0, mv: false, btn: false }, btnLatch: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
+      input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
       respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
@@ -214,8 +217,10 @@ export class World {
     p.input.mv = !!inp.mv;
     p.input.btn = !!inp.btn;
     if (inp.hold !== undefined && Number.isFinite(inp.hold)) {
-      p.holdT = Math.min(CFG.CHARGE_MAX + 0.5, Math.max(0, inp.hold));
+      p.holdT = p.mass >= 20 ? Math.min(CFG.CHARGE_MAX + 0.5, Math.max(0, inp.hold)) : 0;
       p.pressed = true;
+      p.releaseLatch = true;
+      p.releaseAimA = p.input.a;
     }
     if (p.input.btn) p.btnLatch = true;
   }
@@ -240,7 +245,7 @@ export class World {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: spawnMass, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
-      best: Math.max(spawnMass, p.best || 0), btnLatch: false, inWaterT: 0,
+      best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0,
     });
     p.input.btn = false;
@@ -974,11 +979,28 @@ export class World {
   /** hold to charge, release to ram */
   private handleButton(p: Player): void {
     if (p.slowT > 0 || p.terrain === 1 || p.stunT > 0) {
-      p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false;
+      p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false; p.releaseLatch = false;
       return;
     }
     const cdRate = (this.currentRule === 'squealer' && p.id === this.napoleonId) ? 2 : 1;
     p.cd = Math.max(0, p.cd - DT * cdRate);
+
+    // If a release with hold occurred between ticks, it has priority
+    if (p.releaseLatch) {
+      p.releaseLatch = false;
+      p.btnLatch = false;
+      if (p.cd <= 0.12 && p.dashT <= 0 && p.stunT <= 0) {
+        const savedA = p.input.a;
+        p.input.a = p.releaseAimA;
+        this.dash(p);
+        p.input.a = savedA;
+      }
+      p.pressed = false;
+      p.holdT = 0;
+      p.charging = false;
+      return;
+    }
+
     const down = (p.input.btn || p.btnLatch) && p.stunT <= 0;
     p.btnLatch = false;
     if (down && p.input.btn) {
@@ -998,7 +1020,7 @@ export class World {
       return;
     }
     // released (or a tap that came and went between two ticks)
-    if ((p.pressed || down) && p.cd <= 0.05 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
+    if ((p.pressed || down) && p.cd <= 0.12 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 

@@ -213,7 +213,21 @@ export class InputManager {
     }
   }
 
-  computeAim(camera: THREE.Camera, meX: number, meZ: number, meMass: number): void {
+  /** Làm mới mốc thời gian tích lực (gọi khi hết stun hoặc hết cooldown trong lúc vẫn đang giữ nút) */
+  resetHoldStart(): void {
+    if (this.holding) {
+      this.holdStart = performance.now();
+    }
+  }
+
+  computeAim(
+    camera: THREE.Camera,
+    meX: number,
+    meZ: number,
+    meMass: number,
+    camTargetX = meX,
+    camTargetZ = meZ
+  ): void {
     const ka = this.keyVec();
     if (ka !== null) {
       this.aimA = this.keyA = ka;
@@ -239,8 +253,23 @@ export class InputManager {
     this.ndc.set((this.pointer.x / window.innerWidth) * 2 - 1, -(this.pointer.y / window.innerHeight) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, camera);
     if (!this.raycaster.ray.intersectPlane(this.ground, this.hit)) return;
-    this.aimA = Math.atan2(this.hit.z - meZ, this.hit.x - meX);
-    this.aimMove = Math.hypot(this.hit.x - meX, this.hit.z - meZ) > radiusOf(meMass) + 0.6;
+
+    // Bù trừ độ trễ của Camera (Camera Lag Compensation):
+    // Đo vector chuột tính từ tâm mặt đất của camera (camTarget), tránh vòng lặp phản hồi âm khi camera đang lerp đuổi theo con vật
+    const dx = this.hit.x - camTargetX;
+    const dz = this.hit.z - camTargetZ;
+    const dist = Math.hypot(dx, dz);
+
+    // Chỉ cập nhật góc khi con trỏ nằm ngoài vùng tâm cực nhỏ để tránh nhảy góc đột ngột
+    if (dist > 0.08) {
+      this.aimA = Math.atan2(dz, dx);
+    }
+
+    // Hysteresis (vùng trễ kép) để tránh bật/tắt aimMove liên tục ở ranh giới
+    const baseR = radiusOf(meMass);
+    const stopThreshold = baseR + 0.40;
+    const startThreshold = baseR + 0.65;
+    this.aimMove = this.aimMove ? dist > stopThreshold : dist > startThreshold;
   }
 
   getInput(): Input {

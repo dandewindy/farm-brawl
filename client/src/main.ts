@@ -90,17 +90,27 @@ input.onReleaseRam = (held: number) => {
   const inWater = ((myEnt?.flags ?? 0) & FLAG.WATER) !== 0;
   if (inWater || localStunTimer > 0) return;
   const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
-  const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05;
+  const curX = predictor.on ? predictor.x : (myEnt?.x ?? 0);
+  const curZ = predictor.on ? predictor.z : (myEnt?.z ?? 0);
+  const curMass = myEnt?.mass ?? CFG.START_MASS;
+  input.computeAim(world.camera, curX, curZ, curMass, world.camTarget.x, world.camTarget.z);
+
+  const validHeld = curMass >= 20 ? Math.min(held, predictor.holdT > 0 ? predictor.holdT : held) : 0;
+  const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05 && predictor.dashT <= 0;
   if (canDash) {
-    predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
+    predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper);
     // Locally set cooldown so player cannot spam dash
     const baseCd = myMeta.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
-    const isPlow = held >= CFG.CHARGE_MIN;
+    const isPlow = validHeld >= CFG.CHARGE_MIN;
     gameState.me.cd = baseCd + (isPlow ? CFG.PLOW_CD * (myMeta.species === 'chicken' ? 0.65 : 1) : 0);
   }
-  // Send btn: false with exact held duration immediately
+  // Send btn: false immediately; only include hold if canDash was valid
   if (transport && gameState.alive) {
-    transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false, hold: held });
+    if (canDash) {
+      transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false, hold: validHeld });
+    } else {
+      transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false });
+    }
     lastSentInput = { a: input.aimA, mv: input.aimMove, btn: false };
     lastSentTime = performance.now();
   }
@@ -1721,12 +1731,20 @@ function animate(now: number): void {
     const myX = predictor.on ? predictor.x : (me ? me.x : 0);
     const myZ = predictor.on ? predictor.z : (me ? me.z : 0);
 
+    // Decrement local cooldown smoothly every frame before prediction step
+    if (gameState.me.cd > 0) {
+      gameState.me.cd = Math.max(0, gameState.me.cd - dt);
+    }
+    if (gameState.me.cd > 0.05 || predictor.dashT > 0 || localStunTimer > 0) {
+      input.resetHoldStart();
+    }
+
     if (isStunned || isSpectating) {
       input.cancelRam();
     }
 
-    // Precise 3D raycasted aiming
-    input.computeAim(world.camera, myX, myZ, myMass);
+    // Precise 3D raycasted aiming with camera lag compensation
+    input.computeAim(world.camera, myX, myZ, myMass, world.camTarget.x, world.camTarget.z);
 
     const isLocked = isStunned || isSpectating;
     const stepFlags = me ? (isLocked ? (me.flags | FLAG.STUN) : me.flags) : (isLocked ? FLAG.STUN : 0);
@@ -1751,7 +1769,8 @@ function animate(now: number): void {
         gameState.myId,
         gameState.snapTick,
         transport.rtt,
-        tillSpeedMult
+        tillSpeedMult,
+        gameState.me.cd
       );
     }
 
@@ -1767,15 +1786,10 @@ function animate(now: number): void {
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
 
-    if (btnChanged || (timeSinceLast >= 50 && (angleDiff > 0.008 || mvChanged))) {
+    if (btnChanged || mvChanged || (timeSinceLast >= 45 && angleDiff > 0.008)) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;
-    }
-
-    // Decrement local cooldown smoothly every frame
-    if (gameState.me.cd > 0) {
-      gameState.me.cd = Math.max(0, gameState.me.cd - dt);
     }
 
     // Update charging meter in HUD and charge whine audio (disabled in water and while stunned)
