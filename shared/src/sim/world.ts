@@ -213,6 +213,10 @@ export class World {
     p.input.a = Number.isFinite(inp.a) ? inp.a : p.input.a;
     p.input.mv = !!inp.mv;
     p.input.btn = !!inp.btn;
+    if (inp.hold !== undefined && Number.isFinite(inp.hold)) {
+      p.holdT = Math.min(CFG.CHARGE_MAX + 0.5, Math.max(0, inp.hold));
+      p.pressed = true;
+    }
     if (p.input.btn) p.btnLatch = true;
   }
 
@@ -978,7 +982,7 @@ export class World {
     const down = (p.input.btn || p.btnLatch) && p.stunT <= 0;
     p.btnLatch = false;
     if (down && p.input.btn) {
-      if (p.cd > 0 || p.dashT > 0) {
+      if (p.cd > 0.05 || p.dashT > 0) {
         p.pressed = false; p.holdT = 0; p.charging = false;
       } else {
         p.pressed = true;
@@ -994,7 +998,7 @@ export class World {
       return;
     }
     // released (or a tap that came and went between two ticks)
-    if ((p.pressed || down) && p.cd <= 0 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
+    if ((p.pressed || down) && p.cd <= 0.05 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 

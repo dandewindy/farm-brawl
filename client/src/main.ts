@@ -73,6 +73,13 @@ let lastSentTime = 0;
 input.onPressRam = () => {
   if (localStunTimer > 0) {
     input.cancelRam();
+    return;
+  }
+  // Send btn: true immediately so server starts tracking hold time with 0 frame latency
+  if (transport && gameState.alive && localStunTimer <= 0) {
+    transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: true });
+    lastSentInput = { a: input.aimA, mv: input.aimMove, btn: true };
+    lastSentTime = performance.now();
   }
 };
 
@@ -83,8 +90,19 @@ input.onReleaseRam = (held: number) => {
   const inWater = ((myEnt?.flags ?? 0) & FLAG.WATER) !== 0;
   if (inWater || localStunTimer > 0) return;
   const isSuper = (myEnt?.flags ?? 0) & 32768 ? true : false;
-  if (myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05) {
+  const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05;
+  if (canDash) {
     predictor.predictDash(myMeta.species, held, input.aimA, gameState.map, isSuper);
+    // Locally set cooldown so player cannot spam dash
+    const baseCd = myMeta.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
+    const isPlow = held >= CFG.CHARGE_MIN;
+    gameState.me.cd = baseCd + (isPlow ? CFG.PLOW_CD * (myMeta.species === 'chicken' ? 0.65 : 1) : 0);
+  }
+  // Send btn: false with exact held duration immediately
+  if (transport && gameState.alive) {
+    transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false, hold: held });
+    lastSentInput = { a: input.aimA, mv: input.aimMove, btn: false };
+    lastSentTime = performance.now();
   }
 };
 
@@ -1152,6 +1170,20 @@ function handleGameEvent(ev: GameEvent): void {
       }
       if (isMine) shake = Math.max(shake, 0.6);
 
+      // Attacker hit someone with normal (non-plow) dash: stop dash velocity immediately on impact!
+      if (ev.a === myId && !predictor.plow) {
+        predictor.dashT = 0;
+        predictor.vx *= 0.25;
+        predictor.vz *= 0.25;
+      }
+      // Victim hit by someone: stop dash and charging immediately
+      if (ev.v === myId && ev.a !== 0) {
+        predictor.dashT = 0;
+        predictor.plow = false;
+        input.cancelRam();
+        chargeStop();
+      }
+
       // Stun lockout ONLY when hitting a post/obstacle ("trúng cọc" / "trúng bục", ev.a === 0)!
       // Normal ramming between animals does NOT cause stun!
       if (ev.v === myId && ev.a === 0) {
@@ -1741,6 +1773,11 @@ function animate(now: number): void {
       lastSentTime = now;
     }
 
+    // Decrement local cooldown smoothly every frame
+    if (gameState.me.cd > 0) {
+      gameState.me.cd = Math.max(0, gameState.me.cd - dt);
+    }
+
     // Update charging meter in HUD and charge whine audio (disabled in water and while stunned)
     const inWater = me
       ? ((me.flags & FLAG.WATER) !== 0 || (gameState.map?.pond.some((b) => insideBlob(b, predictor.x, predictor.z)) ?? false))
@@ -1799,6 +1836,11 @@ function animate(now: number): void {
       if (isMe && wasInWater) {
         pFlags |= FLAG.WATER;
         if (meta.species !== 'duck') pFlags |= FLAG.DROWNING;
+      }
+      if (isMe) {
+        if (predictor.dashT > 0) pFlags |= FLAG.DASH;
+        if (predictor.plow) pFlags |= FLAG.PLOW;
+        if (input.holding && (now - input.holdStart) >= CFG.CHARGE_SLOW_AFTER * 1000) pFlags |= FLAG.CHARGING;
       }
       const isKing = ent.id === gameState.napoleonId;
       animals.update(

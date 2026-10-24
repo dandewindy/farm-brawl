@@ -34,6 +34,7 @@ export class ClientPredictor {
   stunT = 0;
   stunned = false;
   plow = false;
+  holdT = 0;
   podShieldActive = true;
 
   // Visual render position (simulated position + smoothly decaying error offset)
@@ -84,6 +85,7 @@ export class ClientPredictor {
     this.stunned = false;
     this.stunT = 0;
     this.plow = false;
+    this.holdT = 0;
     this.lastDashLaunchTime = 0;
   }
 
@@ -126,28 +128,41 @@ export class ClientPredictor {
 
     const now = performance.now();
 
-    // 1. Dash Grace Window:
-    // When the player launches a dash, the command is in flight across the network (1 RTT ~ 35-50ms)
-    // plus server tick latency (~0-50ms). During this 140ms window, incoming server snapshots
-    // represent state BEFORE the dash started. We must NOT let pre-dash snapshots pull the player backward!
+    // 1. Dash Grace & Phase Windows:
+    // When the player launches a dash locally:
+    // - Pre-dash window: Server has not received the dash command yet (!serverIsDashing).
+    //   Do NOT let pre-dash snapshots pull the player backward!
+    // - Mid-dash & Post-dash window: Client and server are executing the same dash.
+    //   Because the client starts the dash earlier than the server, the client finishes earlier.
+    //   Do NOT let late server-dashing snapshots pull the player around!
     const timeSinceDash = now - this.lastDashLaunchTime;
     const serverIsDashing = (flags & 1) !== 0;
-    if (timeSinceDash < 140 && !serverIsDashing && this.dashT > 0) {
+    const safeGraceMs = Math.max(250, (rtt > 0 ? rtt : 35) * 2 + 100);
+
+    if (this.dashT > 0 && !serverIsDashing && timeSinceDash < safeGraceMs) {
       this.sx = serverX;
       this.sz = serverZ;
       this.sTick = snapTick;
       return;
     }
 
-    // 2. Sample predicted history at the estimated time the server generated this tick:
-    // Packet arrived at `now`, one-way transit time is ~rtt * 0.5.
-    const oneWayLatency = Math.max(10, Math.min(150, (rtt > 0 ? rtt : 35) * 0.5));
-    const targetTime = now - oneWayLatency;
+    if (this.dashT <= 0 && serverIsDashing && timeSinceDash < safeGraceMs) {
+      this.sx = serverX;
+      this.sz = serverZ;
+      this.sTick = snapTick;
+      return;
+    }
+
+    // 2. Sample predicted history at the exact historical timestamp:
+    // One round-trip (RTT) + average server tick queuing delay (TICK_MS / 2 = 25ms).
+    // This accurately aligns the client's past input timeline with the server snapshot!
+    const transitDelay = Math.max(20, Math.min(250, (rtt > 0 ? rtt : 35) + 25));
+    const targetTime = now - transitDelay;
     const then = this.predAt(targetTime);
 
-    // 3. Huge discrepancy check (respawn, teleport, map warp, or > 6.0m):
+    // 3. Huge discrepancy check (respawn, teleport, map warp, or > 5.5m):
     const currentDist = Math.hypot(serverX - this.simX, serverZ - this.simZ);
-    if (!then || currentDist > 6.0) {
+    if (!then || currentDist > 5.5) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
@@ -159,12 +174,11 @@ export class ClientPredictor {
     const errorDist = Math.hypot(dx, dz);
 
     // 5. Deadzone & Visual Error Smoothing (Glenn Fiedler / Gabriel Gambetta model):
-    // If error is under 0.25m, it is pure sub-frame tick quantization between 20Hz server & 60/120Hz client.
-    // Do not jerk the player!
-    if (errorDist > 0.25 && errorDist <= 4.0) {
-      // Soft adjustment: adjust simulation position by 50% of the discrepancy
-      const adjustX = dx * 0.5;
-      const adjustZ = dz * 0.5;
+    // Under 0.30m is sub-tick interpolation variance between 20Hz server and 60-144Hz client.
+    // Zero jitter: do not touch simulation position.
+    if (errorDist > 0.30 && errorDist <= 3.5) {
+      const adjustX = dx * 0.4;
+      const adjustZ = dz * 0.4;
       this.simX += adjustX;
       this.simZ += adjustZ;
 
@@ -173,14 +187,13 @@ export class ClientPredictor {
       this.errorX -= adjustX;
       this.errorZ -= adjustZ;
 
-      // Adjust history so subsequent frames don't double-compensate
+      // Adjust history buffer
       for (const s of this.hist) {
         s.x += adjustX;
         s.z += adjustZ;
       }
-    } else if (errorDist > 4.0) {
-      // Larger discrepancy (e.g. violent knockback or explosion):
-      // Snap simulation state, and smoothly blend visual render transition
+    } else if (errorDist > 3.5) {
+      // Discrepancy > 3.5m: snap simulation state and smoothly decay visual transition
       this.simX = serverX;
       this.simZ = serverZ;
       this.errorX = Math.max(-2, Math.min(2, then.x - serverX));
@@ -258,7 +271,12 @@ export class ClientPredictor {
 
     this.mass = myMass;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
-    const charging = !stun && holding;
+    if (holding && !stun && myMass >= 20) {
+      this.holdT = Math.min(CFG.CHARGE_MAX + 0.5, this.holdT + dt);
+    } else {
+      this.holdT = 0;
+    }
+    const charging = !stun && holding && this.holdT >= CFG.CHARGE_SLOW_AFTER && myMass >= 20;
     const canMove = !stun && aimMove;
 
     // Substep simulation at 25ms max for rock-solid numerical stability matching server

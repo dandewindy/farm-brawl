@@ -10,6 +10,8 @@ export interface Input {
   mv: boolean;
   /** ram button held */
   btn: boolean;
+  /** exact hold duration in seconds on release */
+  hold?: number;
 }
 
 export interface PlayerMeta {
