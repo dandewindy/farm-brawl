@@ -1794,7 +1794,7 @@ function animate(now: number): void {
       const isMe = ent.id === gameState.myId && predictor.on;
       const px = isMe ? predictor.x : ent.x;
       const pz = isMe ? predictor.z : ent.z;
-      const pa = isMe ? (isStunned ? lockedAimA : (predictor.dashT > 0 ? predictor.a : input.aimA)) : ent.a;
+      const pa = isMe ? (isStunned ? lockedAimA : predictor.a) : ent.a;
       let pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
       if (isMe && wasInWater) {
         pFlags |= FLAG.WATER;
