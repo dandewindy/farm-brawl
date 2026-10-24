@@ -337,7 +337,7 @@ export class ClientPredictor {
 
       // Chỉ xoay thêm khi đứng yên ngắm chuột mà không giữ nút (vì charging đã được xoay trong stepMove)
       if (!stun && this.dashT <= 0 && !canMove && !charging) {
-        const turnK = 1 - Math.exp(-12 * h);
+        const turnK = 1 - Math.exp(-15 * h);
         this.a = wrapAngle(this.a + wrapAngle(aimA - this.a) * turnK);
       }
 

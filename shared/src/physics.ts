@@ -49,8 +49,13 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
     const d = Math.exp(-1.2 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (stunned || !inp.mv) {
+  } else if (stunned) {
     const d = Math.exp(-3.5 * dt);
+    b.vx *= d;
+    b.vz *= d;
+  } else if (!inp.mv) {
+    // Khi chủ động dừng (thả phím hoặc rê chuột vào sát thân), phanh dừng dứt khoát (-6.0) để không trôi tuột quán tính
+    const d = Math.exp(-6.0 * dt);
     b.vx *= d;
     b.vz *= d;
   } else {
@@ -69,9 +74,9 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
     b.vz *= d;
   }
 
-  // Xoay hướng mượt và đồng nhất giữa Client & Server (cả khi di chuyển lẫn khi đứng gồng/ngắm)
+  // Xoay hướng mượt và dứt khoát giữa Client & Server (cả khi di chuyển lẫn khi đứng gồng/ngắm)
   if (!stunned && b.dashT <= 0 && (inp.mv || b.charging)) {
-    const turnK = 1 - Math.exp(-12 * dt);
+    const turnK = 1 - Math.exp(-15 * dt);
     b.a += wrapAngle(inp.a - b.a) * turnK;
   }
   b.a = wrapAngle(b.a);

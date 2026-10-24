@@ -224,9 +224,7 @@ export class InputManager {
     camera: THREE.Camera,
     meX: number,
     meZ: number,
-    meMass: number,
-    camTargetX = meX,
-    camTargetZ = meZ
+    meMass: number
   ): void {
     const ka = this.keyVec();
     if (ka !== null) {
@@ -254,21 +252,24 @@ export class InputManager {
     this.raycaster.setFromCamera(this.ndc, camera);
     if (!this.raycaster.ray.intersectPlane(this.ground, this.hit)) return;
 
-    // Bù trừ độ trễ của Camera (Camera Lag Compensation):
-    // Đo vector chuột tính từ tâm mặt đất của camera (camTarget), tránh vòng lặp phản hồi âm khi camera đang lerp đuổi theo con vật
-    const dx = this.hit.x - camTargetX;
-    const dz = this.hit.z - camTargetZ;
+    // Vector ngắm tính trực tiếp từ vị trí con vật (meX, meZ) trong thế giới:
+    // Tuyệt đối không đo từ camTarget vì camera lerp trễ phía sau sẽ cộng vector trễ vào hướng ngắm,
+    // làm con vật bị quán tính giả (không thể dừng khi rê chuột vào sát thân, ngoặt góc bị rê theo hướng cũ).
+    const dx = this.hit.x - meX;
+    const dz = this.hit.z - meZ;
     const dist = Math.hypot(dx, dz);
 
-    // Chỉ cập nhật góc khi con trỏ nằm ngoài vùng tâm cực nhỏ để tránh nhảy góc đột ngột
+    // Chỉ cập nhật góc khi con trỏ nằm ngoài tâm để tránh nhảy góc khi chuột ở quá gần
     if (dist > 0.08) {
       this.aimA = Math.atan2(dz, dx);
     }
 
-    // Hysteresis (vùng trễ kép) để tránh bật/tắt aimMove liên tục ở ranh giới
+    // Hysteresis (vùng trễ) sát thân con vật:
+    // Khi chuột vào sát người (baseR + 0.25), con vật dừng dứt khoát (không trôi tuột quán tính).
+    // Khi chuột rê ra ngoài (baseR + 0.45), con vật bắt đầu di chuyển.
     const baseR = radiusOf(meMass);
-    const stopThreshold = baseR + 0.40;
-    const startThreshold = baseR + 0.65;
+    const stopThreshold = baseR + 0.25;
+    const startThreshold = baseR + 0.45;
     this.aimMove = this.aimMove ? dist > stopThreshold : dist > startThreshold;
   }
 
