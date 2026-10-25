@@ -25,7 +25,7 @@ export class WsClient implements Transport {
   private lobbySteerAttempts = 0;
   private currentPingDelay = 500;
 
-  // Khóa chống probe liên tục khi ISP cố định tuyến Anycast sang châu Âu
+  // Khóa chống probe liên tục khi ISP cố định tuyến Anycast hoặc khi trạm hiện tại đã tối ưu
   private routeLockedUntil = 0;
   private endpointIdx = 0;
   private readonly endpoints: string[];
@@ -147,26 +147,32 @@ export class WsClient implements Transport {
 
               if (onFastNode) {
                 this.lobbySteerAttempts = 0;
-                this.routeLockedUntil = 0;
               }
 
-              // Chỉ tăng badPingStreak khi không bị khóa route
-              if (onFastNode && this.rtt <= 90 && s <= 105) {
+              // Bad ping streak:
+              // Mạng Đông Nam Á (SIN/HKG) ping 40-110ms là hoàn toàn bình thường và ổn định
+              // Chỉ coi là bất thường khi ping vượt quá 130ms liên tục
+              if (onFastNode && this.rtt <= 110) {
                 this.badPingStreak = 0;
               } else if (now < this.routeLockedUntil) {
                 this.badPingStreak = 0;
-              } else {
+              } else if (!onFastNode) {
                 this.badPingStreak++;
+              } else if (this.rtt > 130) {
+                this.badPingStreak++;
+              } else {
+                this.badPingStreak = 0;
               }
 
-              const targetDelay = (this.rtt > 90 || !onFastNode) && now >= this.routeLockedUntil ? 400 : 500;
+              const targetDelay = (this.rtt > 120 || !onFastNode) && now >= this.routeLockedUntil ? 400 : 500;
               if (targetDelay !== this.currentPingDelay) {
                 this.currentPingDelay = targetDelay;
                 this.startPing();
               }
 
               // ── LOBBY STEER ──
-              if (!this.inGame && !onFastNode && this.rtt > 120 && !this.closed && now >= this.routeLockedUntil) {
+              // Chỉ steer trong lobby khi node ngoài châu Á và ping > 150ms
+              if (!this.inGame && !onFastNode && this.rtt > 150 && !this.closed && now >= this.routeLockedUntil) {
                 if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
                   if (now - this.lastLobbyReconnectTime > 5000) {
                     this.lastLobbyReconnectTime = now;
@@ -176,12 +182,13 @@ export class WsClient implements Transport {
                     this.forceReconnect();
                   }
                 } else if (this.lobbySteerAttempts >= 2) {
-                  this.routeLockedUntil = now + 60000;
+                  this.routeLockedUntil = now + 90000;
                 }
               }
 
               // ── IN-GAME ZERO-DOWNTIME MIGRATION ──
-              if (this.inGame && this.rttWin.length >= 4 && this.badPingStreak >= 4 && !this.closed && now >= this.routeLockedUntil) {
+              // Chỉ tự động dò khi có ít nhất 5 mẫu và 6 lần liên tục ping xấu (> 130ms hoặc ngoài châu Á)
+              if (this.inGame && this.rttWin.length >= 5 && this.badPingStreak >= 6 && !this.closed && now >= this.routeLockedUntil) {
                 this.triggerHotMigration();
               }
             }
@@ -250,7 +257,8 @@ export class WsClient implements Transport {
   public triggerHotMigration(isManual = false): void {
     if (!this.inGame || this.closed) return;
     const now = performance.now();
-    if (this.migrationWs !== null || (!isManual && now - this.lastMigrationProbeTime < 6000)) return;
+    // Throttle: ít nhất 10 giây giữa các lần tự động probe
+    if (this.migrationWs !== null || (!isManual && now - this.lastMigrationProbeTime < 10000)) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
     if (isManual) {
@@ -274,10 +282,10 @@ export class WsClient implements Transport {
         this.probeAttempts++;
         this.abortProbe(probeSocket, probeTimeout);
         this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= 3) {
+        if (this.probeAttempts >= 2) {
           this.probeAttempts = 0;
           this.badPingStreak = 0;
-          this.routeLockedUntil = performance.now() + 90000;
+          this.routeLockedUntil = performance.now() + 120000; // Khóa 2 phút nếu probe thất bại
         }
       }
     }, 2500);
@@ -310,12 +318,16 @@ export class WsClient implements Transport {
             if (!currentIsFast && probeIsFast) {
               // Từ trạm ngoài châu Á chuyển về trạm châu Á: luôn chuyển!
               shouldSwitch = true;
-            } else if (probeIsFast && currentIsFast && probeColo !== this.colo && probeRtt < this.rtt - 15) {
-              // Cùng châu Á nhưng khác POP và nhanh hơn >= 15ms
-              shouldSwitch = true;
-            } else if (probeIsFast && probeRtt < this.rtt - 25 && probeRtt < this.rtt * 0.78) {
-              // Tuyến mới giảm ít nhất 25ms và > 22% RTT
-              shouldSwitch = true;
+            } else if (probeIsFast && currentIsFast) {
+              // Cả 2 đều ở châu Á:
+              // NẾU CÙNG POP (ví dụ SIN -> SIN): KHÔNG BAO GIỜ TỰ ĐỘNG CHUYỂN! Cùng POP thì cùng tuyến cáp, đổi socket chỉ gây nghẽn và gián đoạn.
+              if (probeColo !== this.colo && probeRtt < this.rtt - 25 && probeRtt < this.rtt * 0.75) {
+                // Khác POP (ví dụ HKG -> SIN hoặc ngược lại) VÀ nhanh hơn hẳn >= 25ms & > 25%: chuyển!
+                shouldSwitch = true;
+              } else if (isManual && probeRtt < this.rtt - 35) {
+                // Chỉ cho phép cùng POP nếu người dùng chủ động bấm retune và probe nhanh hơn hẳn 35ms
+                shouldSwitch = true;
+              }
             } else if (!currentIsFast && !probeIsFast && probeColo !== this.colo && probeRtt < this.rtt - 45) {
               // Cả 2 đều ngoài châu Á: CHỈ chuyển nếu khác trạm và nhanh hơn hẳn 45ms (chặn loop FRA -> FRA)
               shouldSwitch = true;
@@ -333,10 +345,10 @@ export class WsClient implements Transport {
             this.probeAttempts++;
             this.abortProbe(probeSocket, probeTimeout);
             this.onMigrationStatus?.('failed', this.colo);
-            if (this.probeAttempts >= 3) {
+            if (this.probeAttempts >= 2) {
               this.probeAttempts = 0;
               this.badPingStreak = 0;
-              this.routeLockedUntil = performance.now() + 90000;
+              this.routeLockedUntil = performance.now() + 120000; // Khóa 2 phút nếu probe không tìm thấy tuyến tốt hơn
             }
           }
         } else if (msg.t === 'init') {
@@ -476,7 +488,7 @@ export class WsClient implements Transport {
   public manualRetune(): void {
     if (this.closed) return;
     this.routeLockedUntil = 0;
-    this.badPingStreak = 4;
+    this.badPingStreak = 6;
     this.probeAttempts = 0;
     if (this.inGame) {
       if (this.migrationWs) {

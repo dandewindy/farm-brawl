@@ -13,13 +13,13 @@ function getTargetLocationHint(_request: Request): DurableObjectLocationHint {
 }
 
 function resolveRoomKey(roomParam: string): string {
-  // Tăng version lên v13 để Cloudflare hủy các Durable Object cũ đang bị ghim ở châu Âu
-  if (roomParam === 'pub-1') return 'pub-apac-v13';
-  if (roomParam === 'team-1') return 'team-apac-v13';
+  // Tăng version lên v14 để Cloudflare tạo mới hoàn toàn Durable Object tại trạm 'apac'
+  if (roomParam === 'pub-1') return 'pub-apac-v14';
+  if (roomParam === 'team-1') return 'team-apac-v14';
   if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
-    return `${roomParam}-apac-v13`;
+    return `${roomParam}-apac-v14`;
   }
-  return `${roomParam}-apac-v13`;
+  return `${roomParam}-apac-v14`;
 }
 
 export default {

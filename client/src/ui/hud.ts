@@ -2046,7 +2046,7 @@ export class HudManager {
     if (this.pingVal) {
       this.pingVal.textContent = ping > 0 ? String(ping) : '--';
       if (this.pingDot) {
-        this.pingDot.className = `perf-dot ${ping > 0 ? (ping <= 60 ? 'good' : ping <= 90 ? 'warn' : 'bad') : 'good'}`;
+        this.pingDot.className = `perf-dot ${ping > 0 ? (ping <= 80 ? 'good' : ping <= 130 ? 'warn' : 'bad') : 'good'}`;
       }
     }
     if (this.coloVal && colo) {
@@ -2061,15 +2061,15 @@ export class HudManager {
         this.coloVal.textContent = `${colo} 🔍`;
         this.coloVal.className = 'perf-colo warn';
         this.coloVal.title = `Trạm ${colo} (Xa) - Đang dò tìm tuyến gần hơn... Nhấp để dò ngay`;
-      } else if (ping > 90) {
+      } else if (ping > 130) {
         this.coloVal.textContent = `${colo} ⚠️`;
-        this.coloVal.className = ping > 120 ? 'perf-colo bad' : 'perf-colo warn';
+        this.coloVal.className = ping > 180 ? 'perf-colo bad' : 'perf-colo warn';
         this.coloVal.title = `Trạm ${colo} có độ trễ cao (~${ping}ms). Nhấp vào đây để đổi sang tuyến tối ưu!`;
       } else {
         this.coloVal.textContent = colo;
         this.coloVal.className = 'perf-colo good';
         this.coloVal.title = isSin
-          ? `Trạm Singapore (SIN) tối ưu (~${ping > 0 ? ping : 35}ms). Nhấp để kiểm tra lại tuyến`
+          ? `Trạm Singapore (SIN) (~${ping > 0 ? ping : 35}ms). Nhấp để kiểm tra lại tuyến`
           : `Trạm ${colo} (~${ping > 0 ? ping : 50}ms). Nhấp để kiểm tra lại tuyến`;
       }
     }
