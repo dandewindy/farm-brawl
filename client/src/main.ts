@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CFG, type Species } from '@shared/constants';
+import { CFG, radiusOf, type Species } from '@shared/constants';
 import { insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
@@ -1183,18 +1183,45 @@ function handleGameEvent(ev: GameEvent): void {
       }
       if (isMine) shake = Math.max(shake, 0.6);
 
+      // Super Rainbow Candy sonic blast effect
+      if (ev.s >= 70) {
+        foodParts.sonicWave(ev.x, 0.8, ev.z, 3.5);
+        if (isMine) {
+          shake = Math.max(shake, 1.4);
+          sfxBoom();
+        }
+      }
+
       // Attacker hit someone with normal (non-plow) dash: stop dash velocity immediately on impact!
       if (ev.a === myId && !predictor.plow) {
         predictor.dashT = 0;
         predictor.vx *= 0.25;
         predictor.vz *= 0.25;
+        const meEnt = gameState.ents.get(myId);
+        const myRadius = radiusOf(meEnt ? meEnt.mass : CFG.START_MASS);
+        const toContactX = ev.x - predictor.simX;
+        const toContactZ = ev.z - predictor.simZ;
+        const dot = toContactX * Math.cos(predictor.a) + toContactZ * Math.sin(predictor.a);
+        if (dot < 0) {
+          predictor.simX = ev.x - Math.cos(predictor.a) * myRadius;
+          predictor.simZ = ev.z - Math.sin(predictor.a) * myRadius;
+        }
       }
-      // Victim hit by someone: stop dash and charging immediately
+      // Victim hit by someone: stop dash and charging immediately, apply knockback impulse
       if (ev.v === myId && ev.a !== 0) {
         predictor.dashT = 0;
         predictor.plow = false;
         input.cancelRam();
         chargeStop();
+        const hitDx = predictor.simX - ev.x;
+        const hitDz = predictor.simZ - ev.z;
+        const hitD = Math.hypot(hitDx, hitDz);
+        if (hitD > 0.01 && ev.s > 15) {
+          const nx = hitDx / hitD;
+          const nz = hitDz / hitD;
+          predictor.vx = nx * ev.s;
+          predictor.vz = nz * ev.s;
+        }
       }
 
       // Stun lockout ONLY when hitting a post/obstacle ("trúng cọc" / "trúng bục", ev.a === 0)!
@@ -1711,7 +1738,7 @@ function animate(now: number): void {
     currentFps = Math.min(60, Math.round((fpsFrames * 1000) / (now - lastFpsTime)));
     fpsFrames = 0;
     lastFpsTime = now;
-    const currentPing = transport ? Math.round(transport.rttMin > 0 ? transport.rttMin : transport.rtt) : 0;
+    const currentPing = transport ? Math.round(transport.rtt > 0 ? transport.rtt : transport.rttMin) : 0;
     hud.updatePerf(currentFps, currentPing, transport?.colo, transport?.isMigrating);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
@@ -1820,7 +1847,7 @@ function animate(now: number): void {
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
 
-    if (btnChanged || mvChanged || (timeSinceLast >= 45 && angleDiff > 0.008)) {
+    if (btnChanged || mvChanged || timeSinceLast >= 120 || (timeSinceLast >= 45 && angleDiff > 0.008)) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;

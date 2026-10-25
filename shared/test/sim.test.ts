@@ -107,10 +107,11 @@ describe('world', () => {
     w.step(); w.flush();
     w.setInput(a, { a: 0, mv: true, btn: false });
     let hit = false;
+    let lastSnap: any = null;
     for (let i = 0; i < 10 && !hit; i++) {
       w.step();
-      const snap = w.snapshotFor(a);
-      hit = snap.ev.some((e) => e.k === 'hit' && e.a === a && e.v === b);
+      lastSnap = w.snapshotFor(a);
+      hit = lastSnap.ev.some((e: any) => e.k === 'hit' && e.a === a && e.v === b);
       w.flush();
     }
     expect(hit).toBe(true);
@@ -451,6 +452,36 @@ describe('bonus weapons and tools', () => {
     // Victim knocked back with extreme velocity
     expect(vic.vx).toBeGreaterThan(60);
     expect(vic.stunT).toBe(0);
+  });
+
+  it('knockback velocity persists across multiple steps and flings victim even while walking', () => {
+    const w = emptyWorld();
+    const attId = w.addPlayer('Attacker', 'cow');
+    const vicId = w.addPlayer('Victim', 'pig');
+    place(w, attId, 0, 0, 30);
+    place(w, vicId, 2, 0, 30);
+
+    const att = w.players.get(attId)!;
+    const vic = w.players.get(vicId)!;
+
+    att.superT = 8.0;
+    att.dashT = 0.3;
+    att.power = 2.5;
+    att.vx = 60;
+
+    w.step(); // collision occurs here
+    expect(vic.vx).toBeGreaterThan(60);
+
+    // Victim attempts to steer in opposite direction while walking
+    w.setInput(vicId, { a: Math.PI, mv: true, btn: false });
+
+    // Step 5 ticks (0.25s)
+    for (let i = 0; i < 5; i++) {
+      w.step();
+    }
+    // Victim should still be moving forward fast along +x, not abruptly stopped
+    expect(vic.vx).toBeGreaterThan(25);
+    expect(vic.x).toBeGreaterThan(10);
   });
 
   it('private room with bots: false never spawns bots', () => {

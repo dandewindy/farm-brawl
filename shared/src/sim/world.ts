@@ -1447,7 +1447,7 @@ export class World {
 
     // Super Rainbow Dash: violent massive knockback launching victim far across the map!
     if (att.superT > 0) {
-      k = Math.max(k * 3.2, 72);
+      k = Math.max(k * 3.5, 78);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;
@@ -1628,6 +1628,8 @@ export class World {
   private eat(list: Player[]): void {
     for (const p of list) {
       if (!p.alive) continue;
+      // Cannot eat food for 0.3s right after being rammed (prevents instantly re-eating dropped food while flying)
+      if (this.time - p.lastHitT < 0.3) continue;
       const r = radiusOf(p.mass) + 0.4;
       for (const f of this.food.values()) {
         const dx = f.x - p.x, dz = f.z - p.z;

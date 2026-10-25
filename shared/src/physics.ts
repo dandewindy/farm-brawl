@@ -53,14 +53,26 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
     const d = Math.exp(-6.0 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (!inp.mv) {
+  } else {
+    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
     const speed = Math.hypot(b.vx, b.vz);
-    if (speed > 14.0) {
-      // Đang bay do bị húc văng: giữ quán tính knockback bay dạt tự nhiên
-      const d = Math.exp(-4.5 * dt);
-      b.vx *= d;
-      b.vz *= d;
-    } else {
+    if (speed > ms) {
+      // Đang có vận tốc lớn hơn tốc độ đi bộ tối đa (do bị húc văng, nổ dynamite, hoặc đà bay cầu vồng)
+      // Giữ đà quán tính knockback bay dạt tự nhiên với lực cản khí động học d = exp(-3.5 * dt)
+      const excess = speed - ms;
+      const d = Math.exp(-3.5 * dt);
+      const newExcess = excess * d;
+      const newSpeed = ms + newExcess;
+      const factor = newSpeed / speed;
+      b.vx *= factor;
+      b.vz *= factor;
+      // Cho phép người chơi điều khiển nhẹ hướng lái trong khi bay dạt mà không triệt tiêu lực đẩy
+      if (inp.mv) {
+        const steerK = 1 - Math.exp(-6.0 * dt);
+        b.vx += (Math.cos(inp.a) * ms - b.vx * (ms / newSpeed)) * steerK;
+        b.vz += (Math.sin(inp.a) * ms - b.vz * (ms / newSpeed)) * steerK;
+      }
+    } else if (!inp.mv) {
       // Dừng đi bộ bình thường: phanh dứt khoát, không trượt quán tính
       const d = Math.exp(-25.0 * dt);
       b.vx *= d;
@@ -69,15 +81,13 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
         b.vx = 0;
         b.vz = 0;
       }
+    } else {
+      // Luôn điều khiển lái mượt mà theo góc ngắm
+      const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.15) * terrainFactor(sp, t);
+      const k = 1 - Math.exp(-accelRate * dt);
+      b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
+      b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
     }
-  } else {
-    // Luôn điều khiển lái mượt mà theo góc ngắm, không khóa lái hay giật chậm lại khi quay xe
-    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
-    const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.15) * terrainFactor(sp, t);
-    // Dùng hàm mũ để bất biến với mọi dt (60Hz, 144Hz hay 40Hz substep trên server)
-    const k = 1 - Math.exp(-accelRate * dt);
-    b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
-    b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
   }
 
   // Ponds drag everyone but ducks and dogs, even while knocked back

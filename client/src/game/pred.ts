@@ -37,6 +37,7 @@ export class ClientPredictor {
   plow = false;
   holdT = 0;
   podShieldActive = true;
+  aimMove = false;
 
   x = 0;
   z = 0;
@@ -128,14 +129,20 @@ export class ClientPredictor {
     const now = performance.now();
     const isServerStun = (flags & 8) !== 0;
 
-    // 0. Xử lý Stun (bị choáng/húc vào cột rơm)
+    // 0. Cập nhật vận tốc khi server truyền xung lực cực mạnh (knockback do húc, nổ bom, hoặc choáng)
+    if (this.sTick === snapTick - 1) {
+      const svx = (serverX - this.sx) / 0.05;
+      const svz = (serverZ - this.sz) / 0.05;
+      const svSpeed = Math.hypot(svx, svz);
+      if (isServerStun || svSpeed > 15) {
+        this.kicks++;
+        this.vx = svx;
+        this.vz = svz;
+      }
+    }
+
     if (isServerStun && !this.stunned) {
       this.setStun(1.5);
-      if (this.sTick === snapTick - 1) {
-        this.kicks++;
-        this.vx = (serverX - this.sx) / 0.05;
-        this.vz = (serverZ - this.sz) / 0.05;
-      }
     } else if (!isServerStun && this.stunT <= 0) {
       this.stunned = false;
     }
@@ -144,18 +151,27 @@ export class ClientPredictor {
     const timeSinceLaunch = now - this.lastDashLaunchTime;
     const timeSinceEnd = now - this.lastDashEndTime;
     const serverIsDashing = (flags & 1) !== 0;
-    const safeGraceMs = Math.max(300, (rtt > 0 ? rtt : 35) * 2.0 + 120);
+    const preDashWindow = Math.min(100, (rtt > 0 ? rtt : 35) * 0.5 + 40);
 
     // Pha 1 (Pre-dash): Client vừa phóng đi nhưng gói tin chưa kịp xử lý trên Server
-    if (!isServerStun && this.dashT > 0 && !serverIsDashing && timeSinceLaunch < safeGraceMs) {
-      this.sx = serverX;
-      this.sz = serverZ;
-      this.sTick = snapTick;
-      return;
+    if (!isServerStun && this.dashT > 0 && !serverIsDashing) {
+      if (timeSinceLaunch < preDashWindow) {
+        this.sx = serverX;
+        this.sz = serverZ;
+        this.sTick = snapTick;
+        return;
+      } else {
+        // Server đã dừng hoặc va chạm cú húc này: kết thúc dash trên client ngay lập tức
+        this.dashT = 0;
+        this.plow = false;
+        this.vx *= 0.25;
+        this.vz *= 0.25;
+      }
     }
 
     // Pha 3 (Post-dash): Client vừa kết thúc cú húc nhưng snapshot trả về vẫn thuộc cuối cú húc trên Server
-    if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < safeGraceMs) {
+    const postDashWindow = Math.min(120, (rtt > 0 ? rtt : 35) * 0.5 + 50);
+    if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < postDashWindow) {
       this.sx = serverX;
       this.sz = serverZ;
       this.sTick = snapTick;
@@ -200,8 +216,14 @@ export class ClientPredictor {
       this.simX += adjustX;
       this.simZ += adjustZ;
 
-      this.errorX -= adjustX;
-      this.errorZ -= adjustZ;
+      // Khi đã dừng lại, không tích lũy errorX trôi dạt làm hình ảnh con vật tự dịch chuyển
+      if (!this.aimMove && Math.hypot(this.vx, this.vz) < 0.1) {
+        this.errorX = 0;
+        this.errorZ = 0;
+      } else {
+        this.errorX -= adjustX;
+        this.errorZ -= adjustZ;
+      }
 
       for (const s of this.hist) {
         s.x += adjustX;
@@ -279,6 +301,7 @@ export class ClientPredictor {
     }
     const charging = canCharge && holding && this.holdT >= CFG.CHARGE_SLOW_AFTER;
     const canMove = !stun && aimMove;
+    this.aimMove = canMove;
 
     const wasDashing = this.dashT > 0;
 
@@ -410,11 +433,11 @@ export class ClientPredictor {
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    const decay = Math.exp(-12.0 * dt);
+    const decay = Math.exp(-14.0 * dt);
     this.errorX *= decay;
     this.errorZ *= decay;
-    if (Math.abs(this.errorX) < 0.002) this.errorX = 0;
-    if (Math.abs(this.errorZ) < 0.002) this.errorZ = 0;
+    if (Math.abs(this.errorX) < 0.002 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorX = 0;
+    if (Math.abs(this.errorZ) < 0.002 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorZ = 0;
 
     this.x = this.simX + this.errorX;
     this.z = this.simZ + this.errorZ;
