@@ -131,31 +131,30 @@ export class WsClient implements Transport {
               // <= 90ms on fast node: excellent → reset
               // > 90ms on fast node: suboptimal → increment (seek better route)
               // Non-fast node: immediately alert
-              if (onFastNode && this.rttMin <= 90) {
+              if (onFastNode && this.rtt <= 85 && s <= 95) {
                 this.badPingStreak = 0;
               } else if (!onFastNode) {
                 this.badPingStreak = Math.max(3, this.badPingStreak + 1);
               } else {
-                // Fast Asian node but ping > 90ms (e.g. HKG routing through long path to DO in SIN)
                 this.badPingStreak++;
               }
 
-              // Ping faster when suboptimal
-              const targetDelay = this.rttMin > 90 || !onFastNode ? 300 : 500;
+              // Ping faster when suboptimal (> 85ms) to accelerate route probing
+              const targetDelay = this.rtt > 85 || !onFastNode ? 300 : 500;
               if (targetDelay !== this.currentPingDelay) {
                 this.currentPingDelay = targetDelay;
                 this.startPing();
               }
 
               // ── LOBBY STEER ──
-              // Only steer if on a non-Asian node with high ping. Max 3 attempts.
-              if (!this.inGame && !onFastNode && this.rttMin > 150 && !this.closed) {
+              // When in lobby with elevated ping (> 100ms), actively reconnect to find a lower-latency route
+              if (!this.inGame && this.rtt > 100 && !this.closed) {
                 if (this.rttWin.length >= 2 && this.lobbySteerAttempts < 3) {
                   const now = performance.now();
-                  if (now - this.lastLobbyReconnectTime > 5000) {
+                  if (now - this.lastLobbyReconnectTime > 3500) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
-                    console.log(`[WS] Lobby steer: ${this.colo} ~${Math.round(this.rttMin)}ms, attempt ${this.lobbySteerAttempts}/3`);
+                    console.log(`[WS] Lobby steer: ${this.colo} ~${Math.round(this.rtt)}ms, attempt ${this.lobbySteerAttempts}/3`);
                     this.forceReconnect();
                   }
                 }
@@ -219,7 +218,7 @@ export class WsClient implements Transport {
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
     this.onMigrationStatus?.('probing', this.colo);
-    console.log(`[WS] Probe: current ${this.colo} ~${Math.round(this.rttMin)}ms, seeking faster route...`);
+    console.log(`[WS] Probe: current ${this.colo} ~${Math.round(this.rtt)}ms, seeking faster route...`);
 
     const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
     let probeSocket: WebSocket;
@@ -268,44 +267,46 @@ export class WsClient implements Transport {
         if (msg.t === 'pong') {
           const probeColo = msg.colo;
           const probeRtt = performance.now() - msg.c;
-          console.log(`[WS] Probe: ${probeColo} ~${Math.round(probeRtt)}ms vs current ${this.colo} ~${Math.round(this.rttMin)}ms`);
+          console.log(`[WS] Probe: ${probeColo} ~${Math.round(probeRtt)}ms vs current ${this.colo} ~${Math.round(this.rtt)}ms`);
 
           const probeIsFast = isFastColo(probeColo);
           const currentIsFast = isFastColo(this.colo);
           let shouldSwitch = false;
 
-          if (probeColo === this.colo) {
-            // Same colo → no point switching (ISP routes to same PoP)
-            shouldSwitch = false;
-          } else if (!currentIsFast && probeIsFast && probeRtt > 0 && probeRtt < 300) {
-            // Non-Asian → Asian: always switch
-            shouldSwitch = true;
-          } else if (currentIsFast && probeIsFast && probeRtt > 0 && probeRtt < this.rttMin - 15) {
-            // Both Asian but probe >= 15ms faster: switch (e.g. HKG ~70ms → SIN ~35ms)
-            shouldSwitch = true;
-          } else if (!currentIsFast && !probeIsFast && probeRtt > 0 && probeRtt < this.rttMin * 0.6) {
-            // Both non-Asian but probe significantly faster
-            shouldSwitch = true;
+          if (probeRtt > 0) {
+            if (!currentIsFast && probeIsFast) {
+              // Non-Asian → Asian: always switch
+              shouldSwitch = true;
+            } else if (probeColo !== this.colo && probeIsFast && probeRtt < this.rtt - 10) {
+              // Different faster Asian POP (e.g. HKG ~85ms → SIN ~45ms)
+              shouldSwitch = true;
+            } else if (probeRtt < this.rtt - 20) {
+              // Any route (including fresh connection to same POP) that is >= 20ms faster: switch!
+              shouldSwitch = true;
+            } else if (this.rtt > 85 && probeRtt < this.rtt * 0.8) {
+              // At least 20% latency reduction when current ping is elevated: switch!
+              shouldSwitch = true;
+            }
           }
 
           if (shouldSwitch && this.lastJoinMsg) {
             this.probeAttempts = 0;
-            console.log(`[WS] Switching: ${this.colo} ~${Math.round(this.rttMin)}ms → ${probeColo} ~${Math.round(probeRtt)}ms`);
+            console.log(`[WS] Switching: ${this.colo} ~${Math.round(this.rtt)}ms → ${probeColo} ~${Math.round(probeRtt)}ms`);
             probeSocket.send(JSON.stringify({
               ...this.lastJoinMsg,
               token: this.sessionToken || undefined,
             }));
           } else {
             clearTimeout(probeTimeout);
-            probeSocket.close();
+            try { probeSocket.close(); } catch (_) {}
             this.migrationWs = null;
             this.isMigrating = false;
             this.probeAttempts++;
             this.onMigrationStatus?.('failed', this.colo);
-            if (this.probeAttempts >= 5) {
+            if (this.probeAttempts >= 6) {
               this.probeAttempts = 0;
               this.badPingStreak = 0;
-              console.log('[WS] Accepting current route after 5 failed probes.');
+              console.log('[WS] Accepting current route after 6 failed probes.');
             }
           }
         } else if (msg.t === 'init') {
@@ -437,6 +438,23 @@ export class WsClient implements Transport {
     try {
       this.send({ t: 'leave' });
     } catch (_) {}
+  }
+
+  public manualRetune(): void {
+    if (this.closed) return;
+    this.badPingStreak = 3;
+    this.probeAttempts = 0;
+    if (this.inGame) {
+      if (this.migrationWs) {
+        try { this.migrationWs.close(); } catch (_) {}
+        this.migrationWs = null;
+        this.isMigrating = false;
+      }
+      this.lastMigrationProbeTime = 0;
+      this.triggerHotMigration();
+    } else {
+      this.forceReconnect();
+    }
   }
 
   public forceReconnect(): void {

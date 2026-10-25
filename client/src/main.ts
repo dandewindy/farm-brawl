@@ -14,7 +14,7 @@ import { GameState } from './game/state';
 import { applyTexts, getLanguage, t } from './i18n';
 import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
-import { isFastColo, WsClient } from './net/ws';
+import { WsClient } from './net/ws';
 import { registerFriendRoom } from './net/firebase';
 import { AnimalRenderer } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
@@ -204,21 +204,12 @@ hud.onChangeLanguage = () => {
 };
 
 hud.onReconnect = () => {
-  if (transport?.inGame) {
-    if (isFastColo(transport?.colo) && transport.rttMin <= 100) {
-      hud.showToast(transport?.colo === 'SIN' ? t('coloSinToast') : t('coloHkgToast'));
-      return;
-    }
-    hud.showToast(t('coloSwitchingToast'));
-    if (transport?.triggerHotMigration) {
-      transport.triggerHotMigration();
-    } else if (transport?.forceReconnect) {
-      transport.forceReconnect();
-    }
-    return;
-  }
-  if (transport?.forceReconnect) {
-    hud.showToast(t('coloSwitchingToast'));
+  hud.showToast(t('coloSwitchingToast'));
+  if (transport?.manualRetune) {
+    transport.manualRetune();
+  } else if (transport?.triggerHotMigration) {
+    transport.triggerHotMigration();
+  } else if (transport?.forceReconnect) {
     transport.forceReconnect();
   }
 };
@@ -1672,7 +1663,9 @@ function getClientId(): string {
       hud.showToast(t('migratedToast', { colo: newColo }), 3000);
     };
     transport.onMigrationStatus = (status, colo) => {
-      if (status === 'migrated') {
+      if (status === 'probing') {
+        hud.showToast(t('coloProbingToast'), 2000);
+      } else if (status === 'migrated') {
         hud.showToast(t('migratedSinToast', { colo: colo || 'SIN' }), 3000);
       }
     };

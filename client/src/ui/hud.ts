@@ -2056,17 +2056,21 @@ export class HudManager {
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
+        this.coloVal.title = `Đang tự động dò tìm tuyến mạng tối ưu... Nhấp để dò lại`;
       } else if (!isFast) {
         this.coloVal.textContent = `${colo} 🔍`;
         this.coloVal.className = 'perf-colo warn';
-        this.coloVal.title = `Trạm ${colo} (Xa) - Mắt thần đang tự động dò tìm đường về Singapore (SIN)...`;
+        this.coloVal.title = `Trạm ${colo} (Xa) - Đang dò tìm tuyến gần hơn... Nhấp để dò ngay`;
+      } else if (ping > 90) {
+        this.coloVal.textContent = `${colo} ⚠️`;
+        this.coloVal.className = ping > 120 ? 'perf-colo bad' : 'perf-colo warn';
+        this.coloVal.title = `Trạm ${colo} có độ trễ cao (~${ping}ms). Nhấp vào đây để đổi sang tuyến tối ưu!`;
       } else {
         this.coloVal.textContent = colo;
         this.coloVal.className = 'perf-colo good';
         this.coloVal.title = isSin
-          ? `Trạm Singapore (SIN) tối ưu - Ping cực thấp (~${ping > 0 ? ping : 35}ms)`
-          : `Trạm ${colo} (Châu Á) - Tốc độ cao (~${ping > 0 ? ping : 50}ms)`;
+          ? `Trạm Singapore (SIN) tối ưu (~${ping > 0 ? ping : 35}ms). Nhấp để kiểm tra lại tuyến`
+          : `Trạm ${colo} (~${ping > 0 ? ping : 50}ms). Nhấp để kiểm tra lại tuyến`;
       }
     }
   }

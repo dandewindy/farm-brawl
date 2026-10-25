@@ -16,6 +16,7 @@ export interface Transport {
   forceReconnect?(): void;
   triggerHotMigration?(): void;
   leaveGame?(): void;
+  manualRetune?(): void;
   onMigrationSuccess?: (newColo: string) => void;
   onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
 }

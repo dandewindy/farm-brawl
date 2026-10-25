@@ -30,11 +30,17 @@ export default {
         targetRoomKey = `${roomParam}-sin2`;
       }
 
+      const cf = (request as any).cf;
+      const cfRay = request.headers.get('cf-ray') || '';
+      const clientColo = cf?.colo || (cfRay.includes('-') ? cfRay.split('-')[1] : null) || 'SIN';
+
+      url.searchParams.set('colo', clientColo);
+
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      // Pass native request directly to preserve WebSocket upgrade headers and zero-copy piping
-      return roomStub.fetch(request);
+      // Pass request with colo query param to report real Edge POP
+      return roomStub.fetch(url.toString(), request);
     }
 
     // Health check endpoint with zero-caching for rapid client watchdog probing
@@ -73,7 +79,11 @@ export default {
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      return roomStub.fetch(new Request(`${url.origin}/info?room=${encodeURIComponent(roomParam)}`, {
+      const cf = (request as any).cf;
+      const cfRay = request.headers.get('cf-ray') || '';
+      const clientColo = cf?.colo || (cfRay.includes('-') ? cfRay.split('-')[1] : null) || 'SIN';
+
+      return roomStub.fetch(new Request(`${url.origin}/info?room=${encodeURIComponent(roomParam)}&colo=${clientColo}`, {
         headers: request.headers,
       }));
     }
