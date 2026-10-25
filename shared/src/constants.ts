@@ -16,7 +16,7 @@ export const CFG = {
   MAX_MASS: Infinity,
 
   MOVE_SPEED: 13,
-  MOVE_ACCEL: 7,
+  MOVE_ACCEL: 28,
 
   DASH_SPEED: 34,
   DASH_TIME: 0.22,

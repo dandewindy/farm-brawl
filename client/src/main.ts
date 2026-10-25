@@ -93,7 +93,7 @@ input.onReleaseRam = (held: number) => {
   const curX = predictor.on ? predictor.x : (myEnt?.x ?? 0);
   const curZ = predictor.on ? predictor.z : (myEnt?.z ?? 0);
   const curMass = myEnt?.mass ?? CFG.START_MASS;
-  input.computeAim(world.camera, curX, curZ, curMass, world.camTarget.x, world.camTarget.z);
+  input.computeAim(world.camera, curX, curZ, curMass);
 
   const validHeld = curMass >= 20 ? Math.min(held, predictor.holdT > 0 ? predictor.holdT : held) : 0;
   const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05 && predictor.dashT <= 0;
@@ -1743,8 +1743,8 @@ function animate(now: number): void {
       input.cancelRam();
     }
 
-    // Precise 3D raycasted aiming with camera lag compensation
-    input.computeAim(world.camera, myX, myZ, myMass, world.camTarget.x, world.camTarget.z);
+    // Precise 3D raycasted aiming from player animal
+    input.computeAim(world.camera, myX, myZ, myMass);
 
     const isLocked = isStunned || isSpectating;
     const stepFlags = me ? (isLocked ? (me.flags | FLAG.STUN) : me.flags) : (isLocked ? FLAG.STUN : 0);

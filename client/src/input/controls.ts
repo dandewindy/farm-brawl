@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { radiusOf } from '@shared/constants';
+import { CFG, radiusOf } from '@shared/constants';
 import type { Input } from '@shared/protocol';
 
 const KEY_DIR: Record<string, [number, number]> = {
@@ -17,7 +17,6 @@ export class InputManager {
 
   private readonly keysDown = new Set<string>();
   private keyAim = false;
-  private keyA = 0;
 
   private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2, has: false };
   private isTouch: boolean;
@@ -224,21 +223,18 @@ export class InputManager {
     camera: THREE.Camera,
     meX: number,
     meZ: number,
-    meMass: number,
-    camTargetX = meX,
-    camTargetZ = meZ
+    meMass: number = CFG.START_MASS
   ): void {
     const ka = this.keyVec();
     if (ka !== null) {
-      this.aimA = this.keyA = ka;
+      this.aimA = ka;
       this.aimMove = true;
       this.keyAim = true;
       return;
     }
     if (this.keyAim) {
-      this.aimA = this.keyA;
       this.aimMove = false;
-      return;
+      this.keyAim = false;
     }
     if (this.isTouch) {
       if (this.stickVec && Math.hypot(this.stickVec.x, this.stickVec.y) > 0.15) {
@@ -254,21 +250,20 @@ export class InputManager {
     this.raycaster.setFromCamera(this.ndc, camera);
     if (!this.raycaster.ray.intersectPlane(this.ground, this.hit)) return;
 
-    // Bù trừ độ trễ của Camera (Camera Lag Compensation):
-    // Đo vector chuột tính từ tâm mặt đất của camera (camTarget), tránh vòng lặp phản hồi âm khi camera đang lerp đuổi theo con vật
-    const dx = this.hit.x - camTargetX;
-    const dz = this.hit.z - camTargetZ;
+    // Đo vector chuột trực tiếp từ vị trí con vật (meX, meZ)
+    const dx = this.hit.x - meX;
+    const dz = this.hit.z - meZ;
     const dist = Math.hypot(dx, dz);
 
-    // Chỉ cập nhật góc khi con trỏ nằm ngoài vùng tâm cực nhỏ để tránh nhảy góc đột ngột
-    if (dist > 0.08) {
+    // Cập nhật góc ngắm khi chuột cách tâm con vật
+    if (dist > 0.12) {
       this.aimA = Math.atan2(dz, dx);
     }
 
-    // Hysteresis (vùng trễ kép) để tránh bật/tắt aimMove liên tục ở ranh giới
+    // Dừng khi chuột ở sát con vật, chạy khi chuột đưa ra ngoài
     const baseR = radiusOf(meMass);
-    const stopThreshold = baseR + 0.40;
-    const startThreshold = baseR + 0.65;
+    const stopThreshold = baseR + 0.35;
+    const startThreshold = baseR + 0.55;
     this.aimMove = this.aimMove ? dist > stopThreshold : dist > startThreshold;
   }
 

@@ -127,15 +127,30 @@ export class ClientPredictor {
     const now = performance.now();
     const isServerStun = (flags & 8) !== 0;
 
-    // 0. Nếu Server báo bị Stun hoặc va chạm mạnh, ưu tiên xử lý ngay cả khi đang trong cửa sổ Dash
-    if (isServerStun && !this.stunned) {
-      this.setStun(1.5);
-      if (this.sTick === snapTick - 1) {
-        this.kicks++;
-        this.vx = (serverX - this.sx) / 0.05;
-        this.vz = (serverZ - this.sz) / 0.05;
-      }
-    } else if (!isServerStun && this.stunT <= 0) {
+    // 0. Tính vận tốc server giữa 2 snapshot liên tiếp:
+    const tickDt = 0.05;
+    const ticksPassed = snapTick > this.sTick && this.sTick > 0 ? snapTick - this.sTick : 1;
+    const sVx = this.sTick > 0 ? (serverX - this.sx) / (ticksPassed * tickDt) : 0;
+    const sVz = this.sTick > 0 ? (serverZ - this.sz) / (ticksPassed * tickDt) : 0;
+    const sSpeed = Math.hypot(sVx, sVz);
+
+    // Nếu Server báo bị Stun hoặc có xung lực va chạm/knockback cực mạnh (sSpeed > 18 m/s):
+    if (isServerStun || sSpeed > 18.0) {
+      if (isServerStun) this.setStun(1.5);
+      this.vx = sVx;
+      this.vz = sVz;
+      this.simX = serverX;
+      this.simZ = serverZ;
+      this.errorX = 0;
+      this.errorZ = 0;
+      this.hist.length = 0;
+      this.sx = serverX;
+      this.sz = serverZ;
+      this.sTick = snapTick;
+      return;
+    }
+
+    if (!isServerStun && this.stunT <= 0) {
       this.stunned = false;
     }
 
@@ -154,7 +169,6 @@ export class ClientPredictor {
     }
 
     // Pha 3 (Post-dash): Client vừa kết thúc cú húc nhưng snapshot trả về vẫn thuộc cuối cú húc trên Server
-    // (Tính theo lastDashEndTime thay vì lastDashLaunchTime!)
     if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < safeGraceMs) {
       this.sx = serverX;
       this.sz = serverZ;
@@ -162,8 +176,8 @@ export class ClientPredictor {
       return;
     }
 
-    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot:
-    const transitDelay = Math.max(20, Math.min(250, (rtt > 0 ? rtt : 35) + 25));
+    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot (one-way transit ~ rtt / 2):
+    const transitDelay = Math.max(12, Math.min(120, (rtt > 0 ? rtt : 35) * 0.5));
     const targetTime = now - transitDelay;
     const then = this.predAt(targetTime);
 
@@ -173,33 +187,30 @@ export class ClientPredictor {
       return;
     }
 
-    // 3. Tính sai số thực tế tại cùng một mốc thời gian lịch sử (KHÔNG so serverX quá khứ với simX hiện tại ở ngưỡng 5.5m!)
+    // 3. Tính sai số thực tế tại cùng một mốc thời gian lịch sử
     const dx = serverX - then.x;
     const dz = serverZ - then.z;
     const errorDist = Math.hypot(dx, dz);
 
-    // Nếu sai số lịch sử > 9.0m (hồi sinh, dịch chuyển tức thời, kẹt tường lớn): reset cứng
-    if (errorDist > 9.0) {
+    // Nếu sai số lịch sử > 8.0m: reset cứng
+    if (errorDist > 8.0) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
     }
 
     // 4. Hòa giải mượt (Smooth Reconciliation):
-    // Trong lúc đang Dash (hoặc mẫu lịch sử thuộc pha Dash), sai số lượng tử hóa tick 50ms của Server (25ms * 50m/s = ~1.25m)
-    // là hoàn toàn bình thường -> nới deadzone lên 1.8m để không bị kéo giật giữa cú húc!
     const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 180;
-    const deadzone = inDashWindow && !isServerStun ? 1.8 : 0.28;
+    const deadzone = inDashWindow ? 1.5 : 0.20;
 
-    if (errorDist > deadzone && errorDist <= 3.8) {
-      const gain = inDashWindow ? 0.25 : 0.4;
+    if (errorDist > deadzone && errorDist <= 3.0) {
+      const gain = inDashWindow ? 0.25 : 0.35;
       const adjustX = dx * gain;
       const adjustZ = dz * gain;
 
       this.simX += adjustX;
       this.simZ += adjustZ;
 
-      // Bù trừ vào errorX/errorZ để vị trí hiển thị (simX + errorX) KHÔNG NHẢY BẬC 1 pixel nào!
       this.errorX -= adjustX;
       this.errorZ -= adjustZ;
 
@@ -207,23 +218,15 @@ export class ClientPredictor {
         s.x += adjustX;
         s.z += adjustZ;
       }
-    } else if (errorDist > 3.8) {
-      // Bị người chơi khác húc văng hoặc lệch lớn:
-      // Dịch chuyển simX theo toàn bộ độ lệch lịch sử (dx, dz) thay vì gán lùi về tọa độ quá khứ serverX!
-      const prevRenderX = this.simX + this.errorX;
-      const prevRenderZ = this.simZ + this.errorZ;
-
-      this.simX += dx;
-      this.simZ += dz;
-
-      // Giữ nguyên vị trí hiển thị hiện tại rồi cho hội tụ mũ mượt mà về simX mới
-      this.errorX = Math.max(-4.5, Math.min(4.5, prevRenderX - this.simX));
-      this.errorZ = Math.max(-4.5, Math.min(4.5, prevRenderZ - this.simZ));
-
-      for (const s of this.hist) {
-        s.x += dx;
-        s.z += dz;
-      }
+    } else if (errorDist > 3.0) {
+      // Knockback hoặc lệch lớn từ va chạm: đồng bộ tức thời với server velocity
+      this.simX = serverX;
+      this.simZ = serverZ;
+      this.vx = sVx;
+      this.vz = sVz;
+      this.errorX = 0;
+      this.errorZ = 0;
+      this.hist.length = 0;
     }
 
     this.sx = serverX;
@@ -337,7 +340,7 @@ export class ClientPredictor {
 
       // Chỉ xoay thêm khi đứng yên ngắm chuột mà không giữ nút (vì charging đã được xoay trong stepMove)
       if (!stun && this.dashT <= 0 && !canMove && !charging) {
-        const turnK = 1 - Math.exp(-12 * h);
+        const turnK = 1 - Math.exp(-18 * h);
         this.a = wrapAngle(this.a + wrapAngle(aimA - this.a) * turnK);
       }
 
@@ -419,7 +422,7 @@ export class ClientPredictor {
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    const decay = Math.exp(-14.0 * dt);
+    const decay = Math.exp(-18.0 * dt);
     this.errorX *= decay;
     this.errorZ *= decay;
     if (Math.abs(this.errorX) < 0.002) this.errorX = 0;

@@ -45,17 +45,33 @@ export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolea
 function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult: number): void {
   if (dt <= 1e-6) return;
   const stunned = b.stunT > 0;
+  const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
+  const speed = Math.hypot(b.vx, b.vz);
+
   if (b.dashT > 0) {
     const d = Math.exp(-1.2 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (stunned || !inp.mv) {
-    const d = Math.exp(-3.5 * dt);
+  } else if (stunned) {
+    const d = Math.exp(-6.0 * dt);
     b.vx *= d;
     b.vz *= d;
+  } else if (speed > ms * 1.05) {
+    // Đang bị va đập hoặc knockback văng đi (bị húc / nổ): bảo toàn quán tính bay dạt tự nhiên
+    const d = Math.exp(-4.5 * dt);
+    b.vx *= d;
+    b.vz *= d;
+  } else if (!inp.mv) {
+    // Phanh chủ động dứt khoát khi dừng di chuyển: dừng ngay lập tức, không trượt quán tính như trên băng
+    const d = Math.exp(-25.0 * dt);
+    b.vx *= d;
+    b.vz *= d;
+    if (Math.hypot(b.vx, b.vz) < 0.05) {
+      b.vx = 0;
+      b.vz = 0;
+    }
   } else {
-    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
-    const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.25) * terrainFactor(sp, t);
+    const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.15) * terrainFactor(sp, t);
     // Dùng hàm mũ để bất biến với mọi dt (60Hz, 144Hz hay 40Hz substep trên server)
     const k = 1 - Math.exp(-accelRate * dt);
     b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
@@ -69,9 +85,9 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
     b.vz *= d;
   }
 
-  // Xoay hướng mượt và đồng nhất giữa Client & Server (cả khi di chuyển lẫn khi đứng gồng/ngắm)
+  // Xoay hướng mượt và nhạy theo góc ngắm
   if (!stunned && b.dashT <= 0 && (inp.mv || b.charging)) {
-    const turnK = 1 - Math.exp(-12 * dt);
+    const turnK = 1 - Math.exp(-18 * dt);
     b.a += wrapAngle(inp.a - b.a) * turnK;
   }
   b.a = wrapAngle(b.a);

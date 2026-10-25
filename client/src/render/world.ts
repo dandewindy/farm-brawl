@@ -1957,7 +1957,7 @@ export class WorldRenderer {
     let h = 30 + r * 6 + this.zoomBias;
     if (this.camera.aspect < 1) h *= 1 + (1 - this.camera.aspect) * 0.9;
 
-    const k = 1 - Math.exp(-dt * 7);
+    const k = 1 - Math.exp(-dt * 14);
     this.camTarget.x += (targetX - this.camTarget.x) * k;
     this.camTarget.z += (targetZ - this.camTarget.z) * k;
     this.camH += (h - this.camH) * (1 - Math.exp(-dt * 2));
