@@ -67,6 +67,7 @@ let wasInWater = false;
 let lastUnder20Toast = 0;
 
 const predictor = new ClientPredictor();
+let inputSeq = 0;
 let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
 
@@ -77,7 +78,9 @@ input.onPressRam = () => {
   }
   // Send btn: true immediately so server starts tracking hold time with 0 frame latency
   if (transport && gameState.alive && localStunTimer <= 0) {
-    transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: true });
+    inputSeq += 1;
+    predictor.currentSeq = inputSeq;
+    transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: true });
     lastSentInput = { a: input.aimA, mv: input.aimMove, btn: true };
     lastSentTime = performance.now();
   }
@@ -97,8 +100,13 @@ input.onReleaseRam = (held: number) => {
 
   const validHeld = curMass >= 20 ? Math.min(held, predictor.holdT > 0 ? predictor.holdT : held) : 0;
   const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05 && predictor.dashT <= 0;
+
+  inputSeq += 1;
+  const triggeredDashSeq = canDash ? inputSeq : undefined;
+  predictor.currentSeq = inputSeq;
+
   if (canDash) {
-    predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper);
+    predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
     // Locally set cooldown so player cannot spam dash
     const baseCd = myMeta.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
     const isPlow = validHeld >= CFG.CHARGE_MIN;
@@ -107,9 +115,9 @@ input.onReleaseRam = (held: number) => {
   // Send btn: false immediately; only include hold if canDash was valid
   if (transport && gameState.alive) {
     if (canDash) {
-      transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false, hold: validHeld });
+      transport.send({ t: 'input', seq: inputSeq, dashSeq: triggeredDashSeq, a: input.aimA, mv: input.aimMove, btn: false, hold: validHeld });
     } else {
-      transport.send({ t: 'input', a: input.aimA, mv: input.aimMove, btn: false });
+      transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: false });
     }
     lastSentInput = { a: input.aimA, mv: input.aimMove, btn: false };
     lastSentTime = performance.now();
@@ -1059,8 +1067,18 @@ const gameState = new GameState({
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
         }
-        const currentRtt = transport ? transport.rtt : 0;
-        predictor.onServerSnapshot(x, z, flags, gameState.snapTick, gameState.clockOff, currentRtt);
+        const currentRtt = (transport as any)?.netRtt ?? (transport ? transport.rtt : 48);
+        predictor.onServerSnapshot(
+          x,
+          z,
+          flags,
+          gameState.snapTick,
+          transport?.clockOffset ?? gameState.clockOff,
+          currentRtt,
+          s.ackSeq ?? 0,
+          s.ackDash ?? 0,
+          s.st
+        );
 
         hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
         // Mass change tracking with accumulator matching original game
@@ -1849,7 +1867,9 @@ function animate(now: number): void {
     const maxInterval = inp.mv ? 50 : 100;
 
     if (btnChanged || mvChanged || timeSinceLast >= maxInterval || (timeSinceLast >= 35 && angleDiff > 0.01)) {
-      transport.send({ t: 'input', ...inp });
+      inputSeq += 1;
+      predictor.currentSeq = inputSeq;
+      transport.send({ t: 'input', seq: inputSeq, ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;
     }

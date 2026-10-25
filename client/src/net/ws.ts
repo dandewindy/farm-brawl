@@ -235,12 +235,17 @@ export class WsClient implements Transport {
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
+  public netRtt = 48;
   public rttJitter = 0;
+  public clockOffset: number | null = null;
   public colo = '';
   public doColo = '';
   public inGame = false;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
+  private lastPongRecvPerf = 0;
+  private lastRawRtt = 48;
+  private smoothedRtt = 48;
 
   // Quản lý endpoint và xoay vòng ECMP
   private endpointIdx = 0;
@@ -412,9 +417,10 @@ export class WsClient implements Transport {
           // Tránh ghi nhận RTT sai lệch khi tab đang bị ẩn
           if (typeof document !== 'undefined' && document.hidden) return;
 
-          const s = performance.now() - msg.c;
+          const now = performance.now();
+          const s = now - msg.c;
           if (s >= 0 && s < 2500) {
-            this.recordPrimaryRtt(s);
+            this.recordPrimaryRtt(s, now, msg.s);
           }
         }
         return;
@@ -434,6 +440,17 @@ export class WsClient implements Transport {
             this.lastJoinMsg.token = parsed.token;
           }
         }
+      } else if (parsed.t === 's') {
+        const snap = parsed as import('@shared/protocol').Snapshot;
+        if (typeof snap.st === 'number' && this.clockOffset !== null) {
+          const transitEstimate = (this.rttMin || 48) * 0.5;
+          const candidateOffset = snap.st - (performance.now() - transitEstimate);
+          if (candidateOffset > this.clockOffset) {
+            this.clockOffset = candidateOffset;
+          } else {
+            this.clockOffset += (candidateOffset - this.clockOffset) * 0.02;
+          }
+        }
       }
 
       this.onMsg(parsed);
@@ -442,16 +459,59 @@ export class WsClient implements Transport {
     }
   }
 
-  private recordPrimaryRtt(rtt: number): void {
-    this.rttWin.push(rtt);
-    if (this.rttWin.length > RTT_WINDOW_SIZE) {
-      this.rttWin.shift();
+  private recordPrimaryRtt(rawRtt: number, recvNow = performance.now(), serverTime?: number): void {
+    const interArrival = this.lastPongRecvPerf > 0 ? recvNow - this.lastPongRecvPerf : PING_INTERVAL_MS;
+    this.lastPongRecvPerf = recvNow;
+
+    const isQueuedBurstTail = interArrival < 80 && rawRtt < this.lastRawRtt;
+    this.lastRawRtt = rawRtt;
+
+    if (this.rttWin.length === 0) {
+      this.rttWin.push(rawRtt);
+      this.rttMin = Math.round(rawRtt);
+      this.smoothedRtt = rawRtt;
+      this.rtt = Math.round(rawRtt);
+      this.netRtt = Math.round(rawRtt);
+      if (typeof serverTime === 'number') {
+        this.clockOffset = serverTime - (recvNow - rawRtt * 0.5);
+      }
+      return;
+    }
+
+    if (!isQueuedBurstTail) {
+      const clampedForWindow =
+        rawRtt > this.rttMin * 2.5 + 60
+          ? Math.min(rawRtt, this.rttMin + 90)
+          : rawRtt;
+
+      this.rttWin.push(clampedForWindow);
+      if (this.rttWin.length > RTT_WINDOW_SIZE) {
+        this.rttWin.shift();
+      }
     }
 
     const stats = computeRttStats(this.rttWin);
     this.rttMin = stats.min;
-    this.rtt = stats.median;
     this.rttJitter = stats.jitter;
+
+    if (rawRtt <= this.smoothedRtt) {
+      this.smoothedRtt += (rawRtt - this.smoothedRtt) * 0.45;
+    } else {
+      const cappedSpike = Math.min(rawRtt, this.smoothedRtt + 35);
+      this.smoothedRtt += (cappedSpike - this.smoothedRtt) * 0.15;
+    }
+
+    this.rtt = Math.round(this.smoothedRtt);
+    this.netRtt = Math.round(this.rttMin + Math.min(25, this.rttJitter * 0.5));
+
+    if (typeof serverTime === 'number' && rawRtt <= this.rttMin + 15) {
+      const bestOffset = serverTime - (recvNow - rawRtt * 0.5);
+      if (this.clockOffset === null) {
+        this.clockOffset = bestOffset;
+      } else {
+        this.clockOffset += (bestOffset - this.clockOffset) * 0.3;
+      }
+    }
 
     const currentTier = getColoTier(this.colo);
 

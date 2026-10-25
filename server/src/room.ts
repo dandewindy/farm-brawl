@@ -14,6 +14,8 @@ export class GameRoom extends DurableObject {
   private readonly socketClientIds = new Map<WebSocket, string>();
   private readonly playerTokens = new Map<number, string>();
   private readonly clientPlayerIds = new Map<string, number>();
+  private readonly playerLastSeq = new Map<number, number>();
+  private readonly playerLastDashSeq = new Map<number, number>();
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private nextTickTime = 0;
@@ -182,6 +184,8 @@ export class GameRoom extends DurableObject {
           });
         } else {
           this.world.removePlayer(playerId);
+          this.playerLastSeq.delete(playerId);
+          this.playerLastDashSeq.delete(playerId);
           if (token) this.playerTokens.delete(playerId);
           if (c) this.clientPlayerIds.delete(c);
         }
@@ -411,6 +415,8 @@ export class GameRoom extends DurableObject {
         const tok = this.playerTokens.get(playerId);
         if (tok) this.playerTokens.delete(playerId);
         if (cid) this.clientPlayerIds.delete(cid);
+        this.playerLastSeq.delete(playerId);
+        this.playerLastDashSeq.delete(playerId);
         this.world.removePlayer(playerId);
       }
       this.lobbyTeams.delete(ws);
@@ -435,7 +441,13 @@ export class GameRoom extends DurableObject {
     } else if (msg.t === 'input') {
       const playerId = this.sockets.get(ws);
       if (playerId) {
-        this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold });
+        if (typeof msg.seq === 'number' && msg.seq > (this.playerLastSeq.get(playerId) ?? 0)) {
+          this.playerLastSeq.set(playerId, msg.seq);
+        }
+        if (typeof msg.dashSeq === 'number' && msg.dashSeq > 0) {
+          this.playerLastDashSeq.set(playerId, msg.dashSeq);
+        }
+        this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold, seq: msg.seq, dashSeq: msg.dashSeq });
       }
     } else if (msg.t === 'ping') {
       ws.send(`{"t":"pong","c":${msg.c},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
@@ -537,6 +549,8 @@ export class GameRoom extends DurableObject {
         if (now - entry.disconnectTime > GRACE_PERIOD_MS) {
           this.disconnectedPlayers.delete(token);
           this.playerTokens.delete(entry.playerId);
+          this.playerLastSeq.delete(entry.playerId);
+          this.playerLastDashSeq.delete(entry.playerId);
           this.world.removePlayer(entry.playerId);
           for (const [c, pid] of this.clientPlayerIds.entries()) {
             if (pid === entry.playerId) this.clientPlayerIds.delete(c);
@@ -552,9 +566,14 @@ export class GameRoom extends DurableObject {
     this.world.step();
 
     // Broadcast authoritative snapshot to all human players
+    const serverNow = Date.now();
     for (const [ws, playerId] of this.sockets.entries()) {
+      if (ws.readyState !== 1) continue;
       try {
         const snap = this.world.snapshotFor(playerId);
+        snap.ackSeq = this.playerLastSeq.get(playerId) ?? 0;
+        snap.ackDash = this.playerLastDashSeq.get(playerId) ?? 0;
+        snap.st = serverNow;
         ws.send(JSON.stringify(snap));
       } catch {
         // Socket error handled in close event listener

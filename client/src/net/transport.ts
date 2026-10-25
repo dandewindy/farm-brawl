@@ -9,6 +9,8 @@ export interface Transport {
   close(): void;
   readonly rtt: number;
   readonly rttMin: number;
+  readonly netRtt?: number;
+  readonly clockOffset?: number | null;
   readonly colo?: string;
   inGame?: boolean;
   isMigrating?: boolean;
@@ -27,6 +29,8 @@ export type Handler = (m: ServerMsg) => void;
 export class LocalServer implements Transport {
   public readonly rtt = 0;
   public readonly rttMin = 0;
+  public readonly netRtt = 0;
+  public readonly clockOffset = 0;
   public readonly colo = 'LOCAL';
   private readonly world = new World();
   private myId = 0;

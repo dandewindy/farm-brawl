@@ -14,11 +14,13 @@ import type { Ent } from './state';
 
 export interface PredSample {
   t: number;
+  seq: number;
   x: number;
   z: number;
   vx: number;
   vz: number;
   dashing: boolean;
+  dashT?: number;
 }
 
 export class ClientPredictor {
@@ -60,6 +62,11 @@ export class ClientPredictor {
   resets = 0;
   kicks = 0;
 
+  currentSeq = 0;
+  lastDashSeq = 0;
+  lastReconciledSeq = 0;
+  lastServerTick = -1;
+
   private lastDashLaunchTime = 0;
   private lastDashEndTime = 0;
 
@@ -96,24 +103,76 @@ export class ClientPredictor {
     this.holdT = 0;
   }
 
-  predAt(t: number): { x: number; z: number; vx: number; vz: number; dashing: boolean } | null {
+  predAtSeq(targetSeq: number): PredSample | null {
+    if (this.hist.length === 0) return null;
+    for (let i = this.hist.length - 1; i >= 0; i--) {
+      if (this.hist[i].seq <= targetSeq) {
+        return this.hist[i];
+      }
+    }
+    return null;
+  }
+
+  predAt(t: number): PredSample | null {
     const h = this.hist;
     if (!h.length) return null;
     if (t <= h[0].t) return h[0];
+    if (t >= h[h.length - 1].t) return h[h.length - 1];
     for (let i = h.length - 1; i > 0; i--) {
       const b = h[i], a = h[i - 1];
-      if (a.t <= t) {
-        const k = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 1;
+      if (a.t <= t && t <= b.t) {
+        const span = b.t - a.t;
+        const k = span > 0.0001 ? Math.min(1, Math.max(0, (t - a.t) / span)) : 1;
         return {
+          t,
+          seq: k >= 0.5 ? b.seq : a.seq,
           x: a.x + (b.x - a.x) * k,
           z: a.z + (b.z - a.z) * k,
           vx: a.vx + (b.vx - a.vx) * k,
           vz: a.vz + (b.vz - a.vz) * k,
           dashing: a.dashing || b.dashing,
+          dashT: (a.dashT ?? 0) + ((b.dashT ?? 0) - (a.dashT ?? 0)) * k,
         };
       }
     }
     return h[h.length - 1];
+  }
+
+  private applySmoothCorrection(
+    dx: number,
+    dz: number,
+    gain: number,
+    reconciledTime: number
+  ): void {
+    const corrX = dx * gain;
+    const corrZ = dz * gain;
+
+    // 1. Shift physical simulation state
+    this.simX += corrX;
+    this.simZ += corrZ;
+
+    // 2. Subtract from visual error offset so render position (x = simX + errorX) doesn't jump at frame 0
+    this.errorX -= corrX;
+    this.errorZ -= corrZ;
+
+    const maxVisualOffset = 3.5;
+    const errMag = Math.hypot(this.errorX, this.errorZ);
+    if (errMag > maxVisualOffset) {
+      const scale = maxVisualOffset / errMag;
+      this.errorX *= scale;
+      this.errorZ *= scale;
+    }
+
+    this.x = this.simX + this.errorX;
+    this.z = this.simZ + this.errorZ;
+
+    // 3. Shift all samples from reconciledTime to current time
+    for (let i = 0; i < this.hist.length; i++) {
+      if (this.hist[i].t >= reconciledTime) {
+        this.hist[i].x += corrX;
+        this.hist[i].z += corrZ;
+      }
+    }
   }
 
   onServerSnapshot(
@@ -121,15 +180,28 @@ export class ClientPredictor {
     serverZ: number,
     flags: number,
     snapTick: number,
-    _clockOff: number | null,
-    rtt: number
+    clockOff: number | null,
+    rtt: number,
+    ackSeq = 0,
+    ackDash = 0,
+    serverTime?: number
   ): void {
-    if (!this.on) return;
+    if (!this.on) {
+      this.reset(serverX, serverZ);
+      return;
+    }
+
+    // 1. Skip late/out-of-order snapshots
+    if (snapTick > 0 && snapTick <= this.lastServerTick) {
+      return;
+    }
+    this.lastServerTick = snapTick;
 
     const now = performance.now();
     const isServerStun = (flags & 8) !== 0;
+    const serverIsDashing = (flags & 1) !== 0;
 
-    // 0. Cập nhật vận tốc khi server truyền xung lực cực mạnh (knockback do húc, nổ bom, hoặc choáng)
+    // 0. Update velocity if server transmitted a heavy force impulse
     if (this.sTick === snapTick - 1) {
       const svx = (serverX - this.sx) / 0.05;
       const svz = (serverZ - this.sz) / 0.05;
@@ -141,100 +213,94 @@ export class ClientPredictor {
       }
     }
 
-    if (isServerStun && !this.stunned) {
-      this.setStun(1.5);
-    } else if (!isServerStun && this.stunT <= 0) {
+    this.sx = serverX;
+    this.sz = serverZ;
+    this.sTick = snapTick;
+
+    // 2. Stun handling
+    if (isServerStun) {
+      this.dashT = 0;
+      this.flyT = 0;
+      this.plow = false;
+      if (!this.stunned) this.setStun(1.5);
+      const dxStun = serverX - this.simX;
+      const dzStun = serverZ - this.simZ;
+      if (Math.hypot(dxStun, dzStun) > 12.0) {
+        this.resets++;
+        this.reset(serverX, serverZ);
+      } else {
+        this.applySmoothCorrection(dxStun, dzStun, 0.55, now);
+      }
+      return;
+    } else if (this.stunT <= 0) {
       this.stunned = false;
     }
 
-    // 1. Cửa sổ bảo vệ pha Húc (Dash Phase Windows):
+    // 3. Anti-Double-Dash Guard:
     const timeSinceLaunch = now - this.lastDashLaunchTime;
     const timeSinceEnd = now - this.lastDashEndTime;
-    const serverIsDashing = (flags & 1) !== 0;
-    const effectiveRtt = rtt > 0 ? rtt : 40;
-    const preDashWindow = Math.max(180, effectiveRtt + 100);
+    const effectiveRtt = rtt > 0 ? Math.min(rtt, 140) : 48;
 
-    // Pha 1 (Pre-dash): Client vừa phóng đi nhưng gói tin chưa kịp xử lý trên Server
-    if (!isServerStun && this.dashT > 0 && !serverIsDashing) {
-      if (timeSinceLaunch < preDashWindow) {
-        this.sx = serverX;
-        this.sz = serverZ;
-        this.sTick = snapTick;
-        return; // Không can thiệp hoặc hủy dash trong giai đoạn gói tin đang bay!
-      } else {
-        // Hết thời gian chờ mà Server vẫn chưa dash -> kết thúc dash nhẹ nhàng
-        this.dashT = 0;
-        this.plow = false;
-        this.vx *= 0.25;
-        this.vz *= 0.25;
+    const serverHasAckedOurDash =
+      serverIsDashing ||
+      (this.lastDashSeq > 0 &&
+        (ackDash >= this.lastDashSeq || ackSeq >= this.lastDashSeq));
+
+    // Never allow pre-dash snapshots to roll back a locally launched dash
+    if (
+      this.lastDashSeq > 0 &&
+      !serverHasAckedOurDash &&
+      timeSinceLaunch < Math.max(380, effectiveRtt * 2.5 + 180)
+    ) {
+      return;
+    }
+
+    // 4. Historical sample lookup
+    let then: PredSample | null = null;
+    if (ackSeq > 0) {
+      then = this.predAtSeq(ackSeq);
+    }
+    if (!then && typeof serverTime === 'number' && clockOff !== null) {
+      const exactClientPerfTime = serverTime - clockOff;
+      if (now - exactClientPerfTime >= 10 && now - exactClientPerfTime <= 1200) {
+        then = this.predAt(exactClientPerfTime);
       }
     }
-
-    // Pha 3 (Post-dash): Client vừa kết thúc cú húc nhưng snapshot trả về vẫn thuộc cuối cú húc trên Server
-    const postDashWindow = Math.max(150, effectiveRtt + 90);
-    if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < postDashWindow) {
-      this.sx = serverX;
-      this.sz = serverZ;
-      this.sTick = snapTick;
-      return;
-    }
-
-    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot:
-    // Snapshot ở Server được tính từ input gửi lúc: now - (RTT/2 + 25ms tick + RTT/2) = now - (RTT + 35ms)
-    const transitDelay = Math.max(35, Math.min(220, effectiveRtt + 35));
-    const targetTime = now - transitDelay;
-    const then = this.predAt(targetTime);
-
     if (!then) {
-      this.sx = serverX;
-      this.sz = serverZ;
-      this.sTick = snapTick;
-      return;
+      const transitDelay = Math.max(30, Math.min(180, effectiveRtt * 0.65 + 25));
+      then = this.predAt(now - transitDelay);
     }
+    if (!then) return;
 
-    // 3. Tính sai số thực tế tại cùng một mốc thời gian lịch sử
+    // 5. Calculate error vector
     const dx = serverX - then.x;
     const dz = serverZ - then.z;
     const errorDist = Math.hypot(dx, dz);
 
-    // Hard reset CHỈ xảy ra khi sai số cực lớn (hồi sinh, dịch chuyển tức thời, teleport > 10m):
-    if (errorDist > 10.0) {
+    if (errorDist > 18.0) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
     }
 
-    // 4. Hòa giải mượt (Smooth Reconciliation):
-    const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
-    const deadzone = inDashWindow ? 2.5 : 0.35;
-
-    if (errorDist > deadzone) {
-      // Khi chênh lệch vượt deadzone, bù trừ mượt mà qua errorX/errorZ và nhích nhẹ simX/simZ
-      const nudgeGain = inDashWindow ? 0.08 : 0.20;
-      const adjustX = dx * nudgeGain;
-      const adjustZ = dz * nudgeGain;
-
-      this.simX += adjustX;
-      this.simZ += adjustZ;
-
-      // Đưa phần sai lệch còn lại vào errorX/errorZ để được làm mờ (decay) êm ái
-      this.errorX += dx * (1 - nudgeGain);
-      this.errorZ += dz * (1 - nudgeGain);
-      this.errorX = Math.max(-2.0, Math.min(2.0, this.errorX));
-      this.errorZ = Math.max(-2.0, Math.min(2.0, this.errorZ));
-
-      for (const s of this.hist) {
-        s.x += adjustX;
-        s.z += adjustZ;
-      }
+    const inDashPhase = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
+    const deadzone = inDashPhase ? 1.2 : 0.20;
+    if (errorDist <= deadzone) {
+      return;
     }
 
-    this.sx = serverX;
-    this.sz = serverZ;
-    this.sTick = snapTick;
+    const excessRatio = (errorDist - deadzone) / errorDist;
+    const effDx = dx * excessRatio;
+    const effDz = dz * excessRatio;
+    const nudgeGain = inDashPhase ? 0.18 : 0.30;
+
+    this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t);
+    if (ackSeq > this.lastReconciledSeq) {
+      this.lastReconciledSeq = ackSeq;
+    }
   }
 
-  predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false): void {
+  predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false, dashSeq?: number): void {
     if (!this.on || this.stunned || this.stunT > 0 || this.dashT > 0) return;
     if (map) {
       const terrain = terrainAt(map, this.simX, this.simZ);
@@ -243,6 +309,7 @@ export class ClientPredictor {
 
     const now = performance.now();
     this.lastDashLaunchTime = now;
+    this.lastDashSeq = dashSeq !== undefined ? dashSeq : this.currentSeq;
 
     if (isSuper) {
       this.plow = true;
@@ -419,11 +486,13 @@ export class ClientPredictor {
 
     this.hist.push({
       t: now,
+      seq: this.currentSeq,
       x: this.simX,
       z: this.simZ,
       vx: this.vx,
       vz: this.vz,
       dashing: this.dashT > 0,
+      dashT: this.dashT,
     });
     if (this.hist.length > 2 && this.hist[0].t < now - 1500) {
       let cut = 0;

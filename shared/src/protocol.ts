@@ -12,6 +12,10 @@ export interface Input {
   btn: boolean;
   /** exact hold duration in seconds on release */
   hold?: number;
+  /** input sequence number for synchronization */
+  seq?: number;
+  /** dash sequence number when a dash is triggered */
+  dashSeq?: number;
 }
 
 export interface PlayerMeta {
@@ -148,6 +152,12 @@ export interface Snapshot {
   podShield?: [boolean, number];
   /** fruit trees sync state: [id, stage, big, small, flowers] */
   trees?: TreeSyncWire[];
+  /** client input sequence acknowledged by the server */
+  ackSeq?: number;
+  /** last dash sequence acknowledged by the server */
+  ackDash?: number;
+  /** authoritative server timestamp when tick executed */
+  st?: number;
 }
 
 export type ServerMsg =
