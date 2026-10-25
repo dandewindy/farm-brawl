@@ -41,8 +41,8 @@ const PING_INTERVAL_MS = 500;
 /** Ngưỡng ping người chơi yêu cầu: trên 90ms sẽ kích hoạt dò tuyến mới */
 export const HIGH_PING_THRESHOLD_MS = 90;
 
-/** Số mẫu ping liên tiếp > 90ms cần thiết để kích hoạt Probe (3 mẫu * 500ms = 1.5s) */
-const SUSTAINED_HIGH_PING_SAMPLES = 3;
+/** Số mẫu ping liên tiếp > 90ms cần thiết để kích hoạt Probe (8 mẫu * 500ms = 4.0s) */
+const SUSTAINED_HIGH_PING_SAMPLES = 8;
 
 /**
  * Hệ số bù tải (Load Handicap): Socket đang nhận snapshot 20Hz chịu độ trễ hàng đợi
@@ -185,17 +185,37 @@ export function evaluateMigrationDecision(
     };
   }
 
-  // 6. TRƯỜNG HỢP C: Khác trạm Edge POP nhưng cùng Tier (Ví dụ: HKG <-> SIN hoặc NRT <-> TPE)
-  // Yêu cầu cải thiện thực tế >= 15ms VÀ (đưa ping thô về <= 90ms HOẶC giảm >= 18% tổng độ trễ)
-  if (
-    netGainMs >= 15 &&
-    (probeRawMedian <= HIGH_PING_THRESHOLD_MS || probeEffectiveMedian <= activeMedian * 0.82)
-  ) {
-    return {
-      ...baseResult,
-      shouldSwitch: true,
-      reason: `cross_colo_improvement_${activeColo}_to_${probeColo}_gain_${netGainMs}ms`,
-    };
+  // 6. TRƯỜNG HỢP C: Khác trạm Edge POP nhưng cùng Tier
+  // - Nếu cả 2 đều ở Tier 0 (Ví dụ: SIN vs HKG): Cả hai đều là trạm tối ưu nhất cho Việt Nam.
+  //   NẾU active RTT <= 90ms: TUYỆT ĐỐI KHÔNG CHUYỂN! Tránh bão ping-pong nhảy qua lại giữa SIN và HKG.
+  //   CHỈ chuyển khi active RTT thực sự bị nghẽn (> 90ms) VÀ trạm đối tác đạt RTT <= 65ms với mức cải thiện netGainMs >= 30ms!
+  // - Nếu cùng Tier 1 (APAC) hoặc Tier 2 (ngoài khu vực): chuyển nếu netGainMs >= 20ms VÀ (probeRawMedian <= 90ms HOẶC probeEffectiveMedian <= activeMedian * 0.80)
+  if (!sameColo && probeTier === activeTier) {
+    if (activeTier === 0) {
+      if (activeMedian > HIGH_PING_THRESHOLD_MS && netGainMs >= 30 && probeRawMedian <= 65) {
+        return {
+          ...baseResult,
+          shouldSwitch: true,
+          reason: `sea_core_congestion_relief_${activeColo}_to_${probeColo}_gain_${netGainMs}ms`,
+        };
+      }
+      return {
+        ...baseResult,
+        shouldSwitch: false,
+        reason: `sea_core_already_optimal_${activeColo}_probe_${probeColo}_gain_${netGainMs}ms`,
+      };
+    }
+
+    if (
+      netGainMs >= 20 &&
+      (probeRawMedian <= HIGH_PING_THRESHOLD_MS || probeEffectiveMedian <= activeMedian * 0.80)
+    ) {
+      return {
+        ...baseResult,
+        shouldSwitch: true,
+        reason: `cross_colo_improvement_${activeColo}_to_${probeColo}_gain_${netGainMs}ms`,
+      };
+    }
   }
 
   return {
@@ -680,11 +700,18 @@ export class WsClient implements Transport {
             cleanupProbe(false); // Không đóng candidateWs vì nó đã là this.ws!
             return;
           }
+          if (parsed.t === 'init') {
+            // TUYỆT ĐỐI bỏ qua init khi đang hot handover vì GameState đã có sẵn map và clock!
+            // Nếu xử lý init sẽ gọi resetClock() và xóa toàn bộ lịch sử nội suy nhân vật.
+            return;
+          }
         } catch (_) {
           // Bỏ qua nếu tin nhắn không phải JSON
         }
         // Đệm các snapshot 20Hz đến sát thời điểm handover
-        bufferedMessagesDuringHandover.push(ev.data);
+        if (typeof ev.data === 'string' && ev.data.startsWith('{"t":"s"')) {
+          bufferedMessagesDuringHandover.push(ev.data);
+        }
       }
     };
 

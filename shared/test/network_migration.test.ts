@@ -105,11 +105,19 @@ describe('evaluateMigrationDecision (Anti-Migration Storm & Auto-switch > 90ms)'
     expect(decision.reason).toContain('same_colo_ecmp_recovery');
   });
 
-  it('Cross-Colo in Tier 0: switches when ping > 90ms and candidate reaches <= 90ms with gain >= 15ms', () => {
-    const activeWin = [98, 100, 102, 104, 106]; // active on HKG ~102ms
-    const probeWin = [32, 33, 35, 36, 38, 40]; // candidate on SIN ~36ms (raw <= 90ms, eff 48ms, gain 54ms)
+  it('Cross-Colo in Tier 0: does NOT switch if active is already optimal (<= 90ms)', () => {
+    const activeWin = [50, 52, 54, 55, 56]; // active on HKG ~54ms (good ping)
+    const probeWin = [32, 33, 35, 36, 38, 40]; // candidate on SIN ~36ms
+    const decision = evaluateMigrationDecision(activeWin, 'HKG', probeWin, 'SIN');
+    expect(decision.shouldSwitch).toBe(false);
+    expect(decision.reason).toContain('sea_core_already_optimal');
+  });
+
+  it('Cross-Colo in Tier 0: switches when active is congested (> 90ms) and candidate reaches <= 65ms with gain >= 30ms', () => {
+    const activeWin = [105, 108, 110, 112, 115]; // active on HKG ~110ms (congested)
+    const probeWin = [32, 33, 35, 36, 38, 40]; // candidate on SIN ~36ms (eff 48ms, gain 62ms)
     const decision = evaluateMigrationDecision(activeWin, 'HKG', probeWin, 'SIN');
     expect(decision.shouldSwitch).toBe(true);
-    expect(decision.reason).toContain('cross_colo_improvement');
+    expect(decision.reason).toContain('sea_core_congestion_relief');
   });
 });

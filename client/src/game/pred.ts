@@ -151,7 +151,8 @@ export class ClientPredictor {
     const timeSinceLaunch = now - this.lastDashLaunchTime;
     const timeSinceEnd = now - this.lastDashEndTime;
     const serverIsDashing = (flags & 1) !== 0;
-    const preDashWindow = Math.min(100, (rtt > 0 ? rtt : 35) * 0.5 + 40);
+    const effectiveRtt = rtt > 0 ? rtt : 40;
+    const preDashWindow = Math.max(180, effectiveRtt + 100);
 
     // Pha 1 (Pre-dash): Client vừa phóng đi nhưng gói tin chưa kịp xử lý trên Server
     if (!isServerStun && this.dashT > 0 && !serverIsDashing) {
@@ -159,9 +160,9 @@ export class ClientPredictor {
         this.sx = serverX;
         this.sz = serverZ;
         this.sTick = snapTick;
-        return;
+        return; // Không can thiệp hoặc hủy dash trong giai đoạn gói tin đang bay!
       } else {
-        // Server đã dừng hoặc va chạm cú húc này: kết thúc dash trên client ngay lập tức
+        // Hết thời gian chờ mà Server vẫn chưa dash -> kết thúc dash nhẹ nhàng
         this.dashT = 0;
         this.plow = false;
         this.vx *= 0.25;
@@ -170,7 +171,7 @@ export class ClientPredictor {
     }
 
     // Pha 3 (Post-dash): Client vừa kết thúc cú húc nhưng snapshot trả về vẫn thuộc cuối cú húc trên Server
-    const postDashWindow = Math.min(120, (rtt > 0 ? rtt : 35) * 0.5 + 50);
+    const postDashWindow = Math.max(150, effectiveRtt + 90);
     if (!isServerStun && this.dashT <= 0 && serverIsDashing && timeSinceEnd < postDashWindow) {
       this.sx = serverX;
       this.sz = serverZ;
@@ -179,7 +180,8 @@ export class ClientPredictor {
     }
 
     // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot:
-    const transitDelay = Math.max(15, Math.min(150, (rtt > 0 ? rtt : 35) * 0.5 + 10));
+    // Snapshot ở Server được tính từ input gửi lúc: now - (RTT/2 + 25ms tick + RTT/2) = now - (RTT + 35ms)
+    const transitDelay = Math.max(35, Math.min(220, effectiveRtt + 35));
     const targetTime = now - transitDelay;
     const then = this.predAt(targetTime);
 
@@ -204,26 +206,22 @@ export class ClientPredictor {
 
     // 4. Hòa giải mượt (Smooth Reconciliation):
     const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
-    const deadzone = inDashWindow ? 1.6 : 0.25;
+    const deadzone = inDashWindow ? 2.5 : 0.35;
 
     if (errorDist > deadzone) {
-      // Khi quay đầu gấp hoặc chênh lệch mạng, hòa giải mượt mà (smooth blending)
-      // KHÔNG BAO GIỜ hard-reset giữa đường làm giật chậm hay xé hình!
-      const gain = inDashWindow ? 0.20 : 0.35;
-      const adjustX = dx * gain;
-      const adjustZ = dz * gain;
+      // Khi chênh lệch vượt deadzone, bù trừ mượt mà qua errorX/errorZ và nhích nhẹ simX/simZ
+      const nudgeGain = inDashWindow ? 0.08 : 0.20;
+      const adjustX = dx * nudgeGain;
+      const adjustZ = dz * nudgeGain;
 
       this.simX += adjustX;
       this.simZ += adjustZ;
 
-      // Khi đã dừng lại, không tích lũy errorX trôi dạt làm hình ảnh con vật tự dịch chuyển
-      if (!this.aimMove && Math.hypot(this.vx, this.vz) < 0.1) {
-        this.errorX = 0;
-        this.errorZ = 0;
-      } else {
-        this.errorX -= adjustX;
-        this.errorZ -= adjustZ;
-      }
+      // Đưa phần sai lệch còn lại vào errorX/errorZ để được làm mờ (decay) êm ái
+      this.errorX += dx * (1 - nudgeGain);
+      this.errorZ += dz * (1 - nudgeGain);
+      this.errorX = Math.max(-2.0, Math.min(2.0, this.errorX));
+      this.errorZ = Math.max(-2.0, Math.min(2.0, this.errorZ));
 
       for (const s of this.hist) {
         s.x += adjustX;

@@ -1846,8 +1846,9 @@ function animate(now: number): void {
     const mvChanged = inp.mv !== lastSentInput.mv;
     const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
     const timeSinceLast = now - lastSentTime;
+    const maxInterval = inp.mv ? 50 : 100;
 
-    if (btnChanged || mvChanged || timeSinceLast >= 120 || (timeSinceLast >= 45 && angleDiff > 0.008)) {
+    if (btnChanged || mvChanged || timeSinceLast >= maxInterval || (timeSinceLast >= 35 && angleDiff > 0.01)) {
       transport.send({ t: 'input', ...inp });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;

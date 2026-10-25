@@ -145,7 +145,9 @@ export class GameRoom extends DurableObject {
         if (raw.startsWith('{"t":"ping"')) {
           const cIdx = raw.indexOf('"c":');
           if (cIdx !== -1) {
-            const endIdx = raw.indexOf('}', cIdx);
+            const commaIdx = raw.indexOf(',', cIdx + 4);
+            const braceIdx = raw.indexOf('}', cIdx + 4);
+            const endIdx = commaIdx !== -1 && commaIdx < braceIdx ? commaIdx : braceIdx;
             const cVal = raw.slice(cIdx + 4, endIdx !== -1 ? endIdx : undefined).trim();
             ws.send(`{"t":"pong","c":${cVal},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
             return;
