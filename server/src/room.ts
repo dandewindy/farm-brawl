@@ -17,10 +17,29 @@ export class GameRoom extends DurableObject {
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private nextTickTime = 0;
+  private doColo = 'APAC';
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.world = new World();
+    this.detectDoColo();
+  }
+
+  private async detectDoColo(): Promise<void> {
+    try {
+      const resp = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
+        cf: { cacheTtl: 0 },
+      } as RequestInit);
+      if (resp.ok) {
+        const text = await resp.text();
+        const match = text.match(/^colo=([A-Z0-9]+)/m);
+        if (match && match[1]) {
+          this.doColo = match[1].toUpperCase();
+        }
+      }
+    } catch {
+      // Giữ mặc định 'APAC' nếu trace nội bộ bị chặn
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -64,7 +83,13 @@ export class GameRoom extends DurableObject {
 
       const cid = url.searchParams.get('cid') || '';
       const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = url.searchParams.get('colo') || cfRay.split('-')[1] || (request as any).cf?.colo || 'SIN';
+      const edgeColo = (
+        request.headers.get('x-edge-colo') ||
+        url.searchParams.get('colo') ||
+        (cfRay.includes('-') ? cfRay.split('-')[1] : '') ||
+        (request as any).cf?.colo ||
+        'SIN'
+      ).toUpperCase();
       this.handleWebSocket(server, edgeColo, cid);
 
       return new Response(null, {
@@ -75,7 +100,13 @@ export class GameRoom extends DurableObject {
 
     if (url.pathname === '/info') {
       const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = url.searchParams.get('colo') || cfRay.split('-')[1] || (request as any).cf?.colo || 'SIN';
+      const edgeColo = (
+        request.headers.get('x-edge-colo') ||
+        url.searchParams.get('colo') ||
+        (cfRay.includes('-') ? cfRay.split('-')[1] : '') ||
+        (request as any).cf?.colo ||
+        'SIN'
+      ).toUpperCase();
       return new Response(
         JSON.stringify({
           room: roomParam,
@@ -85,6 +116,7 @@ export class GameRoom extends DurableObject {
           tick: this.world.tick,
           king: this.world.napoleonId,
           edgeColo,
+          doColo: this.doColo,
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -115,7 +147,7 @@ export class GameRoom extends DurableObject {
           if (cIdx !== -1) {
             const endIdx = raw.indexOf('}', cIdx);
             const cVal = raw.slice(cIdx + 4, endIdx !== -1 ? endIdx : undefined).trim();
-            ws.send(`{"t":"pong","c":${cVal},"s":${Date.now()},"colo":"${edgeColo}"}`);
+            ws.send(`{"t":"pong","c":${cVal},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
             return;
           }
         }
@@ -349,7 +381,7 @@ export class GameRoom extends DurableObject {
       ws.send(JSON.stringify(initMsg));
 
       // Send joined confirmation with session token and edge colo
-      const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken, colo: edgeColo };
+      const joinedMsg: ServerMsg = { t: 'joined', id: playerId, token: sessionToken, colo: edgeColo, doColo: this.doColo };
       ws.send(JSON.stringify(joinedMsg));
 
       if (msg.team !== undefined) {
@@ -404,7 +436,7 @@ export class GameRoom extends DurableObject {
         this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold });
       }
     } else if (msg.t === 'ping') {
-      ws.send(`{"t":"pong","c":${msg.c},"s":${Date.now()},"colo":"${edgeColo}"}`);
+      ws.send(`{"t":"pong","c":${msg.c},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
     } else if (msg.t === 'rule') {
       const playerId = this.sockets.get(ws);
       if (playerId) {

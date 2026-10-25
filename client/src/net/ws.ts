@@ -1,13 +1,212 @@
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 import type { Handler, Transport } from './transport';
 
+/**
+ * Phân tầng địa lý các trạm Cloudflare Edge POP cho người chơi tại Việt Nam & Đông Nam Á:
+ * - Tier 0 (SEA / VN Core): Trạm nội địa VN hoặc trục chính Singapore / Hồng Kông / Bangkok / KL (Kỳ vọng: 15ms - 60ms)
+ * - Tier 1 (East Asia / APAC): Đài Loan, Philippines, Nam Trung Quốc, Nhật Bản, Hàn Quốc, Indonesia (Kỳ vọng: 60ms - 115ms)
+ * - Tier 2 (Out-of-Region Detour): Châu Âu (CDG, MRS, FRA...), Mỹ, Úc (Định tuyến lỗi BGP > 140ms)
+ */
+const TIER_0_SEA_COLOS = /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL|PNH|VTE)$/i;
+const TIER_1_APAC_COLOS = /^(TPE|KHH|MNL|CEB|CAN|SZX|MFN|CGK|DPS|RGN|BNY|NRT|HND|KIX|FUK|OKA|ICN|PUS)$/i;
+
+export type ColoTier = 0 | 1 | 2;
+
+export function getColoTier(colo?: string): ColoTier {
+  if (!colo) return 2;
+  const normalized = colo.trim().toUpperCase();
+  if (TIER_0_SEA_COLOS.test(normalized)) return 0;
+  if (TIER_1_APAC_COLOS.test(normalized)) return 1;
+  return 2;
+}
+
+/**
+ * Giữ tương thích ngược với hàm isFastColo hiện tại của dự án:
+ * Trả về true cho Tier 0 (SEA/VN) hoặc Tier 1 (APAC).
+ */
 export function isFastColo(colo?: string): boolean {
-  if (!colo) return false;
-  return /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo);
+  return getColoTier(colo) <= 1;
+}
+
+export function isOptimalSeaColo(colo?: string): boolean {
+  return getColoTier(colo) === 0;
+}
+
+// ============================================================================
+// HẰNG SỐ ĐIỀU KHIỂN HOT MIGRATION (ĐÃ TINH CHỈNH CHỐNG PING-PONG LOOP)
+// ============================================================================
+const RTT_WINDOW_SIZE = 8;
+const PING_INTERVAL_MS = 500;
+
+/** Ngưỡng ping người chơi yêu cầu: trên 90ms sẽ kích hoạt dò tuyến mới */
+export const HIGH_PING_THRESHOLD_MS = 90;
+
+/** Số mẫu ping liên tiếp > 90ms cần thiết để kích hoạt Probe (3 mẫu * 500ms = 1.5s) */
+const SUSTAINED_HIGH_PING_SAMPLES = 3;
+
+/**
+ * Hệ số bù tải (Load Handicap): Socket đang nhận snapshot 20Hz chịu độ trễ hàng đợi
+ * cao hơn socket rỗng (probeSocket) khoảng 12ms. Cộng 12ms vào probe để so sánh công bằng.
+ */
+export const LOAD_HANDICAP_MS = 12;
+
+/** Cấu hình lấy mẫu trên probeSocket */
+const PROBE_WARMUP_PINGS = 1;       // Bỏ qua 1 mẫu đầu tiên (khởi tạo TLS/Edge)
+const PROBE_MEASURE_PINGS = 6;      // Thu thập 6 mẫu thực tế
+const PROBE_PING_SPACING_MS = 250;  // Khoảng cách giữa các mẫu probe (tổng ~1.75s)
+const PROBE_TIMEOUT_MS = 4500;      // Timeout tối đa cho toàn bộ quá trình probe
+const HANDOVER_ACK_TIMEOUT_MS = 3000;
+
+/** Chuỗi đệm 96 bytes giả lập kích thước gói input thực tế khi bắn ping thử tải */
+const PROBE_PAYLOAD_PADDING = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+/** Thời gian khóa Probe sau khi vừa chuyển mạng thành công (25 giây) */
+const POST_SWITCH_GRACE_MS = 25_000;
+
+/** Thời gian Cooldown thích ứng khi Probe không tìm được đường tốt hơn (15s -> 30s -> 60s -> 120s) */
+const BASE_PROBE_COOLDOWN_MS = 15_000;
+const MAX_PROBE_COOLDOWN_MS = 120_000;
+
+export interface RttStats {
+  min: number;
+  median: number;
+  jitter: number;
+  samples: number;
+}
+
+export interface MigrationDecision {
+  shouldSwitch: boolean;
+  reason: string;
+  activeMedian: number;
+  probeRawMedian: number;
+  probeEffectiveMedian: number;
+  activeColo: string;
+  probeColo: string;
+}
+
+/**
+ * Tính toán thống kê RTT: Min, Median (Trung vị) và Jitter (Khoảng tứ phân vị IQR)
+ */
+export function computeRttStats(window: number[]): RttStats {
+  if (window.length === 0) {
+    return { min: 0, median: 0, jitter: 0, samples: 0 };
+  }
+  const sorted = [...window].sort((a, b) => a - b);
+  const n = sorted.length;
+  const min = sorted[0];
+  const mid = Math.floor(n / 2);
+  const median =
+    n % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
+
+  const q25 = sorted[Math.floor(n * 0.25)];
+  const q75 = sorted[Math.floor(n * 0.75)];
+  const jitter = Math.max(0, q75 - q25);
+
+  return { min, median, jitter, samples: n };
+}
+
+/**
+ * Hàm toán học quyết định có chuyển sang probeSocket hay không.
+ * Đảm bảo chuyển dứt khoát khi có đường tốt hơn nhưng tuyệt đối không lặp Ping-Pong.
+ */
+export function evaluateMigrationDecision(
+  activeWin: number[],
+  activeColo: string,
+  probeWin: number[],
+  probeColo: string
+): MigrationDecision {
+  const activeStats = computeRttStats(activeWin);
+  const probeStats = computeRttStats(probeWin);
+
+  const activeMedian = activeStats.median;
+  const probeRawMedian = probeStats.median;
+  // Cộng hệ số bù tải 20Hz vào kết quả của probeSocket
+  const probeEffectiveMedian = probeRawMedian + LOAD_HANDICAP_MS;
+  const netGainMs = activeMedian - probeEffectiveMedian;
+
+  const activeTier = getColoTier(activeColo);
+  const probeTier = getColoTier(probeColo);
+  const sameColo = activeColo.toUpperCase() === probeColo.toUpperCase();
+
+  const baseResult = {
+    activeMedian,
+    probeRawMedian,
+    probeEffectiveMedian,
+    activeColo,
+    probeColo,
+  };
+
+  // 1. Chặn nếu không đủ mẫu đo tin cậy
+  if (probeStats.samples < 4) {
+    return { ...baseResult, shouldSwitch: false, reason: 'insufficient_probe_samples' };
+  }
+
+  // 2. Chặn nếu tuyến Probe bị suy thoái Tier địa lý (ví dụ đang ở NRT Tier 1 mà probe rơi sang FRA Tier 2)
+  if (probeTier > activeTier) {
+    return {
+      ...baseResult,
+      shouldSwitch: false,
+      reason: `tier_regression_${activeTier}_to_${probeTier}`,
+    };
+  }
+
+  // 3. Chặn nếu tuyến Probe bị rớt gói / Jitter quá bất ổn (> 35ms và gấp 1.6 lần socket hiện tại)
+  if (probeStats.jitter > 35 && probeStats.jitter > Math.max(20, activeStats.jitter * 1.6)) {
+    return {
+      ...baseResult,
+      shouldSwitch: false,
+      reason: `probe_jitter_unstable_${probeStats.jitter}ms`,
+    };
+  }
+
+  // 4. TRƯỜNG HỢP A: Nâng cấp Tier địa lý (Ví dụ: Châu Âu Tier 2 -> APAC/SEA, hoặc Nhật Tier 1 -> SIN/SGN Tier 0)
+  if (probeTier < activeTier && netGainMs >= 10) {
+    return {
+      ...baseResult,
+      shouldSwitch: true,
+      reason: `tier_upgrade_${activeColo}(T${activeTier})_to_${probeColo}(T${probeTier})_gain_${netGainMs}ms`,
+    };
+  }
+
+  // 5. TRƯỜNG HỢP B: Cùng trạm Edge POP (Same-Colo Guard)
+  // Chỉ đổi khi kết nối TCP cũ thực sự bị nghẽn ECMP nặng (cải thiện thực tế >= 25ms và giảm ít nhất 22% RTT)
+  if (sameColo) {
+    if (netGainMs >= 25 && probeEffectiveMedian <= activeMedian * 0.78) {
+      return {
+        ...baseResult,
+        shouldSwitch: true,
+        reason: `same_colo_ecmp_recovery_${activeColo}_gain_${netGainMs}ms`,
+      };
+    }
+    return {
+      ...baseResult,
+      shouldSwitch: false,
+      reason: `same_colo_noise_filtered_${activeColo}_gain_${netGainMs}ms`,
+    };
+  }
+
+  // 6. TRƯỜNG HỢP C: Khác trạm Edge POP nhưng cùng Tier (Ví dụ: HKG <-> SIN hoặc NRT <-> TPE)
+  // Yêu cầu cải thiện thực tế >= 15ms VÀ (đưa ping thô về <= 90ms HOẶC giảm >= 18% tổng độ trễ)
+  if (
+    netGainMs >= 15 &&
+    (probeRawMedian <= HIGH_PING_THRESHOLD_MS || probeEffectiveMedian <= activeMedian * 0.82)
+  ) {
+    return {
+      ...baseResult,
+      shouldSwitch: true,
+      reason: `cross_colo_improvement_${activeColo}_to_${probeColo}_gain_${netGainMs}ms`,
+    };
+  }
+
+  return {
+    ...baseResult,
+    shouldSwitch: false,
+    reason: `marginal_difference_gain_${netGainMs}ms`,
+  };
 }
 
 export class WsClient implements Transport {
-  private ws: WebSocket | null = null;
+  public ws: WebSocket | null = null;
   private readonly queue: ClientMsg[] = [];
   private closed = false;
   private isReconnecting = false;
@@ -16,26 +215,31 @@ export class WsClient implements Transport {
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
+  public rttJitter = 0;
   public colo = '';
+  public doColo = '';
   public inGame = false;
   private reconnectTimer: number | null = null;
   private readonly rttWin: number[] = [];
-  private badPingStreak = 0;
-  private lastLobbyReconnectTime = 0;
-  private lobbySteerAttempts = 0;
-  private currentPingDelay = 500;
 
-  // Khóa chống probe liên tục khi ISP cố định tuyến Anycast hoặc khi trạm hiện tại đã tối ưu
-  private routeLockedUntil = 0;
+  // Quản lý endpoint và xoay vòng ECMP
   private endpointIdx = 0;
   private readonly endpoints: string[];
 
-  // In-Game Zero-Downtime Hot Migration
+  // Điều khiển Probe & Hot Migration chống bão
   public isMigrating = false;
-  private migrationWs: WebSocket | null = null;
-  private lastMigrationProbeTime = 0;
-  private probeAttempts = 0;
-  private migrationRetryTimer: number | null = null;
+  private probeWs: WebSocket | null = null;
+  private probing = false;
+  private consecutiveHighPing = 0;
+  private consecutiveFailedProbes = 0;
+  private nextProbeAllowedAt = 0;
+  private baselineMedianAtLastFailure = 0;
+
+  // Lobby steering
+  private lastLobbyReconnectTime = 0;
+  private lobbySteerAttempts = 0;
+
+  // Callbacks
   public onMigrationSuccess?: (newColo: string) => void;
   public onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
 
@@ -47,10 +251,24 @@ export class WsClient implements Transport {
   ) {
     this.endpoints = [url, ...altUrls.filter((u) => u && u !== url)];
     try {
-      this.sessionToken = sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) || sessionStorage.getItem('fb_session_token');
+      this.sessionToken =
+        sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) ||
+        sessionStorage.getItem('fb_session_token');
     } catch (_) {}
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+
     this.connect();
   }
+
+  private handleVisibilityChange = (): void => {
+    if (typeof document !== 'undefined' && !document.hidden) {
+      // Khi người chơi quay lại tab, reset đếm spike ảo do trình duyệt bóp timer
+      this.consecutiveHighPing = 0;
+    }
+  };
 
   private getActiveUrl(): string {
     return this.endpoints[this.endpointIdx % this.endpoints.length];
@@ -72,18 +290,31 @@ export class WsClient implements Transport {
     }
   }
 
+  /**
+   * Tạo URL kết nối WebSocket có hỗ trợ cache-busting / nonce cho Probe
+   */
+  private buildEndpointUrl(isProbe: boolean): string {
+    const base = isProbe ? this.nextEndpointUrl() : this.getActiveUrl();
+    const url = new URL(base, typeof window !== 'undefined' ? window.location.origin : 'https://localhost');
+    if (isProbe) {
+      const nonce = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      url.searchParams.set('_probe', nonce);
+      url.searchParams.set('_t', Date.now().toString());
+    }
+    return url.toString();
+  }
+
   private connect(customUrl?: string): void {
     if (this.closed) return;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
-      clearTimeout(this.migrationRetryTimer ?? undefined);
       this.reconnectTimer = null;
     }
     this.onStatus?.('connecting');
 
     let socket: WebSocket;
     try {
-      socket = new WebSocket(customUrl || this.getActiveUrl());
+      socket = new WebSocket(customUrl || this.buildEndpointUrl(false));
       this.ws = socket;
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
@@ -127,100 +358,14 @@ export class WsClient implements Transport {
 
     socket.onmessage = (event) => {
       if (this.ws !== socket) return;
-      try {
-        const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
-        if (raw.startsWith('{"t":"pong"')) {
-          const msg = JSON.parse(raw) as ServerMsg;
-          if (msg.t === 'pong') {
-            if (msg.colo) this.colo = msg.colo;
-            if (typeof document !== 'undefined' && document.hidden) return;
-            const s = performance.now() - msg.c;
-            if (s >= 0 && s < 2000) {
-              this.rttWin.push(s);
-              if (this.rttWin.length > 8) this.rttWin.shift();
-              const sorted = [...this.rttWin].sort((a, b) => a - b);
-              this.rttMin = sorted[0];
-              this.rtt = sorted[Math.floor(sorted.length / 2)];
-
-              const onFastNode = isFastColo(this.colo);
-              const now = performance.now();
-
-              if (onFastNode) {
-                this.lobbySteerAttempts = 0;
-              }
-
-              // Bad ping streak:
-              // Mạng Đông Nam Á (SIN/HKG) ping 40-110ms là hoàn toàn bình thường và ổn định
-              // Chỉ coi là bất thường khi ping vượt quá 130ms liên tục
-              if (onFastNode && this.rtt <= 110) {
-                this.badPingStreak = 0;
-              } else if (now < this.routeLockedUntil) {
-                this.badPingStreak = 0;
-              } else if (!onFastNode) {
-                this.badPingStreak++;
-              } else if (this.rtt > 130) {
-                this.badPingStreak++;
-              } else {
-                this.badPingStreak = 0;
-              }
-
-              const targetDelay = (this.rtt > 120 || !onFastNode) && now >= this.routeLockedUntil ? 400 : 500;
-              if (targetDelay !== this.currentPingDelay) {
-                this.currentPingDelay = targetDelay;
-                this.startPing();
-              }
-
-              // ── LOBBY STEER ──
-              // Chỉ steer trong lobby khi node ngoài châu Á và ping > 150ms
-              if (!this.inGame && !onFastNode && this.rtt > 150 && !this.closed && now >= this.routeLockedUntil) {
-                if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
-                  if (now - this.lastLobbyReconnectTime > 5000) {
-                    this.lastLobbyReconnectTime = now;
-                    this.lobbySteerAttempts++;
-                    this.nextEndpointUrl();
-                    console.log(`[WS] Lobby steer: ${this.colo} ~${Math.round(this.rtt)}ms, attempt ${this.lobbySteerAttempts}/2`);
-                    this.forceReconnect();
-                  }
-                } else if (this.lobbySteerAttempts >= 2) {
-                  this.routeLockedUntil = now + 90000;
-                }
-              }
-
-              // ── IN-GAME ZERO-DOWNTIME MIGRATION ──
-              // Chỉ tự động dò khi có ít nhất 5 mẫu và 6 lần liên tục ping xấu (> 130ms hoặc ngoài châu Á)
-              if (this.inGame && this.rttWin.length >= 5 && this.badPingStreak >= 6 && !this.closed && now >= this.routeLockedUntil) {
-                this.triggerHotMigration();
-              }
-            }
-          }
-          return;
-        }
-
-        const msg = JSON.parse(raw) as ServerMsg;
-        if (msg.t === 'joined') {
-          if (msg.colo) this.colo = msg.colo;
-          if (msg.token) {
-            this.sessionToken = msg.token;
-            try {
-              sessionStorage.setItem(`fb_tok_${this.getRoomKey()}`, msg.token);
-              sessionStorage.setItem('fb_session_token', msg.token);
-            } catch (_) {}
-            if (this.lastJoinMsg) {
-              this.lastJoinMsg.token = msg.token;
-            }
-          }
-        }
-        this.onMsg(msg);
-      } catch (err) {
-        console.error('Failed to parse server message:', err);
-      }
+      this.handlePrimaryMessage(event.data);
     };
 
     socket.onclose = (ev) => {
       if (this.ws !== socket) return;
       this.stopPing();
       if (ev.reason === 'Handover') return;
-      if (this.isMigrating && this.migrationWs !== null) return;
+      if (this.isMigrating && this.probeWs !== null) return;
       this.isReconnecting = true;
       this.onStatus?.('closed');
       this.scheduleReconnect();
@@ -228,191 +373,430 @@ export class WsClient implements Transport {
 
     socket.onerror = () => {
       if (this.ws !== socket) return;
-      if (this.isMigrating && this.migrationWs !== null) return;
+      if (this.isMigrating && this.probeWs !== null) return;
       this.onStatus?.('error');
     };
   }
 
-  private abortProbe(probeSocket: WebSocket, probeTimeout: number): void {
-    clearTimeout(probeTimeout);
-    if (this.migrationWs === probeSocket) {
-      this.migrationWs = null;
-      this.isMigrating = false;
-    }
+  private handlePrimaryMessage(raw: string | ArrayBuffer): void {
     try {
-      probeSocket.onopen = null;
-      probeSocket.onmessage = null;
-      probeSocket.onclose = null;
-      probeSocket.onerror = null;
-      probeSocket.close();
-    } catch (_) {}
+      const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
 
-    // Cứu hộ Deadlock: Nếu socket chính đã đóng trong lúc đang probe, phải kết nối lại ngay!
-    if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
-      this.isReconnecting = true;
-      this.scheduleReconnect();
+      // Fast-path xử lý pong
+      if (text.startsWith('{"t":"pong"')) {
+        const msg = JSON.parse(text) as ServerMsg;
+        if (msg.t === 'pong') {
+          if (msg.colo) this.colo = msg.colo.toUpperCase();
+          if (msg.doColo) this.doColo = msg.doColo.toUpperCase();
+
+          // Tránh ghi nhận RTT sai lệch khi tab đang bị ẩn
+          if (typeof document !== 'undefined' && document.hidden) return;
+
+          const s = performance.now() - msg.c;
+          if (s >= 0 && s < 2500) {
+            this.recordPrimaryRtt(s);
+          }
+        }
+        return;
+      }
+
+      const parsed = JSON.parse(text) as ServerMsg;
+      if (parsed.t === 'joined') {
+        if (parsed.colo) this.colo = parsed.colo.toUpperCase();
+        if (parsed.doColo) this.doColo = parsed.doColo.toUpperCase();
+        if (parsed.token) {
+          this.sessionToken = parsed.token;
+          try {
+            sessionStorage.setItem(`fb_tok_${this.getRoomKey()}`, parsed.token);
+            sessionStorage.setItem('fb_session_token', parsed.token);
+          } catch (_) {}
+          if (this.lastJoinMsg) {
+            this.lastJoinMsg.token = parsed.token;
+          }
+        }
+      }
+
+      this.onMsg(parsed);
+    } catch (err) {
+      console.error('Failed to parse primary server message:', err);
     }
   }
 
-  public triggerHotMigration(isManual = false): void {
-    if (!this.inGame || this.closed) return;
-    const now = performance.now();
-    // Throttle: ít nhất 10 giây giữa các lần tự động probe
-    if (this.migrationWs !== null || (!isManual && now - this.lastMigrationProbeTime < 10000)) return;
-    this.lastMigrationProbeTime = now;
-    this.isMigrating = true;
-    if (isManual) {
-      this.onMigrationStatus?.('probing', this.colo);
+  private recordPrimaryRtt(rtt: number): void {
+    this.rttWin.push(rtt);
+    if (this.rttWin.length > RTT_WINDOW_SIZE) {
+      this.rttWin.shift();
     }
 
-    const baseTargetUrl = this.nextEndpointUrl();
-    const probeUrl = baseTargetUrl + (baseTargetUrl.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
-    let probeSocket: WebSocket;
+    const stats = computeRttStats(this.rttWin);
+    this.rttMin = stats.min;
+    this.rtt = stats.median;
+    this.rttJitter = stats.jitter;
+
+    const currentTier = getColoTier(this.colo);
+
+    // Đếm số mẫu liên tiếp vượt ngưỡng 90ms
+    if (this.rtt > HIGH_PING_THRESHOLD_MS) {
+      this.consecutiveHighPing += 1;
+    } else {
+      this.consecutiveHighPing = 0;
+    }
+
+    // Nếu mạng bất ngờ vọt lên thêm > 35ms hoặc rớt sang Tier 2 (Châu Âu/Mỹ),
+    // xóa Cooldown để dò tuyến khẩn cấp ngay
+    if (
+      this.consecutiveFailedProbes > 0 &&
+      (this.rtt > this.baselineMedianAtLastFailure + 35 || currentTier === 2)
+    ) {
+      this.consecutiveFailedProbes = 0;
+      this.nextProbeAllowedAt = 0;
+    }
+
+    // LOBBY STEER: Nếu ở sảnh chờ mà dính Tier 2 hoặc ping > 90ms kéo dài
+    if (!this.inGame && !this.closed) {
+      const now = performance.now();
+      if ((currentTier === 2 || this.rtt > HIGH_PING_THRESHOLD_MS) && now - this.lastLobbyReconnectTime > 3500 && this.lobbySteerAttempts < 3) {
+        this.lastLobbyReconnectTime = now;
+        this.lobbySteerAttempts++;
+        console.log(`[WS] Lobby steer attempt ${this.lobbySteerAttempts}/3: currently ${this.colo} ~${Math.round(this.rtt)}ms`);
+        this.forceReconnect();
+        return;
+      }
+    }
+
+    // IN-GAME HOT MIGRATION: Tự động đổi nếu ping > 90ms
+    this.checkAndTriggerHotMigration(currentTier);
+  }
+
+  private checkAndTriggerHotMigration(currentTier: ColoTier): void {
+    if (!this.inGame || this.probing || this.closed || !this.sessionToken) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    const now = Date.now();
+    if (now < this.nextProbeAllowedAt) return;
+
+    // Điều kiện 1: Bị định tuyến nhầm ra ngoài khu vực (Tier 2 Châu Âu/Mỹ) -> dò ngay khi có >= 2 mẫu
+    const isOutOfRegionDetour = currentTier === 2 && this.rttWin.length >= 2;
+
+    // Điều kiện 2: Ping trung vị > 90ms duy trì liên tục (3 chu kỳ)
+    const isSustainedAbove90ms =
+      this.rttWin.length >= 4 &&
+      this.rtt > HIGH_PING_THRESHOLD_MS &&
+      this.consecutiveHighPing >= SUSTAINED_HIGH_PING_SAMPLES;
+
+    if (isOutOfRegionDetour || isSustainedAbove90ms) {
+      this.triggerHotMigration(false);
+    }
+  }
+
+  /**
+   * Kích hoạt Hot Migration song song:
+   * Mở probeSocket chạy ngầm, bắn ping có đệm tải để đo RTT thực tế,
+   * đánh giá qua hàm toán học evaluateMigrationDecision.
+   * Nếu đạt chuẩn: gửi join(handover) -> nhận joined -> tráo socket nguyên tử!
+   */
+  public triggerHotMigration(isManual = false): void {
+    if (!this.inGame || this.closed || this.probing) return;
+    this.probing = true;
+    this.isMigrating = true;
+    this.onMigrationStatus?.('probing', this.colo);
+
+    const probeUrl = this.buildEndpointUrl(true);
+    let candidateWs: WebSocket;
     try {
-      probeSocket = new WebSocket(probeUrl);
-      this.migrationWs = probeSocket;
+      candidateWs = new WebSocket(probeUrl);
+      this.probeWs = candidateWs;
     } catch (e) {
+      this.probing = false;
       this.isMigrating = false;
       this.onMigrationStatus?.('failed', this.colo);
       return;
     }
 
-    const probeTimeout = window.setTimeout(() => {
-      if (this.migrationWs === probeSocket) {
-        this.probeAttempts++;
-        this.abortProbe(probeSocket, probeTimeout);
-        this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= 2) {
-          this.probeAttempts = 0;
-          this.badPingStreak = 0;
-          this.routeLockedUntil = performance.now() + 120000; // Khóa 2 phút nếu probe thất bại
-        }
+    const probeSamples: number[] = [];
+    let probeColo = '';
+    let probeDoColo = '';
+    let pingsSent = 0;
+    let pongsReceived = 0;
+    let probeInterval: number | null = null;
+    let handoverTimer: number | null = null;
+    let awaitingHandoverAck = false;
+    const bufferedMessagesDuringHandover: (string | ArrayBuffer)[] = [];
+
+    const cleanupProbe = (closeSocket: boolean) => {
+      if (probeInterval !== null) {
+        clearInterval(probeInterval);
+        probeInterval = null;
       }
-    }, 2500);
+      if (handoverTimer !== null) {
+        clearTimeout(handoverTimer);
+        handoverTimer = null;
+      }
+      if (closeSocket && candidateWs) {
+        candidateWs.onopen = null;
+        candidateWs.onmessage = null;
+        candidateWs.onerror = null;
+        candidateWs.onclose = null;
+        try {
+          if (candidateWs.readyState === WebSocket.OPEN || candidateWs.readyState === WebSocket.CONNECTING) {
+            candidateWs.close(1000, 'ProbeAborted');
+          }
+        } catch (_) {}
+      }
+      if (this.probeWs === candidateWs) {
+        this.probeWs = null;
+      }
+      this.probing = false;
+    };
 
-    let pendingInit: ServerMsg | null = null;
-    let hadExistingSession = false;
+    // Timeout tổng lực 4.5s cho toàn bộ chu trình Probe
+    const overallTimeout = window.setTimeout(() => {
+      if (!awaitingHandoverAck) {
+        this.scheduleAdaptiveBackoff();
+        cleanupProbe(true);
+        this.isMigrating = false;
+        this.onMigrationStatus?.('failed', this.colo);
+      }
+    }, PROBE_TIMEOUT_MS);
 
-    probeSocket.onopen = () => {
-      if (this.migrationWs !== probeSocket || this.closed) {
-        this.abortProbe(probeSocket, probeTimeout);
+    candidateWs.onopen = () => {
+      if (this.closed || this.probeWs !== candidateWs) {
+        clearTimeout(overallTimeout);
+        cleanupProbe(true);
         return;
       }
-      probeSocket.send(JSON.stringify({ t: 'ping', c: Math.round(performance.now()) }));
-    };
 
-    probeSocket.onmessage = (event) => {
-      if (this.migrationWs !== probeSocket || this.closed) return;
-      try {
-        const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
-        const msg = JSON.parse(raw) as ServerMsg;
-        if (msg.t === 'pong') {
-          const probeColo = msg.colo;
-          const probeRtt = performance.now() - msg.c;
-
-          const probeIsFast = isFastColo(probeColo);
-          const currentIsFast = isFastColo(this.colo);
-          let shouldSwitch = false;
-
-          if (probeRtt > 0) {
-            if (!currentIsFast && probeIsFast) {
-              // Từ trạm ngoài châu Á chuyển về trạm châu Á: luôn chuyển!
-              shouldSwitch = true;
-            } else if (probeIsFast && currentIsFast) {
-              // Cả 2 đều ở châu Á:
-              // NẾU CÙNG POP (ví dụ SIN -> SIN): KHÔNG BAO GIỜ TỰ ĐỘNG CHUYỂN! Cùng POP thì cùng tuyến cáp, đổi socket chỉ gây nghẽn và gián đoạn.
-              if (probeColo !== this.colo && probeRtt < this.rtt - 25 && probeRtt < this.rtt * 0.75) {
-                // Khác POP (ví dụ HKG -> SIN hoặc ngược lại) VÀ nhanh hơn hẳn >= 25ms & > 25%: chuyển!
-                shouldSwitch = true;
-              } else if (isManual && probeRtt < this.rtt - 35) {
-                // Chỉ cho phép cùng POP nếu người dùng chủ động bấm retune và probe nhanh hơn hẳn 35ms
-                shouldSwitch = true;
-              }
-            } else if (!currentIsFast && !probeIsFast && probeColo !== this.colo && probeRtt < this.rtt - 45) {
-              // Cả 2 đều ngoài châu Á: CHỈ chuyển nếu khác trạm và nhanh hơn hẳn 45ms (chặn loop FRA -> FRA)
-              shouldSwitch = true;
-            }
-          }
-
-          if (shouldSwitch && this.lastJoinMsg) {
-            if (probeIsFast) this.probeAttempts = 0;
-            hadExistingSession = !!this.sessionToken;
-            probeSocket.send(JSON.stringify({
-              ...this.lastJoinMsg,
-              token: this.sessionToken || undefined,
-            }));
-          } else {
-            this.probeAttempts++;
-            this.abortProbe(probeSocket, probeTimeout);
-            this.onMigrationStatus?.('failed', this.colo);
-            if (this.probeAttempts >= 2) {
-              this.probeAttempts = 0;
-              this.badPingStreak = 0;
-              this.routeLockedUntil = performance.now() + 120000; // Khóa 2 phút nếu probe không tìm thấy tuyến tốt hơn
-            }
-          }
-        } else if (msg.t === 'init') {
-          pendingInit = msg;
-        } else if (msg.t === 'joined') {
-          clearTimeout(probeTimeout);
-          const oldWs = this.ws;
-          this.ws = probeSocket;
-          this.migrationWs = null;
-          this.isMigrating = false;
-          this.isReconnecting = false;
-          if (this.reconnectTimer !== null) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-          }
-          if (msg.colo) this.colo = msg.colo;
-          if (msg.token) {
-            this.sessionToken = msg.token;
-            if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
-          }
-          this.rttWin.length = 0;
-          this.badPingStreak = 0;
-          this.currentPingDelay = 500;
-
-          if (!isFastColo(this.colo)) {
-            this.routeLockedUntil = performance.now() + 90000;
-          } else {
-            this.probeAttempts = 0;
-            this.routeLockedUntil = 0;
-          }
-
-          if (oldWs) {
-            oldWs.onopen = null;
-            oldWs.onmessage = null;
-            oldWs.onclose = null;
-            oldWs.onerror = null;
-            try { oldWs.close(1000, 'Handover'); } catch (_) {}
-          }
-
-          this.bindActiveSocket(probeSocket);
-          this.startPing();
-
-          // Chỉ nạp init nếu chưa từng có session (không reset map khi đang chơi)
-          if (pendingInit && !hadExistingSession) {
-            this.onMsg(pendingInit);
-          }
-          this.onMsg(msg);
-          this.onMigrationStatus?.('migrated', this.colo);
-          this.onMigrationSuccess?.(this.colo);
-        } else if (this.ws === probeSocket) {
-          this.onMsg(msg);
+      const sendProbePing = () => {
+        if (candidateWs.readyState !== WebSocket.OPEN) return;
+        pingsSent += 1;
+        candidateWs.send(
+          JSON.stringify({
+            t: 'ping',
+            c: Math.round(performance.now()),
+            pad: PROBE_PAYLOAD_PADDING,
+          })
+        );
+        if (pingsSent >= PROBE_WARMUP_PINGS + PROBE_MEASURE_PINGS && probeInterval !== null) {
+          clearInterval(probeInterval);
+          probeInterval = null;
         }
-      } catch (err) {
-        console.error('[WS] Error during migration:', err);
+      };
+
+      sendProbePing();
+      probeInterval = window.setInterval(sendProbePing, PROBE_PING_SPACING_MS);
+    };
+
+    candidateWs.onmessage = (ev: MessageEvent) => {
+      if (this.closed || this.probeWs !== candidateWs) {
+        clearTimeout(overallTimeout);
+        cleanupProbe(true);
+        return;
+      }
+
+      // GIAI ĐOẠN 1: Thu thập mẫu Ping trên probeSocket
+      if (!awaitingHandoverAck) {
+        try {
+          const text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
+          if (text.startsWith('{"t":"pong"')) {
+            const msg = JSON.parse(text) as ServerMsg;
+            if (msg.t === 'pong') {
+              const rtt = Math.max(1, performance.now() - msg.c);
+              if (msg.colo) probeColo = msg.colo.toUpperCase();
+              if (msg.doColo) probeDoColo = msg.doColo.toUpperCase();
+
+              pongsReceived += 1;
+              // Bỏ qua mẫu đầu tiên (Warmup)
+              if (pongsReceived > PROBE_WARMUP_PINGS) {
+                probeSamples.push(rtt);
+              }
+
+              if (probeSamples.length >= PROBE_MEASURE_PINGS) {
+                clearTimeout(overallTimeout);
+                if (probeInterval !== null) {
+                  clearInterval(probeInterval);
+                  probeInterval = null;
+                }
+
+                const decision = evaluateMigrationDecision(
+                  this.rttWin,
+                  this.colo,
+                  probeSamples,
+                  probeColo || this.colo
+                );
+
+                console.log(`[WS Hot Migration] Decision: switch=${decision.shouldSwitch}, reason=${decision.reason}, active=${decision.activeMedian}ms(${this.colo}), probeEff=${decision.probeEffectiveMedian}ms(${probeColo})`);
+
+                if (!decision.shouldSwitch && !isManual) {
+                  // Không tìm thấy tuyến tốt hơn -> ngắt probe êm ái và giãn Cooldown
+                  this.scheduleAdaptiveBackoff();
+                  cleanupProbe(true);
+                  this.isMigrating = false;
+                  this.onMigrationStatus?.('failed', this.colo);
+                  return;
+                }
+
+                // GIAI ĐOẠN 2: Tuyến mới tốt hơn thực sự -> Gửi lệnh join(handover)
+                awaitingHandoverAck = true;
+                if (this.lastJoinMsg) {
+                  candidateWs.send(
+                    JSON.stringify({
+                      ...this.lastJoinMsg,
+                      token: this.sessionToken || undefined,
+                    })
+                  );
+                }
+
+                handoverTimer = window.setTimeout(() => {
+                  this.scheduleAdaptiveBackoff();
+                  cleanupProbe(true);
+                  this.isMigrating = false;
+                  this.onMigrationStatus?.('failed', this.colo);
+                }, HANDOVER_ACK_TIMEOUT_MS);
+              }
+            }
+          }
+        } catch (_) {
+          cleanupProbe(true);
+        }
+        return;
+      }
+
+      // GIAI ĐOẠN 2: Đang chờ xác nhận 'joined' từ DO
+      if (awaitingHandoverAck) {
+        try {
+          const text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
+          const parsed = JSON.parse(text) as ServerMsg;
+          if (parsed.t === 'joined') {
+            // HOÀN TẤT HANDOVER: Tráo socket nguyên tử trong 1 tick!
+            clearTimeout(overallTimeout);
+            this.completeAtomicSocketSwap(
+              candidateWs,
+              probeSamples,
+              probeColo || parsed.colo || this.colo,
+              probeDoColo || parsed.doColo || this.doColo,
+              parsed,
+              bufferedMessagesDuringHandover
+            );
+            cleanupProbe(false); // Không đóng candidateWs vì nó đã là this.ws!
+            return;
+          }
+        } catch (_) {
+          // Bỏ qua nếu tin nhắn không phải JSON
+        }
+        // Đệm các snapshot 20Hz đến sát thời điểm handover
+        bufferedMessagesDuringHandover.push(ev.data);
       }
     };
 
-    const cleanupProbe = () => {
-      if (this.migrationWs === probeSocket) {
-        this.abortProbe(probeSocket, probeTimeout);
+    candidateWs.onerror = () => {
+      clearTimeout(overallTimeout);
+      this.scheduleAdaptiveBackoff();
+      cleanupProbe(true);
+      this.isMigrating = false;
+      this.onMigrationStatus?.('failed', this.colo);
+    };
+
+    candidateWs.onclose = () => {
+      if (this.probing && this.probeWs === candidateWs) {
+        clearTimeout(overallTimeout);
+        this.scheduleAdaptiveBackoff();
+        cleanupProbe(false);
+        this.isMigrating = false;
+        this.onMigrationStatus?.('failed', this.colo);
       }
     };
-    probeSocket.onclose = cleanupProbe;
-    probeSocket.onerror = cleanupProbe;
+  }
+
+  /**
+   * Tráo con trỏ socket chính sang candidateWs ngay khi nhận được xác nhận 'joined':
+   * - Hủy listener trên socket cũ và đóng an toàn với mã 'Handover'
+   * - Khởi tạo cửa sổ RTT mới với hệ số bù tải
+   * - Đặt thời gian ân hạn POST_SWITCH_GRACE_MS (25s)
+   */
+  private completeAtomicSocketSwap(
+    newWs: WebSocket,
+    probeSamples: number[],
+    newColo: string,
+    newDoColo: string,
+    joinedMsg: ServerMsg,
+    bufferedMessages: (string | ArrayBuffer)[]
+  ): void {
+    const oldWs = this.ws;
+
+    // 1. Gỡ bỏ listener của socket cũ trước khi close() để không kích hoạt reconnect loop
+    if (oldWs) {
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onerror = null;
+      oldWs.onclose = null;
+      try {
+        oldWs.close(1000, 'Handover');
+      } catch (_) {}
+    }
+
+    // 2. Gán socket mới làm socket chính
+    this.ws = newWs;
+    this.colo = newColo.toUpperCase();
+    this.doColo = newDoColo.toUpperCase();
+
+    // 3. Khởi tạo cửa sổ RTT mới (đã cộng bù tải 12ms)
+    this.rttWin.length = 0;
+    for (const s of probeSamples) {
+      this.rttWin.push(s + LOAD_HANDICAP_MS);
+    }
+    const stats = computeRttStats(this.rttWin);
+    this.rttMin = stats.min;
+    this.rtt = stats.median;
+    this.rttJitter = stats.jitter;
+
+    // 4. Reset bộ đếm chống bão và khóa probe trong thời gian ân hạn 25s
+    this.consecutiveHighPing = 0;
+    this.consecutiveFailedProbes = 0;
+    this.nextProbeAllowedAt = Date.now() + POST_SWITCH_GRACE_MS;
+    this.isMigrating = false;
+
+    // 5. Gắn listener hoạt động chính thức cho newWs
+    newWs.onmessage = (ev: MessageEvent) => {
+      if (this.ws !== newWs) return;
+      this.handlePrimaryMessage(ev.data);
+    };
+
+    newWs.onclose = (ev) => {
+      if (this.ws !== newWs || this.closed) return;
+      this.stopPing();
+      if (ev.reason === 'Handover') return;
+      this.isReconnecting = true;
+      this.onStatus?.('closed');
+      this.scheduleReconnect();
+    };
+
+    newWs.onerror = () => {
+      if (this.ws !== newWs || this.closed) return;
+      this.onStatus?.('error');
+    };
+
+    // 6. Thông báo thành công ra HUD và chuyển tin nhắn 'joined' cho GameState
+    this.onMigrationStatus?.('migrated', this.colo);
+    this.onMigrationSuccess?.(this.colo);
+    this.onMsg(joinedMsg);
+
+    for (const bufMsg of bufferedMessages) {
+      this.handlePrimaryMessage(bufMsg);
+    }
+  }
+
+  /**
+   * Tăng thời gian nghỉ theo cấp số nhân (15s -> 30s -> 60s -> 120s)
+   * khi mạng của ISP không có bất kỳ tuyến nào dưới 90ms.
+   */
+  private scheduleAdaptiveBackoff(): void {
+    this.consecutiveFailedProbes += 1;
+    this.baselineMedianAtLastFailure = this.rtt;
+    const backoffMs = Math.min(
+      MAX_PROBE_COOLDOWN_MS,
+      BASE_PROBE_COOLDOWN_MS * Math.pow(2, this.consecutiveFailedProbes - 1)
+    );
+    this.nextProbeAllowedAt = Date.now() + backoffMs;
   }
 
   private startPing(): void {
@@ -423,7 +807,7 @@ export class WsClient implements Transport {
         const now = Math.round(performance.now());
         this.send({ t: 'ping', c: now });
       }
-    }, this.currentPingDelay);
+    }, PING_INTERVAL_MS);
   }
 
   private stopPing(): void {
@@ -444,7 +828,7 @@ export class WsClient implements Transport {
     }, 800);
   }
 
-  send(m: ClientMsg): void {
+  public send(m: ClientMsg): void {
     let toSend = m;
     if (m.t === 'join') {
       toSend = { ...m, token: this.sessionToken || m.token };
@@ -462,7 +846,7 @@ export class WsClient implements Transport {
     this.ws.send(JSON.stringify(toSend));
   }
 
-  leaveGame(): void {
+  public leaveGame(): void {
     this.inGame = false;
     this.isMigrating = false;
     this.sessionToken = null;
@@ -472,13 +856,11 @@ export class WsClient implements Transport {
       sessionStorage.removeItem(`fb_tok_${this.getRoomKey()}`);
       sessionStorage.removeItem('fb_session_token');
     } catch (_) {}
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
-    }
-    if (this.migrationRetryTimer !== null) {
-      clearTimeout(this.migrationRetryTimer);
-      this.migrationRetryTimer = null;
+    if (this.probeWs) {
+      try {
+        this.probeWs.close();
+      } catch (_) {}
+      this.probeWs = null;
     }
     try {
       this.send({ t: 'leave' });
@@ -487,16 +869,18 @@ export class WsClient implements Transport {
 
   public manualRetune(): void {
     if (this.closed) return;
-    this.routeLockedUntil = 0;
-    this.badPingStreak = 6;
-    this.probeAttempts = 0;
+    this.nextProbeAllowedAt = 0;
+    this.consecutiveHighPing = SUSTAINED_HIGH_PING_SAMPLES;
+    this.consecutiveFailedProbes = 0;
     if (this.inGame) {
-      if (this.migrationWs) {
-        try { this.migrationWs.close(); } catch (_) {}
-        this.migrationWs = null;
+      if (this.probeWs) {
+        try {
+          this.probeWs.close();
+        } catch (_) {}
+        this.probeWs = null;
+        this.probing = false;
         this.isMigrating = false;
       }
-      this.lastMigrationProbeTime = 0;
       this.triggerHotMigration(true);
     } else {
       this.nextEndpointUrl();
@@ -507,11 +891,13 @@ export class WsClient implements Transport {
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();
-    this.probeAttempts = 0;
+    this.probing = false;
     this.isMigrating = false;
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
+    if (this.probeWs) {
+      try {
+        this.probeWs.close();
+      } catch (_) {}
+      this.probeWs = null;
     }
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
@@ -537,13 +923,19 @@ export class WsClient implements Transport {
     }, 80);
   }
 
-  close(): void {
+  public close(): void {
     this.closed = true;
+    this.probing = false;
     this.isMigrating = false;
     this.stopPing();
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    if (this.probeWs) {
+      try {
+        this.probeWs.close();
+      } catch (_) {}
+      this.probeWs = null;
     }
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);

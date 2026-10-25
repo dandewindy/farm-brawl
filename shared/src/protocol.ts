@@ -152,8 +152,8 @@ export interface Snapshot {
 
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[]; matchDuration?: number }
-  | { t: 'joined'; id: number; token?: string; colo?: string }
-  | { t: 'pong'; c: number; colo?: string }
+  | { t: 'joined'; id: number; token?: string; colo?: string; doColo?: string }
+  | { t: 'pong'; c: number; colo?: string; doColo?: string; s?: number }
   | { t: 'team_counts'; c0: number; c1: number }
   | { t: 'match_duration'; duration: number }
   | Snapshot;
