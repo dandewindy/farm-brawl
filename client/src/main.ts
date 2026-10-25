@@ -1152,6 +1152,9 @@ const gameState = new GameState({
       predictor.podShieldActive = s.podShield[0];
       hud.updatePodiumTimerBadge(s.podShield[0], s.podShield[1], gameState.napoleonId > 0);
     }
+    if (s.trees) {
+      world.updateTrees(s.trees);
+    }
   },
 });
 
@@ -1218,6 +1221,37 @@ function handleGameEvent(ev: GameEvent): void {
           hud.floatText(`-${lossNum} kg`, 'loss', ev.v, initPos);
         }
       }
+      break;
+    }
+    case 'treeHit': {
+      world.onTreeHit(ev.id, ev.by, ev.x, ev.z, ev.size, ev.droppedBig, ev.droppedSmall);
+      const isMine = ev.by === myId;
+      sfxHit(3.5, isMine ? 1.0 : 0.4);
+      if (isMine) {
+        shake = Math.max(shake, 1.2);
+        // Stun for 3.0 seconds on successful ram
+        const stunDur = 3.0;
+        localStunTimer = stunDur;
+        lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
+        predictor.setStun(stunDur);
+        predictor.dashT = 0;
+        predictor.plow = false;
+        input.cancelRam();
+        chargeStop();
+
+        const totalDroppedKg = ev.droppedBig * 11 + ev.droppedSmall * 2.5;
+        const myEnt = gameState.ents.get(myId);
+        const rawPos = animals.getPosition(myId);
+        const myPos = rawPos
+          ? { x: rawPos.x, z: rawPos.z, mass: myEnt ? myEnt.mass : 100 }
+          : myEnt
+          ? { x: myEnt.x, z: myEnt.z, mass: myEnt.mass }
+          : { x: ev.x, z: ev.z, mass: 100 };
+        hud.floatText(`Rung rơi ${ev.droppedBig + ev.droppedSmall} quả (+${Math.round(totalDroppedKg)} kg)! 🍉`, 'spoil', myId, myPos);
+      }
+      const leafColor = getArenaTheme() === 'women_day' ? 0xff4081 : 0x4caf50;
+      foodParts.burst(ev.x, 3.5, ev.z, leafColor, 24, 7, 6, 0.7);
+      foodParts.burst(ev.x, 3.5, ev.z, 0xffeb3b, 14, 5, 5, 0.5);
       break;
     }
     case 'die': {

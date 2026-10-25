@@ -4,6 +4,7 @@ import { wrapAngle } from '@shared/math';
 import {
   type Body,
   collideHay,
+  collideTreeTrunks,
   dashParams,
   stepMove,
   terrainAt,
@@ -339,6 +340,14 @@ export class ClientPredictor {
         this.stunT = body.stunT;
         this.dashT = body.dashT;
         this.plow = false;
+      }
+
+      const treeHit = collideTreeTrunks(body, map.trees);
+      if (treeHit) {
+        this.simX = body.x;
+        this.simZ = body.z;
+        this.vx = body.vx;
+        this.vz = body.vz;
       }
 
       if (this.podShieldActive && map.podium) {

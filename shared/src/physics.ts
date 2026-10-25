@@ -142,6 +142,28 @@ export function collideHay(b: Body, hay: Circle[]): boolean {
   return hit;
 }
 
+/** tree trunks are solid cylindrical obstacles */
+export function collideTreeTrunks(b: Body, trees?: { x: number; z: number; r: number }[]): boolean {
+  if (!trees || trees.length === 0) return false;
+  const r = radiusOf(b.mass);
+  let hit = false;
+  for (const t of trees) {
+    const dx = b.x - t.x, dz = b.z - t.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= t.r + r || d < 1e-6) continue;
+    const nx = dx / d, nz = dz / d;
+    b.x = t.x + nx * (t.r + r);
+    b.z = t.z + nz * (t.r + r);
+    const vn = b.vx * nx + b.vz * nz;
+    if (vn < 0) {
+      b.vx -= 1.6 * vn * nx;
+      b.vz -= 1.6 * vn * nz;
+    }
+    hit = true;
+  }
+  return hit;
+}
+
 /** touching the electric fence */
 export const outsideFence = (b: Body): boolean => Math.hypot(b.x, b.z) + radiusOf(b.mass) * 0.3 > CFG.R;
 

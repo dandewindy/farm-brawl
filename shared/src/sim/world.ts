@@ -5,12 +5,12 @@ import {
   CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf,
   type FoodKind, type Species,
 } from '../constants';
-import { generateMap, type MapData } from '../map';
+import { generateMap, type MapData, type TreeData, type TreeSize } from '../map';
 import { clamp, insideBlob, mulberry32 } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
   FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
-  type PlayerWire, type ServerMsg, type Snapshot, type ToolKind,
+  type PlayerWire, type ServerMsg, type Snapshot, type ToolKind, type TreeSyncWire,
 } from '../protocol';
 
 export interface Player extends Body {
@@ -74,11 +74,86 @@ export interface Food {
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+export interface FlowerBatch {
+  timer: number;
+  count: number;
+  bigCount: number;
+  smallCount: number;
+}
+
+export class TreeSimState {
+  id: number;
+  x: number;
+  z: number;
+  size: TreeSize;
+  r: number;
+  totalFruits: number;
+  big: number;
+  small: number;
+  batches: FlowerBatch[] = [];
+  cooldownHit = 0;
+
+  constructor(data: TreeData) {
+    this.id = data.id;
+    this.x = data.x;
+    this.z = data.z;
+    this.size = data.size;
+    this.r = data.r;
+    this.totalFruits = data.totalFruits;
+    this.big = 0;
+    this.small = 0;
+    // Initial 30s lifecycle:
+    // 0..10s: flower buds
+    // 10..20s: flowers bloom
+    // 20..30s: small fruits appear
+    // 30s+: big ripe fruits ready to ram!
+    this.batches.push({
+      timer: 0,
+      count: data.totalFruits,
+      bigCount: data.initBig,
+      smallCount: data.initSmall,
+    });
+  }
+
+  getStage(): number {
+    if (this.big > 0) return 3;
+    if (this.small > 0 || this.batches.some((b) => b.timer >= 20)) return 2;
+    if (this.batches.some((b) => b.timer >= 10)) return 1;
+    return 0;
+  }
+
+  getFlowerCount(): number {
+    let sum = 0;
+    for (const b of this.batches) {
+      if (b.timer >= 10 && b.timer < 20) {
+        sum += b.count;
+      }
+    }
+    return sum;
+  }
+
+  step(dt: number): void {
+    if (this.cooldownHit > 0) {
+      this.cooldownHit = Math.max(0, this.cooldownHit - dt);
+    }
+    for (let i = this.batches.length - 1; i >= 0; i--) {
+      const b = this.batches[i];
+      b.timer += dt;
+      if (b.timer >= 30) {
+        this.big += b.bigCount;
+        this.small += b.smallCount;
+        this.batches.splice(i, 1);
+      }
+    }
+  }
+}
+
 export class World {
   map: MapData;
   readonly players = new Map<number, Player>();
   readonly food = new Map<number, Food>();
   readonly tools = new Map<number, ToolItem>();
+  readonly treeSims: TreeSimState[] = [];
   tick = 0;
   time = 0;
   /** alive animals, heaviest first (refreshed every tick) */
@@ -135,6 +210,7 @@ export class World {
   constructor(seed: number = (Math.random() * 2 ** 31) | 0, opts: { bots?: boolean; food?: boolean; mode?: 'ffa' | 'team' | 'friend' } = {}) {
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
     this.map = generateMap(seed);
+    this.initTrees();
     this.mode = opts.mode ?? 'ffa';
     this.botsEnabled = opts.bots !== undefined ? opts.bots : (this.mode === 'ffa');
     if (this.mode === 'team' || this.mode === 'friend') {
@@ -146,6 +222,15 @@ export class World {
     }
     for (let i = 0; i < 6; i++) this.spawnTool();
     this.flush();
+  }
+
+  initTrees(): void {
+    this.treeSims.length = 0;
+    if (this.map.trees) {
+      for (const td of this.map.trees) {
+        this.treeSims.push(new TreeSimState(td));
+      }
+    }
   }
 
   rand(): number {
@@ -432,6 +517,10 @@ export class World {
       }
     }
 
+    for (const tree of this.treeSims) {
+      tree.step(DT);
+    }
+
     for (const p of this.players.values()) {
       if (!p.alive) {
         if (p.bot && (p.respawnT -= DT) <= 0) this.spawn(p);
@@ -489,6 +578,99 @@ export class World {
               p.dashT = 0;
               p.plow = false;
               this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 2 });
+            }
+          }
+        }
+
+        // 3 Fruit Trees: solid cylindrical obstacle collision + ramming shaking / fruit drop / 3s stun
+        if (this.treeSims.length > 0) {
+          for (const tree of this.treeSims) {
+            const dx = p.x - tree.x, dz = p.z - tree.z;
+            const d = Math.hypot(dx, dz);
+            const pr = radiusOf(p.mass);
+            const minD = tree.r + pr;
+            if (d < minD && d > 1e-6) {
+              const nx = dx / d, nz = dz / d;
+              p.x = tree.x + nx * minD;
+              p.z = tree.z + nz * minD;
+              const vn = p.vx * nx + p.vz * nz;
+              if (vn < 0) {
+                p.vx -= 1.6 * vn * nx;
+                p.vz -= 1.6 * vn * nz;
+              }
+
+              // Ramming check: dashing into the tree
+              if (p.dashT > 0 && tree.cooldownHit <= 0) {
+                tree.cooldownHit = 0.5;
+                p.plow = false;
+                p.charging = false;
+                p.holdT = 0;
+                p.pressed = false;
+                p.btnLatch = false;
+
+                // Mass requirements: 1000kg (Large, size 2), 500kg (Medium, size 1), 100kg (Small, size 0)
+                const reqMass = tree.size === 2 ? 1000 : tree.size === 1 ? 500 : 100;
+                const hasBigFruits = tree.big > 0;
+
+                if (hasBigFruits && p.mass >= reqMass) {
+                  // SUCCESSFUL RAM!
+                  // Stun for 3.0s
+                  p.stunT = 3.0;
+                  p.dashT = 0;
+                  p.vx = nx * 8;
+                  p.vz = nz * 8;
+
+                  // Each ram drops 1/3 of the remaining fruits
+                  const dropBig = Math.ceil(tree.big / 3);
+                  const dropSmall = Math.ceil(tree.small / 3);
+                  const totalDropped = dropBig + dropSmall;
+
+                  tree.big = Math.max(0, tree.big - dropBig);
+                  tree.small = Math.max(0, tree.small - dropSmall);
+
+                  // Drop fruits onto the ground as edible food
+                  for (let i = 0; i < dropBig; i++) {
+                    const ang = this.rnd() * Math.PI * 2;
+                    const dist = tree.r + 1.2 + this.rnd() * 3.5;
+                    const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+                    const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+                    this.addFood(fx, fz, 7, FOOD_KG[7]);
+                  }
+                  for (let i = 0; i < dropSmall; i++) {
+                    const ang = this.rnd() * Math.PI * 2;
+                    const dist = tree.r + 1.2 + this.rnd() * 3.5;
+                    const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+                    const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+                    this.addFood(fx, fz, 1, FOOD_KG[1]);
+                  }
+
+                  // Number of flowers born matches number of fruits dropped (starts 30s lifecycle)
+                  tree.batches.push({
+                    timer: 0,
+                    count: totalDropped,
+                    bigCount: dropBig,
+                    smallCount: dropSmall,
+                  });
+
+                  this.events.push({
+                    k: 'treeHit',
+                    id: tree.id,
+                    by: p.id,
+                    x: r2(tree.x),
+                    z: r2(tree.z),
+                    size: tree.size,
+                    droppedBig: dropBig,
+                    droppedSmall: dropSmall,
+                  });
+                } else {
+                  // Insufficient mass or no big fruits ready: bounce off trunk
+                  p.dashT = 0;
+                  p.stunT = Math.max(p.stunT, 0.8);
+                  p.vx = nx * 10;
+                  p.vz = nz * 10;
+                  this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 2 });
+                }
+              }
             }
           }
         }
@@ -1648,6 +1830,13 @@ export class World {
       reign: Math.round(this.napoleonReign),
       hof: hofList,
       podShield: [this.podiumShield, Math.ceil(this.podiumPhaseTimer)],
+      trees: this.treeSims.map((t): TreeSyncWire => [
+        t.id,
+        t.getStage(),
+        t.big,
+        t.small,
+        t.getFlowerCount(),
+      ]),
     };
     if (this.tillTruck.active) {
       snap.truck = [r2(this.tillTruck.x), r2(this.tillTruck.z), r2(this.tillTruck.angle)];

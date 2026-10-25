@@ -4,7 +4,7 @@ import { generateMap } from '../src/map';
 import { blobOutline, insideBlob, type Blob } from '../src/math';
 import { dashParams, outsideFence, stepMove } from '../src/physics';
 import { FLAG } from '../src/protocol';
-import { World, type Player } from '../src/sim/world';
+import { World, TreeSimState, type Player } from '../src/sim/world';
 
 /** a world with no bots and no food, so tests control everything */
 function emptyWorld(): World {
@@ -16,6 +16,8 @@ function emptyWorld(): World {
   w.map.mud.length = 0;
   w.map.well.length = 0;
   w.map.fire.length = 0;
+  w.map.trees = [];
+  w.treeSims.length = 0;
   w.map.podium = [45, 45];
   return w;
 }
@@ -1235,6 +1237,110 @@ describe('bonus weapons and tools', () => {
     expect(w.matchEnded).toBe(false);
     expect(w.matchClock).toBeLessThanOrEqual(60);
     expect(w.matchClock).toBeGreaterThan(55);
+  });
+});
+
+describe('fruit trees', () => {
+  it('generates 6 trees with correct sizes and fruit counts inside the fence', () => {
+    for (let s = 1; s <= 5; s++) {
+      const map = generateMap(s);
+      expect(map.trees).toBeDefined();
+      expect(map.trees.length).toBe(6);
+      const sizes = map.trees.map((t) => t.size);
+      expect(sizes).toEqual([2, 1, 0, 2, 1, 0]);
+
+      for (const t of map.trees) {
+        expect(Math.hypot(t.x, t.z) + t.r).toBeLessThan(CFG.R);
+        if (t.size === 2) {
+          expect(t.totalFruits).toBe(30);
+          expect(t.r).toBe(1.8);
+          expect(t.initBig).toBeGreaterThanOrEqual(18);
+          expect(t.initBig).toBeLessThanOrEqual(24);
+          expect(t.initSmall).toBe(30 - t.initBig);
+          expect(t.initBig).toBeGreaterThan(t.initSmall);
+        } else if (t.size === 1) {
+          expect(t.totalFruits).toBe(20);
+          expect(t.r).toBe(1.4);
+          expect(t.initBig).toBeGreaterThanOrEqual(12);
+          expect(t.initBig).toBeLessThanOrEqual(16);
+          expect(t.initSmall).toBe(20 - t.initBig);
+          expect(t.initBig).toBeGreaterThan(t.initSmall);
+        } else {
+          expect(t.totalFruits).toBe(10);
+          expect(t.r).toBe(1.0);
+          expect(t.initBig).toBeGreaterThanOrEqual(6);
+          expect(t.initBig).toBeLessThanOrEqual(8);
+          expect(t.initSmall).toBe(10 - t.initBig);
+          expect(t.initBig).toBeGreaterThan(t.initSmall);
+        }
+      }
+    }
+  });
+
+  it('progresses through 30s lifecycle: 10s flowers, 20s small fruit, 30s ripe big fruit', () => {
+    const w = new World(42, { bots: false, food: false });
+    const tree = w.treeSims[0];
+    expect(tree).toBeDefined();
+
+    // At t = 0s: stage 0 (buds)
+    expect(tree.getStage()).toBe(0);
+
+    // Advance 10s (200 ticks at 20Hz)
+    run(w, 200);
+    expect(tree.getStage()).toBe(1); // Flowers!
+    expect(tree.getFlowerCount()).toBe(tree.totalFruits);
+
+    // Advance to 20s (another 200 ticks)
+    run(w, 200);
+    expect(tree.getStage()).toBe(2); // Small fruits!
+
+    // Advance to 30s (another 200 ticks)
+    run(w, 200);
+    expect(tree.getStage()).toBe(3); // Big ripe fruits!
+    expect(tree.big).toBeGreaterThan(0);
+    expect(tree.small).toBeGreaterThan(0);
+    expect(tree.big + tree.small).toBe(tree.totalFruits);
+  });
+
+  it('requires mass thresholds to shake tree: 100kg (small), 500kg (medium), 1000kg (large)', () => {
+    const w = emptyWorld();
+    // Setup 3 trees: Small (size 0), Medium (size 1), Large (size 2)
+    const treeSmall = new TreeSimState({
+      id: 1, x: 20, z: 0, size: 0, r: 1.0, totalFruits: 10, initBig: 7, initSmall: 3,
+    });
+    // Fast-forward to ripe stage 3
+    treeSmall.big = 7;
+    treeSmall.small = 3;
+    treeSmall.batches.length = 0;
+    w.treeSims.push(treeSmall);
+
+    const idPig = w.addPlayer('Piggy', 'pig');
+    const pig = w.players.get(idPig)!;
+
+    // 1. Pig at 50kg (< 100kg requirement) rams small tree
+    pig.mass = 50;
+    pig.x = 17; pig.z = 0; pig.vx = 25; pig.vz = 0; pig.dashT = 0.2;
+    w.step();
+    // Pig bounced off, not 3s stun, 0 fruits dropped
+    expect(treeSmall.big).toBe(7);
+    expect(pig.stunT).toBeLessThan(1.0);
+
+    // 2. Pig at 100kg (>= 100kg requirement) rams small tree
+    pig.mass = 100;
+    pig.x = 17; pig.z = 0; pig.vx = 25; pig.vz = 0; pig.dashT = 0.2;
+    pig.stunT = 0;
+    treeSmall.cooldownHit = 0;
+    w.step();
+    // Successful ram: 3.0s stun, 1/3 fruits dropped!
+    expect(pig.stunT).toBeGreaterThanOrEqual(2.95);
+    expect(pig.stunT).toBeLessThanOrEqual(3.0);
+    // dropBig = ceil(7/3) = 3, dropSmall = ceil(3/3) = 1 => 4 fruits dropped
+    expect(treeSmall.big).toBe(4);
+    expect(treeSmall.small).toBe(2);
+    // 4 flowers born to begin 30s cycle
+    expect(treeSmall.batches.length).toBe(1);
+    expect(treeSmall.batches[0].count).toBe(4);
+    expect(w.events.some((e) => e.k === 'treeHit' && e.id === 1)).toBe(true);
   });
 });
 

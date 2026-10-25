@@ -105,7 +105,11 @@ export type GameEvent =
   | { k: 'dice'; id: number; roll: number }
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }
+  | { k: 'treeHit'; id: number; by: number; x: number; z: number; size: number; droppedBig: number; droppedSmall: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };
+
+/** [id, stage: 0..3, big, small, flowers] */
+export type TreeSyncWire = [id: number, stage: number, big: number, small: number, flowers: number];
 
 /** [id, name, mass, kills, reign?] */
 export type LeaderRow = [id: number, name: string, mass: number, kills: number, reign?: number];
@@ -142,6 +146,8 @@ export interface Snapshot {
   team?: [number, number, number] | [number, number, number, number, number];
   /** podium shield state: [shieldActive: boolean, timerSeconds: number] */
   podShield?: [boolean, number];
+  /** fruit trees sync state: [id, stage, big, small, flowers] */
+  trees?: TreeSyncWire[];
 }
 
 export type ServerMsg =

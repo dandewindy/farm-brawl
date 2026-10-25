@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CFG, radiusOf } from '@shared/constants';
-import type { MapData } from '@shared/map';
+import type { MapData, TreeData } from '@shared/map';
+import type { TreeSyncWire } from '@shared/protocol';
 import { blobOutline, type Blob } from '@shared/math';
 import { t } from '../i18n';
 import { getArenaTheme, type ArenaTheme } from '../theme';
@@ -672,6 +673,36 @@ export function shouldEnableAntialias(): boolean {
   return true;
 }
 
+export interface FarmFruitTreeVisual {
+  id: number;
+  x: number;
+  z: number;
+  size: 0 | 1 | 2;
+  group: THREE.Group;
+  trunkMesh: THREE.Mesh;
+  canopyGroup: THREE.Group;
+  flowerMeshes: THREE.Mesh[];
+  smallFruitMeshes: THREE.Mesh[];
+  bigFruitMeshes: THREE.Group[];
+  shakeTimer: number;
+  stage: number;
+  bigCount: number;
+  smallCount: number;
+  flowerCount: number;
+}
+
+export interface FallingFruit {
+  mesh: THREE.Mesh;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rotSpeed: number;
+  life: number;
+}
+
 export class WorldRenderer {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
@@ -680,6 +711,10 @@ export class WorldRenderer {
   private readonly hazardGroup = new THREE.Group();
   private readonly podiumGroup = new THREE.Group();
   private readonly podiumTileMats: THREE.MeshStandardMaterial[] = [];
+  private readonly farmTreeGroup = new THREE.Group();
+  private readonly farmTrees: FarmFruitTreeVisual[] = [];
+  private readonly fallingFruits: FallingFruit[] = [];
+  private lastMapData: MapData | null = null;
   private barnSignCanvas: HTMLCanvasElement | null = null;
   private barnSignTex: THREE.CanvasTexture | null = null;
   private shieldGroup: THREE.Group | null = null;
@@ -787,6 +822,7 @@ export class WorldRenderer {
     this.scene.add(this.treeGroup);
     this.scene.add(this.electricGroup);
     this.scene.add(this.hazardGroup);
+    this.scene.add(this.farmTreeGroup);
 
     this.tillTruck = buildTractor();
     this.tillTruck.group.visible = false;
@@ -896,6 +932,9 @@ export class WorldRenderer {
     }
     this.updateBarnSign();
     this.buildTrees(theme);
+    if (this.lastMapData) {
+      this.buildFarmFruitTrees(this.lastMapData.trees || []);
+    }
   }
 
   private buildFence(): void {
@@ -1511,9 +1550,11 @@ export class WorldRenderer {
   }
 
   buildMap(map: MapData): void {
+    this.lastMapData = map;
     this.hazardGroup.clear();
     this.flames.length = 0;
     this.podiumGroup.position.set(map.podium[0], 0, map.podium[1]);
+    this.buildFarmFruitTrees(map.trees || []);
 
     const T = this.tex;
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -1681,11 +1722,298 @@ export class WorldRenderer {
     }
   }
 
+  private buildFarmFruitTrees(trees: TreeData[]): void {
+    this.farmTreeGroup.clear();
+    this.farmTrees.length = 0;
+    const theme = getArenaTheme();
+
+    for (const t of trees) {
+      const g = new THREE.Group();
+      g.position.set(t.x, 0, t.z);
+
+      // Distinct sizes:
+      // Size 2 (Large, 1000kg): h ~ 7.5m, trunk r ~ 0.7m, canopy 3 tiers (r=4.2, 3.3, 2.3)
+      // Size 1 (Medium, 500kg): h ~ 5.4m, trunk r ~ 0.5m, canopy 2 tiers (r=3.1, 2.3)
+      // Size 0 (Small, 100kg): h ~ 3.8m, trunk r ~ 0.35m, canopy 1 tier (r=2.2)
+
+      const trunkH = t.size === 2 ? 4.5 : t.size === 1 ? 3.5 : 2.5;
+      const trunkRTop = t.size === 2 ? 0.65 : t.size === 1 ? 0.48 : 0.35;
+      const trunkRBot = t.size === 2 ? 0.95 : t.size === 1 ? 0.72 : 0.50;
+
+      const trunkMat = new THREE.MeshStandardMaterial({
+        color: theme === 'women_day' ? 0x4e342e : 0x5d3a1a,
+        roughness: 0.85,
+        flatShading: true,
+      });
+
+      const trunkMesh = new THREE.Mesh(new THREE.CylinderGeometry(trunkRTop, trunkRBot, trunkH, 7), trunkMat);
+      trunkMesh.position.y = trunkH * 0.5;
+      trunkMesh.castShadow = true;
+      trunkMesh.receiveShadow = true;
+      g.add(trunkMesh);
+
+      // Canopy group (animates/shakes on impact)
+      const canopyGroup = new THREE.Group();
+      g.add(canopyGroup);
+
+      // Foliage materials based on theme
+      const folMat1 = new THREE.MeshStandardMaterial({
+        color: theme === 'women_day' ? 0xd81b60 : 0x2e7d32,
+        roughness: 0.75,
+        flatShading: true,
+      });
+      const folMat2 = new THREE.MeshStandardMaterial({
+        color: theme === 'women_day' ? 0xec407a : 0x388e3c,
+        roughness: 0.75,
+        flatShading: true,
+      });
+      const folMat3 = new THREE.MeshStandardMaterial({
+        color: theme === 'women_day' ? 0xf48fb1 : 0x43a047,
+        roughness: 0.75,
+        flatShading: true,
+      });
+
+      // Tiers of canopy
+      if (t.size === 2) {
+        // Large: 3 tiers
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.2, 1), folMat1);
+        c1.position.y = 4.5;
+        c1.castShadow = true;
+        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(3.3, 1), folMat2);
+        c2.position.y = 6.3;
+        c2.castShadow = true;
+        const c3 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.3, 1), folMat3);
+        c3.position.y = 7.7;
+        c3.castShadow = true;
+        canopyGroup.add(c1, c2, c3);
+      } else if (t.size === 1) {
+        // Medium: 2 tiers
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(3.1, 1), folMat1);
+        c1.position.y = 3.6;
+        c1.castShadow = true;
+        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.3, 1), folMat2);
+        c2.position.y = 5.2;
+        c2.castShadow = true;
+        canopyGroup.add(c1, c2);
+      } else {
+        // Small: 1 tier
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.2, 1), folMat2);
+        c1.position.y = 2.8;
+        c1.castShadow = true;
+        canopyGroup.add(c1);
+      }
+
+      // Flowers on canopy
+      const flowerMeshes: THREE.Mesh[] = [];
+      const flowerCount = t.size === 2 ? 16 : t.size === 1 ? 10 : 6;
+      const flowerColors = theme === 'women_day'
+        ? [0xffffff, 0xff4081, 0xffeb3b]
+        : [0xfffff0, 0xffd54f, 0xfff9c4];
+
+      for (let i = 0; i < flowerCount; i++) {
+        const col = flowerColors[i % flowerColors.length];
+        const fMat = new THREE.MeshStandardMaterial({
+          color: col,
+          emissive: col === 0xffffff ? 0x333333 : 0x221100,
+          roughness: 0.35,
+          flatShading: true,
+        });
+        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.32 : 0.25, 6, 5), fMat);
+        const ang = (i / flowerCount) * Math.PI * 2 + (i % 2) * 0.3;
+        const tier = t.size === 2 ? (i % 3) : (i % 2);
+        const fY = t.size === 2 ? (tier === 0 ? 4.8 : tier === 1 ? 6.5 : 7.8) : t.size === 1 ? (tier === 0 ? 3.8 : 5.4) : 3.0;
+        const fR = t.size === 2 ? (tier === 0 ? 3.8 : tier === 1 ? 2.9 : 2.0) : t.size === 1 ? (tier === 0 ? 2.8 : 1.9) : 1.8;
+        fMesh.position.set(Math.cos(ang) * fR, fY, Math.sin(ang) * fR);
+        fMesh.visible = false;
+        canopyGroup.add(fMesh);
+        flowerMeshes.push(fMesh);
+      }
+
+      // Small Fruits (Red shiny apples)
+      const smallFruitMeshes: THREE.Mesh[] = [];
+      const smallFruitCount = t.size === 2 ? 8 : t.size === 1 ? 5 : 3;
+      const appleMat = new THREE.MeshStandardMaterial({
+        color: 0xe53935,
+        roughness: 0.3,
+        metalness: 0.1,
+      });
+      for (let i = 0; i < smallFruitCount; i++) {
+        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.28 : 0.22, 8, 7), appleMat);
+        const ang = (i / smallFruitCount) * Math.PI * 2 + 0.4;
+        const aY = t.size === 2 ? 4.2 : t.size === 1 ? 3.4 : 2.6;
+        const aR = t.size === 2 ? 3.6 : t.size === 1 ? 2.7 : 1.8;
+        aMesh.position.set(Math.cos(ang) * aR, aY, Math.sin(ang) * aR);
+        aMesh.visible = false;
+        canopyGroup.add(aMesh);
+        smallFruitMeshes.push(aMesh);
+      }
+
+      // Big Fruits (Large Striped Watermelons)
+      const bigFruitMeshes: THREE.Group[] = [];
+      const bigFruitCount = t.size === 2 ? 8 : t.size === 1 ? 5 : 3;
+      const melonMat = new THREE.MeshStandardMaterial({
+        color: 0x2e7d32,
+        roughness: 0.35,
+      });
+      for (let i = 0; i < bigFruitCount; i++) {
+        const mGroup = new THREE.Group();
+        const mBody = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.46 : 0.38, 10, 8), melonMat);
+        mBody.scale.set(1.0, 1.15, 1.0);
+        mGroup.add(mBody);
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.4 });
+        const stripe = new THREE.Mesh(new THREE.TorusGeometry(t.size === 2 ? 0.44 : 0.36, 0.04, 6, 12), stripeMat);
+        stripe.rotation.x = Math.PI / 2;
+        mGroup.add(stripe);
+
+        const ang = (i / bigFruitCount) * Math.PI * 2 + 0.1;
+        const mY = t.size === 2 ? 4.6 : t.size === 1 ? 3.6 : 2.7;
+        const mR = t.size === 2 ? 3.9 : t.size === 1 ? 2.9 : 2.0;
+        mGroup.position.set(Math.cos(ang) * mR, mY, Math.sin(ang) * mR);
+        mGroup.visible = false;
+        canopyGroup.add(mGroup);
+        bigFruitMeshes.push(mGroup);
+      }
+
+      this.farmTreeGroup.add(g);
+      this.farmTrees.push({
+        id: t.id,
+        x: t.x,
+        z: t.z,
+        size: t.size,
+        group: g,
+        trunkMesh,
+        canopyGroup,
+        flowerMeshes,
+        smallFruitMeshes,
+        bigFruitMeshes,
+        shakeTimer: 0,
+        stage: 0,
+        bigCount: 0,
+        smallCount: 0,
+        flowerCount: 0,
+      });
+    }
+  }
+
+  updateTrees(wireTrees: TreeSyncWire[]): void {
+    for (const [id, stage, big, small, flowers] of wireTrees) {
+      const vis = this.farmTrees.find((t) => t.id === id);
+      if (!vis) continue;
+      vis.stage = stage;
+      vis.bigCount = big;
+      vis.smallCount = small;
+      vis.flowerCount = flowers;
+
+      // Flowers visible: when stage === 1 or flowers > 0
+      const showFlowers = stage === 1 || flowers > 0;
+      vis.flowerMeshes.forEach((fm) => {
+        fm.visible = showFlowers;
+      });
+
+      // Small fruits visible: when stage >= 2 or small > 0
+      const showSmall = stage >= 2 || small > 0;
+      const smallSlots = vis.smallFruitMeshes.length;
+      const smallVisCount = showSmall
+        ? Math.max(1, Math.min(smallSlots, Math.ceil((small / (vis.size === 2 ? 12 : vis.size === 1 ? 8 : 4)) * smallSlots)))
+        : 0;
+      vis.smallFruitMeshes.forEach((sm, idx) => {
+        sm.visible = showSmall && idx < smallVisCount;
+      });
+
+      // Big ripe fruits visible: when stage === 3 or big > 0
+      const showBig = stage === 3 || big > 0;
+      const bigSlots = vis.bigFruitMeshes.length;
+      const bigVisCount = showBig
+        ? Math.max(1, Math.min(bigSlots, Math.ceil((big / (vis.size === 2 ? 24 : vis.size === 1 ? 16 : 8)) * bigSlots)))
+        : 0;
+      vis.bigFruitMeshes.forEach((bm, idx) => {
+        bm.visible = showBig && idx < bigVisCount;
+      });
+    }
+  }
+
+  onTreeHit(id: number, _by: number, x: number, z: number, size: number, droppedBig: number, droppedSmall: number): void {
+    const vis = this.farmTrees.find((t) => t.id === id);
+    if (vis) {
+      vis.shakeTimer = 1.2;
+    }
+
+    // Spawn falling fruit projectiles from canopy to ground
+    const canopyY = size === 2 ? 5.2 : size === 1 ? 4.0 : 3.0;
+    const totalDrop = Math.min(10, droppedBig + droppedSmall);
+    for (let i = 0; i < totalDrop; i++) {
+      const isBig = i < droppedBig;
+      const ang = Math.random() * Math.PI * 2;
+      const dist = (size === 2 ? 3.0 : size === 1 ? 2.2 : 1.5) * (0.6 + Math.random() * 0.5);
+      const startX = x + Math.cos(ang) * dist;
+      const startZ = z + Math.sin(ang) * dist;
+
+      const fruitGeo = new THREE.SphereGeometry(isBig ? 0.35 : 0.2, 7, 6);
+      const fruitMat = new THREE.MeshStandardMaterial({
+        color: isBig ? 0x2e7d32 : 0xe53935,
+        roughness: 0.35,
+      });
+      const mesh = new THREE.Mesh(fruitGeo, fruitMat);
+      mesh.position.set(startX, canopyY + Math.random() * 0.5, startZ);
+      this.scene.add(mesh);
+
+      const outAng = Math.atan2(startZ - z, startX - x) + (Math.random() - 0.5) * 0.6;
+      const speed = 3.5 + Math.random() * 4.0;
+      this.fallingFruits.push({
+        mesh,
+        x: startX,
+        y: canopyY,
+        z: startZ,
+        vx: Math.cos(outAng) * speed,
+        vy: 2.0 + Math.random() * 3.0,
+        vz: Math.sin(outAng) * speed,
+        rotSpeed: (Math.random() - 0.5) * 10,
+        life: 1.5,
+      });
+    }
+  }
+
+  private updateFarmTrees(dt: number, _now: number): void {
+    // 1. Shaking animation
+    for (const tree of this.farmTrees) {
+      if (tree.shakeTimer > 0) {
+        tree.shakeTimer = Math.max(0, tree.shakeTimer - dt);
+        const amp = Math.sin(tree.shakeTimer * 28) * 0.12 * Math.min(1, tree.shakeTimer);
+        tree.canopyGroup.rotation.z = amp;
+        tree.canopyGroup.rotation.x = Math.cos(tree.shakeTimer * 22) * amp * 0.7;
+      } else {
+        tree.canopyGroup.rotation.z = 0;
+        tree.canopyGroup.rotation.x = 0;
+      }
+    }
+
+    // 2. Falling fruit physics
+    for (let i = this.fallingFruits.length - 1; i >= 0; i--) {
+      const f = this.fallingFruits[i];
+      f.life -= dt;
+      f.vy -= 22 * dt;
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.z += f.vz * dt;
+      f.mesh.position.set(f.x, Math.max(0.2, f.y), f.z);
+      f.mesh.rotation.x += f.rotSpeed * dt;
+      f.mesh.rotation.y += f.rotSpeed * dt;
+
+      if (f.y <= 0.25 || f.life <= 0) {
+        this.scene.remove(f.mesh);
+        f.mesh.geometry.dispose();
+        (f.mesh.material as THREE.Material).dispose();
+        this.fallingFruits.splice(i, 1);
+      }
+    }
+  }
+
   updateHazards(
     now: number,
     parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void },
     playerPos?: { x: number; z: number }
   ): void {
+    this.updateFarmTrees(0.016, now);
     if (this.tex) {
       this.tex.waterMat.map!.offset.set(now * 0.000012, now * 0.000008);
       this.tex.rippleMat.map!.offset.set(-now * 0.00003, now * 0.00002);

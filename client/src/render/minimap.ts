@@ -77,6 +77,21 @@ export class MinimapRenderer {
     bCtx.arc(center + map.podium[0] * scale, center + map.podium[1] * scale, CFG.PODIUM_R * scale, 0, Math.PI * 2);
     bCtx.fillStyle = '#a5281b';
     bCtx.fill();
+
+    // Fruit Trees (lush foliage with trunk dot)
+    if (map.trees) {
+      for (const t of map.trees) {
+        const trR = (t.size === 2 ? 3.6 : t.size === 1 ? 2.6 : 1.8) * scale;
+        bCtx.beginPath();
+        bCtx.arc(center + t.x * scale, center + t.z * scale, trR, 0, Math.PI * 2);
+        bCtx.fillStyle = '#2e7d32';
+        bCtx.fill();
+        bCtx.beginPath();
+        bCtx.arc(center + t.x * scale, center + t.z * scale, trR * 0.45, 0, Math.PI * 2);
+        bCtx.fillStyle = '#5d3a1a';
+        bCtx.fill();
+      }
+    }
   }
 
   draw(
