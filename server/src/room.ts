@@ -19,6 +19,8 @@ export class GameRoom extends DurableObject {
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private nextTickTime = 0;
+  private tickAccumulator = 0;
+  private lastTickPerfTime = 0;
   private doColo = 'APAC';
 
   constructor(ctx: DurableObjectState, env: any) {
@@ -447,7 +449,7 @@ export class GameRoom extends DurableObject {
         if (typeof msg.dashSeq === 'number' && msg.dashSeq > 0) {
           this.playerLastDashSeq.set(playerId, msg.dashSeq);
         }
-        this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold, seq: msg.seq, dashSeq: msg.dashSeq });
+        this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold, seq: msg.seq, dashSeq: msg.dashSeq, eat: (msg as any).eat });
       }
     } else if (msg.t === 'ping') {
       ws.send(`{"t":"pong","c":${msg.c},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
@@ -513,7 +515,8 @@ export class GameRoom extends DurableObject {
 
   private startLoop(): void {
     if (this.loopTimer !== null) return;
-    this.nextTickTime = performance.now();
+    this.lastTickPerfTime = performance.now();
+    this.tickAccumulator = 0;
     this.scheduleNextTick();
   }
 
@@ -529,22 +532,23 @@ export class GameRoom extends DurableObject {
       this.checkRoomEmpty();
       return;
     }
-    const now = performance.now();
-    this.nextTickTime += TICK_MS;
-    if (now - this.nextTickTime > TICK_MS * 2) {
-      this.nextTickTime = now + TICK_MS;
-    }
-    const delay = Math.max(0, Math.round(this.nextTickTime - now));
     this.loopTimer = setTimeout(() => {
       this.tick();
       this.scheduleNextTick();
-    }, delay);
+    }, 25);
   }
 
   private tick(): void {
+    const now = performance.now();
+    let elapsed = this.lastTickPerfTime > 0 ? now - this.lastTickPerfTime : TICK_MS;
+    this.lastTickPerfTime = now;
+    if (elapsed < 0 || elapsed > 500) elapsed = TICK_MS;
+
+    this.tickAccumulator += elapsed;
+    if (this.tickAccumulator < TICK_MS) return;
+
     // Clean up expired disconnected sessions
     if (this.disconnectedPlayers.size > 0) {
-      const now = performance.now();
       for (const [token, entry] of this.disconnectedPlayers.entries()) {
         if (now - entry.disconnectTime > GRACE_PERIOD_MS) {
           this.disconnectedPlayers.delete(token);
@@ -563,7 +567,15 @@ export class GameRoom extends DurableObject {
       }
     }
 
-    this.world.step();
+    let steps = 0;
+    while (this.tickAccumulator >= TICK_MS && steps < 3) {
+      this.world.step();
+      this.tickAccumulator -= TICK_MS;
+      steps++;
+    }
+    if (this.tickAccumulator >= TICK_MS) {
+      this.tickAccumulator %= TICK_MS;
+    }
 
     // Broadcast authoritative snapshot to all human players
     const serverNow = Date.now();

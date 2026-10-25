@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CFG, radiusOf, type Species } from '@shared/constants';
-import { insideBlob, wrapAngle } from '@shared/math';
+import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
@@ -10,7 +10,7 @@ import {
   cycleAudioMode, getAudioMode, type AudioMode,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
-import { GameState } from './game/state';
+import { GameState, type FoodItem } from './game/state';
 import { applyTexts, getLanguage, t } from './i18n';
 import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
@@ -71,6 +71,78 @@ let inputSeq = 0;
 let lastSentInput = { a: 0, mv: false, btn: false };
 let lastSentTime = 0;
 
+let prevPredX = 0;
+let prevPredZ = 0;
+let hasPrevPred = false;
+
+interface OptimisticEatEntry {
+  foodId: number;
+  foodValue: number;
+  eatenAtPerf: number;
+}
+
+const optimisticEatenMap = new Map<number, OptimisticEatEntry>();
+const pendingEatHintsToSend: number[] = [];
+const OPTIMISTIC_EAT_EXPIRY_MS = 750;
+
+function runClientOptimisticFoodPass(
+  now: number,
+  prevX: number,
+  prevZ: number,
+  currX: number,
+  currZ: number,
+  currentMass: number,
+  foodMap: Map<number, FoodItem>,
+  onOptimisticEatVisual?: (foodId: number, x: number, z: number, value: number) => void
+): number {
+  for (const [fid, entry] of optimisticEatenMap.entries()) {
+    if (now - entry.eatenAtPerf > OPTIMISTIC_EAT_EXPIRY_MS) {
+      optimisticEatenMap.delete(fid);
+    }
+  }
+
+  const baseR = radiusOf(currentMass) + 0.45;
+  const baseRSq = baseR * baseR;
+  const minX = Math.min(prevX, currX) - baseR;
+  const maxX = Math.max(prevX, currX) + baseR;
+  const minZ = Math.min(prevZ, currZ) - baseR;
+  const maxZ = Math.max(prevZ, currZ) + baseR;
+
+  let optimisticMassBoost = 0;
+
+  for (const [fid, f] of foodMap.entries()) {
+    if (optimisticEatenMap.has(fid)) {
+      optimisticMassBoost += f.v;
+      continue;
+    }
+
+    if (f.x < minX || f.x > maxX || f.z < minZ || f.z > maxZ) continue;
+
+    const dSq = distToSegmentSq(f.x, f.z, prevX, prevZ, currX, currZ);
+    if (dSq <= baseRSq) {
+      optimisticEatenMap.set(fid, {
+        foodId: fid,
+        foodValue: f.v,
+        eatenAtPerf: now,
+      });
+      optimisticMassBoost += f.v;
+
+      if (!pendingEatHintsToSend.includes(fid)) {
+        pendingEatHintsToSend.push(fid);
+      }
+
+      const fx = f.x;
+      const fz = f.z;
+      const fv = f.v;
+
+      foodMap.delete(fid);
+      onOptimisticEatVisual?.(fid, fx, fz, fv);
+    }
+  }
+
+  return optimisticMassBoost;
+}
+
 input.onPressRam = () => {
   if (localStunTimer > 0) {
     input.cancelRam();
@@ -80,7 +152,8 @@ input.onPressRam = () => {
   if (transport && gameState.alive && localStunTimer <= 0) {
     inputSeq += 1;
     predictor.currentSeq = inputSeq;
-    transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: true });
+    const eatPayload = pendingEatHintsToSend.length > 0 ? pendingEatHintsToSend.splice(0, 6) : undefined;
+    transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: true, ...(eatPayload ? { eat: eatPayload } : {}) });
     lastSentInput = { a: input.aimA, mv: input.aimMove, btn: true };
     lastSentTime = performance.now();
   }
@@ -114,10 +187,11 @@ input.onReleaseRam = (held: number) => {
   }
   // Send btn: false immediately; only include hold if canDash was valid
   if (transport && gameState.alive) {
+    const eatPayload = pendingEatHintsToSend.length > 0 ? pendingEatHintsToSend.splice(0, 6) : undefined;
     if (canDash) {
-      transport.send({ t: 'input', seq: inputSeq, dashSeq: triggeredDashSeq, a: input.aimA, mv: input.aimMove, btn: false, hold: validHeld });
+      transport.send({ t: 'input', seq: inputSeq, dashSeq: triggeredDashSeq, a: input.aimA, mv: input.aimMove, btn: false, hold: validHeld, ...(eatPayload ? { eat: eatPayload } : {}) });
     } else {
-      transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: false });
+      transport.send({ t: 'input', seq: inputSeq, a: input.aimA, mv: input.aimMove, btn: false, ...(eatPayload ? { eat: eatPayload } : {}) });
     }
     lastSentInput = { a: input.aimA, mv: input.aimMove, btn: false };
     lastSentTime = performance.now();
@@ -1050,6 +1124,9 @@ const gameState = new GameState({
       gainTimer = 0;
       firstSpawn = true;
       predictor.on = false;
+      hasPrevPred = false;
+      pendingEatHintsToSend.length = 0;
+      optimisticEatenMap.clear();
     }
   },
   onEvent(ev: GameEvent) {
@@ -1057,6 +1134,11 @@ const gameState = new GameState({
   },
   onSnapshot(s: Snapshot) {
     tools.sync(s.tl || []);
+    if (Array.isArray(s.fr)) {
+      for (const id of s.fr) {
+        optimisticEatenMap.delete(id);
+      }
+    }
     let seenMe = false;
     for (const [id, x, z, _a, mass, flags, _charge] of s.p) {
       if (id === gameState.myId && gameState.alive) {
@@ -1080,12 +1162,23 @@ const gameState = new GameState({
           s.st
         );
 
-        hud.updateStats(mass, gameState.me.rank, gameState.total, gameState.me.kills);
+        let unackedBoost = 0;
+        const nowPerf = performance.now();
+        const ackWindow = currentRtt + 70;
+        for (const entry of optimisticEatenMap.values()) {
+          if (nowPerf - entry.eatenAtPerf < ackWindow) {
+            unackedBoost += entry.foodValue;
+          }
+        }
+
+        hud.updateStats(mass + unackedBoost, gameState.me.rank, gameState.total, gameState.me.kills);
         // Mass change tracking with accumulator matching original game
         if (gameState.alive && prevMass > 0 && mass !== prevMass) {
           gainAcc += mass - prevMass;
           if (mass > prevMass && mass - prevMass < 20) {
-            sfxEat(mass - prevMass >= 5);
+            if (optimisticEatenMap.size === 0) {
+              sfxEat(mass - prevMass >= 5);
+            }
           }
         }
         prevMass = mass;
@@ -1333,6 +1426,9 @@ function handleGameEvent(ev: GameEvent): void {
         localStunTimer = 0;
         wasStunnedLastFrame = false;
         predictor.on = false;
+        hasPrevPred = false;
+        pendingEatHintsToSend.length = 0;
+        optimisticEatenMap.clear();
         missingMeTicks = 0;
         isDeadAwaitingScreen = true;
         isSpectating = false;
@@ -1831,8 +1927,38 @@ function animate(now: number): void {
     const stepAimMove = isLocked ? false : input.aimMove;
     const stepHolding = isLocked ? false : input.holding;
 
-    // Authoritative client physics prediction step
+    // 1. Read input & evaluate if packet should be sent BEFORE predictor.step()
+    // Stamping inputSeq before predictor.step eliminates the 1-sequence window mismatch!
+    let inp = input.getInput();
+    if (isStunned) {
+      inp = { a: lockedAimA, mv: false, btn: false };
+    } else if (isSpectating) {
+      inp = { a: lastSentInput.a, mv: false, btn: false };
+    }
+    const btnChanged = inp.btn !== lastSentInput.btn;
+    const mvChanged = inp.mv !== lastSentInput.mv;
+    const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
+    const timeSinceLast = now - lastSentTime;
+    const maxInterval = inp.mv ? 33 : 100;
+    const shouldSendInput =
+      btnChanged ||
+      mvChanged ||
+      pendingEatHintsToSend.length > 0 ||
+      timeSinceLast >= maxInterval ||
+      (timeSinceLast >= 22 && angleDiff > 0.008);
+
+    if (shouldSendInput) {
+      inputSeq += 1;
+      predictor.currentSeq = inputSeq;
+    }
+
+    // 2. Authoritative client physics prediction step
     if (myMeta && me) {
+      if (!hasPrevPred) {
+        prevPredX = predictor.x;
+        prevPredZ = predictor.z;
+        hasPrevPred = true;
+      }
       const tillSpeedMult = gameState.truck !== undefined ? 1.5 : 1.0;
       predictor.step(
         dt,
@@ -1851,25 +1977,54 @@ function animate(now: number): void {
         tillSpeedMult,
         gameState.me.cd
       );
+
+      // 3. Swept segment-circle optimistic food eating (0ms Zero-Latency Eating)
+      if (gameState.alive && gameState.food && gameState.food.size > 0) {
+        const boostMass = runClientOptimisticFoodPass(
+          now,
+          prevPredX,
+          prevPredZ,
+          predictor.x,
+          predictor.z,
+          myMass,
+          gameState.food,
+          (_fid, fx, fz, val) => {
+            sfxEat(val >= 5);
+            foodParts.puff(fx, 0.4, fz, 0xffd54f, 0.6, 0.5, 1.2);
+          }
+        );
+
+        if (boostMass > 0) {
+          hud.updateStats(
+            myMass + boostMass,
+            gameState.me.rank,
+            gameState.total,
+            gameState.me.kills
+          );
+        }
+      }
+
+      prevPredX = predictor.x;
+      prevPredZ = predictor.z;
     }
 
-    // Rate-limited input transmission (completely locked while stunned or spectating)
-    let inp = input.getInput();
-    if (isStunned) {
-      inp = { a: lockedAimA, mv: false, btn: false };
-    } else if (isSpectating) {
-      inp = { a: lastSentInput.a, mv: false, btn: false };
-    }
-    const btnChanged = inp.btn !== lastSentInput.btn;
-    const mvChanged = inp.mv !== lastSentInput.mv;
-    const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
-    const timeSinceLast = now - lastSentTime;
-    const maxInterval = inp.mv ? 50 : 100;
+    // 4. Send rate-limited input packet with optimistic eat hints
+    if (shouldSendInput || pendingEatHintsToSend.length > 0) {
+      if (!shouldSendInput) {
+        inputSeq += 1;
+        predictor.currentSeq = inputSeq;
+      }
+      const eatPayload =
+        pendingEatHintsToSend.length > 0
+          ? pendingEatHintsToSend.splice(0, 6)
+          : undefined;
 
-    if (btnChanged || mvChanged || timeSinceLast >= maxInterval || (timeSinceLast >= 35 && angleDiff > 0.01)) {
-      inputSeq += 1;
-      predictor.currentSeq = inputSeq;
-      transport.send({ t: 'input', seq: inputSeq, ...inp });
+      transport.send({
+        t: 'input',
+        seq: inputSeq,
+        ...inp,
+        ...(eatPayload ? { eat: eatPayload } : {}),
+      });
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;
     }

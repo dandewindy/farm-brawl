@@ -255,21 +255,26 @@ export class ClientPredictor {
       return;
     }
 
-    // 4. Historical sample lookup
-    let then: PredSample | null = null;
-    if (ackSeq > 0) {
-      then = this.predAtSeq(ackSeq);
-    }
-    if (!then && typeof serverTime === 'number' && clockOff !== null) {
-      const exactClientPerfTime = serverTime - clockOff;
-      if (now - exactClientPerfTime >= 10 && now - exactClientPerfTime <= 1200) {
-        then = this.predAt(exactClientPerfTime);
+    // 4. Historical sample lookup via precise clock synchronization (avoids window-end bias of predAtSeq)
+    const minLookbackMs = Math.max(25, effectiveRtt * 0.55);
+    const maxLookbackMs = Math.min(260, effectiveRtt * 1.45 + 45);
+    const defaultLookbackMs = effectiveRtt * 0.85 + 18;
+
+    let targetTime = now - defaultLookbackMs;
+
+    if (typeof serverTime === 'number' && clockOff !== null) {
+      const serverSentPerfTime = serverTime - clockOff;
+      const estimatedClientSimTime = serverSentPerfTime - (effectiveRtt * 0.45 + 12);
+      const lookback = now - estimatedClientSimTime;
+
+      if (lookback >= minLookbackMs && lookback <= maxLookbackMs) {
+        targetTime = estimatedClientSimTime;
+      } else {
+        targetTime = now - Math.max(minLookbackMs, Math.min(maxLookbackMs, defaultLookbackMs));
       }
     }
-    if (!then) {
-      const transitDelay = Math.max(30, Math.min(180, effectiveRtt * 0.65 + 25));
-      then = this.predAt(now - transitDelay);
-    }
+
+    const then = this.predAt(targetTime);
     if (!then) return;
 
     // 5. Calculate error vector
@@ -284,15 +289,32 @@ export class ClientPredictor {
     }
 
     const inDashPhase = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
-    const deadzone = inDashPhase ? 1.2 : 0.20;
-    if (errorDist <= deadzone) {
-      return;
+
+    // 6. Longitudinal Tolerance Filter:
+    // When moving steadily, longitudinal error along (vx, vz) is predominantly network jitter.
+    // Filter out longitudinal jitter under 0.65m if lateral error is small (< 0.22m)
+    // to completely eliminate systematic backward jerking!
+    const speed = Math.hypot(then.vx, then.vz);
+    let deadzone = inDashPhase ? 1.35 : 0.25;
+
+    if (!inDashPhase && speed > 1.0) {
+      const dirX = then.vx / speed;
+      const dirZ = then.vz / speed;
+      const longitudinalErr = dx * dirX + dz * dirZ;
+      const lateralErr = Math.hypot(dx - longitudinalErr * dirX, dz - longitudinalErr * dirZ);
+
+      if (lateralErr < 0.22 && Math.abs(longitudinalErr) < 0.65) {
+        return;
+      }
+      deadzone = 0.40;
     }
+
+    if (errorDist <= deadzone) return;
 
     const excessRatio = (errorDist - deadzone) / errorDist;
     const effDx = dx * excessRatio;
     const effDz = dz * excessRatio;
-    const nudgeGain = inDashPhase ? 0.18 : 0.30;
+    const nudgeGain = inDashPhase ? 0.16 : 0.24;
 
     this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t);
     if (ackSeq > this.lastReconciledSeq) {

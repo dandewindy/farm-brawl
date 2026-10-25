@@ -6,7 +6,8 @@ import {
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type MapData, type TreeData, type TreeSize } from '../map';
-import { clamp, insideBlob, mulberry32 } from '../math';
+import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
+export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
   FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
@@ -52,6 +53,9 @@ export interface Player extends Body {
   flyT: number;
   lastEatT: number;
   squishT: number;
+  prevX?: number;
+  prevZ?: number;
+  pendingEatHints?: number[];
   team?: number;
   origSpecies?: Species;
   ai: BotBrain | null;
@@ -308,6 +312,15 @@ export class World {
       p.releaseAimA = p.input.a;
     }
     if (p.input.btn) p.btnLatch = true;
+    if (Array.isArray(inp.eat) && inp.eat.length > 0) {
+      if (!p.pendingEatHints) p.pendingEatHints = [];
+      for (let i = 0; i < Math.min(6, inp.eat.length); i++) {
+        const fid = Number(inp.eat[i]);
+        if (Number.isInteger(fid) && fid >= 0 && !p.pendingEatHints.includes(fid)) {
+          p.pendingEatHints.push(fid);
+        }
+      }
+    }
   }
 
   meta(p: Player): PlayerMeta {
@@ -531,6 +544,10 @@ export class World {
     }
 
     const alive = [...this.players.values()].filter((p) => p.alive);
+    for (const p of alive) {
+      p.prevX = p.x;
+      p.prevZ = p.z;
+    }
     const h = DT / SUBSTEPS;
     for (let s = 0; s < SUBSTEPS; s++) {
       for (const p of alive) {
@@ -1626,38 +1643,71 @@ export class World {
   // ------------------------------------------------------------------ food
 
   private eat(list: Player[]): void {
+    const consumeFood = (p: Player, f: Food) => {
+      let gain = f.v;
+      if (f.k === 6) {
+        p.superT = 10;
+        p.flyT = 0;
+        p.score = (p.score || 0) + 150;
+        if (p.team !== undefined) {
+          this.teamScores[p.team] += 3;
+        }
+        this.events.push({ k: 'super', id: p.id });
+      }
+      // Rule: "corn" (Corn is for pigs and Napoleon: 3x value, 1/3 for others)
+      if (this.currentRule === 'corn' && (f.k === 0 || f.k === 2)) {
+        if (p.species === 'pig' || p.id === this.napoleonId) {
+          gain *= 3;
+        } else {
+          gain = Math.max(0.5, gain / 3);
+        }
+      }
+      p.mass += gain;
+      p.best = Math.max(p.best, p.mass);
+      p.score = (p.score || 0) + Math.round(gain * 2);
+      p.lastEatT = this.time;
+      this.food.delete(f.id);
+      this.foodRemoved.push(f.id);
+    };
+
     for (const p of list) {
       if (!p.alive) continue;
       // Cannot eat food for 0.3s right after being rammed (prevents instantly re-eating dropped food while flying)
       if (this.time - p.lastHitT < 0.3) continue;
-      const r = radiusOf(p.mass) + 0.4;
+
+      const baseR = radiusOf(p.mass) + 0.45;
+      const baseRSq = baseR * baseR;
+      const prevX = p.prevX ?? p.x;
+      const prevZ = p.prevZ ?? p.z;
+
+      // BƯỚC A: Xử lý Lag-Compensated Eat Hints từ Client (chống cắt góc khi bẻ lái)
+      if (p.pendingEatHints && p.pendingEatHints.length > 0) {
+        const lagCompR = baseR + 1.35;
+        const lagCompRSq = lagCompR * lagCompR;
+
+        for (const hintedId of p.pendingEatHints) {
+          const f = this.food.get(hintedId);
+          if (!f) continue;
+          const dSq = distToSegmentSq(f.x, f.z, prevX, prevZ, p.x, p.z);
+          if (dSq <= lagCompRSq) {
+            consumeFood(p, f);
+          }
+        }
+        p.pendingEatHints.length = 0;
+      }
+
+      // BƯỚC B: Quét va chạm đoạn thẳng (Swept Segment-Circle) chuẩn trên Server
+      const minX = Math.min(prevX, p.x) - baseR;
+      const maxX = Math.max(prevX, p.x) + baseR;
+      const minZ = Math.min(prevZ, p.z) - baseR;
+      const maxZ = Math.max(prevZ, p.z) + baseR;
+
       for (const f of this.food.values()) {
-        const dx = f.x - p.x, dz = f.z - p.z;
-        if (dx > r || dx < -r || dz > r || dz < -r || dx * dx + dz * dz > r * r) continue;
-        let gain = f.v;
-        if (f.k === 6) {
-          p.superT = 10;
-          p.flyT = 0;
-          p.score = (p.score || 0) + 150;
-          if (p.team !== undefined) {
-            this.teamScores[p.team] += 3;
-          }
-          this.events.push({ k: 'super', id: p.id });
+        if (f.x < minX || f.x > maxX || f.z < minZ || f.z > maxZ) continue;
+        const dSq = distToSegmentSq(f.x, f.z, prevX, prevZ, p.x, p.z);
+        if (dSq <= baseRSq) {
+          consumeFood(p, f);
         }
-        // Rule: "corn" (Corn is for pigs and Napoleon: 3x value, 1/3 for others)
-        if (this.currentRule === 'corn' && (f.k === 0 || f.k === 2)) {
-          if (p.species === 'pig' || p.id === this.napoleonId) {
-            gain *= 3;
-          } else {
-            gain = Math.max(0.5, gain / 3);
-          }
-        }
-        p.mass += gain;
-        p.best = Math.max(p.best, p.mass);
-        p.score = (p.score || 0) + Math.round(gain * 2);
-        p.lastEatT = this.time;
-        this.food.delete(f.id);
-        this.foodRemoved.push(f.id);
       }
     }
   }

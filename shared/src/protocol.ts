@@ -16,6 +16,8 @@ export interface Input {
   seq?: number;
   /** dash sequence number when a dash is triggered */
   dashSeq?: number;
+  /** optimistic food IDs touched by client */
+  eat?: number[];
 }
 
 export interface PlayerMeta {

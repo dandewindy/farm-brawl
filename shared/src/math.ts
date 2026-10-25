@@ -48,3 +48,35 @@ export function blobOutline(b: Blob, extra = 0, n = 48): [number, number][] {
   }
   return pts;
 }
+
+/**
+ * Tính bình phương khoảng cách ngắn nhất từ điểm F(fx, fz) tới đoạn thẳng AB[(ax, az) -> (bx, bz)].
+ * Giúp phát hiện chính xác 100% va chạm thức ăn dọc theo toàn bộ quỹ đạo di chuyển trong 50ms tick,
+ * triệt tiêu hoàn toàn lỗi đi xuyên qua thức ăn (Discrete Tunneling) khi chạy nhanh hoặc Dash.
+ */
+export function distToSegmentSq(
+  fx: number,
+  fz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number
+): number {
+  const abx = bx - ax;
+  const abz = bz - az;
+  const lenSq = abx * abx + abz * abz;
+  if (lenSq < 0.00001) {
+    const dx = fx - bx;
+    const dz = fz - bz;
+    return dx * dx + dz * dz;
+  }
+  const apx = fx - ax;
+  const apz = fz - az;
+  const t = Math.max(0, Math.min(1, (apx * abx + apz * abz) / lenSq));
+  const closestX = ax + t * abx;
+  const closestZ = az + t * abz;
+  const dx = fx - closestX;
+  const dz = fz - closestZ;
+  return dx * dx + dz * dz;
+}
+
