@@ -25,6 +25,11 @@ export class WsClient implements Transport {
   private lobbySteerAttempts = 0;
   private currentPingDelay = 500;
 
+  // Khóa chống probe liên tục khi ISP cố định tuyến Anycast sang châu Âu
+  private routeLockedUntil = 0;
+  private endpointIdx = 0;
+  private readonly endpoints: string[];
+
   // In-Game Zero-Downtime Hot Migration
   public isMigrating = false;
   private migrationWs: WebSocket | null = null;
@@ -37,12 +42,25 @@ export class WsClient implements Transport {
   constructor(
     private readonly url: string,
     private readonly onMsg: Handler,
-    private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void
+    private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void,
+    altUrls: string[] = []
   ) {
+    this.endpoints = [url, ...altUrls.filter((u) => u && u !== url)];
     try {
       this.sessionToken = sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) || sessionStorage.getItem('fb_session_token');
     } catch (_) {}
     this.connect();
+  }
+
+  private getActiveUrl(): string {
+    return this.endpoints[this.endpointIdx % this.endpoints.length];
+  }
+
+  private nextEndpointUrl(): string {
+    if (this.endpoints.length > 1) {
+      this.endpointIdx = (this.endpointIdx + 1) % this.endpoints.length;
+    }
+    return this.getActiveUrl();
   }
 
   private getRoomKey(): string {
@@ -54,17 +72,18 @@ export class WsClient implements Transport {
     }
   }
 
-  private connect(): void {
+  private connect(customUrl?: string): void {
     if (this.closed) return;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
+      clearTimeout(this.migrationRetryTimer ?? undefined);
       this.reconnectTimer = null;
     }
     this.onStatus?.('connecting');
 
     let socket: WebSocket;
     try {
-      socket = new WebSocket(this.url);
+      socket = new WebSocket(customUrl || this.getActiveUrl());
       this.ws = socket;
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
@@ -124,48 +143,45 @@ export class WsClient implements Transport {
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
               const onFastNode = isFastColo(this.colo);
+              const now = performance.now();
 
-              if (onFastNode) this.lobbySteerAttempts = 0;
+              if (onFastNode) {
+                this.lobbySteerAttempts = 0;
+                this.routeLockedUntil = 0;
+              }
 
-              // Bad ping streak:
-              // <= 90ms on fast node: excellent → reset
-              // > 90ms on fast node: suboptimal → increment (seek better route)
-              // Non-fast node: immediately alert
-              if (onFastNode && this.rtt <= 85 && s <= 95) {
+              // Chỉ tăng badPingStreak khi không bị khóa route
+              if (onFastNode && this.rtt <= 90 && s <= 105) {
                 this.badPingStreak = 0;
-              } else if (!onFastNode) {
-                this.badPingStreak = Math.max(3, this.badPingStreak + 1);
+              } else if (now < this.routeLockedUntil) {
+                this.badPingStreak = 0;
               } else {
                 this.badPingStreak++;
               }
 
-              // Ping faster when suboptimal (> 85ms) to accelerate route probing
-              const targetDelay = this.rtt > 85 || !onFastNode ? 300 : 500;
+              const targetDelay = (this.rtt > 90 || !onFastNode) && now >= this.routeLockedUntil ? 400 : 500;
               if (targetDelay !== this.currentPingDelay) {
                 this.currentPingDelay = targetDelay;
                 this.startPing();
               }
 
               // ── LOBBY STEER ──
-              // When in lobby with elevated ping (> 100ms), actively reconnect to find a lower-latency route
-              if (!this.inGame && this.rtt > 100 && !this.closed) {
-                if (this.rttWin.length >= 2 && this.lobbySteerAttempts < 3) {
-                  const now = performance.now();
-                  if (now - this.lastLobbyReconnectTime > 3500) {
+              if (!this.inGame && !onFastNode && this.rtt > 120 && !this.closed && now >= this.routeLockedUntil) {
+                if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
+                  if (now - this.lastLobbyReconnectTime > 5000) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
-                    console.log(`[WS] Lobby steer: ${this.colo} ~${Math.round(this.rtt)}ms, attempt ${this.lobbySteerAttempts}/3`);
+                    this.nextEndpointUrl();
+                    console.log(`[WS] Lobby steer: ${this.colo} ~${Math.round(this.rtt)}ms, attempt ${this.lobbySteerAttempts}/2`);
                     this.forceReconnect();
                   }
+                } else if (this.lobbySteerAttempts >= 2) {
+                  this.routeLockedUntil = now + 60000;
                 }
               }
 
               // ── IN-GAME ZERO-DOWNTIME MIGRATION ──
-              // When ping > 90ms for 3+ consecutive pongs, silently probe for a faster route.
-              // This NEVER interrupts gameplay — it opens a separate probe socket.
-              // If the probe finds a faster route, it seamlessly swaps the socket (zero-downtime).
-              // If not, nothing happens and the player keeps playing normally.
-              if (this.inGame && this.badPingStreak >= 3 && !this.closed) {
+              if (this.inGame && this.rttWin.length >= 4 && this.badPingStreak >= 4 && !this.closed && now >= this.routeLockedUntil) {
                 this.triggerHotMigration();
               }
             }
@@ -196,8 +212,8 @@ export class WsClient implements Transport {
     socket.onclose = (ev) => {
       if (this.ws !== socket) return;
       this.stopPing();
-      if (this.isMigrating || this.migrationWs !== null) return;
       if (ev.reason === 'Handover') return;
+      if (this.isMigrating && this.migrationWs !== null) return;
       this.isReconnecting = true;
       this.onStatus?.('closed');
       this.scheduleReconnect();
@@ -205,28 +221,49 @@ export class WsClient implements Transport {
 
     socket.onerror = () => {
       if (this.ws !== socket) return;
-      if (this.isMigrating || this.migrationWs !== null) return;
+      if (this.isMigrating && this.migrationWs !== null) return;
       this.onStatus?.('error');
     };
   }
 
-  public triggerHotMigration(): void {
+  private abortProbe(probeSocket: WebSocket, probeTimeout: number): void {
+    clearTimeout(probeTimeout);
+    if (this.migrationWs === probeSocket) {
+      this.migrationWs = null;
+      this.isMigrating = false;
+    }
+    try {
+      probeSocket.onopen = null;
+      probeSocket.onmessage = null;
+      probeSocket.onclose = null;
+      probeSocket.onerror = null;
+      probeSocket.close();
+    } catch (_) {}
+
+    // Cứu hộ Deadlock: Nếu socket chính đã đóng trong lúc đang probe, phải kết nối lại ngay!
+    if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
+      this.isReconnecting = true;
+      this.scheduleReconnect();
+    }
+  }
+
+  public triggerHotMigration(isManual = false): void {
     if (!this.inGame || this.closed) return;
     const now = performance.now();
-    // Throttle: probe at most once every 3s
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 3000) return;
+    if (this.migrationWs !== null || (!isManual && now - this.lastMigrationProbeTime < 6000)) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
-    this.onMigrationStatus?.('probing', this.colo);
-    console.log(`[WS] Probe: current ${this.colo} ~${Math.round(this.rtt)}ms, seeking faster route...`);
+    if (isManual) {
+      this.onMigrationStatus?.('probing', this.colo);
+    }
 
-    const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
+    const baseTargetUrl = this.nextEndpointUrl();
+    const probeUrl = baseTargetUrl + (baseTargetUrl.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
     let probeSocket: WebSocket;
     try {
       probeSocket = new WebSocket(probeUrl);
       this.migrationWs = probeSocket;
     } catch (e) {
-      console.warn('[WS] Failed to create probe socket:', e);
       this.isMigrating = false;
       this.onMigrationStatus?.('failed', this.colo);
       return;
@@ -234,26 +271,23 @@ export class WsClient implements Transport {
 
     const probeTimeout = window.setTimeout(() => {
       if (this.migrationWs === probeSocket) {
-        try { probeSocket.close(); } catch (_) {}
-        this.migrationWs = null;
-        this.isMigrating = false;
         this.probeAttempts++;
+        this.abortProbe(probeSocket, probeTimeout);
         this.onMigrationStatus?.('failed', this.colo);
-        // After 5 failed probes, accept current route (ISP won't change Anycast routing)
-        if (this.probeAttempts >= 5) {
+        if (this.probeAttempts >= 3) {
           this.probeAttempts = 0;
           this.badPingStreak = 0;
-          console.log('[WS] Accepting current route after 5 failed probes.');
+          this.routeLockedUntil = performance.now() + 90000;
         }
       }
     }, 2500);
 
     let pendingInit: ServerMsg | null = null;
+    let hadExistingSession = false;
 
     probeSocket.onopen = () => {
       if (this.migrationWs !== probeSocket || this.closed) {
-        clearTimeout(probeTimeout);
-        probeSocket.close();
+        this.abortProbe(probeSocket, probeTimeout);
         return;
       }
       probeSocket.send(JSON.stringify({ t: 'ping', c: Math.round(performance.now()) }));
@@ -267,7 +301,6 @@ export class WsClient implements Transport {
         if (msg.t === 'pong') {
           const probeColo = msg.colo;
           const probeRtt = performance.now() - msg.c;
-          console.log(`[WS] Probe: ${probeColo} ~${Math.round(probeRtt)}ms vs current ${this.colo} ~${Math.round(this.rtt)}ms`);
 
           const probeIsFast = isFastColo(probeColo);
           const currentIsFast = isFastColo(this.colo);
@@ -275,47 +308,41 @@ export class WsClient implements Transport {
 
           if (probeRtt > 0) {
             if (!currentIsFast && probeIsFast) {
-              // Non-Asian → Asian: always switch
+              // Từ trạm ngoài châu Á chuyển về trạm châu Á: luôn chuyển!
               shouldSwitch = true;
-            } else if (probeColo !== this.colo && probeIsFast && probeRtt < this.rtt - 10) {
-              // Different faster Asian POP (e.g. HKG ~85ms → SIN ~45ms)
+            } else if (probeIsFast && currentIsFast && probeColo !== this.colo && probeRtt < this.rtt - 15) {
+              // Cùng châu Á nhưng khác POP và nhanh hơn >= 15ms
               shouldSwitch = true;
-            } else if (probeRtt < this.rtt - 20) {
-              // Any route (including fresh connection to same POP) that is >= 20ms faster: switch!
+            } else if (probeIsFast && probeRtt < this.rtt - 25 && probeRtt < this.rtt * 0.78) {
+              // Tuyến mới giảm ít nhất 25ms và > 22% RTT
               shouldSwitch = true;
-            } else if (this.rtt > 85 && probeRtt < this.rtt * 0.8) {
-              // At least 20% latency reduction when current ping is elevated: switch!
+            } else if (!currentIsFast && !probeIsFast && probeColo !== this.colo && probeRtt < this.rtt - 45) {
+              // Cả 2 đều ngoài châu Á: CHỈ chuyển nếu khác trạm và nhanh hơn hẳn 45ms (chặn loop FRA -> FRA)
               shouldSwitch = true;
             }
           }
 
           if (shouldSwitch && this.lastJoinMsg) {
-            this.probeAttempts = 0;
-            console.log(`[WS] Switching: ${this.colo} ~${Math.round(this.rtt)}ms → ${probeColo} ~${Math.round(probeRtt)}ms`);
+            if (probeIsFast) this.probeAttempts = 0;
+            hadExistingSession = !!this.sessionToken;
             probeSocket.send(JSON.stringify({
               ...this.lastJoinMsg,
               token: this.sessionToken || undefined,
             }));
           } else {
-            clearTimeout(probeTimeout);
-            try { probeSocket.close(); } catch (_) {}
-            this.migrationWs = null;
-            this.isMigrating = false;
             this.probeAttempts++;
+            this.abortProbe(probeSocket, probeTimeout);
             this.onMigrationStatus?.('failed', this.colo);
-            if (this.probeAttempts >= 6) {
+            if (this.probeAttempts >= 3) {
               this.probeAttempts = 0;
               this.badPingStreak = 0;
-              console.log('[WS] Accepting current route after 6 failed probes.');
+              this.routeLockedUntil = performance.now() + 90000;
             }
           }
         } else if (msg.t === 'init') {
           pendingInit = msg;
         } else if (msg.t === 'joined') {
-          // Seamless handover complete! Swap sockets without disruption.
           clearTimeout(probeTimeout);
-          this.probeAttempts = 0;
-          console.log(`[WS] Migrated: ${this.colo} → ${msg.colo || 'unknown'} (zero-downtime, no respawn)`);
           const oldWs = this.ws;
           this.ws = probeSocket;
           this.migrationWs = null;
@@ -334,6 +361,13 @@ export class WsClient implements Transport {
           this.badPingStreak = 0;
           this.currentPingDelay = 500;
 
+          if (!isFastColo(this.colo)) {
+            this.routeLockedUntil = performance.now() + 90000;
+          } else {
+            this.probeAttempts = 0;
+            this.routeLockedUntil = 0;
+          }
+
           if (oldWs) {
             oldWs.onopen = null;
             oldWs.onmessage = null;
@@ -344,7 +378,11 @@ export class WsClient implements Transport {
 
           this.bindActiveSocket(probeSocket);
           this.startPing();
-          if (pendingInit) this.onMsg(pendingInit);
+
+          // Chỉ nạp init nếu chưa từng có session (không reset map khi đang chơi)
+          if (pendingInit && !hadExistingSession) {
+            this.onMsg(pendingInit);
+          }
           this.onMsg(msg);
           this.onMigrationStatus?.('migrated', this.colo);
           this.onMigrationSuccess?.(this.colo);
@@ -357,13 +395,8 @@ export class WsClient implements Transport {
     };
 
     const cleanupProbe = () => {
-      clearTimeout(probeTimeout);
       if (this.migrationWs === probeSocket) {
-        this.migrationWs = null;
-        this.isMigrating = false;
-        if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
-          this.scheduleReconnect();
-        }
+        this.abortProbe(probeSocket, probeTimeout);
       }
     };
     probeSocket.onclose = cleanupProbe;
@@ -442,7 +475,8 @@ export class WsClient implements Transport {
 
   public manualRetune(): void {
     if (this.closed) return;
-    this.badPingStreak = 3;
+    this.routeLockedUntil = 0;
+    this.badPingStreak = 4;
     this.probeAttempts = 0;
     if (this.inGame) {
       if (this.migrationWs) {
@@ -451,8 +485,9 @@ export class WsClient implements Transport {
         this.isMigrating = false;
       }
       this.lastMigrationProbeTime = 0;
-      this.triggerHotMigration();
+      this.triggerHotMigration(true);
     } else {
+      this.nextEndpointUrl();
       this.forceReconnect();
     }
   }

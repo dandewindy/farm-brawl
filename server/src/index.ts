@@ -7,9 +7,19 @@ export interface Env {
   ASSETS?: Fetcher;
 }
 
-function getTargetLocationHint(_request: Request): string {
-  // Always lock all Durable Objects strictly to Southeast Asia ('apac-se' - Singapore) for ~30-40ms latency in Vietnam.
-  return 'apac-se';
+function getTargetLocationHint(_request: Request): DurableObjectLocationHint {
+  // 'apac' là mã chuẩn của Cloudflare cho vùng Châu Á - Thái Bình Dương (Singapore, Tokyo, Hong Kong)
+  return 'apac';
+}
+
+function resolveRoomKey(roomParam: string): string {
+  // Tăng version lên v13 để Cloudflare hủy các Durable Object cũ đang bị ghim ở châu Âu
+  if (roomParam === 'pub-1') return 'pub-apac-v13';
+  if (roomParam === 'team-1') return 'team-apac-v13';
+  if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
+    return `${roomParam}-apac-v13`;
+  }
+  return `${roomParam}-apac-v13`;
 }
 
 export default {
@@ -20,15 +30,7 @@ export default {
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const roomParam = url.searchParams.get('room') || 'pub-1';
       const hint = getTargetLocationHint(request);
-      // Route default rooms to fresh Southeast Asia (Singapore) Durable Objects for ~30ms ping
-      let targetRoomKey = roomParam;
-      if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sin-v12';
-      } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sin-v12';
-      } else if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
-        targetRoomKey = `${roomParam}-sin2`;
-      }
+      const targetRoomKey = resolveRoomKey(roomParam);
 
       const cf = (request as any).cf;
       const cfRay = request.headers.get('cf-ray') || '';
@@ -39,8 +41,7 @@ export default {
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
 
-      // Pass request with colo query param to report real Edge POP
-      return roomStub.fetch(url.toString(), request);
+      return roomStub.fetch(new Request(url.toString(), request));
     }
 
     // Health check endpoint with zero-caching for rapid client watchdog probing
@@ -67,14 +68,7 @@ export default {
     if (url.pathname === '/api/room-info') {
       const roomParam = url.searchParams.get('room') || 'pub-1';
       const hint = getTargetLocationHint(request);
-      let targetRoomKey = roomParam;
-      if (roomParam === 'pub-1') {
-        targetRoomKey = 'pub-sin-v12';
-      } else if (roomParam === 'team-1') {
-        targetRoomKey = 'team-sin-v12';
-      } else if (roomParam.startsWith('priv-') || roomParam.startsWith('friend-')) {
-        targetRoomKey = `${roomParam}-sin2`;
-      }
+      const targetRoomKey = resolveRoomKey(roomParam);
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });

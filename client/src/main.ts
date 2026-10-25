@@ -1606,7 +1606,13 @@ function getClientId(): string {
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = isViteDev ? 'localhost:8787' : window.location.host;
-  const wsUrl = `${proto}//${host}/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
+  const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
+  const wsUrl = `${proto}//${host}${query}`;
+
+  const altWorkerUrl = !isViteDev && !host.includes('workers.dev')
+    ? `wss://farm-brawl.farm-brawl.workers.dev${query}`
+    : '';
+  const altUrls = altWorkerUrl ? [altWorkerUrl] : [];
 
   transport = new WsClient(
     wsUrl,
@@ -1655,7 +1661,8 @@ function getClientId(): string {
           gameState.handle(m);
         });
       }
-    }
+    },
+    altUrls
   );
 
   if (transport) {
