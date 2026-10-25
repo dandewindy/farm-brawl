@@ -45,9 +45,6 @@ export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolea
 function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult: number): void {
   if (dt <= 1e-6) return;
   const stunned = b.stunT > 0;
-  const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
-  const speed = Math.hypot(b.vx, b.vz);
-
   if (b.dashT > 0) {
     const d = Math.exp(-1.2 * dt);
     b.vx *= d;
@@ -56,21 +53,26 @@ function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain,
     const d = Math.exp(-6.0 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (speed > ms * 1.05) {
-    // Đang bị va đập hoặc knockback văng đi (bị húc / nổ): bảo toàn quán tính bay dạt tự nhiên
-    const d = Math.exp(-4.5 * dt);
-    b.vx *= d;
-    b.vz *= d;
   } else if (!inp.mv) {
-    // Phanh chủ động dứt khoát khi dừng di chuyển: dừng ngay lập tức, không trượt quán tính như trên băng
-    const d = Math.exp(-25.0 * dt);
-    b.vx *= d;
-    b.vz *= d;
-    if (Math.hypot(b.vx, b.vz) < 0.05) {
-      b.vx = 0;
-      b.vz = 0;
+    const speed = Math.hypot(b.vx, b.vz);
+    if (speed > 14.0) {
+      // Đang bay do bị húc văng: giữ quán tính knockback bay dạt tự nhiên
+      const d = Math.exp(-4.5 * dt);
+      b.vx *= d;
+      b.vz *= d;
+    } else {
+      // Dừng đi bộ bình thường: phanh dứt khoát, không trượt quán tính
+      const d = Math.exp(-25.0 * dt);
+      b.vx *= d;
+      b.vz *= d;
+      if (speed < 0.05) {
+        b.vx = 0;
+        b.vz = 0;
+      }
     }
   } else {
+    // Luôn điều khiển lái mượt mà theo góc ngắm, không khóa lái hay giật chậm lại khi quay xe
+    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
     const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.15) * terrainFactor(sp, t);
     // Dùng hàm mũ để bất biến với mọi dt (60Hz, 144Hz hay 40Hz substep trên server)
     const k = 1 - Math.exp(-accelRate * dt);

@@ -127,30 +127,15 @@ export class ClientPredictor {
     const now = performance.now();
     const isServerStun = (flags & 8) !== 0;
 
-    // 0. Tính vận tốc server giữa 2 snapshot liên tiếp:
-    const tickDt = 0.05;
-    const ticksPassed = snapTick > this.sTick && this.sTick > 0 ? snapTick - this.sTick : 1;
-    const sVx = this.sTick > 0 ? (serverX - this.sx) / (ticksPassed * tickDt) : 0;
-    const sVz = this.sTick > 0 ? (serverZ - this.sz) / (ticksPassed * tickDt) : 0;
-    const sSpeed = Math.hypot(sVx, sVz);
-
-    // Nếu Server báo bị Stun hoặc có xung lực va chạm/knockback cực mạnh (sSpeed > 18 m/s):
-    if (isServerStun || sSpeed > 18.0) {
-      if (isServerStun) this.setStun(1.5);
-      this.vx = sVx;
-      this.vz = sVz;
-      this.simX = serverX;
-      this.simZ = serverZ;
-      this.errorX = 0;
-      this.errorZ = 0;
-      this.hist.length = 0;
-      this.sx = serverX;
-      this.sz = serverZ;
-      this.sTick = snapTick;
-      return;
-    }
-
-    if (!isServerStun && this.stunT <= 0) {
+    // 0. Xử lý Stun (bị choáng/húc vào cột rơm)
+    if (isServerStun && !this.stunned) {
+      this.setStun(1.5);
+      if (this.sTick === snapTick - 1) {
+        this.kicks++;
+        this.vx = (serverX - this.sx) / 0.05;
+        this.vz = (serverZ - this.sz) / 0.05;
+      }
+    } else if (!isServerStun && this.stunT <= 0) {
       this.stunned = false;
     }
 
@@ -158,7 +143,7 @@ export class ClientPredictor {
     const timeSinceLaunch = now - this.lastDashLaunchTime;
     const timeSinceEnd = now - this.lastDashEndTime;
     const serverIsDashing = (flags & 1) !== 0;
-    const safeGraceMs = Math.max(220, (rtt > 0 ? rtt : 35) * 1.8 + 90);
+    const safeGraceMs = Math.max(300, (rtt > 0 ? rtt : 35) * 2.0 + 120);
 
     // Pha 1 (Pre-dash): Client vừa phóng đi nhưng gói tin chưa kịp xử lý trên Server
     if (!isServerStun && this.dashT > 0 && !serverIsDashing && timeSinceLaunch < safeGraceMs) {
@@ -176,14 +161,15 @@ export class ClientPredictor {
       return;
     }
 
-    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot (one-way transit ~ rtt / 2):
-    const transitDelay = Math.max(12, Math.min(120, (rtt > 0 ? rtt : 35) * 0.5));
+    // 2. Lấy mẫu lịch sử dự đoán tại đúng thời điểm quá khứ tương ứng với Snapshot:
+    const transitDelay = Math.max(15, Math.min(150, (rtt > 0 ? rtt : 35) * 0.5 + 10));
     const targetTime = now - transitDelay;
     const then = this.predAt(targetTime);
 
     if (!then) {
-      this.resets++;
-      this.reset(serverX, serverZ);
+      this.sx = serverX;
+      this.sz = serverZ;
+      this.sTick = snapTick;
       return;
     }
 
@@ -192,19 +178,21 @@ export class ClientPredictor {
     const dz = serverZ - then.z;
     const errorDist = Math.hypot(dx, dz);
 
-    // Nếu sai số lịch sử > 8.0m: reset cứng
-    if (errorDist > 8.0) {
+    // Hard reset CHỈ xảy ra khi sai số cực lớn (hồi sinh, dịch chuyển tức thời, teleport > 10m):
+    if (errorDist > 10.0) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
     }
 
     // 4. Hòa giải mượt (Smooth Reconciliation):
-    const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 180;
-    const deadzone = inDashWindow ? 1.5 : 0.20;
+    const inDashWindow = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
+    const deadzone = inDashWindow ? 1.6 : 0.25;
 
-    if (errorDist > deadzone && errorDist <= 3.0) {
-      const gain = inDashWindow ? 0.25 : 0.35;
+    if (errorDist > deadzone) {
+      // Khi quay đầu gấp hoặc chênh lệch mạng, hòa giải mượt mà (smooth blending)
+      // KHÔNG BAO GIỜ hard-reset giữa đường làm giật chậm hay xé hình!
+      const gain = inDashWindow ? 0.20 : 0.35;
       const adjustX = dx * gain;
       const adjustZ = dz * gain;
 
@@ -218,15 +206,6 @@ export class ClientPredictor {
         s.x += adjustX;
         s.z += adjustZ;
       }
-    } else if (errorDist > 3.0) {
-      // Knockback hoặc lệch lớn từ va chạm: đồng bộ tức thời với server velocity
-      this.simX = serverX;
-      this.simZ = serverZ;
-      this.vx = sVx;
-      this.vz = sVz;
-      this.errorX = 0;
-      this.errorZ = 0;
-      this.hist.length = 0;
     }
 
     this.sx = serverX;
@@ -422,7 +401,7 @@ export class ClientPredictor {
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    const decay = Math.exp(-18.0 * dt);
+    const decay = Math.exp(-12.0 * dt);
     this.errorX *= decay;
     this.errorZ *= decay;
     if (Math.abs(this.errorX) < 0.002) this.errorX = 0;
