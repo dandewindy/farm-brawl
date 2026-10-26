@@ -9,7 +9,7 @@ import {
   stepMove,
   terrainAt,
 } from '@shared/physics';
-import type { Input } from '@shared/protocol';
+import type { Input, PlayerMeta } from '@shared/protocol';
 import type { Ent } from './state';
 
 export interface PredSample {
@@ -154,12 +154,13 @@ export class ClientPredictor {
     dx: number,
     dz: number,
     gain: number,
-    reconciledTime: number
+    reconciledTime: number,
+    dampVelocity = false
   ): void {
     const corrX = dx * gain;
     const corrZ = dz * gain;
 
-    // 1. Shift physical simulation state
+    // 1. Shift physical simulation state towards server
     this.simX += corrX;
     this.simZ += corrZ;
 
@@ -167,7 +168,7 @@ export class ClientPredictor {
     this.errorX -= corrX;
     this.errorZ -= corrZ;
 
-    const maxVisualOffset = 3.5;
+    const maxVisualOffset = 4.0;
     const errMag = Math.hypot(this.errorX, this.errorZ);
     if (errMag > maxVisualOffset) {
       const scale = maxVisualOffset / errMag;
@@ -175,10 +176,25 @@ export class ClientPredictor {
       this.errorZ *= scale;
     }
 
+    // 3. Ghost Velocity Damping:
+    // If the server's correction vector opposes current velocity (e.g. server blocked/knocked us back),
+    // damp the opposing velocity component to stop overshooting and rubberbanding
+    const corrDist = Math.hypot(corrX, corrZ);
+    if (dampVelocity && corrDist > 0.05) {
+      const cnx = corrX / corrDist;
+      const cnz = corrZ / corrDist;
+      const vDot = this.vx * cnx + this.vz * cnz;
+      if (vDot < 0) {
+        const dampFactor = Math.min(0.65, gain * 1.1);
+        this.vx -= vDot * cnx * dampFactor;
+        this.vz -= vDot * cnz * dampFactor;
+      }
+    }
+
     this.x = this.simX + this.errorX;
     this.z = this.simZ + this.errorZ;
 
-    // 3. Shift all samples from reconciledTime to current time
+    // 4. Shift all samples from reconciledTime to current time
     for (let i = 0; i < this.hist.length; i++) {
       if (this.hist[i].t >= reconciledTime) {
         this.hist[i].x += corrX;
@@ -244,7 +260,7 @@ export class ClientPredictor {
         this.resets++;
         this.reset(serverX, serverZ);
       } else {
-        this.applySmoothCorrection(dxStun, dzStun, 0.55, now);
+        this.applySmoothCorrection(dxStun, dzStun, 0.55, now, true);
       }
       return;
     } else if (this.stunT <= 0) {
@@ -270,25 +286,28 @@ export class ClientPredictor {
       return;
     }
 
-    // 4. Historical sample lookup via stable physical anchor
-    const physicalBaseRtt = rtt > 0 ? Math.min(rtt, 110) : 48;
-    const fixedOneWayLead = physicalBaseRtt * 0.5 + 12;
-
+    // 4. Historical sample lookup via causal priority:
+    // PRIORITY 1: The exact sent time of the acked input sequence
+    const physicalBaseRtt = rtt > 0 ? Math.min(rtt, 150) : 48;
     let targetTime = now - (physicalBaseRtt + 15);
+    let foundValidTarget = false;
 
-    if (typeof serverTime === 'number' && clockOff !== null) {
-      // serverTime - clockOff là thời điểm chính xác trên đồng hồ Client khi Server tính xong tick đó.
-      // Vì clockOff được neo theo rttMin, mốc này đứng yên tuyệt đối, loại bỏ 100% giật ngược do jitter.
-      const exactClientTimeAtServerTick = serverTime - clockOff - fixedOneWayLead;
-      const lookback = now - exactClientTimeAtServerTick;
-      if (lookback >= 20 && lookback <= 350) {
-        targetTime = exactClientTimeAtServerTick;
-      }
-    } else if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
+    if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
       const sentAt = this.seqSendTime.get(ackSeq)!;
       const age = now - sentAt;
-      if (age >= 20 && age <= 350) {
+      if (age >= 10 && age <= 400) {
         targetTime = sentAt;
+        foundValidTarget = true;
+      }
+    }
+
+    // PRIORITY 2 (Fallback): Synchronized clock offset serverTime - clockOff
+    if (!foundValidTarget && typeof serverTime === 'number' && clockOff !== null) {
+      const fixedOneWayLead = physicalBaseRtt * 0.5 + 12;
+      const exactClientTimeAtServerTick = serverTime - clockOff - fixedOneWayLead;
+      const lookback = now - exactClientTimeAtServerTick;
+      if (lookback >= 15 && lookback <= 400) {
+        targetTime = exactClientTimeAtServerTick;
       }
     }
 
@@ -309,22 +328,29 @@ export class ClientPredictor {
 
     const inDashPhase = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
 
-    // 6. Tight deadzone & responsive convergence:
-    // 0.08m deadzone during normal walk ensures any divergence is smoothed out immediately
-    // without accumulating into multi-meter rubberbanding.
-    const deadzone = this.isCollidingWithEnts ? 0.14 : (inDashPhase ? 0.90 : 0.08);
+    // Deadzone: slightly wider when colliding with crowd to absorb interpolation jitter
+    const deadzone = inDashPhase ? 0.85 : (this.isCollidingWithEnts ? 0.22 : 0.06);
     if (errorDist <= deadzone) return;
 
-    const excessRatio = (errorDist - deadzone) / errorDist;
+    const excessError = errorDist - deadzone;
+    const excessRatio = excessError / errorDist;
     const effDx = dx * excessRatio;
     const effDz = dz * excessRatio;
 
-    let nudgeGain = this.isCollidingWithEnts ? 0.70 : (inDashPhase ? 0.22 : 0.38);
-    if (!inDashPhase && !this.isCollidingWithEnts && errorDist > 1.2) {
-      nudgeGain = 0.60;
+    // Smooth gain curve instead of sharp jump to 0.70
+    let nudgeGain: number;
+    if (inDashPhase) {
+      nudgeGain = 0.22;
+    } else if (this.isCollidingWithEnts) {
+      const t = Math.min(1.0, excessError / 1.5);
+      nudgeGain = 0.28 + t * 0.17;
+    } else {
+      const t = Math.min(1.0, excessError / 1.2);
+      nudgeGain = 0.25 + t * 0.30;
     }
 
-    this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t);
+    const shouldDampVel = isServerStun || this.isCollidingWithEnts || excessError > 0.45;
+    this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t, shouldDampVel);
     if (ackSeq > this.lastReconciledSeq) {
       this.lastReconciledSeq = ackSeq;
     }
@@ -380,7 +406,8 @@ export class ClientPredictor {
     _snapTick: number,
     _rtt: number,
     speedMult = 1.0,
-    myCd = 0
+    myCd = 0,
+    metas?: Map<number, PlayerMeta>
   ): void {
     if (!this.on || !map) return;
 
@@ -469,6 +496,7 @@ export class ClientPredictor {
         this.vz = body.vz;
       }
 
+      // 1. VA CHẠM BỤC (PODIUM) - Khử thành phần vận tốc đâm xuyên để trượt mượt quanh viền:
       if (this.podShieldActive && map.podium) {
         const [podX, podZ] = map.podium;
         const dx = this.simX - podX;
@@ -483,8 +511,8 @@ export class ClientPredictor {
           this.simZ = podZ + nz * minD;
           const vn = this.vx * nx + this.vz * nz;
           if (vn < 0) {
-            this.vx -= 1.4 * vn * nx;
-            this.vz -= 1.4 * vn * nz;
+            this.vx -= vn * nx;
+            this.vz -= vn * nz;
           }
           if (this.dashT > 0) {
             this.dashT = 0;
@@ -510,7 +538,9 @@ export class ClientPredictor {
         }
       }
 
-      // 2. Va chạm vật lý đàn hồi & tách chồng lấn với các con vật khác (khớp world.ts collidePlayers)
+      // 2. VA CHẠM MỀM VỚI CÁC CON VẬT KHÁC (SOFT REMOTE ENTITY COLLISION):
+      // Vì các entity trong `ents` đang ở vị trí nội suy (trễ ~100ms) và đứng tĩnh trong substep,
+      // dùng Soft Separation Damping thay vì Hard Positional Snap để triệt tiêu hoàn toàn rung lắc.
       if (ents && ents.size > 0) {
         const ra = radiusOf(myMass);
         const ma = myMass * (TRAITS[species]?.weight ?? 1.0);
@@ -528,21 +558,28 @@ export class ClientPredictor {
           const d = Math.sqrt(distSq);
           const nx = dx / d;
           const nz = dz / d;
-
-          // A. Tách vị trí chồng lấn (Positional Separation)
           const overlap = minD - d;
-          const mb = b.mass * 1.0;
-          const wa = mb / (ma + mb);
-          this.simX -= nx * overlap * wa;
-          this.simZ -= nz * overlap * wa;
 
-          // B. Xung lực đàn hồi (Impulse) khi lao vào nhau
+          const bMeta = metas?.get(b.id);
+          const bSpecies = (bMeta?.species ?? (b as any).species) as Species | undefined;
+          const bWeight = (bSpecies && TRAITS[bSpecies]?.weight) ? TRAITS[bSpecies].weight : 1.0;
+          const mb = b.mass * bWeight;
+          const wa = mb / (ma + mb);
+
+          // Tách vị trí mềm (Soft Separation):
+          // Giới hạn tốc độ đẩy tách theo bước thời gian h để không nhảy vị trí đột ngột
+          const maxPushStep = Math.min(overlap * wa * 0.45, 12.0 * h);
+          this.simX -= nx * maxPushStep;
+          this.simZ -= nz * maxPushStep;
+
+          // Giảm mềm thành phần vận tốc lao xuyên qua đối phương (Soft Velocity Damping)
+          // chỉ khi chồng lấn sâu (> 15% bán kính), không tạo phản xạ đàn hồi giả
           const va = this.vx * nx + this.vz * nz;
-          if (va > 0) {
-            const jImp = (1.2 * va) / (1 / ma + 1 / mb);
-            const tickScale = Math.min(1.0, h / 0.05);
-            this.vx -= (jImp / ma) * nx * tickScale;
-            this.vz -= (jImp / ma) * nz * tickScale;
+          if (va > 0 && overlap > minD * 0.15) {
+            const dampRatio = Math.min(1.0, (overlap / minD) * 1.5);
+            const vReduction = va * wa * dampRatio * Math.min(1.0, h / 0.025) * 0.5;
+            this.vx -= nx * vReduction;
+            this.vz -= nz * vReduction;
           }
         }
       }
@@ -568,11 +605,18 @@ export class ClientPredictor {
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    const decay = Math.exp(-18.0 * dt);
-    this.errorX *= decay;
-    this.errorZ *= decay;
-    if (Math.abs(this.errorX) < 0.001 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorX = 0;
-    if (Math.abs(this.errorZ) < 0.001 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorZ = 0;
+    // 3. TIÊU TAN SAI SỐ VISUAL (ADAPTIVE EXPONENTIAL SMOOTHING):
+    // TUYỆT ĐỐI KHÔNG gán errorX = 0 khi (!canMove && speed < 0.1) để tránh giật nhảy (Snap Teleport)!
+    const errDist = Math.hypot(this.errorX, this.errorZ);
+    if (errDist > 0.0005) {
+      const smoothRate = 14.0 + Math.min(8.0, errDist * 4.0);
+      const decay = Math.exp(-smoothRate * dt);
+      this.errorX *= decay;
+      this.errorZ *= decay;
+    } else {
+      this.errorX = 0;
+      this.errorZ = 0;
+    }
 
     this.x = this.simX + this.errorX;
     this.z = this.simZ + this.errorZ;

@@ -1990,7 +1990,8 @@ function animate(now: number): void {
         gameState.snapTick,
         transport.rtt,
         tillSpeedMult,
-        gameState.me.cd
+        gameState.me.cd,
+        gameState.metas
       );
 
       // 3. Swept segment-circle optimistic food eating (0ms Zero-Latency Eating)
