@@ -35,7 +35,7 @@ export class InputManager {
   onReleaseRam?: (heldSeconds: number) => void;
 
   constructor() {
-    this.isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    this.isTouch = window.matchMedia('(pointer: coarse)').matches;
     this.stickEl = document.getElementById('stick');
     this.stickKnob = document.getElementById('stickKnob');
     this.dashBtn = document.getElementById('dashBtn');
@@ -78,7 +78,7 @@ export class InputManager {
 
   private bindMouseAndKeyboard(): void {
     window.addEventListener('pointermove', (e) => {
-      if (this.isTouch) return;
+      if (e.pointerType === 'touch') return;
       this.pointer.x = e.clientX;
       this.pointer.y = e.clientY;
       this.pointer.has = true;
@@ -236,8 +236,8 @@ export class InputManager {
       this.aimMove = false;
       this.keyAim = false;
     }
-    if (this.isTouch) {
-      if (this.stickVec && Math.hypot(this.stickVec.x, this.stickVec.y) > 0.15) {
+    if (this.stickVec !== null) {
+      if (Math.hypot(this.stickVec.x, this.stickVec.y) > 0.15) {
         this.aimA = Math.atan2(this.stickVec.y, this.stickVec.x);
         this.aimMove = true;
       } else {

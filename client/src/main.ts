@@ -1117,6 +1117,16 @@ const gameState = new GameState({
     spectateTargetId = null;
     hud.isPlayerAlive = true;
     hud.showInGame();
+    if (!gameState.metas.has(gameState.myId)) {
+      gameState.metas.set(gameState.myId, {
+        id: gameState.myId,
+        name: hud.getPlayerName(),
+        species: hud.getSelectedSpecies(),
+        skin: hud.getSelectedSkin(),
+        bot: false,
+        team: hud.selectedTeam,
+      });
+    }
     if (!isReconnecting) {
       hud.showBanner(t('welcome'), t('welcomeSub'));
       prevMass = CFG.START_MASS;
@@ -2033,7 +2043,7 @@ function animate(now: number): void {
       (timeSinceLast >= 20 && angleDiff > 0.006);
 
     const socketIsOpen = Boolean(
-      transport && (transport as any).ws && (transport as any).ws.readyState === WebSocket.OPEN
+      transport && (!(transport as any).ws || (transport as any).ws.readyState === WebSocket.OPEN)
     );
 
     if (shouldSendInput && socketIsOpen) {
