@@ -95,9 +95,14 @@ export class GameRoom extends DurableObject {
       ).toUpperCase();
       this.handleWebSocket(server, edgeColo, cid);
 
+      const responseHeaders = new Headers();
+      responseHeaders.set('x-do-colo', this.doColo);
+      responseHeaders.set('x-do-relocate-ready', this.sockets.size <= 1 ? '1' : '0');
+
       return new Response(null, {
         status: 101,
         webSocket: client,
+        headers: responseHeaders,
       });
     }
 
@@ -130,6 +135,9 @@ export class GameRoom extends DurableObject {
 
   private handleWebSocket(ws: WebSocket, edgeColo: string, cid = ''): void {
     ws.accept();
+    try {
+      ws.send(`{"t":"hello","s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
+    } catch (_) {}
 
     if (cid) {
       this.socketClientIds.set(ws, cid);

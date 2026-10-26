@@ -1,29 +1,51 @@
-import type { ClientMsg, ServerMsg } from '@shared/protocol';
+import type { ClientMsg, ServerMsg, Snapshot } from '@shared/protocol';
 import type { Handler, Transport } from './transport';
+
+// ============================================================================
+// HẰNG SỐ ĐIỀU KHIỂN ĐUA MẠNG & HOT MIGRATION (SUB-350MS EDGE ACQUISITION)
+// ============================================================================
+const PING_INTERVAL_MS = 350;              // Đo mỗi 350ms để phát hiện và phản ứng nhanh gấp đôi
+export const HIGH_PING_THRESHOLD_MS = 90;  // Ngưỡng ping yêu cầu của người chơi
+const SUSTAINED_HIGH_PING_SAMPLES = 3;     // 3 mẫu * 350ms = 1.05s (thay vì 4.0s như cũ)
+export const LOAD_HANDICAP_MS = 12;        // Hệ số bù tải 20Hz chống bão Ping-Pong
+
+// Cấu hình đua đa kết nối song song (Parallel ECMP Socket Spraying)
+const INITIAL_RACE_CONCURRENCY = 4;        // Mở 4 socket đồng thời lúc mới vào game
+const INITIAL_RACE_MAX_WAIT_MS = 420;      // Chốt kết quả đua khởi tạo tối đa trong 420ms
+const LOBBY_SWEEP_INTERVAL_MS = 900;       // Chu kỳ quét tìm SIN/HKG ở sảnh chờ: 900ms
+const LOBBY_SWEEP_CONCURRENCY = 3;         // Mỗi đợt quét sảnh bắn 3 socket song song
+
+// Cấu hình Probe nhanh trong trận (In-Game Fast Parallel Probe)
+const INGAME_PROBE_CONCURRENCY = 3;        // Mở 3 probe socket đồng thời để đổi 3 srcPort ECMP
+const PROBE_WARMUP_PINGS = 1;              // Bỏ qua 1 mẫu đầu
+const PROBE_MEASURE_PINGS = 3;             // Đo 3 mẫu nhanh (3 * 90ms = 270ms)
+const PROBE_PING_SPACING_MS = 90;          // Khoảng cách giữa các ping khi probe: 90ms
+const PROBE_OVERALL_TIMEOUT_MS = 1800;     // Timeout tối đa cho 1 đợt probe
+const POST_SWITCH_GRACE_MS = 12_000;       // Thời gian ổn định sau khi vừa chuyển tuyến thành công
+
+const PROBE_PAYLOAD_PADDING =
+  '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 /**
  * Phân tầng địa lý các trạm Cloudflare Edge POP cho người chơi tại Việt Nam & Đông Nam Á:
- * - Tier 0 (SEA / VN Core): Trạm nội địa VN hoặc trục chính Singapore / Hồng Kông / Bangkok / KL (Kỳ vọng: 15ms - 60ms)
- * - Tier 1 (East Asia / APAC): Đài Loan, Philippines, Nam Trung Quốc, Nhật Bản, Hàn Quốc, Indonesia (Kỳ vọng: 60ms - 115ms)
- * - Tier 2 (Out-of-Region Detour): Châu Âu (CDG, MRS, FRA...), Mỹ, Úc (Định tuyến lỗi BGP > 140ms)
+ * - Tier 0 (Mục tiêu tối ưu < 65ms): SIN (Singapore), HKG (Hồng Kông), SGN/HAN/DAD (Việt Nam), BKK, KUL
+ * - Tier 1 (Châu Á lân cận 65ms - 125ms): TPE, MNL, CGK, CAN, SZX, NRT, HND, KIX, ICN
+ * - Tier 2 (Lệch tuyến sang Châu Âu / Mỹ / Úc > 140ms): CDG, MRS, FRA, LHR, SJC, LAX, SYD...
  */
 const TIER_0_SEA_COLOS = /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL|PNH|VTE)$/i;
-const TIER_1_APAC_COLOS = /^(TPE|KHH|MNL|CEB|CAN|SZX|MFN|CGK|DPS|RGN|BNY|NRT|HND|KIX|FUK|OKA|ICN|PUS)$/i;
+const TIER_1_APAC_COLOS =
+  /^(TPE|KHH|MNL|CEB|CAN|SZX|MFN|CGK|DPS|RGN|BNY|NRT|HND|KIX|FUK|OKA|ICN|PUS)$/i;
 
 export type ColoTier = 0 | 1 | 2;
 
 export function getColoTier(colo?: string): ColoTier {
   if (!colo) return 2;
-  const normalized = colo.trim().toUpperCase();
-  if (TIER_0_SEA_COLOS.test(normalized)) return 0;
-  if (TIER_1_APAC_COLOS.test(normalized)) return 1;
+  const code = colo.trim().toUpperCase();
+  if (TIER_0_SEA_COLOS.test(code)) return 0;
+  if (TIER_1_APAC_COLOS.test(code)) return 1;
   return 2;
 }
 
-/**
- * Giữ tương thích ngược với hàm isFastColo hiện tại của dự án:
- * Trả về true cho Tier 0 (SEA/VN) hoặc Tier 1 (APAC).
- */
 export function isFastColo(colo?: string): boolean {
   return getColoTier(colo) <= 1;
 }
@@ -32,46 +54,31 @@ export function isOptimalSeaColo(colo?: string): boolean {
   return getColoTier(colo) === 0;
 }
 
-// ============================================================================
-// HẰNG SỐ ĐIỀU KHIỂN HOT MIGRATION (ĐÃ TINH CHỈNH CHỐNG PING-PONG LOOP)
-// ============================================================================
-const RTT_WINDOW_SIZE = 8;
-const PING_INTERVAL_MS = 500;
-
-/** Ngưỡng ping người chơi yêu cầu: trên 90ms sẽ kích hoạt dò tuyến mới */
-export const HIGH_PING_THRESHOLD_MS = 90;
-
-/** Số mẫu ping liên tiếp > 90ms cần thiết để kích hoạt Probe (8 mẫu * 500ms = 4.0s) */
-const SUSTAINED_HIGH_PING_SAMPLES = 8;
-
-/**
- * Hệ số bù tải (Load Handicap): Socket đang nhận snapshot 20Hz chịu độ trễ hàng đợi
- * cao hơn socket rỗng (probeSocket) khoảng 12ms. Cộng 12ms vào probe để so sánh công bằng.
- */
-export const LOAD_HANDICAP_MS = 12;
-
-/** Cấu hình lấy mẫu trên probeSocket */
-const PROBE_WARMUP_PINGS = 1;       // Bỏ qua 1 mẫu đầu tiên (khởi tạo TLS/Edge)
-const PROBE_MEASURE_PINGS = 6;      // Thu thập 6 mẫu thực tế
-const PROBE_PING_SPACING_MS = 250;  // Khoảng cách giữa các mẫu probe (tổng ~1.75s)
-const PROBE_TIMEOUT_MS = 4500;      // Timeout tối đa cho toàn bộ quá trình probe
-const HANDOVER_ACK_TIMEOUT_MS = 3000;
-
-/** Chuỗi đệm 96 bytes giả lập kích thước gói input thực tế khi bắn ping thử tải */
-const PROBE_PAYLOAD_PADDING = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-
-/** Thời gian khóa Probe sau khi vừa chuyển mạng thành công (25 giây) */
-const POST_SWITCH_GRACE_MS = 25_000;
-
-/** Thời gian Cooldown thích ứng khi Probe không tìm được đường tốt hơn (15s -> 30s -> 60s -> 120s) */
-const BASE_PROBE_COOLDOWN_MS = 15_000;
-const MAX_PROBE_COOLDOWN_MS = 120_000;
-
 export interface RttStats {
   min: number;
   median: number;
   jitter: number;
   samples: number;
+}
+
+export function computeRttStats(win: number[]): RttStats {
+  if (win.length === 0) return { min: 48, median: 48, jitter: 0, samples: 0 };
+  const sorted = [...win].sort((a, b) => a - b);
+  const n = sorted.length;
+  const min = sorted[0];
+  const mid = Math.floor(n / 2);
+  const median =
+    n % 2 === 0
+      ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+      : Math.round(sorted[mid]);
+  const q25 = sorted[Math.floor(n * 0.25)];
+  const q75 = sorted[Math.floor(n * 0.75)];
+  return {
+    min: Math.round(min),
+    median,
+    jitter: Math.round(Math.max(0, q75 - q25)),
+    samples: n,
+  };
 }
 
 export interface MigrationDecision {
@@ -85,48 +92,34 @@ export interface MigrationDecision {
 }
 
 /**
- * Tính toán thống kê RTT: Min, Median (Trung vị) và Jitter (Khoảng tứ phân vị IQR)
- */
-export function computeRttStats(window: number[]): RttStats {
-  if (window.length === 0) {
-    return { min: 0, median: 0, jitter: 0, samples: 0 };
-  }
-  const sorted = [...window].sort((a, b) => a - b);
-  const n = sorted.length;
-  const min = sorted[0];
-  const mid = Math.floor(n / 2);
-  const median =
-    n % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
-
-  const q25 = sorted[Math.floor(n * 0.25)];
-  const q75 = sorted[Math.floor(n * 0.75)];
-  const jitter = Math.max(0, q75 - q25);
-
-  return { min, median, jitter, samples: n };
-}
-
-/**
- * Hàm toán học quyết định có chuyển sang probeSocket hay không.
- * Đảm bảo chuyển dứt khoát khi có đường tốt hơn nhưng tuyệt đối không lặp Ping-Pong.
+ * Đánh giá xem nhánh mạng của Probe có thực sự tốt hơn nhánh hiện tại hay không.
+ * Vẫn giữ đầy đủ Load Handicap (12ms) và Same-Colo Guard để chống lặp Ping-Pong,
+ * nhưng ưu tiên chuyển ngay lập tức nếu nâng cấp được Tier (ví dụ từ FRA/NRT về SIN/HKG).
  */
 export function evaluateMigrationDecision(
   activeWin: number[],
   activeColo: string,
   probeWin: number[],
-  probeColo: string
+  probeColo: string,
+  minRequiredSamples = 4,
+  isInGame = true
 ): MigrationDecision {
   const activeStats = computeRttStats(activeWin);
   const probeStats = computeRttStats(probeWin);
 
   const activeMedian = activeStats.median;
   const probeRawMedian = probeStats.median;
-  // Cộng hệ số bù tải 20Hz vào kết quả của probeSocket
-  const probeEffectiveMedian = probeRawMedian + LOAD_HANDICAP_MS;
+  // Ở sảnh chờ chưa có tải snapshot 20Hz mạnh như trong trận nên handicap thấp hơn
+  const handicap = isInGame ? LOAD_HANDICAP_MS : 4;
+  const probeEffectiveMedian = probeRawMedian + handicap;
   const netGainMs = activeMedian - probeEffectiveMedian;
 
   const activeTier = getColoTier(activeColo);
   const probeTier = getColoTier(probeColo);
-  const sameColo = activeColo.toUpperCase() === probeColo.toUpperCase();
+  const sameColo =
+    Boolean(activeColo) &&
+    Boolean(probeColo) &&
+    activeColo.toUpperCase() === probeColo.toUpperCase();
 
   const baseResult = {
     activeMedian,
@@ -137,11 +130,11 @@ export function evaluateMigrationDecision(
   };
 
   // 1. Chặn nếu không đủ mẫu đo tin cậy
-  if (probeStats.samples < 4) {
+  if (probeStats.samples < minRequiredSamples) {
     return { ...baseResult, shouldSwitch: false, reason: 'insufficient_probe_samples' };
   }
 
-  // 2. Chặn nếu tuyến Probe bị suy thoái Tier địa lý (ví dụ đang ở NRT Tier 1 mà probe rơi sang FRA Tier 2)
+  // 2. Chặn nếu tuyến Probe bị suy thoái Tier địa lý (ví dụ đang ở Tier 0/1 mà probe rơi sang FRA Tier 2)
   if (probeTier > activeTier) {
     return {
       ...baseResult,
@@ -160,7 +153,10 @@ export function evaluateMigrationDecision(
   }
 
   // 4. TRƯỜNG HỢP A: Nâng cấp Tier địa lý (Ví dụ: Châu Âu Tier 2 -> APAC/SEA, hoặc Nhật Tier 1 -> SIN/SGN Tier 0)
-  if (probeTier < activeTier && netGainMs >= 10) {
+  if (
+    probeTier < activeTier &&
+    (netGainMs >= 10 || (!isInGame && (netGainMs >= 5 || probeRawMedian <= 95)))
+  ) {
     return {
       ...baseResult,
       shouldSwitch: true,
@@ -189,10 +185,14 @@ export function evaluateMigrationDecision(
   // - Nếu cả 2 đều ở Tier 0 (Ví dụ: SIN vs HKG): Cả hai đều là trạm tối ưu nhất cho Việt Nam.
   //   NẾU active RTT <= 90ms: TUYỆT ĐỐI KHÔNG CHUYỂN! Tránh bão ping-pong nhảy qua lại giữa SIN và HKG.
   //   CHỈ chuyển khi active RTT thực sự bị nghẽn (> 90ms) VÀ trạm đối tác đạt RTT <= 65ms với mức cải thiện netGainMs >= 30ms!
-  // - Nếu cùng Tier 1 (APAC) hoặc Tier 2 (ngoài khu vực): chuyển nếu netGainMs >= 20ms VÀ (probeRawMedian <= 90ms HOẶC probeEffectiveMedian <= activeMedian * 0.80)
+  // - Nếu cùng Tier 1 (APAC) hoặc Tier 2 (ngoài khu vực): chuyển nếu netGainMs >= 20ms VÀ (probeRawMedian <= 90ms HOẶC probeEffectiveMedian <= activeMedian * 0.8)
   if (!sameColo && probeTier === activeTier) {
     if (activeTier === 0) {
-      if (activeMedian > HIGH_PING_THRESHOLD_MS && netGainMs >= 30 && probeRawMedian <= 65) {
+      if (
+        activeMedian > HIGH_PING_THRESHOLD_MS &&
+        netGainMs >= 30 &&
+        probeRawMedian <= 65
+      ) {
         return {
           ...baseResult,
           shouldSwitch: true,
@@ -208,7 +208,8 @@ export function evaluateMigrationDecision(
 
     if (
       netGainMs >= 20 &&
-      (probeRawMedian <= HIGH_PING_THRESHOLD_MS || probeEffectiveMedian <= activeMedian * 0.80)
+      (probeRawMedian <= HIGH_PING_THRESHOLD_MS ||
+        probeEffectiveMedian <= activeMedian * 0.8)
     ) {
       return {
         ...baseResult,
@@ -225,56 +226,67 @@ export function evaluateMigrationDecision(
   };
 }
 
+interface CandidateResult {
+  ws: WebSocket;
+  url: string;
+  colo: string;
+  doColo: string;
+  tier: ColoTier;
+  rtts: number[];
+  bestRtt: number;
+  medianRtt: number;
+  clockOffset: number | null;
+  earlyMessages: (string | ArrayBuffer)[];
+}
+
 export class WsClient implements Transport {
   public ws: WebSocket | null = null;
-  private readonly queue: ClientMsg[] = [];
-  private closed = false;
-  private isReconnecting = false;
-  private lastJoinMsg: (ClientMsg & { t: 'join' }) | null = null;
-  public sessionToken: string | null = null;
-  private pingInterval: number | null = null;
-  public rtt = 0;
-  public rttMin = 0;
+  public rtt = 48;
+  public rttMin = 48;
   public netRtt = 48;
-  public rttJitter = 0;
+  public jitter = 0;
   public clockOffset: number | null = null;
   public colo = '';
   public doColo = '';
   public inGame = false;
-  private reconnectTimer: number | null = null;
+  public isMigrating = false;
+  public sessionToken: string | null = null;
+  public closed = false;
+
+  private baseUrls: string[] = [];
+  private urlCursor = 0;
   private readonly rttWin: number[] = [];
+
+  private pingInterval: number | null = null;
+  private lobbySweepTimer: number | null = null;
+  private reconnectTimer: number | null = null;
+
   private lastPongRecvPerf = 0;
   private lastRawRtt = 48;
   private smoothedRtt = 48;
 
-  // Quản lý endpoint và xoay vòng ECMP
-  private endpointIdx = 0;
-  private readonly endpoints: string[];
-
-  // Điều khiển Probe & Hot Migration chống bão
-  public isMigrating = false;
-  private probeWs: WebSocket | null = null;
+  // Quản lý trạng thái dò mạng & Hot Migration
   private probing = false;
+  private activeProbeSockets: WebSocket[] = [];
   private consecutiveHighPing = 0;
   private consecutiveFailedProbes = 0;
   private nextProbeAllowedAt = 0;
-  private baselineMedianAtLastFailure = 0;
-
-  // Lobby steering
-  private lastLobbyReconnectTime = 0;
-  private lobbySteerAttempts = 0;
+  private outboundQueue: ClientMsg[] = [];
+  private lastJoinMsg: (ClientMsg & { t: 'join' }) | null = null;
 
   // Callbacks
   public onMigrationSuccess?: (newColo: string) => void;
   public onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
 
   constructor(
-    private readonly url: string,
+    primaryUrl: string,
     private readonly onMsg: Handler,
     private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void,
     altUrls: string[] = []
   ) {
-    this.endpoints = [url, ...altUrls.filter((u) => u && u !== url)];
+    const dedup = new Set<string>([primaryUrl, ...altUrls.filter(Boolean)]);
+    this.baseUrls = Array.from(dedup);
+
     try {
       this.sessionToken =
         sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) ||
@@ -285,30 +297,19 @@ export class WsClient implements Transport {
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
     }
 
-    this.connect();
+    // Khởi chạy ngay cuộc đua 4 luồng song song để bắt SIN/HKG trong < 350ms!
+    this.startInitialParallelRace();
   }
 
   private handleVisibilityChange = (): void => {
     if (typeof document !== 'undefined' && !document.hidden) {
-      // Khi người chơi quay lại tab, reset đếm spike ảo do trình duyệt bóp timer
       this.consecutiveHighPing = 0;
     }
   };
 
-  private getActiveUrl(): string {
-    return this.endpoints[this.endpointIdx % this.endpoints.length];
-  }
-
-  private nextEndpointUrl(): string {
-    if (this.endpoints.length > 1) {
-      this.endpointIdx = (this.endpointIdx + 1) % this.endpoints.length;
-    }
-    return this.getActiveUrl();
-  }
-
   private getRoomKey(): string {
     try {
-      const u = new URL(this.url);
+      const u = new URL(this.baseUrls[0]);
       return u.searchParams.get('room') || 'pub-1';
     } catch {
       return 'pub-1';
@@ -316,116 +317,418 @@ export class WsClient implements Transport {
   }
 
   /**
-   * Tạo URL kết nối WebSocket có hỗ trợ cache-busting / nonce cho Probe
+   * Tạo URL kèm tham số ngẫu nhiên (_r) để tránh gom kết nối và đổi cổng nguồn ECMP
    */
-  private buildEndpointUrl(isProbe: boolean): string {
-    const base = isProbe ? this.nextEndpointUrl() : this.getActiveUrl();
-    const url = new URL(base, typeof window !== 'undefined' ? window.location.origin : 'https://localhost');
-    if (isProbe) {
-      const nonce = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      url.searchParams.set('_probe', nonce);
-      url.searchParams.set('_t', Date.now().toString());
-    }
-    return url.toString();
+  private buildRaceUrl(slotIndex: number): string {
+    const base =
+      this.baseUrls[(this.urlCursor + slotIndex) % this.baseUrls.length];
+    const sep = base.includes('?') ? '&' : '?';
+    const nonce = `${Date.now().toString(36)}_${slotIndex}_${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    return `${base}${sep}_r=${nonce}`;
   }
 
-  private connect(customUrl?: string): void {
+  /**
+   * GIAI ĐOẠN 1: Đua 4 kết nối WebSocket song song ngay khi vào trang web.
+   * Giữ cả 4 socket mở đồng thời trong quá trình bắt tay để OS cấp 4 srcPort khác nhau,
+   * ép router BGP/ECMP của VNPT/Viettel/FPT thử 4 nhánh cáp quốc tế cùng lúc!
+   */
+  private startInitialParallelRace(): void {
     if (this.closed) return;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
     this.onStatus?.('connecting');
 
-    let socket: WebSocket;
-    try {
-      socket = new WebSocket(customUrl || this.buildEndpointUrl(false));
-      this.ws = socket;
-    } catch (e) {
-      console.error('Failed to create WebSocket:', e);
-      this.onStatus?.('error');
-      this.scheduleReconnect();
-      return;
+    const concurrency = Math.max(INITIAL_RACE_CONCURRENCY, this.baseUrls.length);
+    const candidates: CandidateResult[] = [];
+    const rawSockets: WebSocket[] = [];
+    let settled = false;
+
+    const finalizeWinner = (winner: CandidateResult) => {
+      if (settled || this.closed) return;
+      settled = true;
+      this.urlCursor = (this.urlCursor + 1) % this.baseUrls.length;
+
+      // Đóng ngay lập tức toàn bộ các socket thua cuộc
+      for (const s of rawSockets) {
+        if (s !== winner.ws) {
+          s.onopen = null;
+          s.onmessage = null;
+          s.onerror = null;
+          s.onclose = null;
+          try {
+            s.close(1000, 'RaceLoser');
+          } catch {}
+        }
+      }
+
+      // Thiết lập socket thắng cuộc làm kết nối chính
+      this.promoteSocketToPrimary(winner, false);
+    };
+
+    const evaluateCurrentCandidates = () => {
+      if (settled || candidates.length === 0) return;
+
+      candidates.sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        return a.bestRtt - b.bestRtt;
+      });
+
+      const best = candidates[0];
+      // Nếu đã bắt được trạm chuẩn Đông Nam Á (SIN/HKG - Tier 0) với RTT <= 85ms:
+      // Chốt thắng cuộc NGAY LẬP TỨC không cần đợi hết 420ms!
+      if (best.tier === 0 && best.bestRtt <= 85) {
+        finalizeWinner(best);
+      }
+    };
+
+    // Đặt đồng hồ chốt kết quả sau tối đa 420ms
+    const raceDeadline = window.setTimeout(() => {
+      if (settled || this.closed) return;
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          if (a.tier !== b.tier) return a.tier - b.tier;
+          return a.bestRtt - b.bestRtt;
+        });
+        finalizeWinner(candidates[0]);
+      }
+    }, INITIAL_RACE_MAX_WAIT_MS);
+
+    for (let i = 0; i < concurrency; i++) {
+      const url = this.buildRaceUrl(i);
+      let sock: WebSocket;
+      try {
+        sock = new WebSocket(url);
+      } catch {
+        continue;
+      }
+      rawSockets.push(sock);
+
+      const cand: CandidateResult = {
+        ws: sock,
+        url,
+        colo: '',
+        doColo: '',
+        tier: 2,
+        rtts: [],
+        bestRtt: 9999,
+        medianRtt: 9999,
+        clockOffset: null,
+        earlyMessages: [],
+      };
+
+      const connectStartPerf = performance.now();
+
+      sock.onopen = () => {
+        if (settled || this.closed) {
+          try {
+            sock.close(1000, 'LateOpen');
+          } catch {}
+          return;
+        }
+        // Bắn ngay lập tức gói ping ở 0ms (không đợi 500ms như code cũ!)
+        try {
+          sock.send(`{"t":"ping","c":${Math.round(performance.now())}}`);
+        } catch {}
+      };
+
+      sock.onmessage = (ev: MessageEvent) => {
+        if (settled || this.closed) return;
+        const recvPerf = performance.now();
+        const text =
+          typeof ev.data === 'string'
+            ? ev.data
+            : new TextDecoder().decode(ev.data as ArrayBuffer);
+
+        // Xử lý gói hello (0ms) hoặc pong từ Server
+        if (text.startsWith('{"t":"hello"') || text.startsWith('{"t":"pong"')) {
+          try {
+            const msg = JSON.parse(text) as {
+              t: 'hello' | 'pong';
+              c?: number;
+              s?: number;
+              colo?: string;
+              doColo?: string;
+            };
+            if (msg.colo) {
+              cand.colo = msg.colo.toUpperCase();
+              cand.tier = getColoTier(cand.colo);
+            }
+            if (msg.doColo) {
+              cand.doColo = msg.doColo.toUpperCase();
+            }
+
+            const rtt =
+              typeof msg.c === 'number'
+                ? Math.max(1, recvPerf - msg.c)
+                : Math.max(5, (recvPerf - connectStartPerf) * 0.5);
+
+            cand.rtts.push(rtt);
+            cand.bestRtt = Math.min(cand.bestRtt, rtt);
+            cand.medianRtt = computeRttStats(cand.rtts).median;
+
+            if (typeof msg.s === 'number') {
+              cand.clockOffset = msg.s - (recvPerf - rtt * 0.5);
+            }
+
+            if (!candidates.includes(cand)) {
+              candidates.push(cand);
+            }
+
+            if (msg.t === 'hello') {
+              try {
+                sock.send(`{"t":"ping","c":${Math.round(performance.now())}}`);
+              } catch {}
+            } else {
+              evaluateCurrentCandidates();
+            }
+
+            // Nếu tất cả các socket đã báo kết quả về, chốt người thắng ngay
+            if (candidates.length >= rawSockets.length && msg.t === 'pong') {
+              clearTimeout(raceDeadline);
+              candidates.sort((a, b) => {
+                if (a.tier !== b.tier) return a.tier - b.tier;
+                return a.bestRtt - b.bestRtt;
+              });
+              finalizeWinner(candidates[0]);
+            }
+          } catch {}
+          return;
+        }
+
+        // Lưu lại các bản tin khởi tạo phòng gửi về sớm để phát lại khi socket thắng cuộc
+        cand.earlyMessages.push(ev.data);
+        if (!candidates.includes(cand)) {
+          cand.bestRtt = Math.max(10, (recvPerf - connectStartPerf) * 0.5);
+          cand.medianRtt = cand.bestRtt;
+          candidates.push(cand);
+        }
+      };
+
+      sock.onerror = () => {};
     }
 
-    this.bindActiveSocket(socket);
+    // Bảo vệ trường hợp mạng chập chờn chưa socket nào kịp trả lời trong 420ms
+    window.setTimeout(() => {
+      if (!settled && !this.closed) {
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => {
+            if (a.tier !== b.tier) return a.tier - b.tier;
+            return a.bestRtt - b.bestRtt;
+          });
+          finalizeWinner(candidates[0]);
+        } else {
+          const openSock = rawSockets.find(
+            (s) => s.readyState === WebSocket.OPEN
+          );
+          if (openSock) {
+            finalizeWinner({
+              ws: openSock,
+              url: this.baseUrls[0],
+              colo: this.colo || 'SIN',
+              doColo: this.doColo || 'SIN',
+              tier: getColoTier(this.colo),
+              rtts: [60],
+              bestRtt: 60,
+              medianRtt: 60,
+              clockOffset: null,
+              earlyMessages: [],
+            });
+          } else {
+            this.reconnectTimer = window.setTimeout(
+              () => this.startInitialParallelRace(),
+              800
+            );
+          }
+        }
+      }
+    }, INITIAL_RACE_MAX_WAIT_MS + 600);
   }
 
-  private bindActiveSocket(socket: WebSocket): void {
-    socket.onopen = () => {
-      if (this.ws !== socket) return;
-      const wasReconnecting = this.isReconnecting;
-      this.isReconnecting = false;
-      this.onStatus?.(wasReconnecting ? 'reconnected' : 'open');
+  /**
+   * Đưa ứng viên thắng cuộc lên làm Socket chính thức (dùng cho cả lúc khởi tạo và khi Hot-Swap)
+   */
+  private promoteSocketToPrimary(
+    winner: CandidateResult,
+    isHotSwap: boolean
+  ): void {
+    const oldWs = this.ws;
+    if (oldWs && oldWs !== winner.ws) {
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onerror = null;
+      oldWs.onclose = null;
+      try {
+        oldWs.close(1000, 'SwappedToFasterRoute');
+      } catch {}
+    }
 
-      const hasQueuedJoin = this.queue.some((m) => m.t === 'join');
-      if (this.lastJoinMsg && this.inGame && !hasQueuedJoin) {
-        this.send({
-          ...this.lastJoinMsg,
-          token: this.sessionToken || undefined,
-        });
-      }
+    this.ws = winner.ws;
+    if (winner.colo) this.colo = winner.colo;
+    if (winner.doColo) this.doColo = winner.doColo;
+    if (winner.clockOffset !== null) this.clockOffset = winner.clockOffset;
 
-      while (this.queue.length > 0) {
-        const msg = this.queue.shift()!;
-        this.send(msg);
-      }
+    const handicap = isHotSwap && this.inGame ? LOAD_HANDICAP_MS : 0;
+    const seededRtts =
+      winner.rtts.length > 0
+        ? winner.rtts.map((r) => Math.round(r + handicap))
+        : [50];
 
-      setTimeout(() => {
-        if (!this.closed && this.ws === socket && socket.readyState === WebSocket.OPEN) {
-          const now = Math.round(performance.now());
-          this.send({ t: 'ping', c: now });
-        }
-      }, 50);
+    this.rttWin.length = 0;
+    for (const r of seededRtts) {
+      this.rttWin.push(r);
+    }
 
-      this.startPing();
+    const stats = computeRttStats(this.rttWin);
+    this.rttMin = stats.min;
+    this.rtt = stats.median;
+    this.netRtt = stats.min + Math.min(20, Math.round(stats.jitter * 0.5));
+    this.smoothedRtt = stats.median;
+    this.jitter = stats.jitter;
+
+    this.consecutiveHighPing = 0;
+    this.consecutiveFailedProbes = 0;
+    if (isHotSwap) {
+      this.nextProbeAllowedAt = performance.now() + POST_SWITCH_GRACE_MS;
+      this.onMigrationStatus?.('migrated', this.colo);
+      this.onMigrationSuccess?.(this.colo);
+    }
+
+    const activeSock = winner.ws;
+    activeSock.onmessage = (ev: MessageEvent) => {
+      if (this.ws !== activeSock || this.closed) return;
+      this.handlePrimaryMessage(ev.data);
     };
 
-    socket.onmessage = (event) => {
-      if (this.ws !== socket) return;
-      this.handlePrimaryMessage(event.data);
-    };
-
-    socket.onclose = (ev) => {
-      if (this.ws !== socket) return;
+    activeSock.onclose = (ev) => {
+      if (this.ws !== activeSock || this.closed) return;
       this.stopPing();
       if (ev.reason === 'Handover') return;
-      if (this.isMigrating && this.probeWs !== null) return;
-      this.isReconnecting = true;
       this.onStatus?.('closed');
-      this.scheduleReconnect();
+      this.reconnectTimer = window.setTimeout(() => {
+        if (!this.closed) this.startInitialParallelRace();
+      }, 600);
     };
 
-    socket.onerror = () => {
-      if (this.ws !== socket) return;
-      if (this.isMigrating && this.probeWs !== null) return;
+    activeSock.onerror = () => {
+      if (this.ws !== activeSock || this.closed) return;
       this.onStatus?.('error');
     };
+
+    // Xả các gói tin đang chờ trong hàng đợi
+    while (
+      this.outboundQueue.length > 0 &&
+      activeSock.readyState === WebSocket.OPEN
+    ) {
+      const pkt = this.outboundQueue.shift()!;
+      activeSock.send(JSON.stringify(pkt));
+    }
+
+    // Phát lại các gói tin đến sớm trong lúc đua
+    for (const earlyMsg of winner.earlyMessages) {
+      this.handlePrimaryMessage(earlyMsg);
+    }
+
+    this.onStatus?.(isHotSwap ? 'reconnected' : 'open');
+    this.startPing();
+    this.startLobbyBackgroundSweep();
+  }
+
+  /**
+   * GIAI ĐOẠN 2: Dò mạng ngầm liên tục ở Sảnh chờ (Non-Disruptive Lobby Sweep).
+   * Nếu khi ở sảnh mà chưa vào được trạm Tier 0 (SIN/HKG) hoặc ping > 88ms,
+   * cứ mỗi 900ms bắn 3 socket ngầm song song để săn bằng được tuyến SIN/HKG
+   * mà KHÔNG ngắt kết nối hiện tại và KHÔNG dừng lại sau 3 lần thử!
+   */
+  private startLobbyBackgroundSweep(): void {
+    this.stopLobbyBackgroundSweep();
+    this.lobbySweepTimer = window.setInterval(() => {
+      if (this.closed || this.inGame || this.probing) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      const currentTier = getColoTier(this.colo);
+      // Nếu đã ở đúng SIN/HKG (Tier 0) và ping <= 85ms thì hoàn toàn mãn nguyện, không cần quét thêm
+      if (currentTier === 0 && this.rtt <= 85) return;
+
+      this.triggerParallelProbeAndSwap(false);
+    }, LOBBY_SWEEP_INTERVAL_MS);
+  }
+
+  private stopLobbyBackgroundSweep(): void {
+    if (this.lobbySweepTimer !== null) {
+      clearInterval(this.lobbySweepTimer);
+      this.lobbySweepTimer = null;
+    }
+  }
+
+  public send(m: ClientMsg): void {
+    if (m.t === 'join') {
+      this.lastJoinMsg = { ...m };
+      this.inGame = true;
+      if (this.sessionToken) {
+        m.token = this.sessionToken;
+      }
+    }
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(m));
+    } else {
+      if (this.outboundQueue.length < 32) {
+        this.outboundQueue.push(m);
+      }
+    }
+  }
+
+  public startPing(): void {
+    this.stopPing();
+    // Bắn ngay 1 ping đầu tiên không chờ đợi
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send({ t: 'ping', c: Math.round(performance.now()) });
+    }
+    this.pingInterval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const now = Math.round(performance.now());
+        this.send({ t: 'ping', c: now });
+      }
+    }, PING_INTERVAL_MS);
+  }
+
+  public stopPing(): void {
+    if (this.pingInterval !== null) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
   }
 
   private handlePrimaryMessage(raw: string | ArrayBuffer): void {
-    try {
-      const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+    const recvNow = performance.now();
+    const text =
+      typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
 
-      // Fast-path xử lý pong
-      if (text.startsWith('{"t":"pong"')) {
-        const msg = JSON.parse(text) as ServerMsg;
-        if (msg.t === 'pong') {
-          if (msg.colo) this.colo = msg.colo.toUpperCase();
-          if (msg.doColo) this.doColo = msg.doColo.toUpperCase();
+    if (text.startsWith('{"t":"pong"') || text.startsWith('{"t":"hello"')) {
+      try {
+        const msg = JSON.parse(text) as {
+          t: 'pong' | 'hello';
+          c?: number;
+          s?: number;
+          colo?: string;
+          doColo?: string;
+        };
+        if (msg.colo) this.colo = msg.colo.toUpperCase();
+        if (msg.doColo) this.doColo = msg.doColo.toUpperCase();
+        if (typeof document !== 'undefined' && document.hidden) return;
 
-          // Tránh ghi nhận RTT sai lệch khi tab đang bị ẩn
-          if (typeof document !== 'undefined' && document.hidden) return;
-
-          const now = performance.now();
-          const s = now - msg.c;
-          if (s >= 0 && s < 2500) {
-            this.recordPrimaryRtt(s, now, msg.s);
+        if (typeof msg.c === 'number') {
+          const rawRtt = recvNow - msg.c;
+          if (rawRtt >= 0 && rawRtt < 2500) {
+            this.processRttSample(rawRtt, recvNow, msg.s);
           }
         }
-        return;
-      }
+      } catch {}
+      return;
+    }
 
+    try {
       const parsed = JSON.parse(text) as ServerMsg;
       if (parsed.t === 'joined') {
         if (parsed.colo) this.colo = parsed.colo.toUpperCase();
@@ -441,10 +744,10 @@ export class WsClient implements Transport {
           }
         }
       } else if (parsed.t === 's') {
-        const snap = parsed as import('@shared/protocol').Snapshot;
+        const snap = parsed as Snapshot;
         if (typeof snap.st === 'number' && this.clockOffset !== null) {
           const transitEstimate = (this.rttMin || 48) * 0.5;
-          const candidateOffset = snap.st - (performance.now() - transitEstimate);
+          const candidateOffset = snap.st - (recvNow - transitEstimate);
           if (candidateOffset > this.clockOffset) {
             this.clockOffset = candidateOffset;
           } else {
@@ -452,18 +755,22 @@ export class WsClient implements Transport {
           }
         }
       }
-
       this.onMsg(parsed);
-    } catch (err) {
-      console.error('Failed to parse primary server message:', err);
-    }
+    } catch {}
   }
 
-  private recordPrimaryRtt(rawRtt: number, recvNow = performance.now(), serverTime?: number): void {
-    const interArrival = this.lastPongRecvPerf > 0 ? recvNow - this.lastPongRecvPerf : PING_INTERVAL_MS;
+  private processRttSample(
+    rawRtt: number,
+    recvNow: number,
+    serverTime?: number
+  ): void {
+    const interArrival =
+      this.lastPongRecvPerf > 0
+        ? recvNow - this.lastPongRecvPerf
+        : PING_INTERVAL_MS;
     this.lastPongRecvPerf = recvNow;
 
-    const isQueuedBurstTail = interArrival < 80 && rawRtt < this.lastRawRtt;
+    const isQueuedBurstTail = interArrival < 70 && rawRtt < this.lastRawRtt;
     this.lastRawRtt = rawRtt;
 
     if (this.rttWin.length === 0) {
@@ -479,30 +786,27 @@ export class WsClient implements Transport {
     }
 
     if (!isQueuedBurstTail) {
-      const clampedForWindow =
+      const clamped =
         rawRtt > this.rttMin * 2.5 + 60
           ? Math.min(rawRtt, this.rttMin + 90)
           : rawRtt;
-
-      this.rttWin.push(clampedForWindow);
-      if (this.rttWin.length > RTT_WINDOW_SIZE) {
-        this.rttWin.shift();
-      }
+      this.rttWin.push(clamped);
+      if (this.rttWin.length > 8) this.rttWin.shift();
     }
 
     const stats = computeRttStats(this.rttWin);
     this.rttMin = stats.min;
-    this.rttJitter = stats.jitter;
+    this.jitter = stats.jitter;
 
     if (rawRtt <= this.smoothedRtt) {
       this.smoothedRtt += (rawRtt - this.smoothedRtt) * 0.45;
     } else {
       const cappedSpike = Math.min(rawRtt, this.smoothedRtt + 35);
-      this.smoothedRtt += (cappedSpike - this.smoothedRtt) * 0.15;
+      this.smoothedRtt += (cappedSpike - this.smoothedRtt) * 0.18;
     }
 
     this.rtt = Math.round(this.smoothedRtt);
-    this.netRtt = Math.round(this.rttMin + Math.min(25, this.rttJitter * 0.5));
+    this.netRtt = Math.round(this.rttMin + Math.min(25, this.jitter * 0.5));
 
     if (typeof serverTime === 'number' && rawRtt <= this.rttMin + 15) {
       const bestOffset = serverTime - (recvNow - rawRtt * 0.5);
@@ -513,533 +817,326 @@ export class WsClient implements Transport {
       }
     }
 
+    // Kiểm tra kích hoạt In-Game Hot Migration
     const currentTier = getColoTier(this.colo);
-
-    // Đếm số mẫu liên tiếp vượt ngưỡng 90ms
-    if (this.rtt > HIGH_PING_THRESHOLD_MS) {
+    if (this.rtt > HIGH_PING_THRESHOLD_MS || currentTier > 0) {
       this.consecutiveHighPing += 1;
     } else {
       this.consecutiveHighPing = 0;
     }
 
-    // Nếu mạng bất ngờ vọt lên thêm > 35ms hoặc rớt sang Tier 2 (Châu Âu/Mỹ),
-    // xóa Cooldown để dò tuyến khẩn cấp ngay
-    if (
-      this.consecutiveFailedProbes > 0 &&
-      (this.rtt > this.baselineMedianAtLastFailure + 35 || currentTier === 2)
-    ) {
-      this.consecutiveFailedProbes = 0;
-      this.nextProbeAllowedAt = 0;
-    }
-
-    // LOBBY STEER: Nếu ở sảnh chờ mà dính Tier 2 hoặc ping > 90ms kéo dài
-    if (!this.inGame && !this.closed) {
-      const now = performance.now();
-      if ((currentTier === 2 || this.rtt > HIGH_PING_THRESHOLD_MS) && now - this.lastLobbyReconnectTime > 3500 && this.lobbySteerAttempts < 3) {
-        this.lastLobbyReconnectTime = now;
-        this.lobbySteerAttempts++;
-        console.log(`[WS] Lobby steer attempt ${this.lobbySteerAttempts}/3: currently ${this.colo} ~${Math.round(this.rtt)}ms`);
-        this.forceReconnect();
-        return;
-      }
-    }
-
-    // IN-GAME HOT MIGRATION: Tự động đổi nếu ping > 90ms
-    this.checkAndTriggerHotMigration(currentTier);
+    this.checkInGameMigrationTrigger(currentTier);
   }
 
-  private checkAndTriggerHotMigration(currentTier: ColoTier): void {
-    if (!this.inGame || this.probing || this.closed || !this.sessionToken) return;
+  private checkInGameMigrationTrigger(currentTier: ColoTier): void {
+    if (!this.inGame || this.probing || this.closed) return;
     if (typeof document !== 'undefined' && document.hidden) return;
 
-    const now = Date.now();
+    const now = performance.now();
     if (now < this.nextProbeAllowedAt) return;
 
-    // Điều kiện 1: Bị định tuyến nhầm ra ngoài khu vực (Tier 2 Châu Âu/Mỹ) -> dò ngay khi có >= 2 mẫu
-    const isOutOfRegionDetour = currentTier === 2 && this.rttWin.length >= 2;
+    // Nếu rơi sang Châu Âu / Mỹ (Tier 2): Kích hoạt ngay lập tức ở mẫu đầu tiên (350ms)!
+    const isOutOfRegionEmergency = currentTier === 2 && this.rttWin.length >= 1;
 
-    // Điều kiện 2: Ping trung vị > 90ms duy trì liên tục (3 chu kỳ)
+    // Nếu ping > 90ms kéo dài 3 mẫu (3 * 350ms = 1.05s): Kích hoạt dò 3 luồng song song!
     const isSustainedAbove90ms =
-      this.rttWin.length >= 4 &&
       this.rtt > HIGH_PING_THRESHOLD_MS &&
       this.consecutiveHighPing >= SUSTAINED_HIGH_PING_SAMPLES;
 
-    if (isOutOfRegionDetour || isSustainedAbove90ms) {
-      this.triggerHotMigration(false);
+    if (isOutOfRegionEmergency || isSustainedAbove90ms) {
+      this.triggerParallelProbeAndSwap(true);
     }
   }
 
   /**
-   * Kích hoạt Hot Migration song song:
-   * Mở probeSocket chạy ngầm, bắn ping có đệm tải để đo RTT thực tế,
-   * đánh giá qua hàm toán học evaluateMigrationDecision.
-   * Nếu đạt chuẩn: gửi join(handover) -> nhận joined -> tráo socket nguyên tử!
+   * GIAI ĐOẠN 3: Bắn đồng thời 3 Probe Sockets song song (cả cho Lobby và In-Game Hot Migration).
+   * Mỗi socket bắn 1 warmup + 3 measure pings cách nhau 90ms (chỉ mất 270ms-350ms!).
+   * Socket nào tìm được tuyến SIN/HKG ngon nhất sẽ thực hiện Handover nguyên tử ngay lập tức.
    */
-  public triggerHotMigration(isManual = false): void {
-    if (!this.inGame || this.closed || this.probing) return;
+  private triggerParallelProbeAndSwap(isInGameHandover: boolean): void {
+    if (this.probing || this.closed) return;
     this.probing = true;
     this.isMigrating = true;
     this.onMigrationStatus?.('probing', this.colo);
 
-    const probeUrl = this.buildEndpointUrl(true);
-    let candidateWs: WebSocket;
-    try {
-      candidateWs = new WebSocket(probeUrl);
-      this.probeWs = candidateWs;
-    } catch (e) {
+    const concurrency = isInGameHandover
+      ? INGAME_PROBE_CONCURRENCY
+      : LOBBY_SWEEP_CONCURRENCY;
+
+    const completedProbes: CandidateResult[] = [];
+    const probeSockets: WebSocket[] = [];
+    let finished = false;
+
+    const cleanupAllExcept = (keepWs: WebSocket | null) => {
+      for (const s of probeSockets) {
+        if (s !== keepWs) {
+          s.onopen = null;
+          s.onmessage = null;
+          s.onerror = null;
+          s.onclose = null;
+          try {
+            if (
+              s.readyState === WebSocket.OPEN ||
+              s.readyState === WebSocket.CONNECTING
+            ) {
+              s.close(1000, 'ProbeCleanup');
+            }
+          } catch {}
+        }
+      }
+      this.activeProbeSockets = [];
       this.probing = false;
       this.isMigrating = false;
-      this.onMigrationStatus?.('failed', this.colo);
-      return;
-    }
-
-    const probeSamples: number[] = [];
-    let probeColo = '';
-    let probeDoColo = '';
-    let pingsSent = 0;
-    let pongsReceived = 0;
-    let probeInterval: number | null = null;
-    let handoverTimer: number | null = null;
-    let awaitingHandoverAck = false;
-    const bufferedMessagesDuringHandover: (string | ArrayBuffer)[] = [];
-
-    const cleanupProbe = (closeSocket: boolean) => {
-      if (probeInterval !== null) {
-        clearInterval(probeInterval);
-        probeInterval = null;
-      }
-      if (handoverTimer !== null) {
-        clearTimeout(handoverTimer);
-        handoverTimer = null;
-      }
-      if (closeSocket && candidateWs) {
-        candidateWs.onopen = null;
-        candidateWs.onmessage = null;
-        candidateWs.onerror = null;
-        candidateWs.onclose = null;
-        try {
-          if (candidateWs.readyState === WebSocket.OPEN || candidateWs.readyState === WebSocket.CONNECTING) {
-            candidateWs.close(1000, 'ProbeAborted');
-          }
-        } catch (_) {}
-      }
-      if (this.probeWs === candidateWs) {
-        this.probeWs = null;
-      }
-      this.probing = false;
     };
 
-    // Timeout tổng lực 4.5s cho toàn bộ chu trình Probe
-    const overallTimeout = window.setTimeout(() => {
-      if (!awaitingHandoverAck) {
-        this.scheduleAdaptiveBackoff();
-        cleanupProbe(true);
-        this.isMigrating = false;
-        this.onMigrationStatus?.('failed', this.colo);
-      }
-    }, PROBE_TIMEOUT_MS);
+    const evaluateAndExecuteSwap = () => {
+      if (finished || this.closed) return;
+      finished = true;
 
-    candidateWs.onopen = () => {
-      if (this.closed || this.probeWs !== candidateWs) {
-        clearTimeout(overallTimeout);
-        cleanupProbe(true);
+      if (completedProbes.length === 0) {
+        this.scheduleFastBackoff();
+        cleanupAllExcept(null);
+        this.onMigrationStatus?.('failed', this.colo);
         return;
       }
 
-      const sendProbePing = () => {
-        if (candidateWs.readyState !== WebSocket.OPEN) return;
-        pingsSent += 1;
-        candidateWs.send(
-          JSON.stringify({
-            t: 'ping',
-            c: Math.round(performance.now()),
-            pad: PROBE_PAYLOAD_PADDING,
-          })
-        );
-        if (pingsSent >= PROBE_WARMUP_PINGS + PROBE_MEASURE_PINGS && probeInterval !== null) {
-          clearInterval(probeInterval);
-          probeInterval = null;
-        }
+      // Chọn ứng viên tốt nhất trong 3 luồng probe song song
+      completedProbes.sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        return a.medianRtt - b.medianRtt;
+      });
+
+      const minSamples = isInGameHandover ? 3 : 2;
+      const decision = evaluateMigrationDecision(
+        this.rttWin,
+        this.colo,
+        bestCandidate.rtts,
+        bestCandidate.colo || this.colo,
+        minSamples,
+        isInGameHandover
+      );
+
+      if (!decision.shouldSwitch) {
+        this.scheduleFastBackoff();
+        cleanupAllExcept(null);
+        this.onMigrationStatus?.('failed', this.colo);
+        return;
+      }
+
+      console.log(
+        `[Net] Fast Route Upgrade: ${this.colo} (~${decision.activeMedian}ms) -> ${bestCandidate.colo} (~${decision.probeRawMedian}ms) [${decision.reason}]`
+      );
+
+      // Nếu đang trong trận thì gửi kèm lệnh join handover trước khi tráo con trỏ socket
+      if (isInGameHandover && this.lastJoinMsg) {
+        try {
+          bestCandidate.ws.send(
+            JSON.stringify({
+              ...this.lastJoinMsg,
+              token: this.sessionToken || undefined,
+            })
+          );
+        } catch {}
+      }
+
+      const winnerWs = bestCandidate.ws;
+      cleanupAllExcept(winnerWs);
+      this.promoteSocketToPrimary(bestCandidate, true);
+    };
+
+    const overallTimeout = window.setTimeout(() => {
+      if (!finished) {
+        evaluateAndExecuteSwap();
+      }
+    }, PROBE_OVERALL_TIMEOUT_MS);
+
+    for (let i = 0; i < concurrency; i++) {
+      const probeUrl = this.buildRaceUrl(i + 1);
+      let pws: WebSocket;
+      try {
+        pws = new WebSocket(probeUrl);
+      } catch {
+        continue;
+      }
+      probeSockets.push(pws);
+      this.activeProbeSockets.push(pws);
+
+      const cand: CandidateResult = {
+        ws: pws,
+        url: probeUrl,
+        colo: '',
+        doColo: '',
+        tier: 2,
+        rtts: [],
+        bestRtt: 9999,
+        medianRtt: 9999,
+        clockOffset: null,
+        earlyMessages: [],
       };
 
-      sendProbePing();
-      probeInterval = window.setInterval(sendProbePing, PROBE_PING_SPACING_MS);
-    };
+      let pingsSent = 0;
+      let pongsCount = 0;
+      let pTimer: number | null = null;
 
-    candidateWs.onmessage = (ev: MessageEvent) => {
-      if (this.closed || this.probeWs !== candidateWs) {
-        clearTimeout(overallTimeout);
-        cleanupProbe(true);
-        return;
-      }
+      pws.onopen = () => {
+        if (finished || this.closed) return;
+        const fireProbePing = () => {
+          if (pws.readyState !== WebSocket.OPEN) return;
+          pingsSent += 1;
+          try {
+            pws.send(
+              `{"t":"ping","c":${Math.round(
+                performance.now()
+              )},"pad":"${PROBE_PAYLOAD_PADDING}"}`
+            );
+          } catch {}
+          if (
+            pingsSent >= PROBE_WARMUP_PINGS + PROBE_MEASURE_PINGS &&
+            pTimer !== null
+          ) {
+            clearInterval(pTimer);
+            pTimer = null;
+          }
+        };
+        fireProbePing();
+        pTimer = window.setInterval(fireProbePing, PROBE_PING_SPACING_MS);
+      };
 
-      // GIAI ĐOẠN 1: Thu thập mẫu Ping trên probeSocket
-      if (!awaitingHandoverAck) {
-        try {
-          const text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
-          if (text.startsWith('{"t":"pong"')) {
-            const msg = JSON.parse(text) as ServerMsg;
-            if (msg.t === 'pong') {
-              const rtt = Math.max(1, performance.now() - msg.c);
-              if (msg.colo) probeColo = msg.colo.toUpperCase();
-              if (msg.doColo) probeDoColo = msg.doColo.toUpperCase();
+      pws.onmessage = (ev: MessageEvent) => {
+        if (finished || this.closed) return;
+        const recvPerf = performance.now();
+        const text =
+          typeof ev.data === 'string'
+            ? ev.data
+            : new TextDecoder().decode(ev.data as ArrayBuffer);
 
-              pongsReceived += 1;
-              // Bỏ qua mẫu đầu tiên (Warmup)
-              if (pongsReceived > PROBE_WARMUP_PINGS) {
-                probeSamples.push(rtt);
+        if (text.startsWith('{"t":"hello"') || text.startsWith('{"t":"pong"')) {
+          try {
+            const msg = JSON.parse(text) as {
+              t: 'hello' | 'pong';
+              c?: number;
+              s?: number;
+              colo?: string;
+              doColo?: string;
+            };
+            if (msg.colo) {
+              cand.colo = msg.colo.toUpperCase();
+              cand.tier = getColoTier(cand.colo);
+            }
+            if (msg.doColo) {
+              cand.doColo = msg.doColo.toUpperCase();
+            }
+
+            if (msg.t === 'pong' && typeof msg.c === 'number') {
+              const rtt = Math.max(1, recvPerf - msg.c);
+              pongsCount += 1;
+              if (pongsCount > PROBE_WARMUP_PINGS) {
+                cand.rtts.push(rtt);
+                cand.bestRtt = Math.min(cand.bestRtt, rtt);
+              }
+              if (typeof msg.s === 'number' && rtt <= cand.bestRtt + 10) {
+                cand.clockOffset = msg.s - (recvPerf - rtt * 0.5);
               }
 
-              if (probeSamples.length >= PROBE_MEASURE_PINGS) {
-                clearTimeout(overallTimeout);
-                if (probeInterval !== null) {
-                  clearInterval(probeInterval);
-                  probeInterval = null;
+              if (cand.rtts.length >= PROBE_MEASURE_PINGS) {
+                if (pTimer !== null) {
+                  clearInterval(pTimer);
+                  pTimer = null;
                 }
+                cand.medianRtt = computeRttStats(cand.rtts).median;
+                completedProbes.push(cand);
 
-                const decision = evaluateMigrationDecision(
-                  this.rttWin,
-                  this.colo,
-                  probeSamples,
-                  probeColo || this.colo
-                );
-
-                console.log(`[WS Hot Migration] Decision: switch=${decision.shouldSwitch}, reason=${decision.reason}, active=${decision.activeMedian}ms(${this.colo}), probeEff=${decision.probeEffectiveMedian}ms(${probeColo})`);
-
-                if (!decision.shouldSwitch && !isManual) {
-                  // Không tìm thấy tuyến tốt hơn -> ngắt probe êm ái và giãn Cooldown
-                  this.scheduleAdaptiveBackoff();
-                  cleanupProbe(true);
-                  this.isMigrating = false;
-                  this.onMigrationStatus?.('failed', this.colo);
+                // Nếu luồng probe này bắt trúng ngay SIN/HKG (Tier 0) với RTT <= 75ms
+                // trong khi kết nối hiện tại đang ở Tier 1/2 -> Chuyển ngay lập tức không chờ các luồng khác!
+                if (
+                  cand.tier === 0 &&
+                  cand.medianRtt <= 75 &&
+                  getColoTier(this.colo) > 0
+                ) {
+                  clearTimeout(overallTimeout);
+                  evaluateAndExecuteSwap();
                   return;
                 }
 
-                // GIAI ĐOẠN 2: Tuyến mới tốt hơn thực sự -> Gửi lệnh join(handover)
-                awaitingHandoverAck = true;
-                if (this.lastJoinMsg) {
-                  candidateWs.send(
-                    JSON.stringify({
-                      ...this.lastJoinMsg,
-                      token: this.sessionToken || undefined,
-                    })
-                  );
+                if (completedProbes.length >= probeSockets.length) {
+                  clearTimeout(overallTimeout);
+                  evaluateAndExecuteSwap();
                 }
-
-                handoverTimer = window.setTimeout(() => {
-                  this.scheduleAdaptiveBackoff();
-                  cleanupProbe(true);
-                  this.isMigrating = false;
-                  this.onMigrationStatus?.('failed', this.colo);
-                }, HANDOVER_ACK_TIMEOUT_MS);
               }
             }
-          }
-        } catch (_) {
-          cleanupProbe(true);
+          } catch {}
+          return;
         }
-        return;
-      }
 
-      // GIAI ĐOẠN 2: Đang chờ xác nhận 'joined' từ DO
-      if (awaitingHandoverAck) {
-        try {
-          const text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
-          const parsed = JSON.parse(text) as ServerMsg;
-          if (parsed.t === 'joined') {
-            // HOÀN TẤT HANDOVER: Tráo socket nguyên tử trong 1 tick!
-            clearTimeout(overallTimeout);
-            this.completeAtomicSocketSwap(
-              candidateWs,
-              probeSamples,
-              probeColo || parsed.colo || this.colo,
-              probeDoColo || parsed.doColo || this.doColo,
-              parsed,
-              bufferedMessagesDuringHandover
-            );
-            cleanupProbe(false); // Không đóng candidateWs vì nó đã là this.ws!
-            return;
-          }
-          if (parsed.t === 'init') {
-            // TUYỆT ĐỐI bỏ qua init khi đang hot handover vì GameState đã có sẵn map và clock!
-            // Nếu xử lý init sẽ gọi resetClock() và xóa toàn bộ lịch sử nội suy nhân vật.
-            return;
-          }
-        } catch (_) {
-          // Bỏ qua nếu tin nhắn không phải JSON
-        }
-        // Đệm các snapshot 20Hz đến sát thời điểm handover
-        if (typeof ev.data === 'string' && ev.data.startsWith('{"t":"s"')) {
-          bufferedMessagesDuringHandover.push(ev.data);
-        }
-      }
-    };
-
-    candidateWs.onerror = () => {
-      clearTimeout(overallTimeout);
-      this.scheduleAdaptiveBackoff();
-      cleanupProbe(true);
-      this.isMigrating = false;
-      this.onMigrationStatus?.('failed', this.colo);
-    };
-
-    candidateWs.onclose = () => {
-      if (this.probing && this.probeWs === candidateWs) {
-        clearTimeout(overallTimeout);
-        this.scheduleAdaptiveBackoff();
-        cleanupProbe(false);
-        this.isMigrating = false;
-        this.onMigrationStatus?.('failed', this.colo);
-      }
-    };
-  }
-
-  /**
-   * Tráo con trỏ socket chính sang candidateWs ngay khi nhận được xác nhận 'joined':
-   * - Hủy listener trên socket cũ và đóng an toàn với mã 'Handover'
-   * - Khởi tạo cửa sổ RTT mới với hệ số bù tải
-   * - Đặt thời gian ân hạn POST_SWITCH_GRACE_MS (25s)
-   */
-  private completeAtomicSocketSwap(
-    newWs: WebSocket,
-    probeSamples: number[],
-    newColo: string,
-    newDoColo: string,
-    joinedMsg: ServerMsg,
-    bufferedMessages: (string | ArrayBuffer)[]
-  ): void {
-    const oldWs = this.ws;
-
-    // 1. Gỡ bỏ listener của socket cũ trước khi close() để không kích hoạt reconnect loop
-    if (oldWs) {
-      oldWs.onopen = null;
-      oldWs.onmessage = null;
-      oldWs.onerror = null;
-      oldWs.onclose = null;
-      try {
-        oldWs.close(1000, 'Handover');
-      } catch (_) {}
-    }
-
-    // 2. Gán socket mới làm socket chính
-    this.ws = newWs;
-    this.colo = newColo.toUpperCase();
-    this.doColo = newDoColo.toUpperCase();
-
-    // 3. Khởi tạo cửa sổ RTT mới (đã cộng bù tải 12ms)
-    this.rttWin.length = 0;
-    for (const s of probeSamples) {
-      this.rttWin.push(s + LOAD_HANDICAP_MS);
-    }
-    const stats = computeRttStats(this.rttWin);
-    this.rttMin = stats.min;
-    this.rtt = stats.median;
-    this.rttJitter = stats.jitter;
-
-    // 4. Reset bộ đếm chống bão và khóa probe trong thời gian ân hạn 25s
-    this.consecutiveHighPing = 0;
-    this.consecutiveFailedProbes = 0;
-    this.nextProbeAllowedAt = Date.now() + POST_SWITCH_GRACE_MS;
-    this.isMigrating = false;
-
-    // 5. Gắn listener hoạt động chính thức cho newWs
-    newWs.onmessage = (ev: MessageEvent) => {
-      if (this.ws !== newWs) return;
-      this.handlePrimaryMessage(ev.data);
-    };
-
-    newWs.onclose = (ev) => {
-      if (this.ws !== newWs || this.closed) return;
-      this.stopPing();
-      if (ev.reason === 'Handover') return;
-      this.isReconnecting = true;
-      this.onStatus?.('closed');
-      this.scheduleReconnect();
-    };
-
-    newWs.onerror = () => {
-      if (this.ws !== newWs || this.closed) return;
-      this.onStatus?.('error');
-    };
-
-    // 6. Thông báo thành công ra HUD và chuyển tin nhắn 'joined' cho GameState
-    this.onMigrationStatus?.('migrated', this.colo);
-    this.onMigrationSuccess?.(this.colo);
-    this.onMsg(joinedMsg);
-
-    for (const bufMsg of bufferedMessages) {
-      this.handlePrimaryMessage(bufMsg);
+        cand.earlyMessages.push(ev.data);
+      };
     }
   }
 
   /**
-   * Tăng thời gian nghỉ theo cấp số nhân (15s -> 30s -> 60s -> 120s)
-   * khi mạng của ISP không có bất kỳ tuyến nào dưới 90ms.
+   * Cooldown ngắn & thông minh (2.5s - 8s) thay vì khóa cứng 15s - 120s như trước.
+   * Nếu đang bị kẹt ở Châu Âu/Mỹ (Tier 2), thử lại chỉ sau 2.5 giây!
    */
-  private scheduleAdaptiveBackoff(): void {
+  private scheduleFastBackoff(): void {
     this.consecutiveFailedProbes += 1;
-    this.baselineMedianAtLastFailure = this.rtt;
+    const currentTier = getColoTier(this.colo);
+
+    if (currentTier === 2) {
+      // Đang ở Châu Âu/Mỹ: chỉ nghỉ 2.5s rồi tiếp tục bắn 3 luồng dò SIN/HKG
+      this.nextProbeAllowedAt = performance.now() + 2500;
+      return;
+    }
+
     const backoffMs = Math.min(
-      MAX_PROBE_COOLDOWN_MS,
-      BASE_PROBE_COOLDOWN_MS * Math.pow(2, this.consecutiveFailedProbes - 1)
+      8_000,
+      2500 * Math.min(3, this.consecutiveFailedProbes)
     );
-    this.nextProbeAllowedAt = Date.now() + backoffMs;
+    this.nextProbeAllowedAt = performance.now() + backoffMs;
   }
 
-  private startPing(): void {
-    this.stopPing();
-    this.pingInterval = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        const now = Math.round(performance.now());
-        this.send({ t: 'ping', c: now });
-      }
-    }, PING_INTERVAL_MS);
-  }
-
-  private stopPing(): void {
-    if (this.pingInterval !== null) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-  }
-
-  private scheduleReconnect(): void {
-    if (this.closed) return;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-    }
-    this.reconnectTimer = window.setTimeout(() => {
-      this.reconnectTimer = null;
-      if (!this.closed) this.connect();
-    }, 800);
-  }
-
-  public send(m: ClientMsg): void {
-    let toSend = m;
-    if (m.t === 'join') {
-      toSend = { ...m, token: this.sessionToken || m.token };
-      this.lastJoinMsg = toSend;
-    }
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      if (m.t !== 'input') {
-        this.queue.push(toSend);
-      }
-      return;
-    }
-    if (m.t === 'input' && this.ws.bufferedAmount > 65536) {
-      return;
-    }
-    this.ws.send(JSON.stringify(toSend));
-  }
-
-  public leaveGame(): void {
-    this.inGame = false;
-    this.isMigrating = false;
-    this.sessionToken = null;
-    this.lastJoinMsg = null;
-    this.queue.length = 0;
-    try {
-      sessionStorage.removeItem(`fb_tok_${this.getRoomKey()}`);
-      sessionStorage.removeItem('fb_session_token');
-    } catch (_) {}
-    if (this.probeWs) {
-      try {
-        this.probeWs.close();
-      } catch (_) {}
-      this.probeWs = null;
-    }
-    try {
-      this.send({ t: 'leave' });
-    } catch (_) {}
+  public triggerHotMigration(_isManual = false): void {
+    this.triggerParallelProbeAndSwap(this.inGame);
   }
 
   public manualRetune(): void {
-    if (this.closed) return;
     this.nextProbeAllowedAt = 0;
     this.consecutiveHighPing = SUSTAINED_HIGH_PING_SAMPLES;
     this.consecutiveFailedProbes = 0;
-    if (this.inGame) {
-      if (this.probeWs) {
-        try {
-          this.probeWs.close();
-        } catch (_) {}
-        this.probeWs = null;
-        this.probing = false;
-        this.isMigrating = false;
-      }
-      this.triggerHotMigration(true);
-    } else {
-      this.nextEndpointUrl();
-      this.forceReconnect();
-    }
+    this.triggerParallelProbeAndSwap(this.inGame);
   }
 
   public forceReconnect(): void {
     if (this.closed) return;
-    this.stopPing();
-    this.probing = false;
-    this.isMigrating = false;
-    if (this.probeWs) {
-      try {
-        this.probeWs.close();
-      } catch (_) {}
-      this.probeWs = null;
-    }
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    this.rttWin.length = 0;
-    this.isReconnecting = true;
-    if (this.ws) {
-      const oldWs = this.ws;
-      this.ws = null;
-      oldWs.onopen = null;
-      oldWs.onmessage = null;
-      oldWs.onclose = null;
-      oldWs.onerror = null;
-      try {
-        oldWs.close();
-      } catch (_) {}
-    }
-    setTimeout(() => {
-      if (!this.closed) {
-        this.connect();
-      }
-    }, 80);
+    this.triggerParallelProbeAndSwap(this.inGame);
+  }
+
+  public leaveGame(): void {
+    this.inGame = false;
+    try {
+      this.send({ t: 'leave' });
+    } catch {}
   }
 
   public close(): void {
     this.closed = true;
-    this.probing = false;
-    this.isMigrating = false;
     this.stopPing();
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
-    }
-    if (this.probeWs) {
-      try {
-        this.probeWs.close();
-      } catch (_) {}
-      this.probeWs = null;
-    }
+    this.stopLobbyBackgroundSweep();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.lastJoinMsg = null;
-    this.sessionToken = null;
-    if (this.ws) {
-      const oldWs = this.ws;
-      this.ws = null;
-      oldWs.onopen = null;
-      oldWs.onmessage = null;
-      oldWs.onclose = null;
-      oldWs.onerror = null;
+    for (const s of this.activeProbeSockets) {
       try {
-        oldWs.close();
-      } catch (_) {}
+        s.close(1000, 'ClientClosed');
+      } catch {}
+    }
+    this.activeProbeSockets = [];
+    if (this.ws) {
+      this.ws.onclose = null;
+      try {
+        this.ws.close(1000, 'ClientClosed');
+      } catch {}
+      this.ws = null;
     }
   }
 }

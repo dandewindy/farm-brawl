@@ -1732,10 +1732,16 @@ function getClientId(): string {
   const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
   const wsUrl = `${proto}//${host}${query}`;
 
-  const altWorkerUrl = !isViteDev && !host.includes('workers.dev')
-    ? `wss://farm-brawl.farm-brawl.workers.dev${query}`
-    : '';
-  const altUrls = altWorkerUrl ? [altWorkerUrl] : [];
+  const altUrls: string[] = [];
+  if (!isViteDev) {
+    if (!host.includes('workers.dev')) {
+      altUrls.push(`wss://farm-brawl.farm-brawl.workers.dev${query}`);
+    }
+    // Cung cấp 3 lane phụ để WsClient băm 4 kết nối song song qua 4 cổng nguồn ECMP khác nhau
+    for (let lane = 1; lane <= 3; lane++) {
+      altUrls.push(`${wsUrl}&lane=${lane}`);
+    }
+  }
 
   transport = new WsClient(
     wsUrl,
