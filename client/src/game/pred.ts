@@ -265,7 +265,7 @@ export class ClientPredictor {
         const speed = Math.hypot(this.vx, this.vz);
         if (speed > maxSp) {
           const excess = speed - maxSp;
-          const d = Math.exp(-2.2 * h);
+          const d = Math.exp(-2.8 * h);
           const newSpeed = maxSp + excess * d;
           const factor = newSpeed / speed;
           this.vx *= factor;

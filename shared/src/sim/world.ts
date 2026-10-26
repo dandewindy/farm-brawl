@@ -1442,23 +1442,23 @@ export class World {
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
     const ramFactor = TRAITS[att.species].ram ?? 1.0;
-    let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX * 1.3);
+    let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX);
 
     // Rule: "titan" (Titan clash - colossal impacts)
     if (this.currentRule === 'titan') {
-      k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 1.4);
+      k = Math.min(CFG.KNOCKBACK_MAX * 1.5, k * 1.4);
     }
 
     // Rule: "squealer" (Propaganda empowers King with 1.8x ram force)
     if (this.currentRule === 'squealer' && att.id === this.napoleonId) {
-      k = Math.min(CFG.KNOCKBACK_MAX * 1.8, k * 1.8);
+      k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 1.6);
     }
 
-    // Weapon: Pitchfork (+100% knockback against normal animals, +200% / 3x against King)
+    // Weapon: Pitchfork (+80% knockback against normal animals, +150% against King)
     if (att.pitchforkT > 0) {
       const isKing = vic.id === this.napoleonId;
-      const pitchMult = isKing ? 3.0 : 2.0;
-      k = Math.max(k * pitchMult, isKing ? 58 : 42);
+      const pitchMult = isKing ? 2.5 : 1.8;
+      k = Math.max(k * pitchMult, isKing ? 50 : 38);
     }
 
     // Weapon: Dynamite explosion
@@ -1466,7 +1466,7 @@ export class World {
     let boomX = 0, boomZ = 0;
     if (att.hasDynamite) {
       att.hasDynamite = false;
-      k = Math.max(k * 2.5, 55);
+      k = Math.max(k * 2.2, 50);
       boomX = r2((att.x + vic.x) / 2);
       boomZ = r2((att.z + vic.z) / 2);
       this.events.push({ k: 'boom', id: att.id, x: boomX, z: boomZ });
@@ -1484,9 +1484,9 @@ export class World {
       }
     }
 
-    // Super Rainbow Dash: violent massive knockback launching victim far across the map into the electric fence!
+    // Super Rainbow Dash: violent massive knockback launching victim across the map into the fence
     if (att.superT > 0) {
-      k = Math.max(k * 4.5, 125);
+      k = Math.max(k * 2.8, 65);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;

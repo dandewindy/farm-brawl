@@ -1115,6 +1115,9 @@ const gameState = new GameState({
     deathCamTarget = null;
     isSpectating = false;
     spectateTargetId = null;
+    localStunTimer = 0;
+    wasStunnedLastFrame = false;
+    input.cancelRam();
     hud.isPlayerAlive = true;
     hud.showInGame();
     if (!gameState.metas.has(gameState.myId)) {
@@ -1927,8 +1930,8 @@ function animate(now: number): void {
   if (transport && gameState.alive) {
     const myMeta = gameState.metas.get(gameState.myId);
     const myMass = me ? me.mass : CFG.START_MASS;
-    const myX = predictor.on ? predictor.x : (me ? me.x : 0);
-    const myZ = predictor.on ? predictor.z : (me ? me.z : 0);
+    const myX = predictor.on ? predictor.x : (me ? me.x : world.camTarget.x);
+    const myZ = predictor.on ? predictor.z : (me ? me.z : world.camTarget.z);
 
     // Decrement local cooldown smoothly every frame before prediction step
     if (gameState.me.cd > 0) {

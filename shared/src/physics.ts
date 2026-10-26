@@ -57,7 +57,7 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
     const speed = Math.hypot(b.vx, b.vz);
     if (speed > ms) {
       const excess = speed - ms;
-      const d = Math.exp(-2.2 * dt);
+      const d = Math.exp(-2.8 * dt);
       const newSpeed = ms + excess * d;
       const factor = newSpeed / speed;
       b.vx *= factor;

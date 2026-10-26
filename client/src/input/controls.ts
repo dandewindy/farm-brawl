@@ -18,7 +18,7 @@ export class InputManager {
   private readonly keysDown = new Set<string>();
   private keyAim = false;
 
-  private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2, has: false };
+  private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight * 0.35, has: true };
   private isTouch: boolean;
   private stickVec: { x: number; y: number } | null = null;
 
@@ -77,20 +77,29 @@ export class InputManager {
   }
 
   private bindMouseAndKeyboard(): void {
-    window.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch') return;
-      this.pointer.x = e.clientX;
-      this.pointer.y = e.clientY;
+    const handleMove = (clientX: number, clientY: number) => {
+      this.pointer.x = clientX;
+      this.pointer.y = clientY;
       this.pointer.has = true;
       this.keyAim = false;
+    };
+
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      handleMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      handleMove(e.clientX, e.clientY);
     });
 
     window.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') {
-        this.pointer.x = e.clientX;
-        this.pointer.y = e.clientY;
-        this.pointer.has = true;
-        this.keyAim = false;
+        handleMove(e.clientX, e.clientY);
+        const target = e.target as HTMLElement | null;
+        if (target && target.closest('button, input, select, textarea, a, .screen, .modal, .card, .dialog, #start, #death, #pcSettingsMenu, #gameDrawerModal, #netPerf, #gameControls')) {
+          return;
+        }
         if (e.button === 0) this.pressRam();
       }
     });
@@ -147,9 +156,8 @@ export class InputManager {
       }
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        // Only create stick for touches on the left half that aren't already tracked and not on UI elements
         const target = t.target as HTMLElement | null;
-        if (target && target.closest('button, input, select, textarea, a, #gameDrawerModal, #pcSettingsMenu, #netPerf, .drawer-modal, .card, .dialog')) {
+        if (target && target.closest('button, input, select, textarea, a, #gameDrawerModal, #pcSettingsMenu, #netPerf, .drawer-modal, .card, .dialog, #gameControls, #dashBtn')) {
           continue;
         }
         if (t.clientX < window.innerWidth * 0.5 && stickTouchId === null) {
@@ -162,6 +170,11 @@ export class InputManager {
             this.stickEl.style.top = `${t.clientY}px`;
             this.stickEl.hidden = false;
           }
+        } else if (stickTouchId === null) {
+          // Direct touch aim outside stick zone
+          this.pointer.x = t.clientX;
+          this.pointer.y = t.clientY;
+          this.pointer.has = true;
         }
       }
     }, { passive: true });
@@ -169,7 +182,6 @@ export class InputManager {
     window.addEventListener('touchmove', (e) => {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        // Only track the stick finger by its identifier (not by screen position)
         if (t.identifier === stickTouchId && this.stickVec) {
           const dx = t.clientX - touchStartX;
           const dy = t.clientY - touchStartY;
@@ -183,6 +195,10 @@ export class InputManager {
             const ky = Math.sin(angle) * Math.min(dist, maxR);
             this.stickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
           }
+        } else if (stickTouchId === null) {
+          this.pointer.x = t.clientX;
+          this.pointer.y = t.clientY;
+          this.pointer.has = true;
         }
       }
     }, { passive: true });
@@ -245,7 +261,10 @@ export class InputManager {
       }
       return;
     }
-    if (!this.pointer.has) return;
+    if (!this.pointer.has) {
+      this.aimMove = false;
+      return;
+    }
     this.ndc.set((this.pointer.x / window.innerWidth) * 2 - 1, -(this.pointer.y / window.innerHeight) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, camera);
     if (!this.raycaster.ray.intersectPlane(this.ground, this.hit)) return;
@@ -262,9 +281,7 @@ export class InputManager {
 
     // Dừng khi chuột ở sát con vật, chạy khi chuột đưa ra ngoài
     const baseR = radiusOf(meMass);
-    const stopThreshold = baseR + 0.35;
-    const startThreshold = baseR + 0.55;
-    this.aimMove = this.aimMove ? dist > stopThreshold : dist > startThreshold;
+    this.aimMove = dist > baseR + 0.35;
   }
 
   getInput(): Input {
