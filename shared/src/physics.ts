@@ -54,9 +54,22 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
     b.vz *= d;
   } else {
     const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
-    const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.25) * terrainFactor(sp, t) * dt);
-    b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
-    b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
+    const speed = Math.hypot(b.vx, b.vz);
+    if (speed > ms) {
+      const excess = speed - ms;
+      const d = Math.exp(-2.2 * dt);
+      const newSpeed = ms + excess * d;
+      const factor = newSpeed / speed;
+      b.vx *= factor;
+      b.vz *= factor;
+      const steerK = 1 - Math.exp(-3.5 * dt);
+      b.vx += (Math.cos(inp.a) * ms - b.vx * (ms / newSpeed)) * steerK;
+      b.vz += (Math.sin(inp.a) * ms - b.vz * (ms / newSpeed)) * steerK;
+    } else {
+      const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.25) * terrainFactor(sp, t) * dt);
+      b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
+      b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
+    }
   }
   // ponds drag everyone but ducks and dogs, even while knocked back
   if (t === 1 && sp !== 'duck' && sp !== 'dog' && b.dashT <= 0) {

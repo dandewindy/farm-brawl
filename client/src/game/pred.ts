@@ -233,6 +233,10 @@ export class ClientPredictor {
       this.dashT = Math.max(0, this.dashT - h);
       this.flyT = Math.max(0, this.flyT - h);
       this.stunT = Math.max(0, this.stunT - h);
+      if (this.dashT <= 0) {
+        this.plow = false;
+        this.flyT = 0;
+      }
       if (this.stunT <= 0 && (flags & 8) === 0) {
         this.stunned = false;
       }
@@ -258,9 +262,22 @@ export class ClientPredictor {
         this.vx *= d;
         this.vz *= d;
       } else {
-        const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / mm, 0.25) * terrain * h);
-        this.vx += (Math.cos(aimA) * maxSp - this.vx) * k;
-        this.vz += (Math.sin(aimA) * maxSp - this.vz) * k;
+        const speed = Math.hypot(this.vx, this.vz);
+        if (speed > maxSp) {
+          const excess = speed - maxSp;
+          const d = Math.exp(-2.2 * h);
+          const newSpeed = maxSp + excess * d;
+          const factor = newSpeed / speed;
+          this.vx *= factor;
+          this.vz *= factor;
+          const steerK = 1 - Math.exp(-3.5 * h);
+          this.vx += (Math.cos(aimA) * maxSp - this.vx * (maxSp / newSpeed)) * steerK;
+          this.vz += (Math.sin(aimA) * maxSp - this.vz * (maxSp / newSpeed)) * steerK;
+        } else {
+          const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / mm, 0.25) * terrain * h);
+          this.vx += (Math.cos(aimA) * maxSp - this.vx) * k;
+          this.vz += (Math.sin(aimA) * maxSp - this.vz) * k;
+        }
       }
 
       if (water && species !== 'duck' && this.dashT <= 0) {

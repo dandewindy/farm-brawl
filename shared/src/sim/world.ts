@@ -715,7 +715,10 @@ export class World {
     }
 
     for (const p of alive) {
-      if (p.dashT <= 0) p.plow = false;
+      if (p.dashT <= 0) {
+        p.plow = false;
+        p.flyT = 0;
+      }
       if (!p.alive) continue;
 
       // 1. Electric fence
@@ -1481,9 +1484,9 @@ export class World {
       }
     }
 
-    // Super Rainbow Dash: violent massive knockback launching victim far across the map!
+    // Super Rainbow Dash: violent massive knockback launching victim far across the map into the electric fence!
     if (att.superT > 0) {
-      k = Math.max(k * 3.5, 78);
+      k = Math.max(k * 4.5, 125);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;

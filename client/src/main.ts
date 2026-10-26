@@ -1307,15 +1307,11 @@ function handleGameEvent(ev: GameEvent): void {
         // Hay bale collision stun: burst of golden straw flying everywhere!
         foodParts.burst(ev.x, 1.4, ev.z, 0xe8c55a, 26, 9, 8, 0.85);
       }
-      if (isMine) shake = Math.max(shake, 0.6);
+      if (isMine) shake = Math.max(shake, 0.15);
 
-      // Super Rainbow Candy sonic blast effect
+      // Super Rainbow Candy sonic blast visual effect (clean visual, no cannon shaking or boom sound)
       if (ev.s >= 70) {
         foodParts.sonicWave(ev.x, 0.8, ev.z, 3.5);
-        if (isMine) {
-          shake = Math.max(shake, 1.4);
-          sfxBoom();
-        }
       }
 
       // Attacker hit someone with normal (non-plow) dash: stop dash velocity immediately on impact!
@@ -2131,8 +2127,18 @@ function animate(now: number): void {
         if (meta.species !== 'duck') pFlags |= FLAG.DROWNING;
       }
       if (isMe) {
-        if (predictor.dashT > 0) pFlags |= FLAG.DASH;
-        if (predictor.plow) pFlags |= FLAG.PLOW;
+        if (predictor.dashT > 0) {
+          pFlags |= FLAG.DASH;
+          if (predictor.plow) pFlags |= FLAG.PLOW;
+        } else {
+          pFlags &= ~FLAG.DASH;
+          pFlags &= ~FLAG.PLOW;
+        }
+        if (predictor.flyT > 0) {
+          pFlags |= FLAG.FLYING;
+        } else {
+          pFlags &= ~FLAG.FLYING;
+        }
         if (input.holding && (now - input.holdStart) >= CFG.CHARGE_SLOW_AFTER * 1000) pFlags |= FLAG.CHARGING;
       }
       const isKing = ent.id === gameState.napoleonId;

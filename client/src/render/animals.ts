@@ -1250,7 +1250,7 @@ export class AnimalRenderer {
     vis.root.rotation.y = -angle + (isStunned && sq <= 0.4 ? Math.sin(now / 50) * 0.5 : 0);
 
     // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water, dazed sway when stunned
-    vis.root.rotation.z = sq > 0.4
+    const targetRotZ = sq > 0.4
       ? Math.sin(now / 120) * 0.05
       : isStunned
       ? Math.sin(now / 90) * 0.15
@@ -1267,6 +1267,8 @@ export class AnimalRenderer {
       : isCharging
       ? 0.15 + lvl * 0.15
       : 0;
+
+    vis.root.rotation.z += (targetRotZ - vis.root.rotation.z) * Math.min(1, 16 * dt);
 
     if (isDrowning && sq <= 0.4) {
       // Gentle side-to-side flailing
