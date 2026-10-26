@@ -18,7 +18,6 @@ export class GameRoom extends DurableObject {
   private readonly playerLastDashSeq = new Map<number, number>();
   private readonly disconnectedPlayers = new Map<string, { playerId: number; disconnectTime: number }>();
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
-  private nextTickTime = 0;
   private tickAccumulator = 0;
   private lastTickPerfTime = 0;
   private doColo = 'APAC';
@@ -441,15 +440,25 @@ export class GameRoom extends DurableObject {
       this.world.matchEndTimer = 0;
       this.broadcastMatchDuration(dur);
     } else if (msg.t === 'input') {
-      const playerId = this.sockets.get(ws);
-      if (playerId) {
-        if (typeof msg.seq === 'number' && msg.seq > (this.playerLastSeq.get(playerId) ?? 0)) {
-          this.playerLastSeq.set(playerId, msg.seq);
+      const rawPlayerId = this.sockets.get(ws);
+      if (rawPlayerId !== undefined && rawPlayerId !== null) {
+        const playerId = typeof rawPlayerId === 'number' ? rawPlayerId : Number(rawPlayerId);
+        const keyId = Number.isNaN(playerId) ? rawPlayerId : playerId;
+        if (typeof msg.seq === 'number' && msg.seq > (this.playerLastSeq.get(keyId as any) ?? 0)) {
+          this.playerLastSeq.set(keyId as any, msg.seq);
         }
         if (typeof msg.dashSeq === 'number' && msg.dashSeq > 0) {
-          this.playerLastDashSeq.set(playerId, msg.dashSeq);
+          this.playerLastDashSeq.set(keyId as any, msg.dashSeq);
         }
-        this.world.setInput(playerId, { a: msg.a, mv: msg.mv, btn: msg.btn, hold: msg.hold, seq: msg.seq, dashSeq: msg.dashSeq, eat: (msg as any).eat });
+        this.world.setInput(keyId, {
+          a: msg.a,
+          mv: msg.mv,
+          btn: msg.btn,
+          hold: msg.hold,
+          seq: msg.seq,
+          dashSeq: msg.dashSeq,
+          eat: (msg as any).eat,
+        });
       }
     } else if (msg.t === 'ping') {
       ws.send(`{"t":"pong","c":${msg.c},"s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);

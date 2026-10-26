@@ -56,6 +56,7 @@ export interface Player extends Body {
   prevX?: number;
   prevZ?: number;
   pendingEatHints?: number[];
+  lastInputSeq?: number;
   team?: number;
   origSpecies?: Species;
   ai: BotBrain | null;
@@ -299,9 +300,27 @@ export class World {
     this.events.push({ k: 'leave', id });
   }
 
-  setInput(id: number, inp: Input): void {
-    const p = this.players.get(id);
-    if (!p || p.bot) return;
+  setInput(
+    id: number | string,
+    inp: Input & { seq?: number; dashSeq?: number; eat?: number[] }
+  ): void {
+    const numericId = typeof id === 'number' ? id : Number(id);
+    const p = this.players.get(numericId) ?? this.players.get(id as any);
+    if (!p) return;
+
+    // Human player connected via socket is definitely not a bot
+    p.ai = null;
+    p.bot = false;
+
+    // Reject out-of-order sequence packets
+    if (typeof inp.seq === 'number' && inp.seq > 0) {
+      const lastSeq = p.lastInputSeq ?? 0;
+      if (inp.seq < lastSeq) {
+        return;
+      }
+      p.lastInputSeq = inp.seq;
+    }
+
     p.input.a = Number.isFinite(inp.a) ? inp.a : p.input.a;
     p.input.mv = !!inp.mv;
     p.input.btn = !!inp.btn;
@@ -539,7 +558,7 @@ export class World {
         if (p.bot && (p.respawnT -= DT) <= 0) this.spawn(p);
         continue;
       }
-      if (p.ai) thinkBot(this, p, DT);
+      if (p.ai && p.bot) thinkBot(this, p, DT);
       this.handleButton(p);
     }
 

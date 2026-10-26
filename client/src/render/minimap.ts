@@ -102,7 +102,8 @@ export class MinimapRenderer {
     napoleonId = 0,
     food?: Map<number, { k: number; x: number; z: number }>,
     truck?: [number, number, number],
-    podShieldActive = false
+    podShieldActive = false,
+    myPos?: { x: number; z: number }
   ): void {
     const { ctx, size } = this;
     const center = size / 2;
@@ -171,9 +172,11 @@ export class MinimapRenderer {
 
     // My Animal (bright red with white ring)
     const me = ents.get(myId);
-    if (me) {
-      const mx = center + me.x * scale;
-      const mz = center + me.z * scale;
+    const mxCoord = myPos ? myPos.x : (me ? me.x : null);
+    const mzCoord = myPos ? myPos.z : (me ? me.z : null);
+    if (mxCoord !== null && mzCoord !== null) {
+      const mx = center + mxCoord * scale;
+      const mz = center + mzCoord * scale;
       ctx.beginPath();
       ctx.arc(mx, mz, 5.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ff3b30';

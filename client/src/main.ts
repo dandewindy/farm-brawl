@@ -1162,6 +1162,15 @@ const gameState = new GameState({
           s.st
         );
 
+        const myEnt = gameState.ents.get(gameState.myId);
+        if (myEnt && predictor.on) {
+          (myEnt as any).serverX = x;
+          (myEnt as any).serverZ = z;
+          myEnt.x = predictor.x;
+          myEnt.z = predictor.z;
+          myEnt.a = predictor.a;
+        }
+
         let unackedBoost = 0;
         const nowPerf = performance.now();
         const ackWindow = currentRtt + 70;
@@ -1927,30 +1936,12 @@ function animate(now: number): void {
     const stepAimMove = isLocked ? false : input.aimMove;
     const stepHolding = isLocked ? false : input.holding;
 
-    // 1. Read input & evaluate if packet should be sent BEFORE predictor.step()
-    // Stamping inputSeq before predictor.step eliminates the 1-sequence window mismatch!
-    let inp = input.getInput();
-    if (isStunned) {
-      inp = { a: lockedAimA, mv: false, btn: false };
-    } else if (isSpectating) {
-      inp = { a: lastSentInput.a, mv: false, btn: false };
-    }
-    const btnChanged = inp.btn !== lastSentInput.btn;
-    const mvChanged = inp.mv !== lastSentInput.mv;
-    const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
-    const timeSinceLast = now - lastSentTime;
-    const maxInterval = inp.mv ? 33 : 100;
-    const shouldSendInput =
-      btnChanged ||
-      mvChanged ||
-      pendingEatHintsToSend.length > 0 ||
-      timeSinceLast >= maxInterval ||
-      (timeSinceLast >= 22 && angleDiff > 0.008);
-
-    if (shouldSendInput) {
-      inputSeq += 1;
-      predictor.currentSeq = inputSeq;
-    }
+    // 1. Prepare unified input state
+    const inp = {
+      a: stepAimA,
+      mv: stepAimMove,
+      btn: stepHolding,
+    };
 
     // 2. Authoritative client physics prediction step
     if (myMeta && me) {
@@ -2006,14 +1997,39 @@ function animate(now: number): void {
 
       prevPredX = predictor.x;
       prevPredZ = predictor.z;
+
+      // Keep own entity in gameState.ents in perfect sync with predictor
+      if (predictor.on && gameState.alive) {
+        me.x = predictor.x;
+        me.z = predictor.z;
+        me.a = stepAimA;
+      }
     }
 
     // 4. Send rate-limited input packet with optimistic eat hints
-    if (shouldSendInput || pendingEatHintsToSend.length > 0) {
-      if (!shouldSendInput) {
-        inputSeq += 1;
-        predictor.currentSeq = inputSeq;
+    const btnChanged = inp.btn !== lastSentInput.btn;
+    const mvChanged = inp.mv !== lastSentInput.mv;
+    const angleDiff = Math.abs(wrapAngle(inp.a - lastSentInput.a));
+    const timeSinceLast = now - lastSentTime;
+    const maxInterval = inp.mv ? 30 : 150;
+    const shouldSendInput =
+      btnChanged ||
+      mvChanged ||
+      pendingEatHintsToSend.length > 0 ||
+      timeSinceLast >= maxInterval ||
+      (timeSinceLast >= 20 && angleDiff > 0.006);
+
+    const socketIsOpen = Boolean(
+      transport && (transport as any).ws && (transport as any).ws.readyState === WebSocket.OPEN
+    );
+
+    if (shouldSendInput && socketIsOpen) {
+      inputSeq += 1;
+      predictor.recordSentSeq(inputSeq, now);
+      if (predictor.hist.length > 0) {
+        predictor.hist[predictor.hist.length - 1].seq = inputSeq;
       }
+
       const eatPayload =
         pendingEatHintsToSend.length > 0
           ? pendingEatHintsToSend.splice(0, 6)
@@ -2022,9 +2038,12 @@ function animate(now: number): void {
       transport.send({
         t: 'input',
         seq: inputSeq,
-        ...inp,
+        a: Number(inp.a.toFixed(4)),
+        mv: inp.mv,
+        btn: inp.btn,
         ...(eatPayload ? { eat: eatPayload } : {}),
       });
+
       lastSentInput = { a: inp.a, mv: inp.mv, btn: inp.btn };
       lastSentTime = now;
     }
@@ -2236,7 +2255,8 @@ function animate(now: number): void {
     gameState.napoleonId,
     gameState.food,
     gameState.truck,
-    gameState.podShield[0]
+    gameState.podShield[0],
+    predictor.on ? { x: predictor.x, z: predictor.z } : undefined
   );
 }
 

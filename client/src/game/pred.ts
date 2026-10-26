@@ -67,6 +67,7 @@ export class ClientPredictor {
   lastReconciledSeq = 0;
   lastServerTick = -1;
 
+  private readonly seqSendTime = new Map<number, number>();
   private lastDashLaunchTime = 0;
   private lastDashEndTime = 0;
 
@@ -83,6 +84,7 @@ export class ClientPredictor {
     this.dashT = 0;
     this.flyT = 0;
     this.hist.length = 0;
+    this.seqSendTime.clear();
     this.sx = x;
     this.sz = z;
     this.sTick = -9;
@@ -92,6 +94,15 @@ export class ClientPredictor {
     this.holdT = 0;
     this.lastDashLaunchTime = 0;
     this.lastDashEndTime = 0;
+  }
+
+  recordSentSeq(seq: number, sentAtPerf: number): void {
+    this.currentSeq = seq;
+    this.seqSendTime.set(seq, sentAtPerf);
+    if (this.seqSendTime.size > 120) {
+      const oldestKey = this.seqSendTime.keys().next().value;
+      if (oldestKey !== undefined) this.seqSendTime.delete(oldestKey);
+    }
   }
 
   setStun(duration = 1.5): void {
@@ -239,7 +250,7 @@ export class ClientPredictor {
     // 3. Anti-Double-Dash Guard:
     const timeSinceLaunch = now - this.lastDashLaunchTime;
     const timeSinceEnd = now - this.lastDashEndTime;
-    const effectiveRtt = rtt > 0 ? Math.min(rtt, 140) : 48;
+    const effectiveRtt = rtt > 0 ? Math.min(rtt, 160) : 55;
 
     const serverHasAckedOurDash =
       serverIsDashing ||
@@ -250,19 +261,25 @@ export class ClientPredictor {
     if (
       this.lastDashSeq > 0 &&
       !serverHasAckedOurDash &&
-      timeSinceLaunch < Math.max(380, effectiveRtt * 2.5 + 180)
+      timeSinceLaunch < Math.max(320, effectiveRtt * 2.2 + 120)
     ) {
       return;
     }
 
-    // 4. Historical sample lookup via precise clock synchronization (avoids window-end bias of predAtSeq)
-    const minLookbackMs = Math.max(25, effectiveRtt * 0.55);
-    const maxLookbackMs = Math.min(260, effectiveRtt * 1.45 + 45);
-    const defaultLookbackMs = effectiveRtt * 0.85 + 18;
+    // 4. Historical sample lookup via sequence anchor and effective RTT
+    const minLookbackMs = Math.max(30, effectiveRtt * 0.55);
+    const maxLookbackMs = Math.min(240, effectiveRtt * 1.35 + 40);
+    const defaultLookbackMs = effectiveRtt + 20;
 
     let targetTime = now - defaultLookbackMs;
 
-    if (typeof serverTime === 'number' && clockOff !== null) {
+    if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
+      const sentAt = this.seqSendTime.get(ackSeq)!;
+      const age = now - sentAt;
+      if (age >= 20 && age <= 280) {
+        targetTime = now - Math.max(minLookbackMs, Math.min(maxLookbackMs, defaultLookbackMs));
+      }
+    } else if (typeof serverTime === 'number' && clockOff !== null) {
       const serverSentPerfTime = serverTime - clockOff;
       const estimatedClientSimTime = serverSentPerfTime - (effectiveRtt * 0.45 + 12);
       const lookback = now - estimatedClientSimTime;
@@ -282,7 +299,8 @@ export class ClientPredictor {
     const dz = serverZ - then.z;
     const errorDist = Math.hypot(dx, dz);
 
-    if (errorDist > 18.0) {
+    // Hard-reset at 8.0m instead of 18.0m to prevent long runaway desync
+    if (errorDist > 8.0) {
       this.resets++;
       this.reset(serverX, serverZ);
       return;
@@ -290,31 +308,20 @@ export class ClientPredictor {
 
     const inDashPhase = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
 
-    // 6. Longitudinal Tolerance Filter:
-    // When moving steadily, longitudinal error along (vx, vz) is predominantly network jitter.
-    // Filter out longitudinal jitter under 0.65m if lateral error is small (< 0.22m)
-    // to completely eliminate systematic backward jerking!
-    const speed = Math.hypot(then.vx, then.vz);
-    let deadzone = inDashPhase ? 1.35 : 0.25;
-
-    if (!inDashPhase && speed > 1.0) {
-      const dirX = then.vx / speed;
-      const dirZ = then.vz / speed;
-      const longitudinalErr = dx * dirX + dz * dirZ;
-      const lateralErr = Math.hypot(dx - longitudinalErr * dirX, dz - longitudinalErr * dirZ);
-
-      if (lateralErr < 0.22 && Math.abs(longitudinalErr) < 0.65) {
-        return;
-      }
-      deadzone = 0.40;
-    }
-
+    // 6. Tight deadzone & responsive convergence:
+    // 0.08m deadzone during normal walk ensures any divergence is smoothed out immediately
+    // without accumulating into multi-meter rubberbanding.
+    const deadzone = inDashPhase ? 0.90 : 0.08;
     if (errorDist <= deadzone) return;
 
     const excessRatio = (errorDist - deadzone) / errorDist;
     const effDx = dx * excessRatio;
     const effDz = dz * excessRatio;
-    const nudgeGain = inDashPhase ? 0.16 : 0.24;
+
+    let nudgeGain = inDashPhase ? 0.22 : 0.38;
+    if (!inDashPhase && errorDist > 1.2) {
+      nudgeGain = 0.60;
+    }
 
     this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t);
     if (ackSeq > this.lastReconciledSeq) {
