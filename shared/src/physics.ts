@@ -41,85 +41,35 @@ export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolea
   return CFG.MOVE_SPEED * TRAITS[sp].speed * Math.pow(20 / Math.max(1, mass), 0.15) * terrainFactor(sp, t) * (charging ? 0.45 : 1);
 }
 
-/** Helper nội bộ: tích phân một pha đồng nhất (đang dash hoặc không dash) */
-function stepMovePhase(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult: number): void {
-  if (dt <= 1e-6) return;
+/** advance one body by dt seconds */
+export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult = 1.0): void {
   const stunned = b.stunT > 0;
   if (b.dashT > 0) {
     const d = Math.exp(-1.2 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (stunned) {
-    const d = Math.exp(-6.0 * dt);
+  } else if (stunned || !inp.mv) {
+    const d = Math.exp(-3.5 * dt);
     b.vx *= d;
     b.vz *= d;
   } else {
     const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
-    const speed = Math.hypot(b.vx, b.vz);
-    if (speed > ms) {
-      // Đang có vận tốc lớn hơn tốc độ đi bộ tối đa (do bị húc văng, nổ dynamite, hoặc đà bay cầu vồng)
-      // Giữ đà quán tính knockback bay dạt tự nhiên với lực cản khí động học d = exp(-3.5 * dt)
-      const excess = speed - ms;
-      const d = Math.exp(-3.5 * dt);
-      const newExcess = excess * d;
-      const newSpeed = ms + newExcess;
-      const factor = newSpeed / speed;
-      b.vx *= factor;
-      b.vz *= factor;
-      // Cho phép người chơi điều khiển nhẹ hướng lái trong khi bay dạt mà không triệt tiêu lực đẩy
-      if (inp.mv) {
-        const steerK = 1 - Math.exp(-6.0 * dt);
-        b.vx += (Math.cos(inp.a) * ms - b.vx * (ms / newSpeed)) * steerK;
-        b.vz += (Math.sin(inp.a) * ms - b.vz * (ms / newSpeed)) * steerK;
-      }
-    } else if (!inp.mv) {
-      // Dừng đi bộ bình thường: phanh dứt khoát, không trượt quán tính
-      const d = Math.exp(-25.0 * dt);
-      b.vx *= d;
-      b.vz *= d;
-      if (speed < 0.05) {
-        b.vx = 0;
-        b.vz = 0;
-      }
-    } else {
-      // Luôn điều khiển lái mượt mà theo góc ngắm
-      const accelRate = CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.15) * terrainFactor(sp, t);
-      const k = 1 - Math.exp(-accelRate * dt);
-      b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
-      b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
-    }
+    const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / Math.max(1, b.mass), 0.25) * terrainFactor(sp, t) * dt);
+    b.vx += (Math.cos(inp.a) * ms - b.vx) * k;
+    b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
   }
-
-  // Ponds drag everyone but ducks and dogs, even while knocked back
+  // ponds drag everyone but ducks and dogs, even while knocked back
   if (t === 1 && sp !== 'duck' && sp !== 'dog' && b.dashT <= 0) {
     const d = Math.exp(-2 * dt);
     b.vx *= d;
     b.vz *= d;
   }
-
-  // Xoay hướng mượt và nhạy theo góc ngắm
-  if (!stunned && b.dashT <= 0 && (inp.mv || b.charging)) {
-    const turnK = 1 - Math.exp(-18 * dt);
-    b.a += wrapAngle(inp.a - b.a) * turnK;
-  }
+  if (!stunned && b.dashT <= 0 && inp.mv) b.a += wrapAngle(inp.a - b.a) * Math.min(1, 12 * dt);
   b.a = wrapAngle(b.a);
   b.x += b.vx * dt;
   b.z += b.vz * dt;
   b.dashT = Math.max(0, b.dashT - dt);
   b.stunT = Math.max(0, b.stunT - dt);
-}
-
-/** advance one body by dt seconds (tách chính xác thời điểm kết thúc dash) */
-export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult = 1.0): void {
-  if (b.dashT > 0 && b.dashT < dt) {
-    const dashDt = b.dashT;
-    const remDt = dt - dashDt;
-    stepMovePhase(b, inp, dashDt, sp, t, speedMult);
-    b.dashT = 0;
-    stepMovePhase(b, inp, remDt, sp, t, speedMult);
-  } else {
-    stepMovePhase(b, inp, dt, sp, t, speedMult);
-  }
 }
 
 /** hay bales are solid: push out, bounce, and stun on ram */

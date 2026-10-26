@@ -1,109 +1,61 @@
-import { CFG, radiusOf, TRAITS, type Species } from '@shared/constants';
+import { CFG, TICK_MS, TRAITS, radiusOf, type Species } from '@shared/constants';
 import type { MapData } from '@shared/map';
-import { wrapAngle } from '@shared/math';
-import {
-  type Body,
-  collideHay,
-  collideTreeTrunks,
-  dashParams,
-  stepMove,
-  terrainAt,
-} from '@shared/physics';
-import type { Input, PlayerMeta } from '@shared/protocol';
+import { insideBlob, wrapAngle } from '@shared/math';
 import type { Ent } from './state';
 
 export interface PredSample {
   t: number;
-  seq: number;
   x: number;
   z: number;
   vx: number;
   vz: number;
-  dashing: boolean;
-  dashT?: number;
+  seq?: number;
 }
 
 export class ClientPredictor {
   on = false;
-
-  simX = 0;
-  simZ = 0;
+  x = 0;
+  z = 0;
   vx = 0;
   vz = 0;
   a = 0;
-  mass: number = CFG.START_MASS;
   dashT = 0;
   flyT = 0;
-  stunT = 0;
-  stunned = false;
-  plow = false;
-  holdT = 0;
-  podShieldActive = true;
-  aimMove = false;
-  private isCollidingWithEnts = false;
-
-  x = 0;
-  z = 0;
-
-  errorX = 0;
-  errorZ = 0;
-
-  get ex(): number {
-    return this.errorX;
-  }
-  get ez(): number {
-    return this.errorZ;
-  }
-
+  ex = 0;
+  ez = 0;
   readonly hist: PredSample[] = [];
-
   sx = 0;
   sz = 0;
   sTick = -9;
   resets = 0;
   kicks = 0;
-
+  stunned = false;
+  stunT = 0;
+  plow = false;
+  podShieldActive = true;
   currentSeq = 0;
-  lastDashSeq = 0;
-  lastReconciledSeq = 0;
-  lastServerTick = -1;
-
-  private readonly seqSendTime = new Map<number, number>();
-  private lastDashLaunchTime = 0;
-  private lastDashEndTime = 0;
 
   reset(x = 0, z = 0): void {
     this.on = true;
-    this.simX = x;
-    this.simZ = z;
     this.x = x;
     this.z = z;
-    this.errorX = 0;
-    this.errorZ = 0;
     this.vx = 0;
     this.vz = 0;
     this.dashT = 0;
     this.flyT = 0;
+    this.ex = 0;
+    this.ez = 0;
     this.hist.length = 0;
-    this.seqSendTime.clear();
     this.sx = x;
     this.sz = z;
     this.sTick = -9;
     this.stunned = false;
     this.stunT = 0;
     this.plow = false;
-    this.holdT = 0;
-    this.lastDashLaunchTime = 0;
-    this.lastDashEndTime = 0;
   }
 
-  recordSentSeq(seq: number, sentAtPerf: number): void {
+  recordSentSeq(seq: number, _sentAtPerf?: number): void {
     this.currentSeq = seq;
-    this.seqSendTime.set(seq, sentAtPerf);
-    if (this.seqSendTime.size > 120) {
-      const oldestKey = this.seqSendTime.keys().next().value;
-      if (oldestKey !== undefined) this.seqSendTime.delete(oldestKey);
-    }
   }
 
   setStun(duration = 1.5): void {
@@ -112,261 +64,90 @@ export class ClientPredictor {
     this.dashT = 0;
     this.flyT = 0;
     this.plow = false;
-    this.holdT = 0;
   }
 
-  predAtSeq(targetSeq: number): PredSample | null {
-    if (this.hist.length === 0) return null;
-    for (let i = this.hist.length - 1; i >= 0; i--) {
-      if (this.hist[i].seq <= targetSeq) {
-        return this.hist[i];
-      }
-    }
-    return null;
-  }
-
-  predAt(t: number): PredSample | null {
+  predAt(t: number): { x: number; z: number; vx: number; vz: number } | null {
     const h = this.hist;
     if (!h.length) return null;
     if (t <= h[0].t) return h[0];
-    if (t >= h[h.length - 1].t) return h[h.length - 1];
     for (let i = h.length - 1; i > 0; i--) {
       const b = h[i], a = h[i - 1];
-      if (a.t <= t && t <= b.t) {
-        const span = b.t - a.t;
-        const k = span > 0.0001 ? Math.min(1, Math.max(0, (t - a.t) / span)) : 1;
+      if (a.t <= t) {
+        const k = b.t > a.t ? Math.min(1, (t - a.t) / (b.t - a.t)) : 1;
         return {
-          t,
-          seq: k >= 0.5 ? b.seq : a.seq,
           x: a.x + (b.x - a.x) * k,
           z: a.z + (b.z - a.z) * k,
           vx: a.vx + (b.vx - a.vx) * k,
           vz: a.vz + (b.vz - a.vz) * k,
-          dashing: a.dashing || b.dashing,
-          dashT: (a.dashT ?? 0) + ((b.dashT ?? 0) - (a.dashT ?? 0)) * k,
         };
       }
     }
     return h[h.length - 1];
   }
 
-  private applySmoothCorrection(
-    dx: number,
-    dz: number,
-    gain: number,
-    reconciledTime: number,
-    dampVelocity = false
-  ): void {
-    const corrX = dx * gain;
-    const corrZ = dz * gain;
-
-    // 1. Shift physical simulation state towards server
-    this.simX += corrX;
-    this.simZ += corrZ;
-
-    // 2. Subtract from visual error offset so render position (x = simX + errorX) doesn't jump at frame 0
-    this.errorX -= corrX;
-    this.errorZ -= corrZ;
-
-    const maxVisualOffset = 4.0;
-    const errMag = Math.hypot(this.errorX, this.errorZ);
-    if (errMag > maxVisualOffset) {
-      const scale = maxVisualOffset / errMag;
-      this.errorX *= scale;
-      this.errorZ *= scale;
-    }
-
-    // 3. Ghost Velocity Damping:
-    // If the server's correction vector opposes current velocity (e.g. server blocked/knocked us back),
-    // damp the opposing velocity component to stop overshooting and rubberbanding
-    const corrDist = Math.hypot(corrX, corrZ);
-    if (dampVelocity && corrDist > 0.05) {
-      const cnx = corrX / corrDist;
-      const cnz = corrZ / corrDist;
-      const vDot = this.vx * cnx + this.vz * cnz;
-      if (vDot < 0) {
-        const dampFactor = Math.min(0.65, gain * 1.1);
-        this.vx -= vDot * cnx * dampFactor;
-        this.vz -= vDot * cnz * dampFactor;
-      }
-    }
-
-    this.x = this.simX + this.errorX;
-    this.z = this.simZ + this.errorZ;
-
-    // 4. Shift all samples from reconciledTime to current time
-    for (let i = 0; i < this.hist.length; i++) {
-      if (this.hist[i].t >= reconciledTime) {
-        this.hist[i].x += corrX;
-        this.hist[i].z += corrZ;
-      }
-    }
-  }
-
   onServerSnapshot(
-    serverX: number,
-    serverZ: number,
+    x: number,
+    z: number,
     flags: number,
     snapTick: number,
     clockOff: number | null,
     rtt: number,
-    ackSeq = 0,
-    ackDash = 0,
-    serverTime?: number
+    _ackSeq = 0,
+    _ackDash = 0,
+    _serverTime?: number
   ): void {
-    if (!this.on) {
-      this.reset(serverX, serverZ);
+    const targetTime = clockOff !== null ? clockOff + snapTick * TICK_MS - (rtt * 0.75) : null;
+    const then = this.on && targetTime !== null ? this.predAt(targetTime) : null;
+
+    if (!then || Math.hypot(x - then.x, z - then.z) > 10) {
+      if (this.on) this.resets++;
+      this.reset(x, z);
+      this.sx = x;
+      this.sz = z;
+      this.sTick = snapTick;
       return;
     }
 
-    // 1. Skip late/out-of-order snapshots
-    if (snapTick > 0 && snapTick <= this.lastServerTick) {
-      return;
-    }
-    this.lastServerTick = snapTick;
+    const rawEx = x - then.x;
+    const rawEz = z - then.z;
+    const dist = Math.hypot(rawEx, rawEz);
 
-    const now = performance.now();
-    const isServerStun = (flags & 8) !== 0;
-    const serverIsDashing = (flags & 1) !== 0;
-
-    // 0. Update velocity if server transmitted a heavy force impulse
-    if (this.sTick === snapTick - 1) {
-      const svx = (serverX - this.sx) / 0.05;
-      const svz = (serverZ - this.sz) / 0.05;
-      const svSpeed = Math.hypot(svx, svz);
-      if (isServerStun || svSpeed > 15) {
-        this.kicks++;
-        this.vx = svx;
-        this.vz = svz;
-      } else if (this.isCollidingWithEnts) {
-        this.vx = this.vx * 0.5 + svx * 0.5;
-        this.vz = this.vz * 0.5 + svz * 0.5;
-      }
-    }
-
-    this.sx = serverX;
-    this.sz = serverZ;
-    this.sTick = snapTick;
-
-    // 2. Stun handling
-    if (isServerStun) {
-      this.dashT = 0;
-      this.flyT = 0;
-      this.plow = false;
-      if (!this.stunned) this.setStun(1.5);
-      const dxStun = serverX - this.simX;
-      const dzStun = serverZ - this.simZ;
-      if (Math.hypot(dxStun, dzStun) > 12.0) {
-        this.resets++;
-        this.reset(serverX, serverZ);
-      } else {
-        this.applySmoothCorrection(dxStun, dzStun, 0.55, now, true);
-      }
-      return;
-    } else if (this.stunT <= 0) {
-      this.stunned = false;
-    }
-
-    // 3. Anti-Double-Dash Guard:
-    const timeSinceLaunch = now - this.lastDashLaunchTime;
-    const timeSinceEnd = now - this.lastDashEndTime;
-    const effectiveRtt = rtt > 0 ? Math.min(rtt, 160) : 55;
-
-    const serverHasAckedOurDash =
-      serverIsDashing ||
-      (this.lastDashSeq > 0 &&
-        (ackDash >= this.lastDashSeq || ackSeq >= this.lastDashSeq));
-
-    // Never allow pre-dash snapshots to roll back a locally launched dash
-    if (
-      this.lastDashSeq > 0 &&
-      !serverHasAckedOurDash &&
-      timeSinceLaunch < Math.max(320, effectiveRtt * 2.2 + 120)
-    ) {
-      return;
-    }
-
-    // 4. Historical sample lookup via causal priority:
-    // PRIORITY 1: The exact sent time of the acked input sequence
-    const physicalBaseRtt = rtt > 0 ? Math.min(rtt, 150) : 48;
-    let targetTime = now - (physicalBaseRtt + 15);
-    let foundValidTarget = false;
-
-    if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
-      const sentAt = this.seqSendTime.get(ackSeq)!;
-      const age = now - sentAt;
-      if (age >= 10 && age <= 400) {
-        targetTime = sentAt;
-        foundValidTarget = true;
-      }
-    }
-
-    // PRIORITY 2 (Fallback): Synchronized clock offset serverTime - clockOff
-    if (!foundValidTarget && typeof serverTime === 'number' && clockOff !== null) {
-      const fixedOneWayLead = physicalBaseRtt * 0.5 + 12;
-      const exactClientTimeAtServerTick = serverTime - clockOff - fixedOneWayLead;
-      const lookback = now - exactClientTimeAtServerTick;
-      if (lookback >= 15 && lookback <= 400) {
-        targetTime = exactClientTimeAtServerTick;
-      }
-    }
-
-    const then = this.predAt(targetTime);
-    if (!then) return;
-
-    // 5. Calculate error vector
-    const dx = serverX - then.x;
-    const dz = serverZ - then.z;
-    const errorDist = Math.hypot(dx, dz);
-
-    // Hard-reset at 8.0m instead of 18.0m to prevent long runaway desync
-    if (errorDist > 8.0) {
-      this.resets++;
-      this.reset(serverX, serverZ);
-      return;
-    }
-
-    const inDashPhase = this.dashT > 0 || serverIsDashing || then.dashing || timeSinceEnd < 250;
-
-    // Deadzone: slightly wider when colliding with crowd to absorb interpolation jitter
-    const deadzone = inDashPhase ? 0.85 : (this.isCollidingWithEnts ? 0.22 : 0.06);
-    if (errorDist <= deadzone) return;
-
-    const excessError = errorDist - deadzone;
-    const excessRatio = excessError / errorDist;
-    const effDx = dx * excessRatio;
-    const effDz = dz * excessRatio;
-
-    // Smooth gain curve instead of sharp jump to 0.70
-    let nudgeGain: number;
-    if (inDashPhase) {
-      nudgeGain = 0.22;
-    } else if (this.isCollidingWithEnts) {
-      const t = Math.min(1.0, excessError / 1.5);
-      nudgeGain = 0.28 + t * 0.17;
+    // Deadzone: under 0.35m discrepancy is normal clock jitter, do not jerk the player!
+    if (dist < 0.35) {
+      this.ex *= 0.75;
+      this.ez *= 0.75;
     } else {
-      const t = Math.min(1.0, excessError / 1.2);
-      nudgeGain = 0.25 + t * 0.30;
+      this.ex = rawEx * 0.65;
+      this.ez = rawEz * 0.65;
     }
 
-    const shouldDampVel = isServerStun || this.isCollidingWithEnts || excessError > 0.45;
-    this.applySmoothCorrection(effDx, effDz, nudgeGain, then.t, shouldDampVel);
-    if (ackSeq > this.lastReconciledSeq) {
-      this.lastReconciledSeq = ackSeq;
+    const isServerStun = (flags & 8) !== 0;
+    if (isServerStun) {
+      if (!this.stunned) {
+        this.setStun(1.5);
+        if (this.sTick === snapTick - 1 && clockOff !== null) {
+          const age = Math.max(0, performance.now() - (clockOff + snapTick * TICK_MS) + rtt / 2) / 1000;
+          const decay = Math.exp(-3.5 * age);
+          this.kicks++;
+          this.vx = ((x - this.sx) / (TICK_MS / 1000)) * decay;
+          this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
+          this.dashT = 0;
+          this.flyT = 0;
+        }
+      }
+    } else {
+      this.stunned = false;
+      this.stunT = 0;
     }
+    this.sx = x;
+    this.sz = z;
+    this.sTick = snapTick;
   }
 
-  predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false, dashSeq?: number): void {
-    if (!this.on || this.stunned || this.stunT > 0 || this.dashT > 0) return;
-    if (map) {
-      const terrain = terrainAt(map, this.simX, this.simZ);
-      if (terrain === 1) return; // Cannot dash in water
-    }
-
-    const now = performance.now();
-    this.lastDashLaunchTime = now;
-    this.lastDashSeq = dashSeq !== undefined ? dashSeq : this.currentSeq;
-
+  predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false, _dashSeq?: number): void {
+    if (!this.on || this.stunned || this.stunT > 0) return;
+    const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
+    if (inWater) return;
     if (isSuper) {
       this.plow = true;
       this.vx = Math.cos(aimA) * 62;
@@ -374,21 +155,51 @@ export class ClientPredictor {
       this.a = aimA;
       this.dashT = 0.55;
       this.flyT = 0.55;
-      this.holdT = 0;
-      this.lastDashEndTime = now + 550;
       return;
     }
+    const inMud = map ? map.mud.some((b) => insideBlob(b, this.x, this.z)) : false;
+    const mud = inMud && species !== 'pig' ? 0.55 : 1;
+    const mudT = inMud && species !== 'pig' ? 0.6 : 1;
+    const DS = CFG.DASH_SPEED;
+    const DT = CFG.DASH_TIME;
+    const CMIN = CFG.CHARGE_MIN;
+    const CMAX = CFG.CHARGE_MAX;
 
-    const effectiveHeld = this.mass >= 20 ? held : 0;
-    const terrain = map ? terrainAt(map, this.simX, this.simZ) : 0;
-    const d = dashParams(species, effectiveHeld, terrain);
-    this.vx = Math.cos(aimA) * d.speed;
-    this.vz = Math.sin(aimA) * d.speed;
+    const chickenDash = species === 'chicken' ? 1.30 : 1;
+    let sp = DS * mud * chickenDash;
+    let dashT = DT * mudT;
+
+    this.plow = held >= CMIN;
+    if (this.plow) {
+      const c = Math.min(1, Math.max(0, (held - CMIN) / (CMAX - CMIN)));
+      sp = DS * (1 + 0.45 * c) * mud * chickenDash;
+      dashT = (DT + 0.28 * c) * mudT;
+    }
+
+    this.vx = Math.cos(aimA) * sp;
+    this.vz = Math.sin(aimA) * sp;
     this.a = aimA;
-    this.dashT = d.time;
-    this.plow = d.plow;
-    this.holdT = 0;
-    this.lastDashEndTime = now + d.time * 1000;
+    this.dashT = dashT;
+  }
+
+  private ramContact(myMass: number, rtt: number, ents: Map<number, Ent>, myId: number, snapTick: number): void {
+    const r = radiusOf(myMass);
+    const ahead = Math.min(0.6, rtt / 1000);
+    for (const st of ents.values()) {
+      if (st.id === myId || st.seen !== snapTick || (st.flags & 2) || !st.hist || st.hist.length < 2) continue;
+      const h = st.hist;
+      const a = h[h.length - 2];
+      const b = h[h.length - 1];
+      const k = (ahead * 1000) / TICK_MS / Math.max(1, b[0] - a[0]);
+      const ox = b[1] + (b[1] - a[1]) * k;
+      const oz = b[2] + (b[2] - a[2]) * k;
+      if (Math.hypot(ox - this.x, oz - this.z) < r + radiusOf(st.mass)) {
+        this.dashT = 0;
+        this.vx *= 0.25;
+        this.vz *= 0.25;
+        return;
+      }
+    }
   }
 
   step(
@@ -403,116 +214,127 @@ export class ClientPredictor {
     map: MapData | null,
     ents: Map<number, Ent>,
     myId: number,
-    _snapTick: number,
-    _rtt: number,
+    snapTick: number,
+    rtt: number,
     speedMult = 1.0,
-    myCd = 0,
-    metas?: Map<number, PlayerMeta>
+    _myCd = 0,
+    _metas?: any
   ): void {
     if (!this.on || !map) return;
-
-    this.isCollidingWithEnts = false;
-    this.mass = myMass;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
-
-    // Đồng bộ 100% với handleButton() trên Server: không tích lực và không làm chậm khi đang cooldown hoặc đang dash!
-    const canCharge = !stun && this.dashT <= 0 && myCd <= 0.05 && myMass >= 20;
-    if (holding && canCharge) {
-      this.holdT = Math.min(CFG.CHARGE_MAX + 0.5, this.holdT + dt);
-    } else {
-      this.holdT = 0;
-    }
-    const charging = canCharge && holding && this.holdT >= CFG.CHARGE_SLOW_AFTER;
+    const mm = Math.max(1, myMass);
+    const charging = !stun && holding;
     const canMove = !stun && aimMove;
-    this.aimMove = canMove;
-
-    const wasDashing = this.dashT > 0;
+    const plowing = (flags & 2) !== 0 || this.plow;
 
     for (let left = dt; left > 1e-4;) {
       const h = Math.min(left, 0.025);
       left -= h;
-
-      if (this.flyT > 0) this.flyT = Math.max(0, this.flyT - h);
-
-      const terrain = terrainAt(map, this.simX, this.simZ);
-      const body: Body = {
-        x: this.simX,
-        z: this.simZ,
-        vx: this.vx,
-        vz: this.vz,
-        a: this.a,
-        mass: myMass,
-        dashT: this.dashT,
-        stunT: this.stunT,
-        charging,
-      };
-
-      const inputObj: Input = {
-        a: aimA,
-        mv: canMove,
-        btn: holding,
-      };
-
-      // stepMove đã bao gồm cả xoay hướng khi di chuyển lẫn khi đứng gồng/ngắm
-      stepMove(body, inputObj, h, species, terrain, speedMult);
-
-      this.simX = body.x;
-      this.simZ = body.z;
-      this.vx = body.vx;
-      this.vz = body.vz;
-      this.a = body.a;
-      this.dashT = body.dashT;
-      this.stunT = body.stunT;
-
-      // Chỉ xoay thêm khi đứng yên ngắm chuột mà không giữ nút (vì charging đã được xoay trong stepMove)
-      if (!stun && this.dashT <= 0 && !canMove && !charging) {
-        const turnK = 1 - Math.exp(-18 * h);
-        this.a = wrapAngle(this.a + wrapAngle(aimA - this.a) * turnK);
-      }
-
-      if (this.dashT <= 0) {
-        this.plow = false;
-      }
+      this.dashT = Math.max(0, this.dashT - h);
+      this.flyT = Math.max(0, this.flyT - h);
+      this.stunT = Math.max(0, this.stunT - h);
       if (this.stunT <= 0 && (flags & 8) === 0) {
         this.stunned = false;
       }
 
-      const hayHit = collideHay(body, map.hay);
-      if (hayHit) {
-        this.simX = body.x;
-        this.simZ = body.z;
-        this.vx = body.vx;
-        this.vz = body.vz;
-        this.stunT = body.stunT;
-        this.dashT = body.dashT;
-        this.plow = false;
+      const water = map.pond.some((b) => insideBlob(b, this.x, this.z));
+      const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
+
+      let terrain = water
+        ? species === 'duck' ? 1.25 : species === 'dog' ? 0.35 : 0.45
+        : mud
+        ? species === 'pig' ? 1.1 : 0.45
+        : species === 'duck' ? 0.87 : 1;
+
+      const spMult = TRAITS[species]?.speed ?? 1.0;
+      const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
+
+      if (this.dashT > 0) {
+        const d = Math.exp(-1.2 * h);
+        this.vx *= d;
+        this.vz *= d;
+      } else if (stun || !canMove) {
+        const d = Math.exp(-3.5 * h);
+        this.vx *= d;
+        this.vz *= d;
+      } else {
+        const k = Math.min(1, CFG.MOVE_ACCEL * Math.pow(20 / mm, 0.25) * terrain * h);
+        this.vx += (Math.cos(aimA) * maxSp - this.vx) * k;
+        this.vz += (Math.sin(aimA) * maxSp - this.vz) * k;
       }
 
-      const treeHit = collideTreeTrunks(body, map.trees);
-      if (treeHit) {
-        this.simX = body.x;
-        this.simZ = body.z;
-        this.vx = body.vx;
-        this.vz = body.vz;
+      if (water && species !== 'duck' && this.dashT <= 0) {
+        const d = Math.exp(-2 * h);
+        this.vx *= d;
+        this.vz *= d;
       }
 
-      // 1. VA CHẠM BỤC (PODIUM) - Khử thành phần vận tốc đâm xuyên để trượt mượt quanh viền:
+      if (!stun && this.dashT <= 0) {
+        this.a += wrapAngle(aimA - this.a) * Math.min(1, 12 * h);
+      }
+
+      this.x += this.vx * h;
+      this.z += this.vz * h;
+
+      if (this.dashT > 0 && !plowing) {
+        this.ramContact(myMass, rtt, ents, myId, snapTick);
+      }
+
+      // Hay collision
+      const r = radiusOf(myMass);
+      for (const [hx, hz, hr] of map.hay) {
+        const dx = this.x - hx, dz = this.z - hz;
+        const d = Math.hypot(dx, dz);
+        if (d < hr + r && d > 0) {
+          const nx = dx / d, nz = dz / d;
+          this.x = hx + nx * (hr + r);
+          this.z = hz + nz * (hr + r);
+          const vn = this.vx * nx + this.vz * nz;
+          const impactSpeed = -vn;
+          if (vn < 0) {
+            this.vx -= 1.6 * vn * nx;
+            this.vz -= 1.6 * vn * nz;
+          }
+          const isDirectDash = this.dashT > 0 && impactSpeed > 10;
+          const isDirectSlam = impactSpeed > 16;
+          if (isDirectDash || isDirectSlam) {
+            this.setStun(1.5);
+          }
+        }
+      }
+
+      // Fruit trees trunk collision
+      if (map.trees && map.trees.length > 0) {
+        for (const t of map.trees) {
+          const dx = this.x - t.x, dz = this.z - t.z;
+          const d = Math.hypot(dx, dz);
+          if (d < t.r + r && d > 1e-6) {
+            const nx = dx / d, nz = dz / d;
+            this.x = t.x + nx * (t.r + r);
+            this.z = t.z + nz * (t.r + r);
+            const vn = this.vx * nx + this.vz * nz;
+            if (vn < 0) {
+              this.vx -= 1.6 * vn * nx;
+              this.vz -= 1.6 * vn * nz;
+            }
+          }
+        }
+      }
+
+      // Podium shield barrier collision
       if (this.podShieldActive && map.podium) {
         const [podX, podZ] = map.podium;
-        const dx = this.simX - podX;
-        const dz = this.simZ - podZ;
+        const dx = this.x - podX, dz = this.z - podZ;
         const d = Math.hypot(dx, dz);
-        const pr = radiusOf(myMass);
-        const minD = CFG.PODIUM_R + 0.5 + pr;
+        const minD = CFG.PODIUM_R + 0.5 + r;
         if (d < minD && d > 1e-6) {
-          const nx = dx / d;
-          const nz = dz / d;
-          this.simX = podX + nx * minD;
-          this.simZ = podZ + nz * minD;
+          const nx = dx / d, nz = dz / d;
+          this.x = podX + nx * minD;
+          this.z = podZ + nz * minD;
           const vn = this.vx * nx + this.vz * nz;
           if (vn < 0) {
-            this.vx -= vn * nx;
-            this.vz -= vn * nz;
+            this.vx -= 1.4 * vn * nx;
+            this.vz -= 1.4 * vn * nz;
           }
           if (this.dashT > 0) {
             this.dashT = 0;
@@ -521,12 +343,12 @@ export class ClientPredictor {
         }
       }
 
-      const distCenter = Math.hypot(this.simX, this.simZ);
-      const pr = radiusOf(myMass);
-      const limit = CFG.R - pr * 0.3 - 0.5;
-      if (distCenter > limit && distCenter > 1e-6) {
-        this.simX = (this.simX / distCenter) * limit;
-        this.simZ = (this.simZ / distCenter) * limit;
+      // Fence clamp
+      const distCenter = Math.hypot(this.x, this.z);
+      const limit = CFG.R - radiusOf(myMass) * 0.3 - 0.5;
+      if (distCenter > limit) {
+        this.x = (this.x / distCenter) * limit;
+        this.z = (this.z / distCenter) * limit;
         if (this.flyT > 0) {
           this.vx *= -0.2;
           this.vz *= -0.2;
@@ -537,89 +359,30 @@ export class ClientPredictor {
           this.vz *= 0.5;
         }
       }
-
-      // 2. VA CHẠM MỀM VỚI CÁC CON VẬT KHÁC (SOFT REMOTE ENTITY COLLISION):
-      // Vì các entity trong `ents` đang ở vị trí nội suy (trễ ~100ms) và đứng tĩnh trong substep,
-      // dùng Soft Separation Damping thay vì Hard Positional Snap để triệt tiêu hoàn toàn rung lắc.
-      if (ents && ents.size > 0) {
-        const ra = radiusOf(myMass);
-        const ma = myMass * (TRAITS[species]?.weight ?? 1.0);
-        for (const [id, b] of ents) {
-          if (id === myId || !b) continue;
-          const dx = b.x - this.simX;
-          const dz = b.z - this.simZ;
-          const rb = radiusOf(b.mass);
-          const minD = ra + rb;
-          if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
-          const distSq = dx * dx + dz * dz;
-          if (distSq >= minD * minD || distSq < 1e-6) continue;
-
-          this.isCollidingWithEnts = true;
-          const d = Math.sqrt(distSq);
-          const nx = dx / d;
-          const nz = dz / d;
-          const overlap = minD - d;
-
-          const bMeta = metas?.get(b.id);
-          const bSpecies = (bMeta?.species ?? (b as any).species) as Species | undefined;
-          const bWeight = (bSpecies && TRAITS[bSpecies]?.weight) ? TRAITS[bSpecies].weight : 1.0;
-          const mb = b.mass * bWeight;
-          const wa = mb / (ma + mb);
-
-          // Tách vị trí mềm (Soft Separation):
-          // Giới hạn tốc độ đẩy tách theo bước thời gian h để không nhảy vị trí đột ngột
-          const maxPushStep = Math.min(overlap * wa * 0.45, 12.0 * h);
-          this.simX -= nx * maxPushStep;
-          this.simZ -= nz * maxPushStep;
-
-          // Giảm mềm thành phần vận tốc lao xuyên qua đối phương (Soft Velocity Damping)
-          // chỉ khi chồng lấn sâu (> 15% bán kính), không tạo phản xạ đàn hồi giả
-          const va = this.vx * nx + this.vz * nz;
-          if (va > 0 && overlap > minD * 0.15) {
-            const dampRatio = Math.min(1.0, (overlap / minD) * 1.5);
-            const vReduction = va * wa * dampRatio * Math.min(1.0, h / 0.025) * 0.5;
-            this.vx -= nx * vReduction;
-            this.vz -= nz * vReduction;
-          }
-        }
-      }
     }
 
-    if (wasDashing && this.dashT <= 0) {
-      this.lastDashEndTime = now;
+    // Ease out remaining error smoothly (exponential decay with error scaling)
+    const errorMag = Math.hypot(this.ex, this.ez);
+    const k = 1 - Math.exp(-dt * (8 + 3 * errorMag));
+    const cx = this.ex * k;
+    const cz = this.ez * k;
+    this.x += cx;
+    this.z += cz;
+    this.ex -= cx;
+    this.ez -= cz;
+
+    for (const s of this.hist) {
+      s.x += cx;
+      s.z += cz;
     }
 
-    this.hist.push({
-      t: now,
-      seq: this.currentSeq,
-      x: this.simX,
-      z: this.simZ,
-      vx: this.vx,
-      vz: this.vz,
-      dashing: this.dashT > 0,
-      dashT: this.dashT,
-    });
+    this.hist.push({ t: now, x: this.x, z: this.z, vx: this.vx, vz: this.vz });
     if (this.hist.length > 2 && this.hist[0].t < now - 1500) {
       let cut = 0;
-      while (cut < this.hist.length - 2 && this.hist[cut].t < now - 1500) cut++;
+      while (cut < this.hist.length - 2 && this.hist[cut].t < now - 1500) {
+        cut++;
+      }
       if (cut > 0) this.hist.splice(0, cut);
     }
-
-    // 3. TIÊU TAN SAI SỐ VISUAL (ADAPTIVE EXPONENTIAL SMOOTHING):
-    // TUYỆT ĐỐI KHÔNG gán errorX = 0 khi (!canMove && speed < 0.1) để tránh giật nhảy (Snap Teleport)!
-    const errDist = Math.hypot(this.errorX, this.errorZ);
-    if (errDist > 0.0005) {
-      const smoothRate = 14.0 + Math.min(8.0, errDist * 4.0);
-      const decay = Math.exp(-smoothRate * dt);
-      this.errorX *= decay;
-      this.errorZ *= decay;
-    } else {
-      this.errorX = 0;
-      this.errorZ = 0;
-    }
-
-    this.x = this.simX + this.errorX;
-    this.z = this.simZ + this.errorZ;
   }
 }
-

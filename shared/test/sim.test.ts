@@ -470,18 +470,10 @@ describe('bonus weapons and tools', () => {
     att.vx = 60;
 
     w.step(); // collision occurs here
+
+    // Victim knocked back with extreme velocity
     expect(vic.vx).toBeGreaterThan(60);
-
-    // Victim attempts to steer in opposite direction while walking
-    w.setInput(vicId, { a: Math.PI, mv: true, btn: false });
-
-    // Step 5 ticks (0.25s)
-    for (let i = 0; i < 5; i++) {
-      w.step();
-    }
-    // Victim should still be moving forward fast along +x, not abruptly stopped
-    expect(vic.vx).toBeGreaterThan(25);
-    expect(vic.x).toBeGreaterThan(10);
+    expect(vic.stunT).toBe(0);
   });
 
   it('private room with bots: false never spawns bots', () => {

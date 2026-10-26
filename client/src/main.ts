@@ -171,7 +171,7 @@ input.onReleaseRam = (held: number) => {
   const curMass = myEnt?.mass ?? CFG.START_MASS;
   input.computeAim(world.camera, curX, curZ, curMass);
 
-  const validHeld = curMass >= 20 ? Math.min(held, predictor.holdT > 0 ? predictor.holdT : held) : 0;
+  const validHeld = curMass >= 20 ? held : 0;
   const canDash = myMeta && predictor.on && gameState.alive && gameState.me.cd <= 0.05 && predictor.dashT <= 0;
 
   inputSeq += 1;
@@ -1315,12 +1315,12 @@ function handleGameEvent(ev: GameEvent): void {
         predictor.vz *= 0.25;
         const meEnt = gameState.ents.get(myId);
         const myRadius = radiusOf(meEnt ? meEnt.mass : CFG.START_MASS);
-        const toContactX = ev.x - predictor.simX;
-        const toContactZ = ev.z - predictor.simZ;
+        const toContactX = ev.x - predictor.x;
+        const toContactZ = ev.z - predictor.z;
         const dot = toContactX * Math.cos(predictor.a) + toContactZ * Math.sin(predictor.a);
         if (dot < 0) {
-          predictor.simX = ev.x - Math.cos(predictor.a) * myRadius;
-          predictor.simZ = ev.z - Math.sin(predictor.a) * myRadius;
+          predictor.x = ev.x - Math.cos(predictor.a) * myRadius;
+          predictor.z = ev.z - Math.sin(predictor.a) * myRadius;
         }
       }
       // Victim hit by someone: stop dash and charging immediately, apply knockback impulse
@@ -1329,8 +1329,8 @@ function handleGameEvent(ev: GameEvent): void {
         predictor.plow = false;
         input.cancelRam();
         chargeStop();
-        const hitDx = predictor.simX - ev.x;
-        const hitDz = predictor.simZ - ev.z;
+        const hitDx = predictor.x - ev.x;
+        const hitDz = predictor.z - ev.z;
         const hitD = Math.hypot(hitDx, hitDz);
         if (hitD > 0.01 && ev.s > 15) {
           const nx = hitDx / hitD;
@@ -1737,17 +1737,6 @@ function getClientId(): string {
   const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
   const wsUrl = `${proto}//${host}${query}`;
 
-  const altUrls: string[] = [];
-  if (!isViteDev) {
-    if (!host.includes('workers.dev')) {
-      altUrls.push(`wss://farm-brawl.farm-brawl.workers.dev${query}`);
-    }
-    // Cung cấp 3 lane phụ để WsClient băm 4 kết nối song song qua 4 cổng nguồn ECMP khác nhau
-    for (let lane = 1; lane <= 3; lane++) {
-      altUrls.push(`${wsUrl}&lane=${lane}`);
-    }
-  }
-
   transport = new WsClient(
     wsUrl,
     (m) => {
@@ -1795,8 +1784,7 @@ function getClientId(): string {
           gameState.handle(m);
         });
       }
-    },
-    altUrls
+    }
   );
 
   if (transport) {
