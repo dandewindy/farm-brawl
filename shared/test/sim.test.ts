@@ -1276,21 +1276,21 @@ describe('fruit trees', () => {
         expect(Math.hypot(t.x, t.z) + t.r).toBeLessThan(CFG.R);
         if (t.size === 2) {
           expect(t.totalFruits).toBe(30);
-          expect(t.r).toBe(1.8);
+          expect(t.r).toBe(3.6);
           expect(t.initBig).toBeGreaterThanOrEqual(18);
           expect(t.initBig).toBeLessThanOrEqual(24);
           expect(t.initSmall).toBe(30 - t.initBig);
           expect(t.initBig).toBeGreaterThan(t.initSmall);
         } else if (t.size === 1) {
           expect(t.totalFruits).toBe(20);
-          expect(t.r).toBe(1.4);
+          expect(t.r).toBe(2.8);
           expect(t.initBig).toBeGreaterThanOrEqual(12);
           expect(t.initBig).toBeLessThanOrEqual(16);
           expect(t.initSmall).toBe(20 - t.initBig);
           expect(t.initBig).toBeGreaterThan(t.initSmall);
         } else {
           expect(t.totalFruits).toBe(10);
-          expect(t.r).toBe(1.0);
+          expect(t.r).toBe(2.0);
           expect(t.initBig).toBeGreaterThanOrEqual(6);
           expect(t.initBig).toBeLessThanOrEqual(8);
           expect(t.initSmall).toBe(10 - t.initBig);
@@ -1354,9 +1354,9 @@ describe('fruit trees', () => {
     pig.stunT = 0;
     treeSmall.cooldownHit = 0;
     w.step();
-    // Successful ram: 3.0s stun, 1/3 fruits dropped!
-    expect(pig.stunT).toBeGreaterThanOrEqual(2.95);
-    expect(pig.stunT).toBeLessThanOrEqual(3.0);
+    // Successful ram: 1.5s stun, 1/3 fruits dropped!
+    expect(pig.stunT).toBeGreaterThanOrEqual(1.45);
+    expect(pig.stunT).toBeLessThanOrEqual(1.5);
     // dropBig = ceil(7/3) = 3, dropSmall = ceil(3/3) = 1 => 4 fruits dropped
     expect(treeSmall.big).toBe(4);
     expect(treeSmall.small).toBe(2);

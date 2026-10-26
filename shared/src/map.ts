@@ -100,7 +100,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   // 3 models of fruit trees (Large, Medium, Small) scattered inside the farm near the perimeter fence
   const trees: TreeData[] = [];
   const treeSizes: TreeSize[] = [2, 1, 0, 2, 1, 0];
-  const treeRadii = [1.0, 1.4, 1.8];
+  const treeRadii = [2.0, 2.8, 3.6];
   const treeTotals = [10, 20, 30];
 
   for (let i = 0; i < treeSizes.length; i++) {

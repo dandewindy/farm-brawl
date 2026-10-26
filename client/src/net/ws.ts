@@ -125,18 +125,13 @@ export class WsClient implements Transport {
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
               const onFastNode = isFastColo(this.colo);
-              const isSlow = !onFastNode || this.rttMin > 140;
+              const isOptimal = this.colo === 'SIN' && this.rttMin <= 90;
+              const isSlow = !onFastNode || this.rttMin > 90 || (this.colo === 'HKG' && this.rttMin > 80);
 
-              if (onFastNode) {
-                // When connected to any fast Asian node, reset lobby steer attempts
+              if (isOptimal) {
                 this.lobbySteerAttempts = 0;
-              }
-
-              if (onFastNode && (this.rttMin <= 120 || this.rtt <= 120)) {
-                // Ping is good on Asian nodes: immediately reset bad ping streak to 0
                 this.badPingStreak = 0;
               } else if (isSlow) {
-                // If non-fast node detected (e.g. FRA, MAD, ORD, SJC), jump to alert threshold
                 this.badPingStreak = !onFastNode ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
@@ -149,27 +144,23 @@ export class WsClient implements Transport {
                 this.startPing();
               }
 
-              // 1. Silent Lobby Steer (Max 2 attempts, only for truly distant non-Asian nodes):
-              // If connected to an Asian node (SIN, HKG, HAN, SGN, TPE, etc.), NEVER auto-reconnect in lobby!
-              // Even if ping is higher due to mobile 4G/WiFi conditions, keeping a stable connection is critical.
-              // Only steer if landed on a distant overseas PoP (e.g. FRA, MAD, ORD, SJC) with ping > 200ms.
-              if (!this.inGame && !onFastNode && this.rttMin > 200 && !this.closed) {
+              // 1. Silent Lobby Steer (Max 2 attempts, for distant non-Asian nodes):
+              if (!this.inGame && !onFastNode && this.rttMin > 180 && !this.closed) {
                 if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
                   const now = performance.now();
                   if (now - this.lastLobbyReconnectTime > 6000) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
-                    console.log(`[WS Watchdog] Lobby on distant non-Asian node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/2 to find Asian route...`);
+                    console.log(`[WS Watchdog] Lobby on non-optimal node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/2 to find SIN route...`);
                     this.forceReconnect();
                   }
                 }
               }
 
-              // 2. Active In-Game Hot Migration Watchdog:
-              // During live gameplay, if bad ping streak >= 3 and NOT on an Asian node,
-              // automatically trigger zero-downtime hot migration!
-              const isGoodAsianNode = onFastNode && this.rttMin <= 150;
-              if (this.inGame && this.badPingStreak >= 3 && !isGoodAsianNode && !this.closed) {
+              // 2. Active In-Game Zero-Downtime Hot Migration Watchdog:
+              // During live gameplay, if bad ping streak >= 2 and ping > 90ms (or on HKG > 80ms),
+              // automatically trigger silent hot migration to switch to SIN without despawning!
+              if (this.inGame && this.badPingStreak >= 2 && !isOptimal && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -285,10 +276,11 @@ export class WsClient implements Transport {
           const probeRtt = performance.now() - msg.c;
           console.log(`[WS Watchdog] Hot migration probe response colo: ${probeColo}, rtt: ${Math.round(probeRtt)}ms`);
           const currentlyFast = isFastColo(this.colo);
-          // If already on a fast Asian node (SIN/HKG), ONLY switch if the probe is ALSO fast AND significantly better (at least 25% lower latency)
-          // If on a slow/distant node (FRA/MAD/ORD...), switch if probe is a fast Asian node OR has at least 35% lower latency
-          const isBetter = currentlyFast
-            ? (isFastColo(probeColo) && probeRtt > 0 && probeRtt < this.rttMin * 0.75)
+          // Prioritize Singapore (SIN) edge POP, especially when mobile/iPad is routed to HKG or latency > 90ms
+          const isBetter = probeColo === 'SIN'
+            ? (probeRtt > 0 && (this.colo !== 'SIN' || probeRtt < this.rttMin * 0.9))
+            : currentlyFast
+            ? (isFastColo(probeColo) && probeRtt > 0 && probeRtt < this.rttMin * 0.8)
             : (isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65));
 
           if (isBetter) {

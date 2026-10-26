@@ -312,10 +312,10 @@ export class World {
     p.ai = null;
     p.bot = false;
 
-    // Reject out-of-order sequence packets
+    // Reject out-of-order sequence packets, with auto-recovery if client reset seq
     if (typeof inp.seq === 'number' && inp.seq > 0) {
       const lastSeq = p.lastInputSeq ?? 0;
-      if (inp.seq < lastSeq) {
+      if (inp.seq < lastSeq && (lastSeq - inp.seq) < 150 && inp.seq > 60) {
         return;
       }
       p.lastInputSeq = inp.seq;
@@ -650,8 +650,8 @@ export class World {
 
                 if (hasBigFruits && p.mass >= reqMass) {
                   // SUCCESSFUL RAM!
-                  // Stun for 3.0s
-                  p.stunT = 3.0;
+                  // Stun for 1.5s
+                  p.stunT = 1.5;
                   p.dashT = 0;
                   p.vx = nx * 8;
                   p.vz = nz * 8;
@@ -665,19 +665,23 @@ export class World {
                   tree.small = Math.max(0, tree.small - dropSmall);
 
                   // Drop fruits onto the ground as edible food
+                  // Big fruits: Size 2 drops 100kg giant apples, Size 1 drops 20..50kg medium apples, Size 0 drops 20..50kg
                   for (let i = 0; i < dropBig; i++) {
                     const ang = this.rnd() * Math.PI * 2;
                     const dist = tree.r + 1.2 + this.rnd() * 3.5;
                     const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
                     const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-                    this.addFood(fx, fz, 7, FOOD_KG[7]);
+                    const bigWeight = tree.size === 2 ? 100 : Math.round(20 + this.rnd() * 30);
+                    this.addFood(fx, fz, 7, bigWeight);
                   }
+                  // Small fruits: 5..10kg red apples
                   for (let i = 0; i < dropSmall; i++) {
                     const ang = this.rnd() * Math.PI * 2;
                     const dist = tree.r + 1.2 + this.rnd() * 3.5;
                     const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
                     const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-                    this.addFood(fx, fz, 1, FOOD_KG[1]);
+                    const smallWeight = Math.round(5 + this.rnd() * 5);
+                    this.addFood(fx, fz, 1, smallWeight);
                   }
 
                   // Number of flowers born matches number of fruits dropped (starts 30s lifecycle)
@@ -1442,7 +1446,11 @@ export class World {
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
     const ramFactor = TRAITS[att.species].ram ?? 1.0;
-    let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.35), CFG.KNOCKBACK_MIN, CFG.KNOCKBACK_MAX);
+    // Dynamic knockback ceiling based on mass ratio and charging power (gồng húc)
+    const massAdvantage = Math.pow(ma / mv, 0.4);
+    const chargeAdvantage = att.power > 1.0 ? (1 + (att.power - 1) * 0.45) : 1.0;
+    const dynamicMax = clamp(CFG.KNOCKBACK_MAX * Math.max(0.65, Math.min(2.5, massAdvantage * chargeAdvantage)), CFG.KNOCKBACK_MIN + 10, 150);
+    let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.38), CFG.KNOCKBACK_MIN, dynamicMax);
 
     // Rule: "titan" (Titan clash - colossal impacts)
     if (this.currentRule === 'titan') {

@@ -36,9 +36,11 @@ export function setAudioMode(mode: AudioMode): void {
   } catch (_) {}
 
   if (mode === 0) {
+    unlock();
     setMuted(false);
     setMusic(true);
   } else if (mode === 1) {
+    unlock();
     setMuted(false);
     setMusic(false);
   } else {
@@ -71,10 +73,18 @@ export function unlock(): void {
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // iOS / iPadOS WebKit silent buffer unlock trick:
+    try {
+      const unlockBuf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = unlockBuf;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch (_) {}
     startAmbience();
     startMusic();
   }
-  if (ctx.state === 'suspended' && !held) {
+  if (ctx && ctx.state === 'suspended' && !held) {
     ctx.resume().catch(() => {});
   }
 }

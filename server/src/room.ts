@@ -454,6 +454,24 @@ export class GameRoom extends DurableObject {
         this.clientSockets.set(cid, ws);
       }
 
+      // Reset sequence counter and input state so newly joined player's input packets are immediately accepted
+      const numId = typeof playerId === 'number' ? playerId : Number(playerId);
+      const keyId = Number.isNaN(numId) ? playerId : numId;
+      this.playerLastSeq.set(keyId as any, 0);
+
+      const p = this.world.players.get(numId) ?? this.world.players.get(playerId as any);
+      if (p) {
+        p.lastInputSeq = 0;
+        p.ai = null;
+        p.bot = false;
+        p.input.mv = false;
+        p.input.btn = false;
+        p.stunT = 0;
+        if (typeof msg.name === 'string' && msg.name.trim()) p.name = msg.name.trim().slice(0, 16);
+        if (msg.species) p.species = msg.species;
+        if (typeof msg.skin === 'number') p.skin = msg.skin % SKIN_COUNT;
+      }
+
       // Send initial world configuration & map
       const initMsg: ServerMsg = this.world.init();
       if (initMsg.t === 'init') {

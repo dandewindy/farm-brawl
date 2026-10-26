@@ -1731,14 +1731,14 @@ export class WorldRenderer {
       const g = new THREE.Group();
       g.position.set(t.x, 0, t.z);
 
-      // Distinct sizes:
-      // Size 2 (Large, 1000kg): h ~ 7.5m, trunk r ~ 0.7m, canopy 3 tiers (r=4.2, 3.3, 2.3)
-      // Size 1 (Medium, 500kg): h ~ 5.4m, trunk r ~ 0.5m, canopy 2 tiers (r=3.1, 2.3)
-      // Size 0 (Small, 100kg): h ~ 3.8m, trunk r ~ 0.35m, canopy 1 tier (r=2.2)
+      // Distinct sizes (+100% scale, +100% trunk height):
+      // Size 2 (Large, 1000kg): trunkH = 9.0m, trunk r ~ 1.3..1.9m, canopy 3 tiers (r=8.4, 6.6, 4.6)
+      // Size 1 (Medium, 500kg): trunkH = 7.0m, trunk r ~ 0.96..1.44m, canopy 2 tiers (r=6.2, 4.6)
+      // Size 0 (Small, 100kg): trunkH = 5.0m, trunk r ~ 0.70..1.00m, canopy 1 tier (r=4.4)
 
-      const trunkH = t.size === 2 ? 4.5 : t.size === 1 ? 3.5 : 2.5;
-      const trunkRTop = t.size === 2 ? 0.65 : t.size === 1 ? 0.48 : 0.35;
-      const trunkRBot = t.size === 2 ? 0.95 : t.size === 1 ? 0.72 : 0.50;
+      const trunkH = t.size === 2 ? 9.0 : t.size === 1 ? 7.0 : 5.0;
+      const trunkRTop = t.size === 2 ? 1.30 : t.size === 1 ? 0.96 : 0.70;
+      const trunkRBot = t.size === 2 ? 1.90 : t.size === 1 ? 1.44 : 1.00;
 
       const trunkMat = new THREE.MeshStandardMaterial({
         color: theme === 'women_day' ? 0x4e342e : 0x5d3a1a,
@@ -1746,7 +1746,7 @@ export class WorldRenderer {
         flatShading: true,
       });
 
-      const trunkMesh = new THREE.Mesh(new THREE.CylinderGeometry(trunkRTop, trunkRBot, trunkH, 7), trunkMat);
+      const trunkMesh = new THREE.Mesh(new THREE.CylinderGeometry(trunkRTop, trunkRBot, trunkH, 8), trunkMat);
       trunkMesh.position.y = trunkH * 0.5;
       trunkMesh.castShadow = true;
       trunkMesh.receiveShadow = true;
@@ -1773,102 +1773,130 @@ export class WorldRenderer {
         flatShading: true,
       });
 
-      // Tiers of canopy
+      // Tiers of canopy (raised to top of lengthened trunk)
       if (t.size === 2) {
         // Large: 3 tiers
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.2, 1), folMat1);
-        c1.position.y = 4.5;
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(8.4, 1), folMat1);
+        c1.position.y = 9.0;
         c1.castShadow = true;
-        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(3.3, 1), folMat2);
-        c2.position.y = 6.3;
+        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(6.6, 1), folMat2);
+        c2.position.y = 12.6;
         c2.castShadow = true;
-        const c3 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.3, 1), folMat3);
-        c3.position.y = 7.7;
+        const c3 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.6, 1), folMat3);
+        c3.position.y = 15.4;
         c3.castShadow = true;
         canopyGroup.add(c1, c2, c3);
       } else if (t.size === 1) {
         // Medium: 2 tiers
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(3.1, 1), folMat1);
-        c1.position.y = 3.6;
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(6.2, 1), folMat1);
+        c1.position.y = 7.2;
         c1.castShadow = true;
-        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.3, 1), folMat2);
-        c2.position.y = 5.2;
+        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.6, 1), folMat2);
+        c2.position.y = 10.4;
         c2.castShadow = true;
         canopyGroup.add(c1, c2);
       } else {
         // Small: 1 tier
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.2, 1), folMat2);
-        c1.position.y = 2.8;
+        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.4, 1), folMat2);
+        c1.position.y = 5.6;
         c1.castShadow = true;
         canopyGroup.add(c1);
       }
 
-      // Flowers on canopy
+      const canopyCenterY = t.size === 2 ? 11.5 : t.size === 1 ? 8.8 : 5.8;
+      const canopyMaxR = t.size === 2 ? 7.6 : t.size === 1 ? 5.6 : 4.0;
+
+      // Flowers on canopy: Yellow flowers, naturally scattered in 3D around the canopy
       const flowerMeshes: THREE.Mesh[] = [];
-      const flowerCount = t.size === 2 ? 16 : t.size === 1 ? 10 : 6;
-      const flowerColors = theme === 'women_day'
-        ? [0xffffff, 0xff4081, 0xffeb3b]
-        : [0xfffff0, 0xffd54f, 0xfff9c4];
+      const flowerCount = t.size === 2 ? 24 : t.size === 1 ? 16 : 10;
+      const flowerYellowMat = new THREE.MeshStandardMaterial({
+        color: 0xffd600,
+        emissive: 0x332200,
+        roughness: 0.35,
+        flatShading: true,
+      });
 
       for (let i = 0; i < flowerCount; i++) {
-        const col = flowerColors[i % flowerColors.length];
-        const fMat = new THREE.MeshStandardMaterial({
-          color: col,
-          emissive: col === 0xffffff ? 0x333333 : 0x221100,
-          roughness: 0.35,
-          flatShading: true,
-        });
-        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.32 : 0.25, 6, 5), fMat);
-        const ang = (i / flowerCount) * Math.PI * 2 + (i % 2) * 0.3;
-        const tier = t.size === 2 ? (i % 3) : (i % 2);
-        const fY = t.size === 2 ? (tier === 0 ? 4.8 : tier === 1 ? 6.5 : 7.8) : t.size === 1 ? (tier === 0 ? 3.8 : 5.4) : 3.0;
-        const fR = t.size === 2 ? (tier === 0 ? 3.8 : tier === 1 ? 2.9 : 2.0) : t.size === 1 ? (tier === 0 ? 2.8 : 1.9) : 1.8;
-        fMesh.position.set(Math.cos(ang) * fR, fY, Math.sin(ang) * fR);
+        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.45 : 0.35, 6, 5), flowerYellowMat);
+        const fPhi = (((i * 1.6180339887) % 1) * 0.75 + 0.2) * Math.PI;
+        const fTheta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
+        const r = canopyMaxR * (0.85 + 0.15 * Math.sin(i * 3.7));
+        fMesh.position.set(
+          Math.sin(fPhi) * Math.cos(fTheta) * r,
+          canopyCenterY + Math.cos(fPhi) * r * 0.65,
+          Math.sin(fPhi) * Math.sin(fTheta) * r
+        );
         fMesh.visible = false;
         canopyGroup.add(fMesh);
         flowerMeshes.push(fMesh);
       }
 
-      // Small Fruits (Red shiny apples)
+      // Small Fruits (Red shiny apples with little brown stem, 3D scattered)
       const smallFruitMeshes: THREE.Mesh[] = [];
-      const smallFruitCount = t.size === 2 ? 8 : t.size === 1 ? 5 : 3;
+      const smallFruitCount = t.size === 2 ? 14 : t.size === 1 ? 9 : 5;
       const appleMat = new THREE.MeshStandardMaterial({
         color: 0xe53935,
-        roughness: 0.3,
+        roughness: 0.28,
         metalness: 0.1,
       });
+      const appleStemMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
+
       for (let i = 0; i < smallFruitCount; i++) {
-        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.28 : 0.22, 8, 7), appleMat);
-        const ang = (i / smallFruitCount) * Math.PI * 2 + 0.4;
-        const aY = t.size === 2 ? 4.2 : t.size === 1 ? 3.4 : 2.6;
-        const aR = t.size === 2 ? 3.6 : t.size === 1 ? 2.7 : 1.8;
-        aMesh.position.set(Math.cos(ang) * aR, aY, Math.sin(ang) * aR);
-        aMesh.visible = false;
-        canopyGroup.add(aMesh);
-        smallFruitMeshes.push(aMesh);
+        const sGroup = new THREE.Group();
+        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.45 : 0.35, 8, 7), appleMat);
+        aMesh.scale.set(1, 0.95, 1);
+        sGroup.add(aMesh);
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.22, 5), appleStemMat);
+        stem.position.y = t.size === 2 ? 0.5 : 0.4;
+        stem.rotation.z = 0.2;
+        sGroup.add(stem);
+
+        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.72) + 0.24) * Math.PI;
+        const aTheta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
+        const aR = canopyMaxR * (0.84 + 0.12 * Math.cos(i * 4.1));
+        sGroup.position.set(
+          Math.sin(aPhi) * Math.cos(aTheta) * aR,
+          canopyCenterY + Math.cos(aPhi) * aR * 0.65,
+          Math.sin(aPhi) * Math.sin(aTheta) * aR
+        );
+        sGroup.visible = false;
+        canopyGroup.add(sGroup);
+        smallFruitMeshes.push(sGroup as any);
       }
 
-      // Big Fruits (Large Striped Watermelons)
+      // Big Fruits (Giant Red Apples with stem and leaf - 100% red tree fruit, no watermelons!)
       const bigFruitMeshes: THREE.Group[] = [];
-      const bigFruitCount = t.size === 2 ? 8 : t.size === 1 ? 5 : 3;
-      const melonMat = new THREE.MeshStandardMaterial({
-        color: 0x2e7d32,
-        roughness: 0.35,
+      const bigFruitCount = t.size === 2 ? 14 : t.size === 1 ? 9 : 5;
+      const bigAppleMat = new THREE.MeshStandardMaterial({
+        color: 0xd32f2f,
+        roughness: 0.25,
+        metalness: 0.08,
       });
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.5 });
+
       for (let i = 0; i < bigFruitCount; i++) {
         const mGroup = new THREE.Group();
-        const mBody = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.46 : 0.38, 10, 8), melonMat);
-        mBody.scale.set(1.0, 1.15, 1.0);
+        const bigR = t.size === 2 ? 0.85 : 0.65;
+        const mBody = new THREE.Mesh(new THREE.SphereGeometry(bigR, 12, 10), bigAppleMat);
+        mBody.scale.set(1.0, 0.94, 1.0);
         mGroup.add(mBody);
-        const stripeMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.4 });
-        const stripe = new THREE.Mesh(new THREE.TorusGeometry(t.size === 2 ? 0.44 : 0.36, 0.04, 6, 12), stripeMat);
-        stripe.rotation.x = Math.PI / 2;
-        mGroup.add(stripe);
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, bigR * 0.55, 6), appleStemMat);
+        stem.position.y = bigR * 1.05;
+        stem.rotation.z = 0.25;
+        mGroup.add(stem);
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(bigR * 0.22, bigR * 0.55, 4), leafMat);
+        leaf.position.set(bigR * 0.18, bigR * 1.15, 0);
+        leaf.rotation.z = -0.8;
+        mGroup.add(leaf);
 
-        const ang = (i / bigFruitCount) * Math.PI * 2 + 0.1;
-        const mY = t.size === 2 ? 4.6 : t.size === 1 ? 3.6 : 2.7;
-        const mR = t.size === 2 ? 3.9 : t.size === 1 ? 2.9 : 2.0;
-        mGroup.position.set(Math.cos(ang) * mR, mY, Math.sin(ang) * mR);
+        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.72) + 0.24) * Math.PI;
+        const mTheta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
+        const mR = canopyMaxR * (0.88 + 0.12 * Math.sin(i * 5.3));
+        mGroup.position.set(
+          Math.sin(mPhi) * Math.cos(mTheta) * mR,
+          canopyCenterY + Math.cos(mPhi) * mR * 0.65,
+          Math.sin(mPhi) * Math.sin(mTheta) * mR
+        );
         mGroup.visible = false;
         canopyGroup.add(mGroup);
         bigFruitMeshes.push(mGroup);

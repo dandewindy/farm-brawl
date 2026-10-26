@@ -59,6 +59,7 @@ let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 let deathScreenTimer: number | null = null;
 let isDeadAwaitingScreen = false;
+let awaitingJoinAck = false;
 let missingMeTicks = 0;
 let localStunTimer = 0;
 let lockedAimA = 0;
@@ -224,6 +225,14 @@ if (isPC) {
 const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
   firstSpawn = true;
+  awaitingJoinAck = true;
+  isSpectating = false;
+  spectateTargetId = null;
+  localStunTimer = 0;
+  wasStunnedLastFrame = false;
+  inputSeq = 0;
+  input.aimMove = true;
+  input.cancelRam();
   if (isTouchDevice) {
     lockLandscape();
   }
@@ -511,12 +520,15 @@ function syncAudioUi(): void {
 }
 
 function handleAudioToggle(): void {
+  unlockAudio();
   const next = cycleAudioMode();
   syncAudioUi();
   showAudioToast(next);
 }
 
 hud.onToggleMute = handleAudioToggle;
+window.addEventListener('pointerdown', () => unlockAudio(), { once: true, passive: true });
+window.addEventListener('touchstart', () => unlockAudio(), { once: true, passive: true });
 
 // Fullscreen & anti-zoom management for desktop, mobile & iPad Chrome/Safari
 const fsBtn = document.getElementById('fsBtn') as HTMLButtonElement | null;
@@ -1111,12 +1123,15 @@ const gameState = new GameState({
       deathScreenTimer = null;
     }
     isDeadAwaitingScreen = false;
+    awaitingJoinAck = false;
     missingMeTicks = 0;
     deathCamTarget = null;
     isSpectating = false;
     spectateTargetId = null;
     localStunTimer = 0;
     wasStunnedLastFrame = false;
+    inputSeq = 0;
+    input.aimMove = true;
     input.cancelRam();
     hud.isPlayerAlive = true;
     hud.showInGame();
@@ -1381,8 +1396,8 @@ function handleGameEvent(ev: GameEvent): void {
       sfxHit(3.5, isMine ? 1.0 : 0.4);
       if (isMine) {
         shake = Math.max(shake, 1.2);
-        // Stun for 3.0 seconds on successful ram
-        const stunDur = 3.0;
+        // Stun for 1.5 seconds on successful ram
+        const stunDur = 1.5;
         localStunTimer = stunDur;
         lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
         predictor.setStun(stunDur);
@@ -1948,9 +1963,9 @@ function animate(now: number): void {
     // Precise 3D raycasted aiming from player animal
     input.computeAim(world.camera, myX, myZ, myMass);
 
-    const isLocked = isStunned || isSpectating;
+    const isLocked = isStunned || (isSpectating && !awaitingJoinAck);
     const stepFlags = me ? (isLocked ? (me.flags | FLAG.STUN) : me.flags) : (isLocked ? FLAG.STUN : 0);
-    const stepAimA = isStunned ? lockedAimA : (isSpectating ? lastSentInput.a : input.aimA);
+    const stepAimA = isStunned ? lockedAimA : ((isSpectating && !awaitingJoinAck) ? lastSentInput.a : input.aimA);
     const stepAimMove = isLocked ? false : input.aimMove;
     const stepHolding = isLocked ? false : input.holding;
 

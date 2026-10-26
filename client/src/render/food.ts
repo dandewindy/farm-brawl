@@ -18,38 +18,6 @@ interface Particle {
   g: number;
 }
 
-function createWatermelonTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
-
-  // Base bright/rich green
-  ctx.fillStyle = '#2e7d32';
-  ctx.fillRect(0, 0, 256, 128);
-
-  // Wavy dark forest green stripes
-  ctx.fillStyle = '#143c16';
-  for (let x = 6; x < 256; x += 32) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    for (let y = 0; y <= 128; y += 16) {
-      const wobble = Math.sin((y / 128) * Math.PI * 4) * 5;
-      ctx.lineTo(x + wobble, y);
-    }
-    for (let y = 128; y >= 0; y -= 16) {
-      const wobble = Math.sin((y / 128) * Math.PI * 4) * 5;
-      ctx.lineTo(x + 14 + wobble, y);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  return tex;
-}
-
 export class FoodAndParticleRenderer {
 
   private readonly foodMeshes: THREE.InstancedMesh[] = [];
@@ -120,12 +88,9 @@ export class FoodAndParticleRenderer {
     // 6: Rainbow Candy (Kẹo cầu vồng siêu thú) - sparkling octahedron
     const rainbowCandyGeo = new THREE.OctahedronGeometry(1.5, 0);
 
-    // 7: Watermelon (Dưa hấu) - large oblong sphere, visibly larger than pumpkin
-    // Rotate geometry 90 degrees around Z so poles align with horizontal ends (-X and +X)
-    // and striped texture converges organically at the tips rather than the belly!
-    const watermelonGeo = new THREE.SphereGeometry(1.05, 18, 14);
-    watermelonGeo.rotateZ(Math.PI / 2);
-    watermelonGeo.scale(1.26, 0.94, 0.94);
+    // 7: Giant Red Apple (Táo Đỏ Khổng Lồ) - large sculpted apple matching tree fruits
+    const giantAppleGeo = new THREE.SphereGeometry(1.0, 18, 14);
+    giantAppleGeo.scale(1.08, 0.95, 1.08);
 
     // 8: Giant Flower (Hoa khổng lồ) - Large multi-petal blooming blossom matching watermelon scale
     const flowerPetals: THREE.BufferGeometry[] = [];
@@ -161,7 +126,7 @@ export class FoodAndParticleRenderer {
       pumpkinGeo,
       turnipGeo,
       rainbowCandyGeo,
-      watermelonGeo,
+      giantAppleGeo,
       giantFlowerGeo,
     ];
 
@@ -180,8 +145,8 @@ export class FoodAndParticleRenderer {
       new THREE.MeshStandardMaterial({ color: 0xf5f5f0, emissive: 0x222222, roughness: 0.6 }),
       // 6: Rainbow Candy - sparkling crystalline
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.2, metalness: 0.25, flatShading: true }),
-      // 7: Watermelon - striped green
-      new THREE.MeshStandardMaterial({ map: createWatermelonTexture(), roughness: 0.45 }),
+      // 7: Giant Red Apple - rich glossy red
+      new THREE.MeshStandardMaterial({ color: 0xd32f2f, emissive: 0x220000, roughness: 0.25, metalness: 0.08 }),
       // 8: Giant Flower - bright radiant rose magenta, double-sided, lush velvet finish
       new THREE.MeshStandardMaterial({
         color: 0xff2d78,
@@ -269,17 +234,21 @@ export class FoodAndParticleRenderer {
     this.scene.add(pumpkinStemMesh);
     this.foodTops[4] = pumpkinStemMesh;
 
-    // 7: Watermelon stem (Cuống dưa hấu mọc từ đầu quả dưa)
-    const melonStemGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.32, 6);
-    melonStemGeo.rotateZ(-Math.PI / 2 + 0.28);
-    melonStemGeo.translate(1.28, 0.08, 0);
-    const melonStemMat = new THREE.MeshStandardMaterial({ color: 0x335522, roughness: 0.8 });
-    const melonStemMesh = new THREE.InstancedMesh(melonStemGeo, melonStemMat, this.maxFoodPerKind);
-    melonStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    melonStemMesh.frustumCulled = false;
-    melonStemMesh.count = 0;
-    this.scene.add(melonStemMesh);
-    this.foodTops[7] = melonStemMesh;
+    // 7: Giant Apple stem & leaf (Cuống táo & lá xanh)
+    const giantStemGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.45, 6);
+    giantStemGeo.translate(0, 1.15, 0);
+    giantStemGeo.rotateZ(0.25);
+    const giantLeafGeo = new THREE.ConeGeometry(0.2, 0.48, 4);
+    giantLeafGeo.translate(0.18, 1.25, 0);
+    giantLeafGeo.rotateZ(-0.75);
+    const giantTopGeo = BufferGeometryUtils.mergeGeometries([giantStemGeo, giantLeafGeo])!;
+    const giantTopMat = new THREE.MeshStandardMaterial({ color: 0x43a047, roughness: 0.6 });
+    const giantTopMesh = new THREE.InstancedMesh(giantTopGeo, giantTopMat, this.maxFoodPerKind);
+    giantTopMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    giantTopMesh.frustumCulled = false;
+    giantTopMesh.count = 0;
+    this.scene.add(giantTopMesh);
+    this.foodTops[7] = giantTopMesh;
 
     // 8: Giant Flower center (Nhuỵ hoa vàng óng tỏa sáng)
     const flowerCenterGeo = new THREE.SphereGeometry(0.58, 16, 12);
