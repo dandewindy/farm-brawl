@@ -12,6 +12,7 @@ export class GameRoom extends DurableObject {
   private readonly lobbyTeams = new Map<WebSocket, number>();
   private readonly clientSockets = new Map<string, WebSocket>();
   private readonly socketClientIds = new Map<WebSocket, string>();
+  private readonly socketEdgeColo = new Map<WebSocket, string>();
   private readonly playerTokens = new Map<number, string>();
   private readonly clientPlayerIds = new Map<string, number>();
   private readonly playerLastSeq = new Map<number, number>();

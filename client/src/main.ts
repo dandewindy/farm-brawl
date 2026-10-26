@@ -1178,7 +1178,7 @@ const gameState = new GameState({
 
         let unackedBoost = 0;
         const nowPerf = performance.now();
-        const ackWindow = currentRtt + 70;
+        const ackWindow = stableBaseRtt + 70;
         for (const entry of optimisticEatenMap.values()) {
           if (nowPerf - entry.eatenAtPerf < ackWindow) {
             unackedBoost += entry.foodValue;

@@ -1457,7 +1457,7 @@ export class AnimalRenderer {
 
     // Ground indicator ring
     vis.ring.visible = !isWater;
-    vis.ring.position.set(x, onPodium ? 0.6 : 0.06, z);
+    vis.ring.position.set(x, smoothBaseY + 0.06, z);
     vis.ring.scale.setScalar(sq > 0.3 ? r * (1 + 0.45 * sq) : r);
     if (isSuper) {
       vis.ring.scale.setScalar(r * 1.25);
