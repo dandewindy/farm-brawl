@@ -12,36 +12,42 @@ export interface Env {
  * Khi một Worker đang chạy tại các POP này gọi lệnh khởi tạo Durable Object với locationHint: 'apac-se',
  * Cloudflare sẽ đặt Durable Object vật lý ngay tại Singapore (SIN) hoặc Hồng Kông (HKG).
  */
-const TIER_0_SEA_COLOS = /^(SIN|HKG|SGN|HAN|DAD|BKK|KUL|CGK|MNL|TPE|PNH|VTE)$/i;
-
 /**
- * Lưu trạng thái thế hệ Shard trên bộ nhớ Isolate để nếu một room ID vô tình
- * bị khởi tạo ở trạm xa (ví dụ FRA, LAX, NRT), Worker sẽ tự động nâng shard
- * ngay khi có request đi qua trạm chuẩn Đông Nam Á (SIN/HKG).
+ * Danh sách các trạm Cloudflare Edge POP chuẩn tại Đông Nam Á & Hồng Kông (Tier 0).
  */
-const activeRoomShardMap = new Map<string, number>();
+export const TIER_0_SEA_COLOS = /^(SIN|HKG|SGN|HAN|DAD|BKK|KUL|PNH|VTE)$/i;
+export const TIER_1_APAC_COLOS = /^(TPE|KHH|MNL|CEB|CAN|SZX|MFN|CGK|DPS|RGN|BNY|NRT|HND|KIX|FUK|OKA|ICN|PUS)$/i;
 
-/**
- * Xác định Location Hint tối ưu cho Durable Object.
- * Dùng 'apac-se' (Southeast Asia-Pacific) để Cloudflare đặt DO tại Singapore (SIN).
- */
-function getTargetLocationHint(): DurableObjectLocationHint {
-  return 'apac-se';
+export function getColoTierServer(colo: string): 0 | 1 | 2 {
+  if (TIER_0_SEA_COLOS.test(colo)) return 0;
+  if (TIER_1_APAC_COLOS.test(colo)) return 1;
+  return 2;
 }
 
 /**
- * Tạo khóa phòng thế hệ mới (sea-v16) để tách khỏi hoàn toàn các DO cũ
- * vốn đã bị ghim cố định ở các trung tâm dữ liệu xa.
+ * Sử dụng locationHint 'apac-se' (Southeast Asia-Pacific - Singapore) chính thức của Cloudflare
+ * để ép Durable Object khởi tạo ngay tại cụm Singapore.
  */
-function resolveRoomKey(roomParam: string, shardIdx = 0): string {
-  const baseRoom =
-    roomParam === 'pub-1'
-      ? 'pub-sea-v16'
-      : roomParam === 'team-1'
-        ? 'team-sea-v16'
-        : `${roomParam}-sea-v16`;
+function getTargetLocationHint(): DurableObjectLocationHint {
+  return 'apac-se' as DurableObjectLocationHint;
+}
 
-  return shardIdx > 0 ? `${baseRoom}-s${shardIdx}` : baseRoom;
+/**
+ * Tạo khóa phòng thế hệ mới (sin-v17) tách biệt hoàn toàn với các DO cũ từng bị tạo nhầm vị trí.
+ * Hỗ trợ hậu tố shard bền vững từ query param để di dời tức thì nếu DO bị lệch vùng.
+ */
+function resolveRoomKey(roomParam: string, shardParam = '0'): string {
+  const cleanRoom = roomParam.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'pub-1';
+  const cleanShard = String(shardParam).replace(/[^0-9]/g, '').slice(0, 2) || '0';
+
+  const baseRoom =
+    cleanRoom === 'pub-1'
+      ? 'pub-sin-v17'
+      : cleanRoom === 'team-1'
+        ? 'team-sin-v17'
+        : `${cleanRoom}-sin-v17`;
+
+  return cleanShard !== '0' ? `${baseRoom}-s${cleanShard}` : baseRoom;
 }
 
 /**
@@ -50,7 +56,7 @@ function resolveRoomKey(roomParam: string, shardIdx = 0): string {
  */
 function extractRealEdgeColo(request: Request, url: URL): string {
   const cf = (request as unknown as { cf?: { colo?: string } }).cf;
-  if (cf?.colo && typeof cf.colo === 'string') {
+  if (cf?.colo && typeof cf.colo === 'string' && cf.colo.length >= 3) {
     return cf.colo.toUpperCase();
   }
   const cfRay = request.headers.get('cf-ray') || '';
@@ -65,7 +71,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const edgeColo = extractRealEdgeColo(request, url);
-    const isSeaEdge = TIER_0_SEA_COLOS.test(edgeColo);
+    const edgeTier = getColoTierServer(edgeColo);
 
     // 1. Endpoint kiểm tra nhanh độ trễ thuần tới trạm biên (Client <-> Edge POP)
     if (url.pathname === '/api/health' || url.pathname === '/api/edge-ping') {
@@ -75,7 +81,7 @@ export default {
           status: 'ok',
           time: Date.now(),
           colo: edgeColo,
-          tier: isSeaEdge ? 0 : 2,
+          tier: edgeTier,
           country: cf?.country ?? 'unknown',
           city: cf?.city ?? 'unknown',
         }),
@@ -86,24 +92,63 @@ export default {
             'Timing-Allow-Origin': '*',
             'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
             'X-Edge-Colo': edgeColo,
+            'X-Edge-Tier': String(edgeTier),
           },
         }
       );
     }
 
-    // 2. Định tuyến WebSocket vào Durable Object GameRoom
+    // 2. Endpoint kiểm tra trực tiếp vị trí vật lý của Durable Object & độ trễ Edge <-> DO
+    if (url.pathname === '/api/do-diag') {
+      const roomParam = url.searchParams.get('room') || 'pub-1';
+      const shardParam = url.searchParams.get('shard') || '0';
+      const targetRoomKey = resolveRoomKey(roomParam, shardParam);
+      const roomId = env.ROOM.idFromName(targetRoomKey);
+      const roomStub = (env.ROOM as any).get(roomId, {
+        locationHint: getTargetLocationHint(),
+      });
+
+      const t0 = Date.now();
+      const diagUrl = new URL(request.url);
+      diagUrl.pathname = '/internal/diag';
+      diagUrl.searchParams.set('colo', edgeColo);
+      const doResp = await roomStub.fetch(new Request(diagUrl.toString()));
+      const edgeToDoMs = Date.now() - t0;
+      const doData = (await doResp.json()) as Record<string, unknown>;
+
+      return new Response(
+        JSON.stringify({
+          roomKey: targetRoomKey,
+          edgeColo,
+          edgeTier,
+          edgeToDoMs,
+          ...doData,
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store',
+          },
+        }
+      );
+    }
+
+    // 3. Định tuyến WebSocket vào Durable Object GameRoom
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const roomParam = url.searchParams.get('room') || 'pub-1';
-      const currentShard = activeRoomShardMap.get(roomParam) ?? 0;
-      const targetRoomKey = resolveRoomKey(roomParam, currentShard);
+      const shardParam = url.searchParams.get('shard') || '0';
+      const targetRoomKey = resolveRoomKey(roomParam, shardParam);
       const hint = getTargetLocationHint();
 
-      // Ghi đè colo thực tế vào query param và header để DO đọc chính xác
       url.searchParams.set('colo', edgeColo);
+      url.searchParams.set('rk', targetRoomKey);
 
       const headers = new Headers(request.headers);
       headers.set('x-edge-colo', edgeColo);
+      headers.set('x-edge-tier', String(edgeTier));
       headers.set('x-edge-ts', Date.now().toString());
+      headers.set('x-room-shard', shardParam);
 
       const roomId = env.ROOM.idFromName(targetRoomKey);
       const roomStub = (env.ROOM as any).get(roomId, { locationHint: hint });
@@ -114,30 +159,14 @@ export default {
         body: request.body,
       });
 
-      const response = await roomStub.fetch(forwardedReq);
-
-      // Nếu DO báo qua header rằng nó vô tình bị sinh ra ở ngoài cụm SEA (ví dụ FRA/LAX/NRT)
-      // và phòng đang sẵn sàng relocate, trong khi request hiện tại đang đứng ở trạm SIN/HKG (Tier 0),
-      // tự động nâng chỉ số Shard để lần kết nối kế tiếp sinh ra DO mới 100% tại SIN/HKG!
-      const doColoHeader = response.headers.get('x-do-colo');
-      const doRelocateReady = response.headers.get('x-do-relocate-ready') === '1';
-      if (
-        doColoHeader &&
-        doRelocateReady &&
-        isSeaEdge &&
-        !TIER_0_SEA_COLOS.test(doColoHeader)
-      ) {
-        activeRoomShardMap.set(roomParam, (currentShard + 1) % 8);
-      }
-
-      return response;
+      return roomStub.fetch(forwardedReq);
     }
 
-    // 3. Room info endpoint for lobby / checking private room status
+    // 4. Room info endpoint for lobby / checking private room status
     if (url.pathname === '/api/room-info') {
       const roomParam = url.searchParams.get('room') || 'pub-1';
-      const currentShard = activeRoomShardMap.get(roomParam) ?? 0;
-      const targetRoomKey = resolveRoomKey(roomParam, currentShard);
+      const shardParam = url.searchParams.get('shard') || '0';
+      const targetRoomKey = resolveRoomKey(roomParam, shardParam);
       const hint = getTargetLocationHint();
 
       const roomId = env.ROOM.idFromName(targetRoomKey);

@@ -20,15 +20,19 @@ export class GameRoom extends DurableObject {
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private tickAccumulator = 0;
   private lastTickPerfTime = 0;
-  private doColo = 'APAC';
+  private doColo = 'UNKNOWN';
+  private doColoPromise: Promise<string> | null = null;
+  private readonly socketEdgeColo = new Map<WebSocket, string>();
+  private readonly playerTiming = new Map<number, { lastClientTs: number; receivedAtServerMs: number }>();
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.world = new World();
-    this.detectDoColo();
+    this.doColoPromise = this.detectDoColo();
   }
 
-  private async detectDoColo(): Promise<void> {
+  private async detectDoColo(): Promise<string> {
+    if (this.doColo !== 'UNKNOWN') return this.doColo;
     try {
       const resp = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
         cf: { cacheTtl: 0 },
@@ -38,11 +42,16 @@ export class GameRoom extends DurableObject {
         const match = text.match(/^colo=([A-Z0-9]+)/m);
         if (match && match[1]) {
           this.doColo = match[1].toUpperCase();
+          return this.doColo;
         }
       }
     } catch {
       // Giữ mặc định 'APAC' nếu trace nội bộ bị chặn
     }
+    if (this.doColo === 'UNKNOWN') {
+      this.doColo = 'APAC';
+    }
+    return this.doColo;
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -75,6 +84,34 @@ export class GameRoom extends DurableObject {
       this.disconnectedPlayers.clear();
     }
 
+    const cfRay = request.headers.get('cf-ray') || '';
+    const edgeColo = (
+      request.headers.get('x-edge-colo') ||
+      url.searchParams.get('colo') ||
+      (cfRay.includes('-') ? cfRay.split('-')[1] : '') ||
+      (request as any).cf?.colo ||
+      'SIN'
+    ).toUpperCase();
+
+    const edgeTs = Number(request.headers.get('x-edge-ts') || Date.now());
+    const currentShard = Number(request.headers.get('x-room-shard') || url.searchParams.get('shard') || '0');
+    const realDoColo = await (this.doColoPromise ?? this.detectDoColo());
+    const edgeToDoInternalMs = Math.max(0, Date.now() - edgeTs);
+
+    // Endpoint kiểm tra nội bộ trực tiếp vị trí DO và độ trễ
+    if (url.pathname === '/internal/diag') {
+      return new Response(
+        JSON.stringify({
+          doColo: realDoColo,
+          isDoInSea: /^(SIN|HKG|SGN|HAN|DAD|BKK|KUL|CGK|MNL|TPE|PNH|VTE)$/i.test(realDoColo),
+          activePlayers: this.sockets.size,
+          tick: this.world.tick,
+          edgeToDoInternalMs,
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (url.pathname === '/ws' || url.pathname.startsWith('/ws/')) {
       const upgradeHeader = request.headers.get('Upgrade');
       if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
@@ -85,18 +122,11 @@ export class GameRoom extends DurableObject {
       const [client, server] = Object.values(pair);
 
       const cid = url.searchParams.get('cid') || '';
-      const cfRay = request.headers.get('cf-ray') || '';
-      const edgeColo = (
-        request.headers.get('x-edge-colo') ||
-        url.searchParams.get('colo') ||
-        (cfRay.includes('-') ? cfRay.split('-')[1] : '') ||
-        (request as any).cf?.colo ||
-        'SIN'
-      ).toUpperCase();
-      this.handleWebSocket(server, edgeColo, cid);
+      this.handleWebSocket(server, edgeColo, realDoColo, edgeToDoInternalMs, currentShard, cid);
 
       const responseHeaders = new Headers();
-      responseHeaders.set('x-do-colo', this.doColo);
+      responseHeaders.set('x-do-colo', realDoColo);
+      responseHeaders.set('x-do-edge-ms', String(edgeToDoInternalMs));
       responseHeaders.set('x-do-relocate-ready', this.sockets.size <= 1 ? '1' : '0');
 
       return new Response(null, {
@@ -133,11 +163,48 @@ export class GameRoom extends DurableObject {
     return new Response('Not found', { status: 404 });
   }
 
-  private handleWebSocket(ws: WebSocket, edgeColo: string, cid = ''): void {
+  private handleWebSocket(
+    ws: WebSocket,
+    edgeColo: string,
+    realDoColo: string,
+    edgeToDoMs: number,
+    currentShard: number,
+    cid = ''
+  ): void {
     ws.accept();
+    this.socketEdgeColo.set(ws, edgeColo);
     try {
-      ws.send(`{"t":"hello","s":${Date.now()},"colo":"${edgeColo}","doColo":"${this.doColo}"}`);
+      ws.send(
+        JSON.stringify({
+          t: 'hello',
+          s: Date.now(),
+          colo: edgeColo,
+          doColo: realDoColo,
+          e2d: edgeToDoMs,
+          shard: currentShard,
+        })
+      );
     } catch (_) {}
+
+    // Nếu người chơi vào trạm biên Đông Nam Á (SIN/HKG) nhưng DO vô tình nằm ở ngoài SEA,
+    // yêu cầu client tự động chuyển shard để tạo phòng mới tại Singapore!
+    const isEdgeInSea = /^(SIN|HKG|SGN|HAN|DAD|BKK|KUL|CGK|MNL|TPE|PNH|VTE)$/i.test(edgeColo);
+    const isDoInSea =
+      /^(SIN|HKG|SGN|HAN|DAD|BKK|KUL|CGK|MNL|TPE|PNH|VTE)$/i.test(realDoColo) ||
+      realDoColo === 'APAC';
+
+    if (isEdgeInSea && !isDoInSea && this.sockets.size <= 1 && currentShard < 5) {
+      try {
+        ws.send(
+          JSON.stringify({
+            t: 'relocate_shard',
+            nextShard: currentShard + 1,
+            badDoColo: realDoColo,
+            edgeColo,
+          })
+        );
+      } catch (_) {}
+    }
 
     if (cid) {
       this.socketClientIds.set(ws, cid);
@@ -174,6 +241,7 @@ export class GameRoom extends DurableObject {
     const onCloseOrError = () => {
       this.allSockets.delete(ws);
       this.lobbyTeams.delete(ws);
+      this.socketEdgeColo.delete(ws);
       const c = this.socketClientIds.get(ws);
       if (c && this.clientSockets.get(c) === ws) {
         this.clientSockets.delete(c);
@@ -182,6 +250,7 @@ export class GameRoom extends DurableObject {
       const playerId = this.sockets.get(ws);
       if (playerId) {
         this.sockets.delete(ws);
+        this.playerTiming.delete(playerId);
         const token = this.playerTokens.get(playerId);
         const player = this.world.players.get(playerId);
         if (token && player) {
@@ -458,6 +527,12 @@ export class GameRoom extends DurableObject {
         if (typeof msg.dashSeq === 'number' && msg.dashSeq > 0) {
           this.playerLastDashSeq.set(keyId as any, msg.dashSeq);
         }
+        if (typeof (msg as any).ct === 'number') {
+          this.playerTiming.set(keyId as any, {
+            lastClientTs: (msg as any).ct,
+            receivedAtServerMs: Date.now(),
+          });
+        }
         this.world.setInput(keyId, {
           a: msg.a,
           mv: msg.mv,
@@ -603,6 +678,13 @@ export class GameRoom extends DurableObject {
         snap.ackSeq = this.playerLastSeq.get(playerId) ?? 0;
         snap.ackDash = this.playerLastDashSeq.get(playerId) ?? 0;
         snap.st = serverNow;
+        const timing = this.playerTiming.get(playerId);
+        if (timing && timing.lastClientTs > 0) {
+          snap.ect = timing.lastClientTs;
+          snap.holdMs = Math.max(0, serverNow - timing.receivedAtServerMs);
+        }
+        snap.colo = this.socketEdgeColo.get(ws) || 'SIN';
+        snap.doColo = this.doColo;
         ws.send(JSON.stringify(snap));
       } catch {
         // Socket error handled in close event listener

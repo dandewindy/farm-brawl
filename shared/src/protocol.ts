@@ -18,6 +18,8 @@ export interface Input {
   dashSeq?: number;
   /** optimistic food IDs touched by client */
   eat?: number[];
+  /** client performance.now() timestamp when input packet was generated */
+  ct?: number;
 }
 
 export interface PlayerMeta {
@@ -160,13 +162,20 @@ export interface Snapshot {
   ackDash?: number;
   /** authoritative server timestamp when tick executed */
   st?: number;
+  /** echoed client timestamp from latest received input for zero-overhead RTT measurement */
+  ect?: number;
+  /** duration in ms that the acknowledged input packet waited on server before tick executed */
+  holdMs?: number;
+  colo?: string;
+  doColo?: string;
 }
 
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[]; matchDuration?: number }
   | { t: 'joined'; id: number; token?: string; colo?: string; doColo?: string }
   | { t: 'pong'; c: number; colo?: string; doColo?: string; s?: number }
-  | { t: 'hello'; s: number; colo?: string; doColo?: string }
+  | { t: 'hello'; s: number; colo?: string; doColo?: string; e2d?: number; shard?: number }
+  | { t: 'relocate_shard'; nextShard: number; badDoColo?: string; edgeColo?: string }
   | { t: 'team_counts'; c0: number; c1: number }
   | { t: 'match_duration'; duration: number }
   | Snapshot;

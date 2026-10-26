@@ -1139,6 +1139,11 @@ const gameState = new GameState({
         optimisticEatenMap.delete(id);
       }
     }
+    if (optimisticEatenMap.size > 0) {
+      for (const fid of optimisticEatenMap.keys()) {
+        gameState.food.delete(fid);
+      }
+    }
     let seenMe = false;
     for (const [id, x, z, _a, mass, flags, _charge] of s.p) {
       if (id === gameState.myId && gameState.alive) {
@@ -1149,14 +1154,14 @@ const gameState = new GameState({
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
         }
-        const currentRtt = (transport as any)?.netRtt ?? (transport ? transport.rtt : 48);
+        const stableBaseRtt = (transport as any)?.rttMin ?? (transport ? transport.rtt : 48);
         predictor.onServerSnapshot(
           x,
           z,
           flags,
           gameState.snapTick,
           transport?.clockOffset ?? gameState.clockOff,
-          currentRtt,
+          stableBaseRtt,
           s.ackSeq ?? 0,
           s.ackDash ?? 0,
           s.st
@@ -1807,6 +1812,16 @@ function getClientId(): string {
     };
   }
 }
+
+// Xuất hàm kiểm tra chẩn đoán mạng ra window để kiểm chứng trực tiếp trên DevTools Console
+(window as any).__farmBrawlNetDiag = () => {
+  if (transport && typeof (transport as any).getDiagnostics === 'function') {
+    const diag = (transport as any).getDiagnostics();
+    console.table(diag);
+    return diag;
+  }
+  return { error: 'transport not ready or not WsClient' };
+};
 
 const modeParam = params.get('mode');
 const roomParam = params.get('room') || params.get('code');

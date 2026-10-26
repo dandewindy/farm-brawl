@@ -266,28 +266,25 @@ export class ClientPredictor {
       return;
     }
 
-    // 4. Historical sample lookup via sequence anchor and effective RTT
-    const minLookbackMs = Math.max(30, effectiveRtt * 0.55);
-    const maxLookbackMs = Math.min(240, effectiveRtt * 1.35 + 40);
-    const defaultLookbackMs = effectiveRtt + 20;
+    // 4. Historical sample lookup via stable physical anchor
+    const physicalBaseRtt = rtt > 0 ? Math.min(rtt, 110) : 48;
+    const fixedOneWayLead = physicalBaseRtt * 0.5 + 12;
 
-    let targetTime = now - defaultLookbackMs;
+    let targetTime = now - (physicalBaseRtt + 15);
 
-    if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
+    if (typeof serverTime === 'number' && clockOff !== null) {
+      // serverTime - clockOff là thời điểm chính xác trên đồng hồ Client khi Server tính xong tick đó.
+      // Vì clockOff được neo theo rttMin, mốc này đứng yên tuyệt đối, loại bỏ 100% giật ngược do jitter.
+      const exactClientTimeAtServerTick = serverTime - clockOff - fixedOneWayLead;
+      const lookback = now - exactClientTimeAtServerTick;
+      if (lookback >= 20 && lookback <= 350) {
+        targetTime = exactClientTimeAtServerTick;
+      }
+    } else if (ackSeq > 0 && this.seqSendTime.has(ackSeq)) {
       const sentAt = this.seqSendTime.get(ackSeq)!;
       const age = now - sentAt;
-      if (age >= 20 && age <= 280) {
-        targetTime = now - Math.max(minLookbackMs, Math.min(maxLookbackMs, defaultLookbackMs));
-      }
-    } else if (typeof serverTime === 'number' && clockOff !== null) {
-      const serverSentPerfTime = serverTime - clockOff;
-      const estimatedClientSimTime = serverSentPerfTime - (effectiveRtt * 0.45 + 12);
-      const lookback = now - estimatedClientSimTime;
-
-      if (lookback >= minLookbackMs && lookback <= maxLookbackMs) {
-        targetTime = estimatedClientSimTime;
-      } else {
-        targetTime = now - Math.max(minLookbackMs, Math.min(maxLookbackMs, defaultLookbackMs));
+      if (age >= 20 && age <= 350) {
+        targetTime = sentAt;
       }
     }
 
