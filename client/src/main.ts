@@ -1882,7 +1882,7 @@ function animate(now: number): void {
     currentFps = Math.min(60, Math.round((fpsFrames * 1000) / (now - lastFpsTime)));
     fpsFrames = 0;
     lastFpsTime = now;
-    const currentPing = transport ? Math.round(transport.rtt > 0 ? transport.rtt : transport.rttMin) : 0;
+    const currentPing = transport ? Math.round((transport as any).displayPing ?? (transport.rtt > 0 ? transport.rtt : transport.rttMin)) : 0;
     hud.updatePerf(currentFps, currentPing, transport?.colo, transport?.isMigrating);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
@@ -1964,7 +1964,10 @@ function animate(now: number): void {
       btn: stepHolding,
     };
 
-    // 2. Authoritative client physics prediction step
+    // 2. Interpolate remote entities first so predictor.step has exact real-time positions of surrounding animals!
+    gameState.interpolate(now);
+
+    // 3. Authoritative client physics prediction step
     if (myMeta && me) {
       if (!hasPrevPred) {
         prevPredX = predictor.x;

@@ -22,8 +22,7 @@ export class GameRoom extends DurableObject {
   private lastTickPerfTime = 0;
   private doColo = 'UNKNOWN';
   private doColoPromise: Promise<string> | null = null;
-  private readonly socketEdgeColo = new Map<WebSocket, string>();
-  private readonly playerTiming = new Map<number, { lastClientTs: number; receivedAtServerMs: number }>();
+  private readonly playerTiming = new Map<number, { lastClientTs: number; receivedAtServerMs: number; ackedInSnapshot: boolean }>();
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
@@ -531,6 +530,7 @@ export class GameRoom extends DurableObject {
           this.playerTiming.set(keyId as any, {
             lastClientTs: (msg as any).ct,
             receivedAtServerMs: Date.now(),
+            ackedInSnapshot: false,
           });
         }
         this.world.setInput(keyId, {
@@ -679,9 +679,13 @@ export class GameRoom extends DurableObject {
         snap.ackDash = this.playerLastDashSeq.get(playerId) ?? 0;
         snap.st = serverNow;
         const timing = this.playerTiming.get(playerId);
-        if (timing && timing.lastClientTs > 0) {
-          snap.ect = timing.lastClientTs;
-          snap.holdMs = Math.max(0, serverNow - timing.receivedAtServerMs);
+        if (timing && timing.lastClientTs > 0 && !timing.ackedInSnapshot) {
+          const holdMs = Math.max(0, serverNow - timing.receivedAtServerMs);
+          if (holdMs <= 60) {
+            snap.ect = timing.lastClientTs;
+            snap.holdMs = holdMs;
+          }
+          timing.ackedInSnapshot = true;
         }
         snap.colo = this.socketEdgeColo.get(ws) || 'SIN';
         snap.doColo = this.doColo;

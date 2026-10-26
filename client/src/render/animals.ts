@@ -32,6 +32,20 @@ interface AnimalVisual {
   rainbowTimer?: number;
   waterT?: number;
   squishFactor?: number;
+  visualY?: number;
+}
+
+function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
+  const dist = Math.hypot(x - podX, z - podZ);
+  const innerR = CFG.PODIUM_R - 0.30;
+  const outerR = CFG.PODIUM_R + 0.20;
+
+  if (dist <= innerR) return 0.55;
+  if (dist >= outerR) return 0;
+
+  const t = (dist - innerR) / (outerR - innerR);
+  const smooth = t * t * (3 - 2 * t);
+  return 0.55 * (1 - smooth);
 }
 
 function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
@@ -1178,8 +1192,12 @@ export class AnimalRenderer {
 
     const podX = podiumPos ? podiumPos[0] : 0;
     const podZ = podiumPos ? podiumPos[1] : 0;
-    const onPodium = Math.hypot(x - podX, z - podZ) < CFG.PODIUM_R;
-    let y = onPodium ? 0.55 : 0;
+    const targetBaseY = computePodiumRampY(x, z, podX, podZ);
+    const prevBaseY = vis.visualY ?? targetBaseY;
+    const yLerpFactor = 1 - Math.exp(-16.0 * Math.min(dt, 0.05));
+    const smoothBaseY = prevBaseY + (targetBaseY - prevBaseY) * yLerpFactor;
+    vis.visualY = smoothBaseY;
+    let y = smoothBaseY;
 
     if (isWater && !isSuper) {
       vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);

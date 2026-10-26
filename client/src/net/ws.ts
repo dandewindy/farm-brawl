@@ -217,7 +217,8 @@ export function evaluateMigrationDecision(
 
 export class WsClient implements Transport {
   public ws: WebSocket | null = null;
-  public rtt = 48;                 // Ping hiển thị trên HUD (đã lọc nhiễu mượt mà)
+  public rtt = 48;                 // Ping nội bộ (đã lọc nhiễu mượt mà)
+  public displayPing = 48;          // Ping hiển thị trên HUD (đứng yên ổn định)
   public rttMin = 48;              // Độ trễ vật lý tối thiểu (dùng làm mỏ neo cho ClientPredictor)
   public netRtt = 48;              // RTT hiệu dụng cho ClientPredictor
   public edgeToDoMs = 0;          // Độ trễ nội bộ giữa Cloudflare Edge POP và Durable Object
@@ -229,6 +230,11 @@ export class WsClient implements Transport {
   public isMigrating = false;
   public sessionToken: string | null = null;
   public closed = false;
+
+  private lastProcessedEct = 0;
+  private clockInitialized = false;
+  private clockSampleCount = 0;
+  private lastHudPingUpdateAt = 0;
 
   private candidateUrls: string[] = [];
   private distinctHostsCount = 1;
@@ -610,10 +616,12 @@ export class WsClient implements Transport {
         const snap = parsed as Snapshot;
         const ect = snap.ect!;
         const holdMs = typeof snap.holdMs === 'number' ? snap.holdMs : 0;
-        const pureSnapRtt = recvNow - ect - holdMs;
-        // Ghi nhận nếu mẫu RTT hợp lệ
-        if (pureSnapRtt >= 2 && pureSnapRtt < 1500) {
-          this.recordRttSample(pureSnapRtt, recvNow, snap.st);
+        if (ect > this.lastProcessedEct && holdMs >= 0 && holdMs <= 35) {
+          this.lastProcessedEct = ect;
+          const pureSnapRtt = recvNow - ect - holdMs;
+          if (pureSnapRtt >= 2 && pureSnapRtt < 1000) {
+            this.recordRttSample(pureSnapRtt, recvNow, snap.st);
+          }
         }
       }
 
@@ -647,63 +655,68 @@ export class WsClient implements Transport {
       return;
     }
 
-    if (this.rttWin.length === 0) {
-      this.rttWin.push(rawRtt);
-      this.rttMin = Math.round(rawRtt);
-      this.smoothedRtt = rawRtt;
-      this.rtt = Math.round(rawRtt);
-      this.netRtt = Math.round(rawRtt);
-      if (typeof serverTime === 'number') {
-        this.clockOffset = serverTime - (recvNow - rawRtt * 0.5);
+    // 1. Chống gai đột biến (Spike rejection):
+    const clampedSample =
+      this.rtt > 0 && this.rttWin.length >= 5
+        ? Math.min(rawRtt, this.rtt * 2.2 + 25)
+        : rawRtt;
+
+    this.rttWin.push(clampedSample);
+    if (this.rttWin.length > 15) this.rttWin.shift();
+
+    // 2. Lấy Phân vị thứ 30 (30th Percentile) làm baseline vật lý
+    const sorted = [...this.rttWin].sort((a, b) => a - b);
+    const p30Index = Math.floor((sorted.length - 1) * 0.3);
+    const baselineRtt = sorted[p30Index];
+    this.rttMin = Math.round(baselineRtt);
+
+    // 3. Làm mượt RTT nội bộ bằng EWMA
+    if (this.rtt === 0) {
+      this.rtt = Math.round(baselineRtt);
+      this.displayPing = Math.round(baselineRtt);
+      this.smoothedRtt = baselineRtt;
+    } else {
+      const alpha = baselineRtt < this.smoothedRtt ? 0.20 : 0.08;
+      this.smoothedRtt += (baselineRtt - this.smoothedRtt) * alpha;
+      this.rtt = Math.round(this.smoothedRtt);
+    }
+    this.netRtt = Math.round(this.rttMin);
+
+    // 4. Cập nhật số Ping trên HUD với Deadband (Hysteresis >= 2ms) & Chu kỳ 1000ms
+    if (recvNow - this.lastHudPingUpdateAt >= 1000) {
+      const candidatePing = Math.round(this.rtt);
+      if (Math.abs(candidatePing - this.displayPing) >= 2 || this.clockSampleCount < 5) {
+        this.displayPing = candidatePing;
+        this.lastHudPingUpdateAt = recvNow;
       }
-      return;
     }
 
-    // Kẹp biên độ xung đơn lẻ (Winsorization):
-    // Nếu đường truyền đã có rttMin = 48ms tại SIN, một mẫu vọt lên 190ms là nghẽn hàng đợi Wi-Fi/TCP,
-    // không cho phép nó làm lệch cửa sổ trượt quá rttMin * 1.65 + 35ms.
-    const maxAllowedInWindow =
-      this.rttWin.length >= 3 ? this.rttMin * 1.65 + 35 : rawRtt;
-    const filteredSample = Math.min(rawRtt, maxAllowedInWindow);
+    // 5. Cập nhật clockOff với bộ giới hạn tốc độ trượt (Slew-Rate Limiter)
+    if (typeof serverTime === 'number' && serverTime > 0) {
+      const candidateOffset = serverTime - (recvNow - baselineRtt * 0.5);
+      this.clockSampleCount++;
 
-    this.rttWin.push(filteredSample);
-    if (this.rttWin.length > 10) this.rttWin.shift();
-
-    // Cho phép rttMin thích nghi chậm nếu mạng thực sự thay đổi nhẹ
-    const stats = computeRttStats(this.rttWin);
-    if (rawRtt < this.rttMin) {
-      this.rttMin = Math.round(rawRtt);
-    } else {
-      this.rttMin = stats.min;
-    }
-    this.jitter = stats.jitter;
-
-    // Asymmetric EMA cho số Ping hiển thị trên HUD:
-    // Giảm nhanh khi mạng mượt (alpha = 0.40), tăng cực kỳ điềm tĩnh khi có nhiễu đơn lẻ (alpha = 0.12)
-    if (filteredSample <= this.smoothedRtt) {
-      this.smoothedRtt += (filteredSample - this.smoothedRtt) * 0.4;
-    } else {
-      const stepCap = Math.min(filteredSample, this.smoothedRtt + 18);
-      this.smoothedRtt += (stepCap - this.smoothedRtt) * 0.12;
-    }
-
-    this.rtt = Math.round(this.smoothedRtt);
-
-    // netRtt dùng cho ClientPredictor: bám sát rttMin vật lý + độ lệch ổn định
-    this.netRtt = Math.round(this.rttMin + Math.min(16, this.jitter * 0.4));
-
-    // Cập nhật clockOffset CHỈ KHI mẫu đo sát với rttMin (không bị nhiễu hàng đợi!)
-    if (typeof serverTime === 'number' && rawRtt <= this.rttMin + 12) {
-      const candidateOffset = serverTime - (recvNow - rawRtt * 0.5);
-      if (this.clockOffset === null) {
+      if (!this.clockInitialized || this.clockOffset === null) {
         this.clockOffset = candidateOffset;
-      } else {
+        this.clockInitialized = true;
+      } else if (this.clockSampleCount <= 8) {
+        // Trong 8 mẫu đầu tiên (Warm-up): hội tụ nhanh
         this.clockOffset += (candidateOffset - this.clockOffset) * 0.25;
+      } else {
+        // Sau khi đã khóa (Locked): Chỉ cập nhật khi mẫu RTT hiện tại nằm gần đáy (ít nhiễu)
+        if (rawRtt <= baselineRtt * 1.15) {
+          const diff = candidateOffset - this.clockOffset;
+          // KẸP CỨNG: Không bao giờ cho phép clockOff dịch chuyển quá 0.25ms mỗi lần!
+          const maxStep = 0.25;
+          const step = Math.max(-maxStep, Math.min(maxStep, diff * 0.05));
+          this.clockOffset += step;
+        }
       }
     }
 
     this.evaluateRouteHealth(rawRtt);
   }
+
 
   /**
    * KIỂM TRA SỨC KHỎE TUYẾN MẠNG (CHỐNG BÃO PROBE KHI ĐÃ Ở SIN/HKG):

@@ -1,4 +1,4 @@
-import { CFG, radiusOf, type Species } from '@shared/constants';
+import { CFG, radiusOf, TRAITS, type Species } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { wrapAngle } from '@shared/math';
 import {
@@ -40,6 +40,7 @@ export class ClientPredictor {
   holdT = 0;
   podShieldActive = true;
   aimMove = false;
+  private isCollidingWithEnts = false;
 
   x = 0;
   z = 0;
@@ -221,6 +222,9 @@ export class ClientPredictor {
         this.kicks++;
         this.vx = svx;
         this.vz = svz;
+      } else if (this.isCollidingWithEnts) {
+        this.vx = this.vx * 0.5 + svx * 0.5;
+        this.vz = this.vz * 0.5 + svz * 0.5;
       }
     }
 
@@ -308,15 +312,15 @@ export class ClientPredictor {
     // 6. Tight deadzone & responsive convergence:
     // 0.08m deadzone during normal walk ensures any divergence is smoothed out immediately
     // without accumulating into multi-meter rubberbanding.
-    const deadzone = inDashPhase ? 0.90 : 0.08;
+    const deadzone = this.isCollidingWithEnts ? 0.14 : (inDashPhase ? 0.90 : 0.08);
     if (errorDist <= deadzone) return;
 
     const excessRatio = (errorDist - deadzone) / errorDist;
     const effDx = dx * excessRatio;
     const effDz = dz * excessRatio;
 
-    let nudgeGain = inDashPhase ? 0.22 : 0.38;
-    if (!inDashPhase && errorDist > 1.2) {
+    let nudgeGain = this.isCollidingWithEnts ? 0.70 : (inDashPhase ? 0.22 : 0.38);
+    if (!inDashPhase && !this.isCollidingWithEnts && errorDist > 1.2) {
       nudgeGain = 0.60;
     }
 
@@ -371,8 +375,8 @@ export class ClientPredictor {
     aimA: number,
     aimMove: boolean,
     map: MapData | null,
-    _ents: Map<number, Ent>,
-    _myId: number,
+    ents: Map<number, Ent>,
+    myId: number,
     _snapTick: number,
     _rtt: number,
     speedMult = 1.0,
@@ -380,6 +384,7 @@ export class ClientPredictor {
   ): void {
     if (!this.on || !map) return;
 
+    this.isCollidingWithEnts = false;
     this.mass = myMass;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
 
@@ -504,6 +509,43 @@ export class ClientPredictor {
           this.vz *= 0.5;
         }
       }
+
+      // 2. Va chạm vật lý đàn hồi & tách chồng lấn với các con vật khác (khớp world.ts collidePlayers)
+      if (ents && ents.size > 0) {
+        const ra = radiusOf(myMass);
+        const ma = myMass * (TRAITS[species]?.weight ?? 1.0);
+        for (const [id, b] of ents) {
+          if (id === myId || !b) continue;
+          const dx = b.x - this.simX;
+          const dz = b.z - this.simZ;
+          const rb = radiusOf(b.mass);
+          const minD = ra + rb;
+          if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
+          const distSq = dx * dx + dz * dz;
+          if (distSq >= minD * minD || distSq < 1e-6) continue;
+
+          this.isCollidingWithEnts = true;
+          const d = Math.sqrt(distSq);
+          const nx = dx / d;
+          const nz = dz / d;
+
+          // A. Tách vị trí chồng lấn (Positional Separation)
+          const overlap = minD - d;
+          const mb = b.mass * 1.0;
+          const wa = mb / (ma + mb);
+          this.simX -= nx * overlap * wa;
+          this.simZ -= nz * overlap * wa;
+
+          // B. Xung lực đàn hồi (Impulse) khi lao vào nhau
+          const va = this.vx * nx + this.vz * nz;
+          if (va > 0) {
+            const jImp = (1.2 * va) / (1 / ma + 1 / mb);
+            const tickScale = Math.min(1.0, h / 0.05);
+            this.vx -= (jImp / ma) * nx * tickScale;
+            this.vz -= (jImp / ma) * nz * tickScale;
+          }
+        }
+      }
     }
 
     if (wasDashing && this.dashT <= 0) {
@@ -526,13 +568,14 @@ export class ClientPredictor {
       if (cut > 0) this.hist.splice(0, cut);
     }
 
-    const decay = Math.exp(-14.0 * dt);
+    const decay = Math.exp(-18.0 * dt);
     this.errorX *= decay;
     this.errorZ *= decay;
-    if (Math.abs(this.errorX) < 0.002 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorX = 0;
-    if (Math.abs(this.errorZ) < 0.002 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorZ = 0;
+    if (Math.abs(this.errorX) < 0.001 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorX = 0;
+    if (Math.abs(this.errorZ) < 0.001 || (!canMove && Math.hypot(this.vx, this.vz) < 0.1)) this.errorZ = 0;
 
     this.x = this.simX + this.errorX;
     this.z = this.simZ + this.errorZ;
   }
 }
+
