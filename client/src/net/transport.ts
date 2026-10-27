@@ -9,6 +9,7 @@ export interface Transport {
   close(): void;
   readonly rtt: number;
   readonly rttMin: number;
+  readonly displayPing?: number;
   readonly netRtt?: number;
   readonly clockOffset?: number | null;
   readonly colo?: string;
@@ -29,6 +30,7 @@ export type Handler = (m: ServerMsg) => void;
 export class LocalServer implements Transport {
   public readonly rtt = 0;
   public readonly rttMin = 0;
+  public readonly displayPing = 0;
   public readonly netRtt = 0;
   public readonly clockOffset = 0;
   public readonly colo = 'LOCAL';

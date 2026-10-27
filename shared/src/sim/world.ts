@@ -1253,12 +1253,12 @@ export class World {
     if (p.terrain === 1) return;
     if (p.superT > 0) {
       p.a = p.input.a;
-      p.vx = Math.cos(p.a) * 62;
-      p.vz = Math.sin(p.a) * 62;
-      p.dashT = 0.55;
-      p.flyT = 0.55;
+      p.vx = Math.cos(p.a) * 50;
+      p.vz = Math.sin(p.a) * 50;
+      p.dashT = 0.48;
+      p.flyT = 0.48;
       p.plow = true;
-      p.power = 2.5;
+      p.power = 1.9;
       p.cd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
@@ -1449,7 +1449,7 @@ export class World {
     // Dynamic knockback ceiling based on mass ratio and charging power (gồng húc)
     const massAdvantage = Math.pow(ma / mv, 0.4);
     const chargeAdvantage = att.power > 1.0 ? (1 + (att.power - 1) * 0.45) : 1.0;
-    const dynamicMax = clamp(CFG.KNOCKBACK_MAX * Math.max(0.65, Math.min(2.5, massAdvantage * chargeAdvantage)), CFG.KNOCKBACK_MIN + 10, 150);
+    const dynamicMax = clamp(CFG.KNOCKBACK_MAX * Math.max(0.65, Math.min(2.0, massAdvantage * chargeAdvantage)), CFG.KNOCKBACK_MIN + 10, 52);
     let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.38), CFG.KNOCKBACK_MIN, dynamicMax);
 
     // Rule: "titan" (Titan clash - colossal impacts)
@@ -1492,9 +1492,10 @@ export class World {
       }
     }
 
-    // Super Rainbow Dash: violent massive knockback launching victim across the map into the fence
+    // Super Rainbow Dash: moderate, impactful knockback (~18-22m) with stun
     if (att.superT > 0) {
-      k = Math.max(k * 2.8, 65);
+      k = clamp(k * 1.35, CFG.KNOCKBACK_MIN, 45);
+      vic.stunT = Math.max(vic.stunT, 0.45);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;

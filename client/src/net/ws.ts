@@ -16,14 +16,17 @@ export class WsClient implements Transport {
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
+  public displayPing = 0; // Giá trị làm dịu mượt mà dành riêng cho HUD
   public colo = '';
   public inGame = false;
   private reconnectTimer: number | null = null;
-  private readonly rttWin: number[] = [];
+  private readonly rttRawSamples: number[] = [];
+  private smoothedPing = 0;
+  private lastPingUpdateTs = 0;
   private badPingStreak = 0;
   private lastLobbyReconnectTime = 0;
   private lobbySteerAttempts = 0;
-  private currentPingDelay = 500;
+  private currentPingDelay = 1000; // Cố định chu kỳ 1s (1000ms), tránh flooding socket
 
   // In-Game Zero-Downtime Hot Migration
   public isMigrating = false;
@@ -116,39 +119,58 @@ export class WsClient implements Transport {
           if (msg.t === 'pong') {
             if (msg.colo) this.colo = msg.colo;
             if (typeof document !== 'undefined' && document.hidden) return;
-            const s = performance.now() - msg.c;
-            if (s >= 0 && s < 2000) {
-              this.rttWin.push(s);
-              if (this.rttWin.length > 8) this.rttWin.shift();
-              const sorted = [...this.rttWin].sort((a, b) => a - b);
+            const sample = performance.now() - msg.c;
+            if (sample > 0 && sample < 1500) {
+              // 1. Cập nhật cửa sổ mẫu (20 mẫu ~ 20s ổn định)
+              this.rttRawSamples.push(sample);
+              if (this.rttRawSamples.length > 20) {
+                this.rttRawSamples.shift();
+              }
+
+              // 2. Spike Rejection & 25th Percentile Baseline
+              const sorted = [...this.rttRawSamples].sort((a, b) => a - b);
               this.rttMin = sorted[0];
+              const p25Index = Math.floor(sorted.length * 0.25);
+              const baseRtt = sorted[p25Index];
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
+              // 3. Asymmetric EWMA (Làm mượt bất đối xứng)
+              if (this.smoothedPing === 0) {
+                this.smoothedPing = baseRtt;
+              } else {
+                // Giảm nhanh (alpha = 0.25) khi mạng tốt, tăng cực kỳ điềm tĩnh (alpha = 0.05) khi có spike/jitter
+                const alpha = baseRtt < this.smoothedPing ? 0.25 : 0.05;
+                this.smoothedPing = alpha * baseRtt + (1 - alpha) * this.smoothedPing;
+              }
+
+              // 4. Deadband & Throttle cho HUD Display (cập nhật 1s/lần hoặc lệch >= 2ms)
+              const now = performance.now();
+              const candidatePing = Math.round(this.smoothedPing);
+              if (now - this.lastPingUpdateTs >= 1000 || this.displayPing === 0) {
+                if (Math.abs(candidatePing - this.displayPing) >= 2 || this.displayPing === 0) {
+                  this.displayPing = candidatePing;
+                }
+                this.lastPingUpdateTs = now;
+              }
+
+              // 5. Watchdog kiểm tra định tuyến (Ngưỡng thực tế tránh false-positive trên 4G/Wi-Fi)
               const onFastNode = isFastColo(this.colo);
-              const isOptimal = this.colo === 'SIN' && this.rttMin <= 90;
-              const isSlow = !onFastNode || this.rttMin > 90 || (this.colo === 'HKG' && this.rttMin > 80);
+              const isOptimal = (this.colo === 'SIN' && this.rttMin <= 110) || (this.colo === 'HKG' && this.rttMin <= 100);
+              const isCriticalSlow = !onFastNode || this.rttMin > 180;
 
               if (isOptimal) {
                 this.lobbySteerAttempts = 0;
                 this.badPingStreak = 0;
-              } else if (isSlow) {
-                this.badPingStreak = !onFastNode ? Math.max(3, this.badPingStreak + 1) : this.badPingStreak + 1;
+              } else if (isCriticalSlow) {
+                this.badPingStreak++;
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // Dynamic retune of ping frequency: if slow, ping 2x faster (250ms) to rapidly detect route fixes
-              const targetDelay = isSlow ? 250 : 500;
-              if (targetDelay !== this.currentPingDelay) {
-                this.currentPingDelay = targetDelay;
-                this.startPing();
-              }
-
-              // 1. Silent Lobby Steer (Max 2 attempts, for distant non-Asian nodes):
-              if (!this.inGame && !onFastNode && this.rttMin > 180 && !this.closed) {
-                if (this.rttWin.length >= 3 && this.lobbySteerAttempts < 2) {
-                  const now = performance.now();
-                  if (now - this.lastLobbyReconnectTime > 6000) {
+              // Silent Lobby Steer (Max 2 attempts, for distant non-Asian nodes):
+              if (!this.inGame && isCriticalSlow && !this.closed) {
+                if (this.rttRawSamples.length >= 3 && this.lobbySteerAttempts < 2) {
+                  if (now - this.lastLobbyReconnectTime > 8000) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
                     console.log(`[WS Watchdog] Lobby on non-optimal node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/2 to find SIN route...`);
@@ -157,10 +179,8 @@ export class WsClient implements Transport {
                 }
               }
 
-              // 2. Active In-Game Zero-Downtime Hot Migration Watchdog:
-              // During live gameplay, if bad ping streak >= 2 and ping > 90ms (or on HKG > 80ms),
-              // automatically trigger silent hot migration to switch to SIN without despawning!
-              if (this.inGame && this.badPingStreak >= 2 && !isOptimal && !this.closed) {
+              // Chỉ kích hoạt hot migration khi thực sự tắc nghẽn liên tục (streak >= 5)
+              if (this.inGame && this.badPingStreak >= 5 && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -334,9 +354,11 @@ export class WsClient implements Transport {
             this.sessionToken = msg.token;
             if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
           }
-          this.rttWin.length = 0;
+          this.rttRawSamples.length = 0;
+          this.smoothedPing = 0;
+          this.displayPing = 0;
           this.badPingStreak = 0;
-          this.currentPingDelay = 500;
+          this.currentPingDelay = 1000;
 
           if (oldWs) {
             oldWs.onopen = null;
@@ -460,7 +482,9 @@ export class WsClient implements Transport {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.rttWin.length = 0;
+    this.rttRawSamples.length = 0;
+    this.smoothedPing = 0;
+    this.displayPing = 0;
     this.isReconnecting = true;
     if (this.ws) {
       const oldWs = this.ws;
