@@ -1253,12 +1253,12 @@ export class World {
     if (p.terrain === 1) return;
     if (p.superT > 0) {
       p.a = p.input.a;
-      p.vx = Math.cos(p.a) * 50;
-      p.vz = Math.sin(p.a) * 50;
-      p.dashT = 0.48;
-      p.flyT = 0.48;
+      p.vx = Math.cos(p.a) * 62;
+      p.vz = Math.sin(p.a) * 62;
+      p.dashT = 0.55;
+      p.flyT = 0.55;
       p.plow = true;
-      p.power = 1.9;
+      p.power = 2.5;
       p.cd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
@@ -1492,10 +1492,9 @@ export class World {
       }
     }
 
-    // Super Rainbow Dash: moderate, impactful knockback (~18-22m) with stun
+    // Super Rainbow Dash: strong, satisfying knockback launching victim far across the arena towards fence
     if (att.superT > 0) {
-      k = clamp(k * 1.35, CFG.KNOCKBACK_MIN, 45);
-      vic.stunT = Math.max(vic.stunT, 0.45);
+      k = Math.max(k * 2.2, 75);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;

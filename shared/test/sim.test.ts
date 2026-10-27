@@ -449,8 +449,8 @@ describe('bonus weapons and tools', () => {
 
     w.step();
 
-    // Victim knocked back with moderate, impactful velocity (~40)
-    expect(vic.vx).toBeGreaterThan(35);
+    // Victim knocked back with strong, impactful velocity
+    expect(vic.vx).toBeGreaterThan(60);
     expect(vic.stunT).toBe(0);
   });
 
@@ -466,13 +466,13 @@ describe('bonus weapons and tools', () => {
 
     att.superT = 8.0;
     att.dashT = 0.3;
-    att.power = 1.9;
-    att.vx = 50;
+    att.power = 2.5;
+    att.vx = 60;
 
     w.step(); // collision occurs here
 
-    // Victim knocked back with moderate, impactful velocity (~40)
-    expect(vic.vx).toBeGreaterThan(35);
+    // Victim knocked back with strong, impactful velocity
+    expect(vic.vx).toBeGreaterThan(60);
     expect(vic.stunT).toBe(0);
   });
 

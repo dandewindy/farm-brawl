@@ -18,7 +18,7 @@ export class InputManager {
   private readonly keysDown = new Set<string>();
   private keyAim = false;
 
-  private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight * 0.35, has: true };
+  private readonly pointer = { x: window.innerWidth / 2, y: window.innerHeight * 0.35, has: false };
   private isTouch: boolean;
   private stickVec: { x: number; y: number } | null = null;
 
@@ -35,7 +35,10 @@ export class InputManager {
   onReleaseRam?: (heldSeconds: number) => void;
 
   constructor() {
-    this.isTouch = window.matchMedia('(pointer: coarse)').matches;
+    this.isTouch = window.matchMedia('(pointer: coarse)').matches ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+    this.pointer.has = !this.isTouch;
     this.stickEl = document.getElementById('stick');
     this.stickKnob = document.getElementById('stickKnob');
     this.dashBtn = document.getElementById('dashBtn');
@@ -78,6 +81,7 @@ export class InputManager {
 
   private bindMouseAndKeyboard(): void {
     const handleMove = (clientX: number, clientY: number) => {
+      this.isTouch = false;
       this.pointer.x = clientX;
       this.pointer.y = clientY;
       this.pointer.has = true;
@@ -170,11 +174,6 @@ export class InputManager {
             this.stickEl.style.top = `${t.clientY}px`;
             this.stickEl.hidden = false;
           }
-        } else if (stickTouchId === null) {
-          // Direct touch aim outside stick zone
-          this.pointer.x = t.clientX;
-          this.pointer.y = t.clientY;
-          this.pointer.has = true;
         }
       }
     }, { passive: true });
@@ -195,10 +194,6 @@ export class InputManager {
             const ky = Math.sin(angle) * Math.min(dist, maxR);
             this.stickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
           }
-        } else if (stickTouchId === null) {
-          this.pointer.x = t.clientX;
-          this.pointer.y = t.clientY;
-          this.pointer.has = true;
         }
       }
     }, { passive: true });
@@ -208,9 +203,18 @@ export class InputManager {
         if (e.changedTouches[i].identifier === stickTouchId) {
           stickTouchId = null;
           this.stickVec = null;
+          this.aimMove = false;
           if (this.stickEl) this.stickEl.hidden = true;
           if (this.stickKnob) this.stickKnob.style.transform = '';
         }
+      }
+      if (e.touches.length === 0) {
+        stickTouchId = null;
+        this.stickVec = null;
+        this.pointer.has = false;
+        this.aimMove = false;
+        if (this.stickEl) this.stickEl.hidden = true;
+        if (this.stickKnob) this.stickKnob.style.transform = '';
       }
     };
 
@@ -259,6 +263,11 @@ export class InputManager {
       } else {
         this.aimMove = false;
       }
+      return;
+    }
+    // On touch devices: if virtual joystick is released, character MUST stand still
+    if (this.isTouch) {
+      this.aimMove = false;
       return;
     }
     if (!this.pointer.has) {
