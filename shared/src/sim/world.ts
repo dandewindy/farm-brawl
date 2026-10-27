@@ -672,7 +672,7 @@ export class World {
                     const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
                     const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
                     const bigWeight = tree.size === 2 ? 100 : Math.round(20 + this.rnd() * 30);
-                    this.addFood(fx, fz, 7, bigWeight);
+                    this.addFood(fx, fz, 1, bigWeight);
                   }
                   // Small fruits: 5..10kg red apples
                   for (let i = 0; i < dropSmall; i++) {
