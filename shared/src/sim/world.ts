@@ -1258,7 +1258,7 @@ export class World {
       p.dashT = 0.55;
       p.flyT = 0.55;
       p.plow = true;
-      p.power = 2.5;
+      p.power = 5.0;
       p.cd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
@@ -1492,9 +1492,9 @@ export class World {
       }
     }
 
-    // Super Rainbow Dash: strong, satisfying knockback launching victim far across the arena towards fence
+    // Super Rainbow Dash: violent massive knockback launching victim across arena into fence (doubled power)
     if (att.superT > 0) {
-      k = Math.max(k * 2.2, 75);
+      k = Math.max(k * 4.4, 150);
     }
 
     vic.vx = nx * k + vic.vx * 0.15;
