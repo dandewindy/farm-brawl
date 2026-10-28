@@ -1577,6 +1577,21 @@ function handleGameEvent(ev: GameEvent): void {
       }, 50);
       break;
     }
+    case 'trickOrTreat': {
+      sfxReward();
+      hud.showToast(t('trickOrTreatToast'), 5000);
+      hud.showBanner(t('r_halloween'), t('d_halloween'));
+      setTimeout(() => {
+        for (const f of gameState.food.values()) {
+          if (f.k === 9) {
+            foodParts.burst(f.x, 1.2, f.z, 0xff6d00, 18, 9, 9, 1.3);
+            foodParts.burst(f.x, 1.4, f.z, 0x9c27b0, 12, 6, 7, 1.0);
+            foodParts.fluff(f.x, f.z, 0x221133, 8);
+          }
+        }
+      }, 50);
+      break;
+    }
     case 'tool': {
       foodParts.burst(ev.x, 1, ev.z, 0xe8b641, 14, 5, 6, 0.7);
       if (ev.id === myId) {

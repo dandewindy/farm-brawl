@@ -153,6 +153,9 @@ export class FoodAndParticleRenderer {
 
     const giantFlowerGeo = BufferGeometryUtils.mergeGeometries(flowerPetals)!;
 
+    // 9: Giant Magic Pumpkin (Bí ngô ma thuật khổng lồ - 15kg) - Extra large squashed ribbed pumpkin
+    const giantPumpkinGeo = new THREE.SphereGeometry(1.25, 16, 12).scale(1.15, 0.8, 1.15);
+
     const geos = [
       cornCobGeo,
       appleGeo,
@@ -163,6 +166,7 @@ export class FoodAndParticleRenderer {
       rainbowCandyGeo,
       watermelonGeo,
       giantFlowerGeo,
+      giantPumpkinGeo,
     ];
 
     const mats = [
@@ -188,6 +192,12 @@ export class FoodAndParticleRenderer {
         emissive: 0x440822,
         roughness: 0.32,
         side: THREE.DoubleSide,
+      }),
+      // 9: Giant Magic Pumpkin - deep Halloween orange with eerie amber glow
+      new THREE.MeshStandardMaterial({
+        color: 0xff6d00,
+        emissive: 0x441a00,
+        roughness: 0.45,
       }),
     ];
 
@@ -298,6 +308,17 @@ export class FoodAndParticleRenderer {
     this.scene.add(flowerCenterMesh);
     this.foodTops[8] = flowerCenterMesh;
 
+    // 9: Giant Pumpkin stem & curly vine (Cuống bí ngô khổng lồ)
+    const giantStemGeo = new THREE.CylinderGeometry(0.12, 0.18, 0.55, 6).translate(0, 0.95, 0);
+    giantStemGeo.rotateZ(0.18);
+    const giantStemMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.75 });
+    const giantStemMesh = new THREE.InstancedMesh(giantStemGeo, giantStemMat, this.maxFoodPerKind);
+    giantStemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    giantStemMesh.frustumCulled = false;
+    giantStemMesh.count = 0;
+    this.scene.add(giantStemMesh);
+    this.foodTops[9] = giantStemMesh;
+
 
     // Soft dark circular shadows under all food items
     const shadowGeo = new THREE.CircleGeometry(0.42, 12).rotateX(-Math.PI / 2);
@@ -362,6 +383,36 @@ export class FoodAndParticleRenderer {
       const m5 = this.foodMats[5] as THREE.MeshStandardMaterial;
       m5.color.setHex(0xffc0cb);
       m5.emissive.setHex(0x221118);
+    } else if (theme === 'halloween') {
+      // 0: Candy Corn (Bắp kẹo Halloween) -> Orange candy corn
+      const m0 = this.foodMats[0] as THREE.MeshStandardMaterial;
+      m0.color.setHex(0xff9800);
+      m0.emissive.setHex(0x442200);
+
+      // 1: Poison Apple (Táo độc) -> Deep blood/plum red
+      const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
+      m1.color.setHex(0x5c0011);
+      m1.emissive.setHex(0x2a0008);
+
+      // 2: Golden Candy (Kẹo vàng Halloween)
+      const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
+      m2.color.setHex(0xffaa00);
+      m2.emissive.setHex(0xaa5500);
+
+      // 3: Spooky Carrot -> Dark burnt orange
+      const m3 = this.foodMats[3] as THREE.MeshStandardMaterial;
+      m3.color.setHex(0xd84315);
+      m3.emissive.setHex(0x331100);
+
+      // 4: Spooky Pumpkin -> Bright pumpkin orange
+      const m4 = this.foodMats[4] as THREE.MeshStandardMaterial;
+      m4.color.setHex(0xff6d00);
+      m4.emissive.setHex(0x441a00);
+
+      // 5: Ghost Marshmallow (Củ cải -> Kẹo ma) -> Ghostly pale lavender white
+      const m5 = this.foodMats[5] as THREE.MeshStandardMaterial;
+      m5.color.setHex(0xf3e5f5);
+      m5.emissive.setHex(0x221122);
     } else {
       const m0 = this.foodMats[0] as THREE.MeshStandardMaterial;
       m0.color.setHex(0xffcb2b);
@@ -390,7 +441,7 @@ export class FoodAndParticleRenderer {
   }
 
   updateFood(foodMap: Map<number, FoodItem>, now: number, podiumPos?: [number, number]): void {
-    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let nShadow = 0;
     const tt = now / 1000;
     const podX = podiumPos ? podiumPos[0] : 0;
@@ -398,7 +449,7 @@ export class FoodAndParticleRenderer {
 
     for (const f of foodMap.values()) {
       const k = f.k as FoodKind;
-      if (k < 0 || k > 8) continue;
+      if (k < 0 || k > 9) continue;
       const maxForThis = k === 6 ? 8 : this.maxFoodPerKind;
       if (counts[k] >= maxForThis) continue;
 
@@ -428,6 +479,25 @@ export class FoodAndParticleRenderer {
             color: this.rainbowColObjects[cIdx],
             size: 0.65,
             g: 0,
+          });
+        }
+      } else if (k === 9) {
+        // Giant Magic Pumpkin: rests on ground, slow mystic rotation and eerie breathing float
+        this.dummy.position.set(f.x, onPod + 0.85 * sz, f.z);
+        this.dummy.rotation.set(0, seed + tt * 0.25, 0);
+        if (Math.random() < 0.2 && this.particles.length < this.maxParticles) {
+          this.particles.push({
+            x: f.x + (Math.random() - 0.5) * 2.8,
+            y: onPod + 0.5 + Math.random() * 1.8,
+            z: f.z + (Math.random() - 0.5) * 2.8,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: 0.8 + Math.random() * 0.8,
+            vz: (Math.random() - 0.5) * 0.3,
+            life: 0.9,
+            maxLife: 0.9,
+            color: new THREE.Color(Math.random() < 0.5 ? 0xff6d00 : 0x39ff14),
+            size: 0.55,
+            g: -0.15,
           });
         }
       } else if (k === 8) {
@@ -469,8 +539,8 @@ export class FoodAndParticleRenderer {
         this.dummy.rotateZ(Math.PI / 4);
       }
 
-      // Golden corn and giant flowers have a gentle pulsating glow size
-      const pulse = k === 2 ? 1 + Math.sin(tt * 6 + seed) * 0.12 : (k === 8 ? 1 + Math.sin(tt * 3 + seed) * 0.08 : 1);
+      // Golden corn, giant flowers, and giant magic pumpkins have a gentle pulsating glow size
+      const pulse = k === 2 ? 1 + Math.sin(tt * 6 + seed) * 0.12 : ((k === 8 || k === 9) ? 1 + Math.sin(tt * 3 + seed) * 0.08 : 1);
       this.dummy.scale.setScalar(grow * sz * pulse);
       this.dummy.updateMatrix();
 
@@ -481,7 +551,7 @@ export class FoodAndParticleRenderer {
 
       // Render ground shadow disc under food item
       if (nShadow < this.maxFoodTotal) {
-        const shadowScale = grow * sz * (k === 6 ? 3.4 : (k === 7 || k === 8) ? 3.0 : k === 4 ? 2.0 : 1.0);
+        const shadowScale = grow * sz * (k === 6 ? 3.4 : (k === 7 || k === 8 || k === 9) ? 3.0 : k === 4 ? 2.0 : 1.0);
         this.shadowM.makeScale(shadowScale, 1, shadowScale);
         this.shadowM.setPosition(f.x, onPod + 0.05, f.z);
         this.foodShadow.setMatrixAt(nShadow++, this.shadowM);

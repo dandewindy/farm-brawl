@@ -1331,6 +1331,10 @@ export class World {
     if (this.theme === 'women_day' && this.currentRule !== 'womenday' && this.rnd() < 0.30) {
       shuffled = ['womenday', ...shuffled.filter((r) => r !== 'womenday')];
     }
+    // Event rule: 30% chance for "TRICK OR TREAT" in halloween theme
+    if (this.theme === 'halloween' && this.currentRule !== 'halloween' && this.rnd() < 0.30) {
+      shuffled = ['halloween', ...shuffled.filter((r) => r !== 'halloween')];
+    }
 
     this.kingChoice = {
       options: shuffled.slice(0, 3),
@@ -1439,6 +1443,21 @@ export class World {
         spawned++;
       }
       this.events.push({ k: 'flowerBloom' });
+    } else if (ruleId === 'halloween') {
+      // 12. Event rule: spawn many giant magic pumpkins (kind 9) simultaneously on open ground
+      let spawned = 0;
+      for (let attempt = 0; attempt < 150 && spawned < 40; attempt++) {
+        const ang = this.rnd() * Math.PI * 2;
+        const dist = 5 + this.rnd() * (CFG.R - 8);
+        const fx = Math.cos(ang) * dist;
+        const fz = Math.sin(ang) * dist;
+        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(fx - hx, fz - hz) < hr + 1.0)) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(fx - wx, fz - wz) < wr + 2.0)) continue;
+        if (this.map.fire?.some(([cx, cz, cr]) => Math.hypot(fx - cx, fz - cz) < cr + 2.0)) continue;
+        this.addFood(fx, fz, 9, FOOD_KG[9]);
+        spawned++;
+      }
+      this.events.push({ k: 'trickOrTreat' });
     }
     this.events.push({ k: 'rule', id: ruleId });
   }

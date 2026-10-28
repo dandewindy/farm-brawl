@@ -14,6 +14,7 @@ interface AnimalVisual {
   labelKey: string;
   regalia: THREE.Group | null;
   flowerHat: THREE.Group;
+  witchHat: THREE.Group;
   isCrowned: boolean;
   ring: THREE.Mesh;
   ringMat: THREE.MeshBasicMaterial;
@@ -945,6 +946,64 @@ export function buildFlowerHat(species: Species): THREE.Group {
   return g;
 }
 
+export function buildWitchHat(species: Species): THREE.Group {
+  const g = new THREE.Group();
+  const [hx, hy] = HEAD[species] || [0.5, 1.8];
+
+  const hatGroup = new THREE.Group();
+  const yOffset = species === 'elephant' ? 0.45 : species === 'horse' ? 0.35 : species === 'cow' ? 0.30 : 0.22;
+  hatGroup.position.set(hx, hy + yOffset, 0);
+  hatGroup.rotation.z = -0.15;
+
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1528,
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const orangeMat = new THREE.MeshStandardMaterial({
+    color: 0xff6d00,
+    roughness: 0.5,
+    emissive: 0x331100,
+  });
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xffd54f,
+    metalness: 0.8,
+    roughness: 0.25,
+  });
+
+  const brimRadius = species === 'elephant' ? 0.65 : species === 'cow' || species === 'horse' ? 0.48 : 0.36;
+  const brimGeo = new THREE.CylinderGeometry(brimRadius, brimRadius, 0.04, 16);
+  const brim = new THREE.Mesh(brimGeo, darkMat);
+  hatGroup.add(brim);
+
+  const ribbonRadius = brimRadius * 0.58;
+  const ribbon = new THREE.Mesh(
+    new THREE.CylinderGeometry(ribbonRadius * 0.95, ribbonRadius, 0.1, 16),
+    orangeMat
+  );
+  ribbon.position.y = 0.05;
+  hatGroup.add(ribbon);
+
+  const buckle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.08, 0.04),
+    goldMat
+  );
+  buckle.position.set(ribbonRadius + 0.02, 0.05, 0);
+  hatGroup.add(buckle);
+
+  const coneHeight = species === 'elephant' ? 1.0 : 0.75;
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(ribbonRadius * 0.9, coneHeight, 16),
+    darkMat
+  );
+  cone.position.set(-0.06, coneHeight * 0.5 + 0.08, 0);
+  cone.rotation.z = -0.22;
+  hatGroup.add(cone);
+
+  g.add(hatGroup);
+  return g;
+}
+
 // Height where name label floats for each species
 const LABEL_Y: Record<Species, number> = {
   chicken: 2.3,
@@ -1497,13 +1556,15 @@ export class AnimalRenderer {
 
   setTheme(theme: ArenaTheme): void {
     const isWomenDay = theme === 'women_day';
+    const isHalloween = theme === 'halloween';
     for (const vis of this.visuals.values()) {
       vis.flowerHat.visible = isWomenDay;
+      vis.witchHat.visible = isHalloween;
     }
   }
 
   private buildAnimal(meta: PlayerMeta, isMe = false): AnimalVisual {
-    const { root, body, legs, collarMat, flowerHat } = buildFullAnimal(meta.species, meta.skin, meta.team);
+    const { root, body, legs, collarMat, flowerHat, witchHat } = buildFullAnimal(meta.species, meta.skin, meta.team);
 
     // Add King regalia (crown + cape)
     const regalia = buildRegalia(meta.species);
@@ -1536,6 +1597,7 @@ export class AnimalRenderer {
       labelKey: meta.name,
       regalia,
       flowerHat,
+      witchHat,
       isCrowned: false,
       ring,
       ringMat,
@@ -1560,6 +1622,7 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   legs: THREE.Group[];
   collarMat: THREE.MeshStandardMaterial;
   flowerHat: THREE.Group;
+  witchHat: THREE.Group;
 } {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -1587,7 +1650,13 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   flowerHat.visible = getArenaTheme() === 'women_day';
   root.add(flowerHat);
 
-  return { root, body, legs, collarMat, flowerHat };
+  // 31/10 Witch Hat accessory
+  const witchHat = buildWitchHat(species);
+  witchHat.name = 'witchHat';
+  witchHat.visible = getArenaTheme() === 'halloween';
+  root.add(witchHat);
+
+  return { root, body, legs, collarMat, flowerHat, witchHat };
 }
 
 export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false, team?: number): { group: THREE.Group; regalia: THREE.Group | null } {

@@ -751,7 +751,7 @@ export class HudManager {
       const ffaImg = document.getElementById('ffaPreviewImg') as HTMLImageElement | null;
       const updateSnapshot = (theme: ArenaTheme) => {
         if (ffaImg) {
-          ffaImg.src = theme === 'women_day' ? '/arena-womenday.jpg' : '/arena-classic.jpg';
+          ffaImg.src = theme === 'women_day' ? '/arena-womenday.jpg' : theme === 'halloween' ? '/arena-halloween.jpg' : '/arena-classic.jpg';
         }
       };
       updateSnapshot(curTheme);

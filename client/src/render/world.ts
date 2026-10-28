@@ -920,6 +920,21 @@ export class WorldRenderer {
       if (this.outerMat) this.outerMat.color.setHex(0xdb839d);
       if (this.arenaMat) this.arenaMat.color.setHex(0xf5a3b7);
       if (this.warnMat) this.warnMat.color.setHex(0xe65c82);
+      for (const r of this.fenceRails) {
+        (r.material as THREE.MeshStandardMaterial).emissive.setHex(0xff4081);
+      }
+    } else if (theme === 'halloween') {
+      const sky = new THREE.Color(0x160728);
+      this.scene.background = sky;
+      if (this.scene.fog) {
+        (this.scene.fog as THREE.Fog).color.setHex(0x280e38);
+      }
+      if (this.outerMat) this.outerMat.color.setHex(0x22181c);
+      if (this.arenaMat) this.arenaMat.color.setHex(0x34222a);
+      if (this.warnMat) this.warnMat.color.setHex(0xc45e00);
+      for (const r of this.fenceRails) {
+        (r.material as THREE.MeshStandardMaterial).emissive.setHex(0x39ff14);
+      }
     } else {
       const sky = new THREE.Color(0xa8dcff);
       this.scene.background = sky;
@@ -929,6 +944,9 @@ export class WorldRenderer {
       if (this.outerMat) this.outerMat.color.setHex(0x6aa84f);
       if (this.arenaMat) this.arenaMat.color.setHex(0x8ccf5e);
       if (this.warnMat) this.warnMat.color.setHex(0xc9b56a);
+      for (const r of this.fenceRails) {
+        (r.material as THREE.MeshStandardMaterial).emissive.setHex(0x00bfff);
+      }
     }
     this.updateBarnSign();
     this.buildTrees(theme);
@@ -1292,14 +1310,21 @@ export class WorldRenderer {
     sg.shadowColor = 'rgba(0, 0, 0, 0.7)';
     sg.shadowBlur = 6;
     sg.shadowOffsetY = 2;
-    const isWomenDay = getArenaTheme() === 'women_day';
-    if (isWomenDay) {
+    const theme = getArenaTheme();
+    if (theme === 'women_day') {
       sg.fillStyle = '#ff4081';
       sg.font = '900 52px "Baloo 2", sans-serif';
       sg.fillText(t('barn_womenday_title'), this.barnSignCanvas.width / 2, 72);
       sg.fillStyle = '#ffe4ec';
       sg.font = '700 48px "Be Vietnam Pro", sans-serif';
       sg.fillText(t('barn_womenday_msg'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 50);
+    } else if (theme === 'halloween') {
+      sg.fillStyle = '#ff6d00';
+      sg.font = '900 52px "Baloo 2", sans-serif';
+      sg.fillText(t('barn_halloween_title'), this.barnSignCanvas.width / 2, 72);
+      sg.fillStyle = '#ffd180';
+      sg.font = '700 48px "Be Vietnam Pro", sans-serif';
+      sg.fillText(t('barn_halloween_msg'), this.barnSignCanvas.width / 2, 185, this.barnSignCanvas.width - 50);
     } else {
       sg.fillStyle = '#a5281b';
       sg.font = '900 52px "Baloo 2", sans-serif';
@@ -1526,6 +1551,84 @@ export class WorldRenderer {
         flowersPink,
         flowersGold
       );
+    } else if (theme === 'halloween') {
+      // Halloween Theme: Spooky autumnal trees with pumpkin orange, blood plum, and gothic purple crowns
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2b1d1d, roughness: 0.9, flatShading: true });
+      const foliageMat1 = new THREE.MeshStandardMaterial({ color: 0xd96414, roughness: 0.75, flatShading: true });
+      const foliageMat2 = new THREE.MeshStandardMaterial({ color: 0x5e192c, roughness: 0.75, flatShading: true });
+      const foliageMat3 = new THREE.MeshStandardMaterial({ color: 0x331038, roughness: 0.75, flatShading: true });
+      const lanternMat = new THREE.MeshStandardMaterial({
+        color: 0xff6d00,
+        emissive: 0xff3300,
+        emissiveIntensity: 1.5,
+        roughness: 0.3,
+      });
+
+      const nTall = Math.ceil(nTree / 2);
+      const nBush = nTree - nTall;
+
+      const trunksTall = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.65, 3.8, 6), trunkMat, nTall);
+      const trunksBush = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.48, 1.8, 5), trunkMat, nBush);
+      const canopyLower = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(3.0, 1), foliageMat1, nTree);
+      const canopyMid = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.3, 1), foliageMat2, nTree);
+      const canopyTop = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1.7, 1), foliageMat3, nTall);
+      const lanterns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.35, 8, 6), lanternMat, nTree * 3);
+
+      trunksTall.castShadow = true;
+      trunksBush.castShadow = true;
+      canopyLower.castShadow = true;
+      canopyMid.castShadow = true;
+      canopyTop.castShadow = true;
+      lanterns.castShadow = true;
+
+      let tallIdx = 0;
+      let bushIdx = 0;
+      let lantIdx = 0;
+
+      for (let i = 0; i < nTree; i++) {
+        const { x, z, s } = this.treeCoords[i];
+        const isTall = i % 2 === 0;
+
+        if (isTall) {
+          m4.makeScale(s, s, s);
+          m4.setPosition(x, 1.9 * s, z);
+          trunksTall.setMatrixAt(tallIdx++, m4);
+
+          m4.makeScale(s * 1.25, s * 0.95, s * 1.25);
+          m4.setPosition(x, 4.5 * s, z);
+          canopyLower.setMatrixAt(i, m4);
+
+          m4.makeScale(s * 1.15, s * 0.95, s * 1.15);
+          m4.setPosition(x, 6.2 * s, z);
+          canopyMid.setMatrixAt(i, m4);
+
+          m4.makeScale(s, s * 0.9, s);
+          m4.setPosition(x, 7.6 * s, z);
+          canopyTop.setMatrixAt(Math.floor(i / 2), m4);
+        } else {
+          m4.makeScale(s, s, s);
+          m4.setPosition(x, 0.9 * s, z);
+          trunksBush.setMatrixAt(bushIdx++, m4);
+
+          m4.makeScale(s * 1.35, s * 0.85, s * 1.35);
+          m4.setPosition(x, 2.2 * s, z);
+          canopyLower.setMatrixAt(i, m4);
+
+          m4.makeScale(s * 1.1, s * 0.8, s * 1.1);
+          m4.setPosition(x, 3.4 * s, z);
+          canopyMid.setMatrixAt(i, m4);
+        }
+
+        for (let j = 0; j < 3; j++) {
+          const ang = (j / 3) * Math.PI * 2 + (i * 1.3);
+          const r = (isTall ? 2.6 : 2.0) * s;
+          m4.makeScale(s, s, s);
+          m4.setPosition(x + Math.cos(ang) * r, (isTall ? 4.2 : 2.2) * s, z + Math.sin(ang) * r);
+          lanterns.setMatrixAt(lantIdx++, m4);
+        }
+      }
+
+      this.treeGroup.add(trunksTall, trunksBush, canopyLower, canopyMid, canopyTop, lanterns);
     } else {
       // Classic Farm Theme: traditional pines
       const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, flatShading: true });
@@ -1741,7 +1844,7 @@ export class WorldRenderer {
       const trunkRBot = t.size === 2 ? 1.90 : t.size === 1 ? 1.44 : 1.00;
 
       const trunkMat = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0x4e342e : 0x5d3a1a,
+        color: theme === 'women_day' ? 0x4e342e : theme === 'halloween' ? 0x2b1d1d : 0x5d3a1a,
         roughness: 0.85,
         flatShading: true,
       });
@@ -1758,17 +1861,17 @@ export class WorldRenderer {
 
       // Foliage materials based on theme
       const folMat1 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xd81b60 : 0x2e7d32,
+        color: theme === 'women_day' ? 0xd81b60 : theme === 'halloween' ? 0xd96414 : 0x2e7d32,
         roughness: 0.75,
         flatShading: true,
       });
       const folMat2 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xec407a : 0x388e3c,
+        color: theme === 'women_day' ? 0xec407a : theme === 'halloween' ? 0x5e192c : 0x388e3c,
         roughness: 0.75,
         flatShading: true,
       });
       const folMat3 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xf48fb1 : 0x43a047,
+        color: theme === 'women_day' ? 0xf48fb1 : theme === 'halloween' ? 0x331038 : 0x43a047,
         roughness: 0.75,
         flatShading: true,
       });

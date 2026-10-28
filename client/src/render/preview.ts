@@ -262,6 +262,10 @@ export class AnimalPreviewRenderer {
       if (flower) {
         flower.visible = theme === 'women_day';
       }
+      const witch = this.currentAnimalGroup.getObjectByName('witchHat');
+      if (witch) {
+        witch.visible = theme === 'halloween';
+      }
     }
   }
 

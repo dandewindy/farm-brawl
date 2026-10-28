@@ -1206,6 +1206,43 @@ describe('bonus weapons and tools', () => {
     expect(womendayOffers).toBeLessThan(100);
   });
 
+  it('halloween rule spawns giant pumpkins (kind 9, 15kg each) with trickOrTreat event', () => {
+    const w = emptyWorld();
+    w.theme = 'halloween';
+    w.applyRule('halloween');
+
+    const pumpkins = [...w.food.values()].filter((f) => f.k === 9);
+    expect(pumpkins.length).toBe(40);
+    expect(pumpkins[0].v).toBe(15);
+    expect(w.events.filter((e) => e.k === 'trickOrTreat').length).toBe(1);
+    expect(w.events.filter((e) => e.k === 'superFood').length).toBe(0);
+  });
+
+  it('event rule halloween is eligible only in halloween theme with 30% chance', () => {
+    // In classic theme, halloween should never appear in king choice
+    const wClassic = emptyWorld();
+    wClassic.theme = 'classic';
+    for (let i = 0; i < 50; i++) {
+      wClassic.currentRule = '';
+      wClassic.startKingChoice();
+      expect(wClassic.kingChoice!.options).not.toContain('halloween');
+    }
+
+    // In halloween theme, halloween appears in options with ~30% probability
+    const wEvent = emptyWorld();
+    wEvent.theme = 'halloween';
+    let halloweenOffers = 0;
+    for (let i = 0; i < 200; i++) {
+      wEvent.currentRule = '';
+      wEvent.startKingChoice();
+      if (wEvent.kingChoice!.options.includes('halloween')) {
+        halloweenOffers++;
+      }
+    }
+    expect(halloweenOffers).toBeGreaterThan(30);
+    expect(halloweenOffers).toBeLessThan(100);
+  });
+
   it('friend mode match timer counts down even if creator leaves', () => {
     const w = emptyWorld();
     w.mode = 'friend';

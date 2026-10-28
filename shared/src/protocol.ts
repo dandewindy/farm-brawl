@@ -93,6 +93,7 @@ export type GameEvent =
   | { k: 'super'; id: number }
   | { k: 'fly'; id: number; x: number; z: number }
   | { k: 'flowerBloom' }
+  | { k: 'trickOrTreat' }
   | {
       k: 'teamWin';
       winner: number;
