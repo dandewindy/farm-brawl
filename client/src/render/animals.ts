@@ -35,6 +35,8 @@ interface AnimalVisual {
   squishFactor?: number;
   visualY?: number;
   waterRippleTimer?: number;
+  mudSplats: THREE.Mesh[];
+  mudSplatMat: THREE.MeshBasicMaterial;
 }
 
 function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
@@ -1111,8 +1113,8 @@ export class AnimalRenderer {
       });
     }
 
-    // Water ripple rings pool for swimming ripples & wake waves
-    const rippleGeo = new THREE.RingGeometry(0.82, 1.0, 32);
+    // Water ripple rings pool for swimming ripples & wake waves (slimmer, softer)
+    const rippleGeo = new THREE.RingGeometry(0.88, 1.0, 32);
     rippleGeo.rotateX(-Math.PI / 2);
     for (let i = 0; i < 48; i++) {
       const mat = new THREE.MeshBasicMaterial({
@@ -1178,7 +1180,7 @@ export class AnimalRenderer {
     }
   }
 
-  spawnWaterRipple(x: number, z: number, startR: number, maxR: number, maxLife = 0.9, color = 0xdef5ff): void {
+  spawnWaterRipple(x: number, z: number, startR: number, maxR: number, maxLife = 0.85, color = 0xdef5ff): void {
     let wr = this.waterRipplePool.find((r) => !r.active);
     if (!wr) wr = this.waterRipplePool[0];
     wr.active = true;
@@ -1189,7 +1191,7 @@ export class AnimalRenderer {
     wr.life = 0;
     wr.maxLife = maxLife;
     wr.mat.color.setHex(color);
-    wr.mat.opacity = 0.72;
+    wr.mat.opacity = 0.38; // Dimmer, more subtle
     wr.mesh.position.set(x, 0.082, z);
     wr.mesh.scale.set(startR, 1, startR);
     wr.mesh.visible = true;
@@ -1206,7 +1208,8 @@ export class AnimalRenderer {
         const k = wr.life / wr.maxLife;
         const curR = wr.startR + (wr.maxR - wr.startR) * Math.sqrt(k);
         wr.mesh.scale.set(curR, 1, curR);
-        wr.mat.opacity = Math.sin((1 - k) * Math.PI * 0.5) * 0.72;
+        // Soft gradual fade out (mờ dần các vòng sóng nước)
+        wr.mat.opacity = Math.pow(1 - k, 1.8) * 0.38;
       }
     }
   }
@@ -1252,6 +1255,13 @@ export class AnimalRenderer {
         vis.label.material.dispose();
         vis.label = null;
       }
+      if (vis.mudSplats) {
+        for (const s of vis.mudSplats) {
+          this.scene.remove(s);
+          s.geometry.dispose();
+        }
+        vis.mudSplatMat.dispose();
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
       this.visuals.delete(id);
@@ -1270,6 +1280,13 @@ export class AnimalRenderer {
         vis.label.material.map?.dispose();
         vis.label.material.dispose();
         vis.label = null;
+      }
+      if (vis.mudSplats) {
+        for (const s of vis.mudSplats) {
+          this.scene.remove(s);
+          s.geometry.dispose();
+        }
+        vis.mudSplatMat.dispose();
       }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
@@ -1343,7 +1360,7 @@ export class AnimalRenderer {
     vis.visualY = smoothBaseY;
     let y = smoothBaseY;
     if (isMud && !isSuper) {
-      y -= 0.12 * sc;
+      y -= 0.08 * sc;
     }
 
     if (isWater && !isSuper) {
@@ -1355,54 +1372,54 @@ export class AnimalRenderer {
     // Maximum water duration is 1.5s
     const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
 
-    // Visual sinking effect reduced by 20%
+    // Visual sinking effect reduced by 25%
     const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'dog'
-      ? Math.max(0.68, 1 - sinkProgress * 0.32)
+      ? Math.max(0.72, 1 - sinkProgress * 0.28)
       : 1;
 
     if (isWater && !isSuper) {
       if (vis.species === 'duck') {
-        // Ducks float peacefully on the surface with slight bobbing
-        y = -0.25 * sc + Math.sin(now / 300) * 0.05;
+        // Ducks float peacefully on the surface with subtle bobbing
+        y = -0.20 * sc + Math.sin(now / 300) * 0.035;
       } else if (vis.species === 'dog') {
-        // Dogs can swim, half body submerged under water with paddling bob (only upper half and head visible)
-        y = -1.05 * sc + Math.sin(now / 220) * 0.03;
+        // Dogs can swim, half body submerged under water with paddling bob
+        y = -0.90 * sc + Math.sin(now / 220) * 0.022;
       } else {
-        // Visual sinking speed reduced by 20% over the 1.5s duration
-        const sinkDepth = 0.30 + Math.pow(sinkProgress, 1.3) * 1.32;
+        // Visual sinking speed reduced by 25%
+        const sinkDepth = 0.25 + Math.pow(sinkProgress, 1.3) * 1.05;
         const sinkY = -sinkDepth * sc;
-        const rippleBob = Math.sin(now / 160) * 0.05 * (1 - sinkProgress);
+        const rippleBob = Math.sin(now / 160) * 0.035 * (1 - sinkProgress);
         y = sinkY + (sinkProgress < 0.95 ? rippleBob : 0);
 
-        // Water bubble puffs floating up from underwater while sinking
-        if (this.onPuff && Math.random() < 0.22) {
+        // Water bubble puffs floating up from underwater while sinking (25% fewer & smaller)
+        if (this.onPuff && Math.random() < 0.16) {
           this.onPuff(
-            x + (Math.random() - 0.5) * 0.7 * r,
+            x + (Math.random() - 0.5) * 0.6 * r,
             0.1,
-            z + (Math.random() - 0.5) * 0.7 * r,
+            z + (Math.random() - 0.5) * 0.6 * r,
             0xdff1ff,
+            0.40 * r,
             0.55,
-            0.65,
-            2.0
+            1.6
           );
         }
       }
     }
 
-    // Water surface ripples & waves when swimming or floating
+    // Water surface ripples & waves when swimming or floating (smaller, softer, less frequent)
     if (isWater && !isSuper) {
       vis.waterRippleTimer = (vis.waterRippleTimer || 0) + dt;
-      const rippleInterval = speed > 0.03 ? 0.20 : 0.45;
+      const rippleInterval = speed > 0.03 ? 0.28 : 0.55;
       if (vis.waterRippleTimer >= rippleInterval) {
         vis.waterRippleTimer = 0;
-        this.spawnWaterRipple(x, z, r * 0.85, r * 2.8, 0.95, 0xdef5ff);
+        this.spawnWaterRipple(x, z, r * 0.55, r * 1.85, 0.85, 0xdef5ff);
         if (speed > 0.03) {
           this.spawnWaterRipple(
-            x - Math.cos(angle) * r * 0.7,
-            z - Math.sin(angle) * r * 0.7,
-            r * 0.6,
-            r * 2.2,
-            0.80,
+            x - Math.cos(angle) * r * 0.6,
+            z - Math.sin(angle) * r * 0.6,
+            r * 0.38,
+            r * 1.40,
+            0.75,
             0xbfe5fa
           );
         }
@@ -1443,9 +1460,9 @@ export class AnimalRenderer {
       // Gentle side-to-side flailing
       vis.root.rotation.x = Math.sin(now / 200) * 0.2;
     } else if (isMud && !isSuper && speed > 0.02 && sq <= 0.4) {
-      // Body rolling and pitching wave as animal trudges through deep mud
-      vis.root.rotation.x = Math.sin(vis.phase * 0.8) * 0.08;
-      vis.root.rotation.z += Math.sin(vis.phase * 0.4) * 0.06;
+      // Gentle subtle wobble as animal trudges through deep mud
+      vis.root.rotation.x = Math.sin(vis.phase * 0.6) * 0.04;
+      vis.root.rotation.z += Math.sin(vis.phase * 0.3) * 0.03;
     }
 
     // Charge trembling wind-up
@@ -1505,13 +1522,10 @@ export class AnimalRenderer {
         leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
         leg.position.y = leg.userData.origY;
       } else if (isMud && !isSuper) {
-        // Wavy sluggish leg gait lifting high out of thick sticky mud in sequential wave
-        const waveOffset = idx === 0 ? 0 : idx === 1 ? Math.PI * 0.5 : idx === 2 ? Math.PI : Math.PI * 1.5;
-        const wavePhase = vis.phase + waveOffset;
-        const legLift = Math.max(0, Math.sin(wavePhase));
-        leg.rotation.z = Math.sin(wavePhase) * 0.85;
-        leg.rotation.x = Math.cos(wavePhase) * 0.22 * (idx % 2 === 0 ? 1 : -1);
-        leg.position.y = leg.userData.origY + legLift * 0.15 * sc;
+        // Toned-down mud wading stride: legs stay firmly under body, zero Y elevation to prevent torso popping
+        leg.rotation.z = baseSwing * 0.38;
+        leg.rotation.x = 0;
+        leg.position.y = leg.userData.origY;
       } else if (isStunned) {
         leg.rotation.z = 0;
         leg.rotation.x = 0;
@@ -1522,6 +1536,34 @@ export class AnimalRenderer {
         leg.position.y = leg.userData.origY;
       }
     });
+
+    // Under-foot dark mud patches (prominent black mud pools on ground under each foot)
+    if (vis.mudSplats && vis.mudSplats.length > 0) {
+      const inMud = isMud && !isSuper;
+      const cosA = Math.cos(-angle);
+      const sinA = Math.sin(-angle);
+      const footR = r * 0.45;
+
+      vis.mudSplats.forEach((splat, idx) => {
+        if (!inMud) {
+          splat.visible = false;
+          return;
+        }
+        const leg = vis.legs[idx];
+        if (!leg) {
+          splat.visible = false;
+          return;
+        }
+        const lx = leg.position.x;
+        const lz = leg.position.z;
+        const fx = x + (lx * cosA - lz * sinA) * sc;
+        const fz = z + (lx * sinA + lz * cosA) * sc;
+        splat.position.set(fx, smoothBaseY + 0.02, fz);
+        const press = 1.0 + 0.15 * Math.sin(vis.phase + idx * 1.5);
+        splat.scale.set(footR * press, 1, footR * (2.0 - press));
+        splat.visible = true;
+      });
+    }
 
     // Stunned spinning stars above head
     if (isStunned || sq > 0.2) {
@@ -1548,8 +1590,8 @@ export class AnimalRenderer {
     vis.dust -= dt;
     if (vis.dust <= 0) {
       if (isWater && vis.species !== 'duck') {
-        vis.dust = 0.25;
-        this.onPuff?.(x - Math.cos(angle) * r, 0.15, z - Math.sin(angle) * r, 0xbfe3ff, 0.8, 0.6, 1);
+        vis.dust = 0.32; // 25% less frequent
+        this.onPuff?.(x - Math.cos(angle) * r, 0.12, z - Math.sin(angle) * r, 0xbfe3ff, 0.55 * r, 0.5, 0.8);
       } else if (isCharging) {
         vis.dust = 0.06;
         const d = r * (1.6 + lvl);
@@ -1569,14 +1611,14 @@ export class AnimalRenderer {
         this.onPuff?.(x + (Math.random() - 0.5) * 0.4 * r, sc * 1.8, z + (Math.random() - 0.5) * 0.4 * r, 0xff7043, 0.3, 0.3, 1.2);
       } else if (isDashing || isMud) {
         vis.dust = isDashing ? 0.03 : 0.12;
-        const mudColor = Math.random() < 0.5 ? 0x4a3525 : 0x5d4037;
+        const mudColor = Math.random() < 0.5 ? 0x16100c : 0x241a12;
         this.onPuff?.(
           x - Math.cos(angle) * r * 0.85 + (Math.random() - 0.5) * 0.3 * r,
-          0.12,
+          0.10,
           z - Math.sin(angle) * r * 0.85 + (Math.random() - 0.5) * 0.3 * r,
           isMud ? mudColor : 0xd8c09a,
-          isMud ? 0.9 * r : (isDashing ? 1.4 : 0.8),
-          0.65
+          isMud ? 1.25 * r : (isDashing ? 1.4 : 0.8),
+          0.70
         );
       }
     }
@@ -1725,6 +1767,24 @@ export class AnimalRenderer {
     const ring = new THREE.Mesh(ringGeo, ringMat);
     this.scene.add(ring);
 
+    // Large dark mud patches under each foot (visible when wading through mud)
+    const mudSplats: THREE.Mesh[] = [];
+    const mudSplatMat = new THREE.MeshBasicMaterial({
+      color: 0x16100c, // Deep dark black mud puddle
+      transparent: true,
+      opacity: 0.90,
+      depthWrite: false,
+    });
+    for (let i = 0; i < legs.length; i++) {
+      const sGeo = new THREE.CircleGeometry(0.42, 16);
+      sGeo.rotateX(-Math.PI / 2);
+      const splat = new THREE.Mesh(sGeo, mudSplatMat);
+      splat.visible = false;
+      splat.renderOrder = 2; // Flat on ground, below animal ring
+      this.scene.add(splat);
+      mudSplats.push(splat);
+    }
+
     return {
       root,
       body,
@@ -1750,6 +1810,8 @@ export class AnimalRenderer {
       wasSuper: false,
       shockwaveTimer: 0,
       rainbowTimer: 0,
+      mudSplats,
+      mudSplatMat,
     };
   }
 }

@@ -1821,8 +1821,26 @@ export class WorldRenderer {
         this.flames.push({ mesh: fl, idx: i });
       }
 
-      this.hazardGroup.add(g);
     }
+  }
+
+  private createTreeLimb(
+    p1: THREE.Vector3,
+    p2: THREE.Vector3,
+    r1: number,
+    r2: number,
+    mat: THREE.Material
+  ): THREE.Mesh {
+    const dir = new THREE.Vector3().subVectors(p2, p1);
+    const len = dir.length();
+    const geo = new THREE.CylinderGeometry(r2, r1, len, 8);
+    geo.translate(0, len * 0.5, 0);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(p1);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   private buildFarmFruitTrees(trees: TreeData[]): void {
@@ -1861,50 +1879,10 @@ export class WorldRenderer {
 
       // Organic wooden tree branches splitting out from upper trunk into the canopy
       const nBranches = t.size === 2 ? 4 : 3;
-      const branchBaseY = trunkH * (t.size === 2 ? 0.65 : t.size === 1 ? 0.62 : 0.58);
-      const branchLen = t.size === 2 ? 4.4 : t.size === 1 ? 3.3 : 2.4;
-      const bR1 = trunkRTop * 0.68;
-      const bR2 = trunkRTop * 0.38;
-
-      for (let b = 0; b < nBranches; b++) {
-        const bAngle = (b / nBranches) * Math.PI * 2 + (t.id * 1.35);
-        const bTilt = t.size === 2 ? 0.68 : t.size === 1 ? 0.62 : 0.55; // 32..39 degrees from vertical
-
-        // Main primary branch
-        const bGeo = new THREE.CylinderGeometry(bR2, bR1, branchLen, 6);
-        bGeo.translate(0, branchLen * 0.5, 0);
-        const bMesh = new THREE.Mesh(bGeo, trunkMat);
-        bMesh.position.set(
-          Math.cos(bAngle) * (trunkRTop * 0.6),
-          branchBaseY,
-          Math.sin(bAngle) * (trunkRTop * 0.6)
-        );
-        bMesh.rotation.y = -bAngle + Math.PI / 2;
-        bMesh.rotation.z = -bTilt;
-        bMesh.castShadow = true;
-        bMesh.receiveShadow = true;
-        canopyGroup.add(bMesh);
-
-        // Secondary forked branch splitting outward from the main branch
-        const subLen = branchLen * 0.62;
-        const subR1 = bR2 * 0.85;
-        const subR2 = bR2 * 0.45;
-        const subGeo = new THREE.CylinderGeometry(subR2, subR1, subLen, 5);
-        subGeo.translate(0, subLen * 0.5, 0);
-        const subMesh = new THREE.Mesh(subGeo, trunkMat);
-        const subDist = branchLen * 0.60;
-        subMesh.position.set(
-          Math.cos(bAngle) * (trunkRTop * 0.6 + Math.sin(bTilt) * subDist),
-          branchBaseY + Math.cos(bTilt) * subDist,
-          Math.sin(bAngle) * (trunkRTop * 0.6 + Math.sin(bTilt) * subDist)
-        );
-        const forkSpread = b % 2 === 0 ? 0.45 : -0.45;
-        subMesh.rotation.y = -bAngle + Math.PI / 2 + forkSpread;
-        subMesh.rotation.z = -(bTilt + 0.32);
-        subMesh.castShadow = true;
-        subMesh.receiveShadow = true;
-        canopyGroup.add(subMesh);
-      }
+      const bSpread = t.size === 2 ? 6.2 : t.size === 1 ? 4.6 : 3.4;
+      const bTipElev = t.size === 2 ? 3.4 : t.size === 1 ? 2.6 : 1.8;
+      const folRadius = t.size === 2 ? 4.0 : t.size === 1 ? 3.0 : 2.2;
+      const branchBaseY = trunkH * 0.80;
 
       // Foliage materials based on theme
       const folMat1 = new THREE.MeshStandardMaterial({
@@ -1923,38 +1901,66 @@ export class WorldRenderer {
         flatShading: true,
       });
 
-      // Tiers of canopy (raised to top of lengthened trunk)
-      if (t.size === 2) {
-        // Large: 3 tiers
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(8.4, 1), folMat1);
-        c1.position.y = 9.0;
-        c1.castShadow = true;
-        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(6.6, 1), folMat2);
-        c2.position.y = 12.6;
-        c2.castShadow = true;
-        const c3 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.6, 1), folMat3);
-        c3.position.y = 15.4;
-        c3.castShadow = true;
-        canopyGroup.add(c1, c2, c3);
-      } else if (t.size === 1) {
-        // Medium: 2 tiers
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(6.2, 1), folMat1);
-        c1.position.y = 7.2;
-        c1.castShadow = true;
-        const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.6, 1), folMat2);
-        c2.position.y = 10.4;
-        c2.castShadow = true;
-        canopyGroup.add(c1, c2);
-      } else {
-        // Small: 1 tier
-        const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(4.4, 1), folMat2);
-        c1.position.y = 5.6;
-        c1.castShadow = true;
-        canopyGroup.add(c1);
+      const branchPuffs: { pos: THREE.Vector3; radius: number }[] = [];
+
+      for (let b = 0; b < nBranches; b++) {
+        const bAngle = (b / nBranches) * Math.PI * 2 + (t.id * 1.57);
+        const pStart = new THREE.Vector3(
+          Math.cos(bAngle) * (trunkRTop * 0.75),
+          branchBaseY,
+          Math.sin(bAngle) * (trunkRTop * 0.75)
+        );
+        const pEnd = new THREE.Vector3(
+          Math.cos(bAngle) * bSpread,
+          trunkH + bTipElev,
+          Math.sin(bAngle) * bSpread
+        );
+
+        // Main primary bough (prominently visible extending outward and upward)
+        const mainLimb = this.createTreeLimb(pStart, pEnd, trunkRTop * 0.70, trunkRTop * 0.38, trunkMat);
+        canopyGroup.add(mainLimb);
+
+        // Secondary forked branch splitting outward from mid-limb
+        const midP = pStart.clone().lerp(pEnd, 0.52);
+        const forkSpreadAngle = bAngle + (b % 2 === 0 ? 0.45 : -0.45);
+        const forkTip = new THREE.Vector3(
+          Math.cos(forkSpreadAngle) * (bSpread * 0.95),
+          trunkH + bTipElev + 0.6,
+          Math.sin(forkSpreadAngle) * (bSpread * 0.95)
+        );
+        const forkLimb = this.createTreeLimb(midP, forkTip, trunkRTop * 0.42, trunkRTop * 0.22, trunkMat);
+        canopyGroup.add(forkLimb);
+
+        // Foliage cloud nestled on the end of each branch
+        const branchFolMat = (b % 3 === 0) ? folMat1 : (b % 3 === 1) ? folMat2 : folMat3;
+        const branchPuff = new THREE.Mesh(new THREE.DodecahedronGeometry(folRadius, 1), branchFolMat);
+        branchPuff.position.copy(pEnd);
+        branchPuff.castShadow = true;
+        branchPuff.receiveShadow = true;
+        canopyGroup.add(branchPuff);
+
+        branchPuffs.push({ pos: pEnd, radius: folRadius });
       }
 
-      const canopyCenterY = t.size === 2 ? 11.5 : t.size === 1 ? 8.8 : 5.8;
-      const canopyMaxR = t.size === 2 ? 7.6 : t.size === 1 ? 5.6 : 4.0;
+      // Central crown foliage tiers (resting above the branched trunk)
+      const crownCenterY = trunkH + (t.size === 2 ? 2.8 : t.size === 1 ? 2.2 : 1.6);
+      const crownR1 = t.size === 2 ? 5.2 : t.size === 1 ? 4.0 : 2.8;
+      const crownPuff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR1, 1), folMat1);
+      crownPuff1.position.set(0, crownCenterY, 0);
+      crownPuff1.castShadow = true;
+      crownPuff1.receiveShadow = true;
+      canopyGroup.add(crownPuff1);
+
+      const crownTopY = crownCenterY + (t.size === 2 ? 3.0 : t.size === 1 ? 2.2 : 1.6);
+      const crownR2 = t.size === 2 ? 3.6 : t.size === 1 ? 2.6 : 1.8;
+      const crownPuff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR2, 1), folMat3);
+      crownPuff2.position.set(0, crownTopY, 0);
+      crownPuff2.castShadow = true;
+      crownPuff2.receiveShadow = true;
+      canopyGroup.add(crownPuff2);
+
+      branchPuffs.push({ pos: new THREE.Vector3(0, crownCenterY, 0), radius: crownR1 });
+      branchPuffs.push({ pos: new THREE.Vector3(0, crownTopY, 0), radius: crownR2 });
 
       // Flowers on canopy: Vibrant yellow flowers, richly scattered in 3D across branches and foliage
       const flowerMeshes: THREE.Mesh[] = [];
@@ -1967,15 +1973,16 @@ export class WorldRenderer {
       });
 
       for (let i = 0; i < flowerCount; i++) {
+        const puff = branchPuffs[i % branchPuffs.length];
         const fR = t.size === 2 ? 0.45 : t.size === 1 ? 0.38 : 0.30;
         const fMesh = new THREE.Mesh(new THREE.SphereGeometry(fR, 6, 5), flowerYellowMat);
-        const fPhi = (((i * 1.6180339887) % 1) * 0.78 + 0.16) * Math.PI;
+        const fPhi = (((i * 1.6180339887) % 1) * 0.70 + 0.15) * Math.PI;
         const fTheta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
-        const r = canopyMaxR * (0.75 + 0.25 * Math.sin(i * 3.7));
+        const r = puff.radius * (0.85 + 0.15 * Math.sin(i * 3.7));
         fMesh.position.set(
-          Math.sin(fPhi) * Math.cos(fTheta) * r,
-          canopyCenterY + Math.cos(fPhi) * (t.size === 2 ? 4.5 : t.size === 1 ? 3.2 : 2.0),
-          Math.sin(fPhi) * Math.sin(fTheta) * r
+          puff.pos.x + Math.sin(fPhi) * Math.cos(fTheta) * r,
+          puff.pos.y + Math.cos(fPhi) * r * 0.85,
+          puff.pos.z + Math.sin(fPhi) * Math.sin(fTheta) * r
         );
         fMesh.visible = false;
         canopyGroup.add(fMesh);
@@ -1993,6 +2000,7 @@ export class WorldRenderer {
       const appleStemMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
 
       for (let i = 0; i < smallFruitCount; i++) {
+        const puff = branchPuffs[(i + 1) % branchPuffs.length];
         const sGroup = new THREE.Group();
         const smallR = t.size === 2 ? 0.60 : t.size === 1 ? 0.40 : 0.25;
         const aMesh = new THREE.Mesh(new THREE.SphereGeometry(smallR, 8, 7), appleMat);
@@ -2003,13 +2011,13 @@ export class WorldRenderer {
         stem.rotation.z = 0.2;
         sGroup.add(stem);
 
-        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.74) + 0.20) * Math.PI;
+        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.68) + 0.22) * Math.PI;
         const aTheta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
-        const aR = canopyMaxR * (0.80 + 0.18 * Math.cos(i * 4.1));
+        const aR = puff.radius * (0.88 + 0.12 * Math.cos(i * 4.1));
         sGroup.position.set(
-          Math.sin(aPhi) * Math.cos(aTheta) * aR,
-          canopyCenterY + Math.cos(aPhi) * (t.size === 2 ? 4.2 : t.size === 1 ? 3.0 : 1.8),
-          Math.sin(aPhi) * Math.sin(aTheta) * aR
+          puff.pos.x + Math.sin(aPhi) * Math.cos(aTheta) * aR,
+          puff.pos.y + Math.cos(aPhi) * aR * 0.85,
+          puff.pos.z + Math.sin(aPhi) * Math.sin(aTheta) * aR
         );
         sGroup.visible = false;
         canopyGroup.add(sGroup);
@@ -2027,8 +2035,8 @@ export class WorldRenderer {
       const leafMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.5 });
 
       for (let i = 0; i < bigFruitCount; i++) {
+        const puff = branchPuffs[(i + 2) % branchPuffs.length];
         const mGroup = new THREE.Group();
-        // Quả to nhất (Cây to size 2) bán kính 1.10 = đúng bằng quả dưa hấu; Cây vừa 0.75; Cây nhỏ 0.45
         const bigR = t.size === 2 ? 1.10 : t.size === 1 ? 0.75 : 0.45;
         const mBody = new THREE.Mesh(new THREE.SphereGeometry(bigR, 12, 10), bigAppleMat);
         mBody.scale.set(1.0, 0.94, 1.0);
@@ -2042,13 +2050,13 @@ export class WorldRenderer {
         leaf.rotation.z = -0.8;
         mGroup.add(leaf);
 
-        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.74) + 0.20) * Math.PI;
+        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.65) + 0.28) * Math.PI;
         const mTheta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
-        const mR = canopyMaxR * (0.82 + 0.18 * Math.sin(i * 5.3));
+        const mR = puff.radius * (0.88 + 0.14 * Math.sin(i * 5.3));
         mGroup.position.set(
-          Math.sin(mPhi) * Math.cos(mTheta) * mR,
-          canopyCenterY + Math.cos(mPhi) * (t.size === 2 ? 4.2 : t.size === 1 ? 3.0 : 1.8),
-          Math.sin(mPhi) * Math.sin(mTheta) * mR
+          puff.pos.x + Math.sin(mPhi) * Math.cos(mTheta) * mR,
+          puff.pos.y + Math.cos(mPhi) * mR * 0.80 - 0.2,
+          puff.pos.z + Math.sin(mPhi) * Math.sin(mTheta) * mR
         );
         mGroup.visible = false;
         canopyGroup.add(mGroup);
