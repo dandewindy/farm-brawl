@@ -665,23 +665,21 @@ export class World {
                   tree.small = Math.max(0, tree.small - dropSmall);
 
                   // Drop fruits onto the ground as edible food
-                  // Big fruits: Size 2 drops 100kg giant apples, Size 1 drops 20..50kg medium apples, Size 0 drops 20..50kg
-                  for (let i = 0; i < dropBig; i++) {
+                  // Correct order based on tree size:
+                  // - Cây nhỏ (size 0): Quả nhỏ từ 5 đến 10 kg
+                  // - Cây vừa (size 1): Quả vừa từ 20 đến 50 kg
+                  // - Cây to (size 2): Quả to 100 kg
+                  for (let i = 0; i < totalDropped; i++) {
                     const ang = this.rnd() * Math.PI * 2;
                     const dist = tree.r + 1.2 + this.rnd() * 3.5;
                     const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
                     const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-                    const bigWeight = tree.size === 2 ? 100 : Math.round(20 + this.rnd() * 30);
-                    this.addFood(fx, fz, 1, bigWeight);
-                  }
-                  // Small fruits: 5..10kg red apples
-                  for (let i = 0; i < dropSmall; i++) {
-                    const ang = this.rnd() * Math.PI * 2;
-                    const dist = tree.r + 1.2 + this.rnd() * 3.5;
-                    const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-                    const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-                    const smallWeight = Math.round(5 + this.rnd() * 5);
-                    this.addFood(fx, fz, 1, smallWeight);
+                    const fruitWeight = tree.size === 2
+                      ? 100
+                      : tree.size === 1
+                      ? Math.round(20 + this.rnd() * 30)
+                      : Math.round(5 + this.rnd() * 5);
+                    this.addFood(fx, fz, 1, fruitWeight);
                   }
 
                   // Number of flowers born matches number of fruits dropped (starts 30s lifecycle)
@@ -1481,13 +1479,6 @@ export class World {
       k = Math.min(CFG.KNOCKBACK_MAX * 1.6, k * 1.6);
     }
 
-    // Weapon: Pitchfork (+80% knockback against normal animals, +150% against King)
-    if (att.pitchforkT > 0) {
-      const isKing = vic.id === this.napoleonId;
-      const pitchMult = isKing ? 2.5 : 1.8;
-      k = Math.max(k * pitchMult, isKing ? 50 : 38);
-    }
-
     // Weapon: Dynamite explosion
     const isDynamite = att.hasDynamite;
     let boomX = 0, boomZ = 0;
@@ -1579,10 +1570,10 @@ export class World {
     }
 
     let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
-    // Pitchfork heavily strips weight based on ram force and grants mass to attacker
+    // Pitchfork heavily strips weight and grants mass to attacker (normal knockback, massive kg steal)
     if (att.pitchforkT > 0) {
       const isKing = vic.id === this.napoleonId;
-      const forceScale = clamp(k / 16, 1.5, 4.0);
+      const forceScale = clamp((speed * att.power * ramFactor) / 6, 2.5, 4.0);
       loss = Math.min(vic.mass - CFG.MIN_MASS, loss * forceScale * (isKing ? 3.0 : 2.0));
       const steal = Math.round(loss * 0.5);
       if (steal > 0) {

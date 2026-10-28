@@ -228,6 +228,8 @@ describe('bonus weapons and tools', () => {
     expect(massBefore - massAfter).toBeGreaterThan(1.0);
     // Pitchfork steals mass directly based on hit force
     expect(pAtt.mass).toBeGreaterThan(attMassBefore);
+    // Knockback is normal (does not launch victim into fence with > 35 speed)
+    expect(w.players.get(king)!.vx).toBeLessThan(35);
   });
 
   it('dynamite explodes on hit and knocks back bystanders', () => {
@@ -1401,6 +1403,48 @@ describe('fruit trees', () => {
     expect(treeSmall.batches.length).toBe(1);
     expect(treeSmall.batches[0].count).toBe(4);
     expect(w.events.some((e) => e.k === 'treeHit' && e.id === 1)).toBe(true);
+    // Size 0 (Small tree): all dropped fruits are 5..10kg
+    for (const f of w.food.values()) {
+      expect(f.v).toBeGreaterThanOrEqual(5);
+      expect(f.v).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('tree fruit weights: small tree (5..10kg), medium tree (20..50kg), large tree (100kg)', () => {
+    // 1. Medium tree (size 1): drops 20..50kg
+    const wMed = emptyWorld();
+    const treeMed = new TreeSimState({
+      id: 2, x: 20, z: 0, size: 1, r: 1.0, totalFruits: 20, initBig: 15, initSmall: 5,
+    });
+    treeMed.big = 15;
+    wMed.treeSims.push(treeMed);
+    const idPigMed = wMed.addPlayer('PigMed', 'pig');
+    const pigMed = wMed.players.get(idPigMed)!;
+    pigMed.mass = 500;
+    pigMed.x = 17; pigMed.z = 0; pigMed.vx = 25; pigMed.vz = 0; pigMed.dashT = 0.2;
+    wMed.step();
+    expect(wMed.food.size).toBeGreaterThan(0);
+    for (const f of wMed.food.values()) {
+      expect(f.v).toBeGreaterThanOrEqual(20);
+      expect(f.v).toBeLessThanOrEqual(50);
+    }
+
+    // 2. Large tree (size 2): drops 100kg
+    const wLarge = emptyWorld();
+    const treeLarge = new TreeSimState({
+      id: 3, x: 20, z: 0, size: 2, r: 1.0, totalFruits: 30, initBig: 20, initSmall: 10,
+    });
+    treeLarge.big = 20;
+    wLarge.treeSims.push(treeLarge);
+    const idPigLarge = wLarge.addPlayer('PigLarge', 'pig');
+    const pigLarge = wLarge.players.get(idPigLarge)!;
+    pigLarge.mass = 1000;
+    pigLarge.x = 17; pigLarge.z = 0; pigLarge.vx = 25; pigLarge.vz = 0; pigLarge.dashT = 0.2;
+    wLarge.step();
+    expect(wLarge.food.size).toBeGreaterThan(0);
+    for (const f of wLarge.food.values()) {
+      expect(f.v).toBe(100);
+    }
   });
 });
 

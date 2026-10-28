@@ -1406,7 +1406,8 @@ function handleGameEvent(ev: GameEvent): void {
         input.cancelRam();
         chargeStop();
 
-        const totalDroppedKg = ev.droppedBig * 11 + ev.droppedSmall * 2.5;
+        const avgFruitKg = ev.size === 2 ? 100 : ev.size === 1 ? 35 : 7.5;
+        const totalDroppedKg = (ev.droppedBig + ev.droppedSmall) * avgFruitKg;
         const myEnt = gameState.ents.get(myId);
         const rawPos = animals.getPosition(myId);
         const myPos = rawPos
@@ -1414,7 +1415,7 @@ function handleGameEvent(ev: GameEvent): void {
           : myEnt
           ? { x: myEnt.x, z: myEnt.z, mass: myEnt.mass }
           : { x: ev.x, z: ev.z, mass: 100 };
-        hud.floatText(`Rung rơi ${ev.droppedBig + ev.droppedSmall} quả (+${Math.round(totalDroppedKg)} kg)! 🍉`, 'spoil', myId, myPos);
+        hud.floatText(`Rung rơi ${ev.droppedBig + ev.droppedSmall} quả (+${Math.round(totalDroppedKg)} kg)! 🍎`, 'spoil', myId, myPos);
       }
       const leafColor = getArenaTheme() === 'women_day' ? 0xff4081 : 0x4caf50;
       foodParts.burst(ev.x, 3.5, ev.z, leafColor, 24, 7, 6, 0.7);

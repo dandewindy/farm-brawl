@@ -1946,11 +1946,12 @@ export class WorldRenderer {
 
       for (let i = 0; i < smallFruitCount; i++) {
         const sGroup = new THREE.Group();
-        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.45 : 0.35, 8, 7), appleMat);
+        const smallR = t.size === 2 ? 0.60 : t.size === 1 ? 0.40 : 0.25;
+        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(smallR, 8, 7), appleMat);
         aMesh.scale.set(1, 0.95, 1);
         sGroup.add(aMesh);
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.22, 5), appleStemMat);
-        stem.position.y = t.size === 2 ? 0.5 : 0.4;
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, smallR * 0.55, 5), appleStemMat);
+        stem.position.y = smallR * 1.05;
         stem.rotation.z = 0.2;
         sGroup.add(stem);
 
@@ -1967,7 +1968,7 @@ export class WorldRenderer {
         smallFruitMeshes.push(sGroup as any);
       }
 
-      // Big Fruits (Giant Red Apples with stem and leaf - 100% red tree fruit, no watermelons!)
+      // Big Fruits (Ripe Apples: Cây to ra quả to 100kg bằng dưa hấu, Cây vừa ra quả vừa 20-50kg, Cây nhỏ ra quả nhỏ 5-10kg)
       const bigFruitMeshes: THREE.Group[] = [];
       const bigFruitCount = t.size === 2 ? 14 : t.size === 1 ? 9 : 5;
       const bigAppleMat = new THREE.MeshStandardMaterial({
@@ -1979,7 +1980,8 @@ export class WorldRenderer {
 
       for (let i = 0; i < bigFruitCount; i++) {
         const mGroup = new THREE.Group();
-        const bigR = t.size === 2 ? 0.85 : 0.65;
+        // Quả to nhất (Cây to size 2) bán kính 1.10 = đúng bằng quả dưa hấu; Cây vừa 0.75; Cây nhỏ 0.45
+        const bigR = t.size === 2 ? 1.10 : t.size === 1 ? 0.75 : 0.45;
         const mBody = new THREE.Mesh(new THREE.SphereGeometry(bigR, 12, 10), bigAppleMat);
         mBody.scale.set(1.0, 0.94, 1.0);
         mGroup.add(mBody);
