@@ -1855,9 +1855,56 @@ export class WorldRenderer {
       trunkMesh.receiveShadow = true;
       g.add(trunkMesh);
 
-      // Canopy group (animates/shakes on impact)
+      // Canopy group (animates/shakes on impact, includes branches, foliage, flowers, and fruits)
       const canopyGroup = new THREE.Group();
       g.add(canopyGroup);
+
+      // Organic wooden tree branches splitting out from upper trunk into the canopy
+      const nBranches = t.size === 2 ? 4 : 3;
+      const branchBaseY = trunkH * (t.size === 2 ? 0.65 : t.size === 1 ? 0.62 : 0.58);
+      const branchLen = t.size === 2 ? 4.4 : t.size === 1 ? 3.3 : 2.4;
+      const bR1 = trunkRTop * 0.68;
+      const bR2 = trunkRTop * 0.38;
+
+      for (let b = 0; b < nBranches; b++) {
+        const bAngle = (b / nBranches) * Math.PI * 2 + (t.id * 1.35);
+        const bTilt = t.size === 2 ? 0.68 : t.size === 1 ? 0.62 : 0.55; // 32..39 degrees from vertical
+
+        // Main primary branch
+        const bGeo = new THREE.CylinderGeometry(bR2, bR1, branchLen, 6);
+        bGeo.translate(0, branchLen * 0.5, 0);
+        const bMesh = new THREE.Mesh(bGeo, trunkMat);
+        bMesh.position.set(
+          Math.cos(bAngle) * (trunkRTop * 0.6),
+          branchBaseY,
+          Math.sin(bAngle) * (trunkRTop * 0.6)
+        );
+        bMesh.rotation.y = -bAngle + Math.PI / 2;
+        bMesh.rotation.z = -bTilt;
+        bMesh.castShadow = true;
+        bMesh.receiveShadow = true;
+        canopyGroup.add(bMesh);
+
+        // Secondary forked branch splitting outward from the main branch
+        const subLen = branchLen * 0.62;
+        const subR1 = bR2 * 0.85;
+        const subR2 = bR2 * 0.45;
+        const subGeo = new THREE.CylinderGeometry(subR2, subR1, subLen, 5);
+        subGeo.translate(0, subLen * 0.5, 0);
+        const subMesh = new THREE.Mesh(subGeo, trunkMat);
+        const subDist = branchLen * 0.60;
+        subMesh.position.set(
+          Math.cos(bAngle) * (trunkRTop * 0.6 + Math.sin(bTilt) * subDist),
+          branchBaseY + Math.cos(bTilt) * subDist,
+          Math.sin(bAngle) * (trunkRTop * 0.6 + Math.sin(bTilt) * subDist)
+        );
+        const forkSpread = b % 2 === 0 ? 0.45 : -0.45;
+        subMesh.rotation.y = -bAngle + Math.PI / 2 + forkSpread;
+        subMesh.rotation.z = -(bTilt + 0.32);
+        subMesh.castShadow = true;
+        subMesh.receiveShadow = true;
+        canopyGroup.add(subMesh);
+      }
 
       // Foliage materials based on theme
       const folMat1 = new THREE.MeshStandardMaterial({
@@ -1909,9 +1956,9 @@ export class WorldRenderer {
       const canopyCenterY = t.size === 2 ? 11.5 : t.size === 1 ? 8.8 : 5.8;
       const canopyMaxR = t.size === 2 ? 7.6 : t.size === 1 ? 5.6 : 4.0;
 
-      // Flowers on canopy: Yellow flowers, naturally scattered in 3D around the canopy
+      // Flowers on canopy: Vibrant yellow flowers, richly scattered in 3D across branches and foliage
       const flowerMeshes: THREE.Mesh[] = [];
-      const flowerCount = t.size === 2 ? 24 : t.size === 1 ? 16 : 10;
+      const flowerCount = t.size === 2 ? 48 : t.size === 1 ? 32 : 20;
       const flowerYellowMat = new THREE.MeshStandardMaterial({
         color: 0xffd600,
         emissive: 0x332200,
@@ -1920,13 +1967,14 @@ export class WorldRenderer {
       });
 
       for (let i = 0; i < flowerCount; i++) {
-        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(t.size === 2 ? 0.45 : 0.35, 6, 5), flowerYellowMat);
-        const fPhi = (((i * 1.6180339887) % 1) * 0.75 + 0.2) * Math.PI;
+        const fR = t.size === 2 ? 0.45 : t.size === 1 ? 0.38 : 0.30;
+        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(fR, 6, 5), flowerYellowMat);
+        const fPhi = (((i * 1.6180339887) % 1) * 0.78 + 0.16) * Math.PI;
         const fTheta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
-        const r = canopyMaxR * (0.85 + 0.15 * Math.sin(i * 3.7));
+        const r = canopyMaxR * (0.75 + 0.25 * Math.sin(i * 3.7));
         fMesh.position.set(
           Math.sin(fPhi) * Math.cos(fTheta) * r,
-          canopyCenterY + Math.cos(fPhi) * r * 0.65,
+          canopyCenterY + Math.cos(fPhi) * (t.size === 2 ? 4.5 : t.size === 1 ? 3.2 : 2.0),
           Math.sin(fPhi) * Math.sin(fTheta) * r
         );
         fMesh.visible = false;
@@ -1934,9 +1982,9 @@ export class WorldRenderer {
         flowerMeshes.push(fMesh);
       }
 
-      // Small Fruits (Red shiny apples with little brown stem, 3D scattered)
+      // Small Fruits (Growing green/red apples, 3D scattered along branches & canopy)
       const smallFruitMeshes: THREE.Mesh[] = [];
-      const smallFruitCount = t.size === 2 ? 14 : t.size === 1 ? 9 : 5;
+      const smallFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
       const appleMat = new THREE.MeshStandardMaterial({
         color: 0xe53935,
         roughness: 0.28,
@@ -1955,12 +2003,12 @@ export class WorldRenderer {
         stem.rotation.z = 0.2;
         sGroup.add(stem);
 
-        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.72) + 0.24) * Math.PI;
+        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.74) + 0.20) * Math.PI;
         const aTheta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
-        const aR = canopyMaxR * (0.84 + 0.12 * Math.cos(i * 4.1));
+        const aR = canopyMaxR * (0.80 + 0.18 * Math.cos(i * 4.1));
         sGroup.position.set(
           Math.sin(aPhi) * Math.cos(aTheta) * aR,
-          canopyCenterY + Math.cos(aPhi) * aR * 0.65,
+          canopyCenterY + Math.cos(aPhi) * (t.size === 2 ? 4.2 : t.size === 1 ? 3.0 : 1.8),
           Math.sin(aPhi) * Math.sin(aTheta) * aR
         );
         sGroup.visible = false;
@@ -1970,7 +2018,7 @@ export class WorldRenderer {
 
       // Big Fruits (Ripe Apples: Cây to ra quả to 100kg bằng dưa hấu, Cây vừa ra quả vừa 20-50kg, Cây nhỏ ra quả nhỏ 5-10kg)
       const bigFruitMeshes: THREE.Group[] = [];
-      const bigFruitCount = t.size === 2 ? 14 : t.size === 1 ? 9 : 5;
+      const bigFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
       const bigAppleMat = new THREE.MeshStandardMaterial({
         color: 0xd32f2f,
         roughness: 0.25,
@@ -1994,12 +2042,12 @@ export class WorldRenderer {
         leaf.rotation.z = -0.8;
         mGroup.add(leaf);
 
-        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.72) + 0.24) * Math.PI;
+        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.74) + 0.20) * Math.PI;
         const mTheta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
-        const mR = canopyMaxR * (0.88 + 0.12 * Math.sin(i * 5.3));
+        const mR = canopyMaxR * (0.82 + 0.18 * Math.sin(i * 5.3));
         mGroup.position.set(
           Math.sin(mPhi) * Math.cos(mTheta) * mR,
-          canopyCenterY + Math.cos(mPhi) * mR * 0.65,
+          canopyCenterY + Math.cos(mPhi) * (t.size === 2 ? 4.2 : t.size === 1 ? 3.0 : 1.8),
           Math.sin(mPhi) * Math.sin(mTheta) * mR
         );
         mGroup.visible = false;
@@ -2047,7 +2095,7 @@ export class WorldRenderer {
       const showSmall = stage >= 2 || small > 0;
       const smallSlots = vis.smallFruitMeshes.length;
       const smallVisCount = showSmall
-        ? Math.max(1, Math.min(smallSlots, Math.ceil((small / (vis.size === 2 ? 12 : vis.size === 1 ? 8 : 4)) * smallSlots)))
+        ? Math.max(1, Math.min(smallSlots, Math.ceil((small / (vis.size === 2 ? 14 : vis.size === 1 ? 9 : 5)) * smallSlots)))
         : 0;
       vis.smallFruitMeshes.forEach((sm, idx) => {
         sm.visible = showSmall && idx < smallVisCount;
@@ -2057,7 +2105,7 @@ export class WorldRenderer {
       const showBig = stage === 3 || big > 0;
       const bigSlots = vis.bigFruitMeshes.length;
       const bigVisCount = showBig
-        ? Math.max(1, Math.min(bigSlots, Math.ceil((big / (vis.size === 2 ? 24 : vis.size === 1 ? 16 : 8)) * bigSlots)))
+        ? Math.max(1, Math.min(bigSlots, Math.ceil((big / (vis.size === 2 ? 18 : vis.size === 1 ? 12 : 6)) * bigSlots)))
         : 0;
       vis.bigFruitMeshes.forEach((bm, idx) => {
         bm.visible = showBig && idx < bigVisCount;

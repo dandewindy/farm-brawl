@@ -2247,6 +2247,7 @@ function animate(now: number): void {
   foodParts.updateFood(gameState.food, now, gameState.map?.podium);
   foodParts.updateParticles(dt);
   animals.updateShockwaves(dt);
+  animals.updateWaterRipples(dt);
 
   // Update animated world hazards (water ripples, pulsing coals, flames, electric fence arcs)
   const playerPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z } : undefined;

@@ -34,6 +34,7 @@ interface AnimalVisual {
   waterT?: number;
   squishFactor?: number;
   visualY?: number;
+  waterRippleTimer?: number;
 }
 
 function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
@@ -1061,11 +1062,24 @@ interface ShockwaveRing {
   active: boolean;
 }
 
+interface WaterRipple {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  x: number;
+  z: number;
+  startR: number;
+  maxR: number;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
 export class AnimalRenderer {
   public myId = 0;
   private readonly visuals = new Map<number, AnimalVisual>();
   private readonly group = new THREE.Group();
   private readonly shockwavePool: ShockwaveRing[] = [];
+  private readonly waterRipplePool: WaterRipple[] = [];
 
   constructor(private readonly scene: THREE.Scene) {
     this.scene.add(this.group);
@@ -1093,6 +1107,35 @@ export class AnimalRenderer {
         baseRadius: 1,
         life: 0,
         maxLife: 0.38,
+        active: false,
+      });
+    }
+
+    // Water ripple rings pool for swimming ripples & wake waves
+    const rippleGeo = new THREE.RingGeometry(0.82, 1.0, 32);
+    rippleGeo.rotateX(-Math.PI / 2);
+    for (let i = 0; i < 48; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xdef5ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(rippleGeo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 3;
+      mesh.position.y = 0.082;
+      this.scene.add(mesh);
+      this.waterRipplePool.push({
+        mesh,
+        mat,
+        x: 0,
+        z: 0,
+        startR: 1,
+        maxR: 3,
+        life: 0,
+        maxLife: 1.0,
         active: false,
       });
     }
@@ -1131,6 +1174,39 @@ export class AnimalRenderer {
         const sc = sw.baseRadius * (1 + k * 4.2);
         sw.mesh.scale.setScalar(sc);
         sw.mat.opacity = (1 - k) * 0.9;
+      }
+    }
+  }
+
+  spawnWaterRipple(x: number, z: number, startR: number, maxR: number, maxLife = 0.9, color = 0xdef5ff): void {
+    let wr = this.waterRipplePool.find((r) => !r.active);
+    if (!wr) wr = this.waterRipplePool[0];
+    wr.active = true;
+    wr.x = x;
+    wr.z = z;
+    wr.startR = startR;
+    wr.maxR = maxR;
+    wr.life = 0;
+    wr.maxLife = maxLife;
+    wr.mat.color.setHex(color);
+    wr.mat.opacity = 0.72;
+    wr.mesh.position.set(x, 0.082, z);
+    wr.mesh.scale.set(startR, 1, startR);
+    wr.mesh.visible = true;
+  }
+
+  updateWaterRipples(dt: number): void {
+    for (const wr of this.waterRipplePool) {
+      if (!wr.active) continue;
+      wr.life += dt;
+      if (wr.life >= wr.maxLife) {
+        wr.active = false;
+        wr.mesh.visible = false;
+      } else {
+        const k = wr.life / wr.maxLife;
+        const curR = wr.startR + (wr.maxR - wr.startR) * Math.sqrt(k);
+        wr.mesh.scale.set(curR, 1, curR);
+        wr.mat.opacity = Math.sin((1 - k) * Math.PI * 0.5) * 0.72;
       }
     }
   }
@@ -1199,6 +1275,14 @@ export class AnimalRenderer {
       this.scene.remove(vis.ring);
     }
     this.visuals.clear();
+    for (const sw of this.shockwavePool) {
+      sw.active = false;
+      sw.mesh.visible = false;
+    }
+    for (const wr of this.waterRipplePool) {
+      wr.active = false;
+      wr.mesh.visible = false;
+    }
   }
 
   update(
@@ -1243,9 +1327,10 @@ export class AnimalRenderer {
 
     setRainbow(vis, isSuper, now);
 
-    // Continuous walking / dashing leg phase accumulation (elephant has slower, heavier, majestic strides)
+    // Continuous walking / dashing leg phase accumulation (elephant has slower strides; mud creates sluggish heavy stepping)
     const legFreqMult = vis.species === 'elephant' ? 0.5 : 1.0;
-    vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12)) * legFreqMult;
+    const mudSpeedMult = isMud && !isSuper ? 0.65 : 1.0;
+    vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12)) * legFreqMult * mudSpeedMult;
     const r = radiusOf(mass);
     const sc = r * 1.35 * (isKing ? 1.2 : 1) * (isSuper ? 1.15 : 1);
 
@@ -1257,6 +1342,9 @@ export class AnimalRenderer {
     const smoothBaseY = prevBaseY + (targetBaseY - prevBaseY) * yLerpFactor;
     vis.visualY = smoothBaseY;
     let y = smoothBaseY;
+    if (isMud && !isSuper) {
+      y -= 0.12 * sc;
+    }
 
     if (isWater && !isSuper) {
       vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
@@ -1301,6 +1389,26 @@ export class AnimalRenderer {
       }
     }
 
+    // Water surface ripples & waves when swimming or floating
+    if (isWater && !isSuper) {
+      vis.waterRippleTimer = (vis.waterRippleTimer || 0) + dt;
+      const rippleInterval = speed > 0.03 ? 0.20 : 0.45;
+      if (vis.waterRippleTimer >= rippleInterval) {
+        vis.waterRippleTimer = 0;
+        this.spawnWaterRipple(x, z, r * 0.85, r * 2.8, 0.95, 0xdef5ff);
+        if (speed > 0.03) {
+          this.spawnWaterRipple(
+            x - Math.cos(angle) * r * 0.7,
+            z - Math.sin(angle) * r * 0.7,
+            r * 0.6,
+            r * 2.2,
+            0.80,
+            0xbfe5fa
+          );
+        }
+      }
+    }
+
     // Body hopping & positioning
     let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r);
     if (isFlying) bodyY += 1.1 * r;
@@ -1321,6 +1429,8 @@ export class AnimalRenderer {
       ? -0.25
       : isDrowning
       ? Math.sin(now / 180) * 0.3
+      : isWater && vis.species === 'duck'
+      ? Math.sin(vis.phase * 0.7) * 0.08
       : isWater && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.sin(now / 120) * 0.15
       : isCharging
@@ -1332,6 +1442,10 @@ export class AnimalRenderer {
     if (isDrowning && sq <= 0.4) {
       // Gentle side-to-side flailing
       vis.root.rotation.x = Math.sin(now / 200) * 0.2;
+    } else if (isMud && !isSuper && speed > 0.02 && sq <= 0.4) {
+      // Body rolling and pitching wave as animal trudges through deep mud
+      vis.root.rotation.x = Math.sin(vis.phase * 0.8) * 0.08;
+      vis.root.rotation.z += Math.sin(vis.phase * 0.4) * 0.06;
     }
 
     // Charge trembling wind-up
@@ -1374,22 +1488,38 @@ export class AnimalRenderer {
       }
       leg.visible = true;
 
+      if (leg.userData.origY === undefined) {
+        leg.userData.origY = leg.position.y;
+      }
+
       const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
       if (sq > 0.4) {
         // Flattened pancake: legs splayed flat horizontally to the sides
         leg.rotation.z = (Math.PI / 2.2) * (idx % 2 === 0 ? 1 : -1);
         leg.rotation.x = 0;
+        leg.position.y = leg.userData.origY;
       } else if (isDrowning || (isWater && vis.species !== 'duck')) {
         // Slow paddling motion, slowing as it sinks deeper
         const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
         leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
         leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
+        leg.position.y = leg.userData.origY;
+      } else if (isMud && !isSuper) {
+        // Wavy sluggish leg gait lifting high out of thick sticky mud in sequential wave
+        const waveOffset = idx === 0 ? 0 : idx === 1 ? Math.PI * 0.5 : idx === 2 ? Math.PI : Math.PI * 1.5;
+        const wavePhase = vis.phase + waveOffset;
+        const legLift = Math.max(0, Math.sin(wavePhase));
+        leg.rotation.z = Math.sin(wavePhase) * 0.85;
+        leg.rotation.x = Math.cos(wavePhase) * 0.22 * (idx % 2 === 0 ? 1 : -1);
+        leg.position.y = leg.userData.origY + legLift * 0.15 * sc;
       } else if (isStunned) {
         leg.rotation.z = 0;
         leg.rotation.x = 0;
+        leg.position.y = leg.userData.origY;
       } else {
         leg.rotation.z = baseSwing * 0.7;
         leg.rotation.x = 0;
+        leg.position.y = leg.userData.origY;
       }
     });
 
@@ -1438,8 +1568,16 @@ export class AnimalRenderer {
         vis.dust = 0.1;
         this.onPuff?.(x + (Math.random() - 0.5) * 0.4 * r, sc * 1.8, z + (Math.random() - 0.5) * 0.4 * r, 0xff7043, 0.3, 0.3, 1.2);
       } else if (isDashing || isMud) {
-        vis.dust = isDashing ? 0.03 : 0.15;
-        this.onPuff?.(x - Math.cos(angle) * r, 0.4, z - Math.sin(angle) * r, isMud ? 0x6b4a2b : 0xd8c09a, isDashing ? 1.4 : 0.8, 0.6);
+        vis.dust = isDashing ? 0.03 : 0.12;
+        const mudColor = Math.random() < 0.5 ? 0x4a3525 : 0x5d4037;
+        this.onPuff?.(
+          x - Math.cos(angle) * r * 0.85 + (Math.random() - 0.5) * 0.3 * r,
+          0.12,
+          z - Math.sin(angle) * r * 0.85 + (Math.random() - 0.5) * 0.3 * r,
+          isMud ? mudColor : 0xd8c09a,
+          isMud ? 0.9 * r : (isDashing ? 1.4 : 0.8),
+          0.65
+        );
       }
     }
 
