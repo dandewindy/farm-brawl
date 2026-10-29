@@ -1893,11 +1893,14 @@ function animate(now: number): void {
     lastRenderTime = now;
   }
 
-  // High-refresh display throttling: only needed on PC with 240Hz/360Hz monitors.
-  // On mobile & iPad/tablet (where displays are hardware VSync capped to 60Hz/120Hz),
-  // NEVER drop frames to avoid triggering WebKit/CADisplayLink 30Hz step-down!
+  // High-refresh display throttling:
+  // - PC: throttle above 144 FPS (elapsed < 6.8ms)
+  // - Mobile & iPad (including 120Hz ProMotion): target rock-solid 60 FPS (elapsed < 14.5ms)
+  //   This halves GPU power consumption, prevents thermal throttling and battery drain,
+  //   and prevents WebKit/Android from dropping frames to 30/20 FPS.
   const elapsed = now - lastRenderTime;
-  if (isPC && elapsed < 7.0) {
+  const minInterval = isPC ? 6.8 : 14.5;
+  if (elapsed < minInterval) {
     return;
   }
 

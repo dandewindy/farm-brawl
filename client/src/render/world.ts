@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CFG, radiusOf } from '@shared/constants';
 import type { MapData, TreeData } from '@shared/map';
 import type { TreeSyncWire } from '@shared/protocol';
@@ -654,23 +655,23 @@ function getDeviceInfo(): { isIPad: boolean; isMobile: boolean; dpr: number } {
 export function getOptimalPixelRatio(): number {
   const { isIPad, isMobile, dpr } = getDeviceInfo();
   if (isIPad) {
-    // iPad (e.g. iPad Gen 9: 2160x1620 Retina, CSS 1080x810):
-    // 1.4 DPR gives 1512x1134 high resolution with 4x MSAA antialiasing.
-    // Models, horns, fences, and edges are silky smooth with zero jaggedness (hết răng cưa)!
-    return Math.min(dpr, 1.4);
+    // iPad: Cap at 1.15 to prevent Retina fill-rate thermal throttling while keeping crisp visuals
+    return Math.min(dpr, 1.15);
   }
   if (isMobile) {
-    // Mobile phones (CSS viewport ~390px): 1.5 DPR gives crisp Retina rendering with zero jaggies
-    return Math.min(dpr, 1.5);
+    // Mobile phones: 1.10 DPR gives crisp Retina display on 350-460ppi screens with zero GPU strain
+    return Math.min(dpr, 1.1);
   }
   // PC / Desktop:
   return Math.min(dpr, 1.5);
 }
 
 export function shouldEnableAntialias(): boolean {
-  // Always enable hardware MSAA antialiasing across all devices (PC, iPad, mobile)
-  // so low-poly 3D animal models, horns, fences, and borders are silky-smooth without jagged edges (hết răng cưa).
-  return true;
+  const { isMobile } = getDeviceInfo();
+  // On mobile & iPad, disable hardware 4x MSAA to eliminate the heavy multisample resolve pass and prevent thermal throttling.
+  // The high pixel density (300-460 ppi) on mobile displays naturally eliminates jagged edges.
+  // On desktop PC, keep hardware antialiasing enabled.
+  return !isMobile;
 }
 
 export interface FarmFruitTreeVisual {
@@ -681,9 +682,12 @@ export interface FarmFruitTreeVisual {
   group: THREE.Group;
   trunkMesh: THREE.Mesh;
   canopyGroup: THREE.Group;
-  flowerMeshes: THREE.Mesh[];
-  smallFruitMeshes: THREE.Mesh[];
-  bigFruitMeshes: THREE.Group[];
+  flowerInst: THREE.InstancedMesh;
+  maxFlowers: number;
+  smallFruitInst: THREE.InstancedMesh;
+  maxSmallFruits: number;
+  bigFruitInst: THREE.InstancedMesh;
+  maxBigFruits: number;
   shakeTimer: number;
   stage: number;
   bigCount: number;
@@ -702,6 +706,89 @@ export interface FallingFruit {
   rotSpeed: number;
   life: number;
 }
+
+// Shared base geometries and materials for farm fruit trees (Zero GC & Single Draw-Call Instancing)
+let sharedSmallAppleGeo: THREE.BufferGeometry | null = null;
+let sharedBigAppleGeo: THREE.BufferGeometry | null = null;
+let sharedFlowerGeo: THREE.BufferGeometry | null = null;
+
+function getSharedFlowerGeo(): THREE.BufferGeometry {
+  if (!sharedFlowerGeo) {
+    sharedFlowerGeo = new THREE.SphereGeometry(1.0, 6, 5);
+  }
+  return sharedFlowerGeo;
+}
+
+function getSharedSmallAppleGeo(): THREE.BufferGeometry {
+  if (!sharedSmallAppleGeo) {
+    const bodyGeo = new THREE.SphereGeometry(1.0, 8, 6);
+    bodyGeo.scale(1, 0.95, 1);
+    const stemGeo = new THREE.CylinderGeometry(0.05, 0.065, 0.55, 5);
+    stemGeo.translate(0, 1.05, 0);
+    stemGeo.rotateZ(0.2);
+    sharedSmallAppleGeo = BufferGeometryUtils.mergeGeometries([bodyGeo, stemGeo]);
+    bodyGeo.dispose();
+    stemGeo.dispose();
+  }
+  return sharedSmallAppleGeo;
+}
+
+function getSharedBigAppleGeo(): THREE.BufferGeometry {
+  if (!sharedBigAppleGeo) {
+    const bodyGeo = new THREE.SphereGeometry(1.0, 10, 8);
+    bodyGeo.scale(1.0, 0.94, 1.0);
+    const stemGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.55, 5);
+    stemGeo.translate(0, 1.05, 0);
+    stemGeo.rotateZ(0.25);
+    const leafGeo = new THREE.ConeGeometry(0.22, 0.55, 4);
+    leafGeo.translate(0.18, 1.15, 0);
+    leafGeo.rotateZ(-0.8);
+    sharedBigAppleGeo = BufferGeometryUtils.mergeGeometries([bodyGeo, stemGeo, leafGeo]);
+    bodyGeo.dispose();
+    stemGeo.dispose();
+    leafGeo.dispose();
+  }
+  return sharedBigAppleGeo;
+}
+
+let sharedFlowerYellowMat: THREE.MeshStandardMaterial | null = null;
+let sharedSmallAppleMat: THREE.MeshStandardMaterial | null = null;
+let sharedBigAppleMat: THREE.MeshStandardMaterial | null = null;
+
+function getSharedTreeMaterials() {
+  if (!sharedFlowerYellowMat) {
+    sharedFlowerYellowMat = new THREE.MeshStandardMaterial({
+      color: 0xffd600,
+      emissive: 0x332200,
+      roughness: 0.35,
+      flatShading: true,
+    });
+  }
+  if (!sharedSmallAppleMat) {
+    sharedSmallAppleMat = new THREE.MeshStandardMaterial({
+      color: 0xe53935,
+      roughness: 0.28,
+      metalness: 0.1,
+    });
+  }
+  if (!sharedBigAppleMat) {
+    sharedBigAppleMat = new THREE.MeshStandardMaterial({
+      color: 0xd32f2f,
+      roughness: 0.25,
+      metalness: 0.08,
+    });
+  }
+  return {
+    flowerMat: sharedFlowerYellowMat,
+    smallMat: sharedSmallAppleMat,
+    bigMat: sharedBigAppleMat,
+  };
+}
+
+const sharedFallingBigGeo = new THREE.SphereGeometry(0.35, 7, 6);
+const sharedFallingSmallGeo = new THREE.SphereGeometry(0.2, 7, 6);
+const sharedFallingBigMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.35 });
+const sharedFallingSmallMat = new THREE.MeshStandardMaterial({ color: 0xe53935, roughness: 0.35 });
 
 export class WorldRenderer {
   readonly scene: THREE.Scene;
@@ -766,7 +853,9 @@ export class WorldRenderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     const savedShadows = typeof localStorage !== 'undefined' ? localStorage.getItem('fb_shadows') : null;
-    this.shadowsEnabled = savedShadows !== '0';
+    const { isMobile } = getDeviceInfo();
+    const defaultShadows = !isMobile;
+    this.shadowsEnabled = savedShadows !== null ? savedShadows === '1' : defaultShadows;
     this.renderer.shadowMap.enabled = this.shadowsEnabled;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -837,10 +926,12 @@ export class WorldRenderer {
     const hemi = new THREE.HemisphereLight(0xffffff, 0x4f7a32, 1.6);
     this.scene.add(hemi);
 
+    const { isMobile } = getDeviceInfo();
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
     sun.position.set(30, 65, 22);
     sun.castShadow = this.shadowsEnabled;
-    sun.shadow.mapSize.set(1024, 1024);
+    const shadowRes = isMobile ? 512 : 1024;
+    sun.shadow.mapSize.set(shadowRes, shadowRes);
     const d = 60;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
@@ -1833,12 +1924,12 @@ export class WorldRenderer {
   ): THREE.Mesh {
     const dir = new THREE.Vector3().subVectors(p2, p1);
     const len = dir.length();
-    const geo = new THREE.CylinderGeometry(r2, r1, len, 8);
+    const geo = new THREE.CylinderGeometry(r2, r1, len, 6);
     geo.translate(0, len * 0.5, 0);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(p1);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-    mesh.castShadow = true;
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -1847,6 +1938,8 @@ export class WorldRenderer {
     this.farmTreeGroup.clear();
     this.farmTrees.length = 0;
     const theme = getArenaTheme();
+    const treeMats = getSharedTreeMaterials();
+    const dummy = new THREE.Object3D();
 
     for (const t of trees) {
       const g = new THREE.Group();
@@ -1916,7 +2009,7 @@ export class WorldRenderer {
           Math.sin(bAngle) * bSpread
         );
 
-        // Main primary bough (prominently visible extending outward and upward)
+        // Main primary bough
         const mainLimb = this.createTreeLimb(pStart, pEnd, trunkRTop * 0.70, trunkRTop * 0.38, trunkMat);
         canopyGroup.add(mainLimb);
 
@@ -1935,7 +2028,7 @@ export class WorldRenderer {
         const branchFolMat = (b % 3 === 0) ? folMat1 : (b % 3 === 1) ? folMat2 : folMat3;
         const branchPuff = new THREE.Mesh(new THREE.DodecahedronGeometry(folRadius, 1), branchFolMat);
         branchPuff.position.copy(pEnd);
-        branchPuff.castShadow = true;
+        branchPuff.castShadow = false;
         branchPuff.receiveShadow = true;
         canopyGroup.add(branchPuff);
 
@@ -1955,113 +2048,90 @@ export class WorldRenderer {
       const crownR2 = t.size === 2 ? 3.6 : t.size === 1 ? 2.6 : 1.8;
       const crownPuff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR2, 1), folMat3);
       crownPuff2.position.set(0, crownTopY, 0);
-      crownPuff2.castShadow = true;
+      crownPuff2.castShadow = false;
       crownPuff2.receiveShadow = true;
       canopyGroup.add(crownPuff2);
 
       branchPuffs.push({ pos: new THREE.Vector3(0, crownCenterY, 0), radius: crownR1 });
       branchPuffs.push({ pos: new THREE.Vector3(0, crownTopY, 0), radius: crownR2 });
 
-      // Flowers on canopy: Vibrant yellow flowers, richly scattered in 3D across branches and foliage
-      const flowerMeshes: THREE.Mesh[] = [];
+      // 1. Flowers InstancedMesh: 1 draw call for all yellow flowers
       const flowerCount = t.size === 2 ? 48 : t.size === 1 ? 32 : 20;
-      const flowerYellowMat = new THREE.MeshStandardMaterial({
-        color: 0xffd600,
-        emissive: 0x332200,
-        roughness: 0.35,
-        flatShading: true,
-      });
+      const flowerInst = new THREE.InstancedMesh(getSharedFlowerGeo(), treeMats.flowerMat, flowerCount);
+      flowerInst.castShadow = false;
+      flowerInst.receiveShadow = false;
 
       for (let i = 0; i < flowerCount; i++) {
         const puff = branchPuffs[i % branchPuffs.length];
         const fR = t.size === 2 ? 0.45 : t.size === 1 ? 0.38 : 0.30;
-        const fMesh = new THREE.Mesh(new THREE.SphereGeometry(fR, 6, 5), flowerYellowMat);
         const fPhi = (((i * 1.6180339887) % 1) * 0.70 + 0.15) * Math.PI;
         const fTheta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
         const r = puff.radius * (0.85 + 0.15 * Math.sin(i * 3.7));
-        fMesh.position.set(
+        dummy.position.set(
           puff.pos.x + Math.sin(fPhi) * Math.cos(fTheta) * r,
           puff.pos.y + Math.cos(fPhi) * r * 0.85,
           puff.pos.z + Math.sin(fPhi) * Math.sin(fTheta) * r
         );
-        fMesh.visible = false;
-        canopyGroup.add(fMesh);
-        flowerMeshes.push(fMesh);
+        dummy.scale.set(fR, fR, fR);
+        dummy.updateMatrix();
+        flowerInst.setMatrixAt(i, dummy.matrix);
       }
+      flowerInst.instanceMatrix.needsUpdate = true;
+      flowerInst.count = 0;
+      flowerInst.visible = false;
+      canopyGroup.add(flowerInst);
 
-      // Small Fruits (Growing green/red apples, 3D scattered along branches & canopy)
-      const smallFruitMeshes: THREE.Mesh[] = [];
+      // 2. Small Fruits InstancedMesh: 1 draw call for all growing apples
       const smallFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
-      const appleMat = new THREE.MeshStandardMaterial({
-        color: 0xe53935,
-        roughness: 0.28,
-        metalness: 0.1,
-      });
-      const appleStemMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
+      const smallFruitInst = new THREE.InstancedMesh(getSharedSmallAppleGeo(), treeMats.smallMat, smallFruitCount);
+      smallFruitInst.castShadow = false;
+      smallFruitInst.receiveShadow = false;
 
       for (let i = 0; i < smallFruitCount; i++) {
         const puff = branchPuffs[(i + 1) % branchPuffs.length];
-        const sGroup = new THREE.Group();
         const smallR = t.size === 2 ? 0.60 : t.size === 1 ? 0.40 : 0.25;
-        const aMesh = new THREE.Mesh(new THREE.SphereGeometry(smallR, 8, 7), appleMat);
-        aMesh.scale.set(1, 0.95, 1);
-        sGroup.add(aMesh);
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, smallR * 0.55, 5), appleStemMat);
-        stem.position.y = smallR * 1.05;
-        stem.rotation.z = 0.2;
-        sGroup.add(stem);
-
         const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.68) + 0.22) * Math.PI;
         const aTheta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
         const aR = puff.radius * (0.88 + 0.12 * Math.cos(i * 4.1));
-        sGroup.position.set(
+        dummy.position.set(
           puff.pos.x + Math.sin(aPhi) * Math.cos(aTheta) * aR,
           puff.pos.y + Math.cos(aPhi) * aR * 0.85,
           puff.pos.z + Math.sin(aPhi) * Math.sin(aTheta) * aR
         );
-        sGroup.visible = false;
-        canopyGroup.add(sGroup);
-        smallFruitMeshes.push(sGroup as any);
+        dummy.scale.set(smallR, smallR, smallR);
+        dummy.updateMatrix();
+        smallFruitInst.setMatrixAt(i, dummy.matrix);
       }
+      smallFruitInst.instanceMatrix.needsUpdate = true;
+      smallFruitInst.count = 0;
+      smallFruitInst.visible = false;
+      canopyGroup.add(smallFruitInst);
 
-      // Big Fruits (Ripe Apples: Cây to ra quả to 100kg bằng dưa hấu, Cây vừa ra quả vừa 20-50kg, Cây nhỏ ra quả nhỏ 5-10kg)
-      const bigFruitMeshes: THREE.Group[] = [];
+      // 3. Big Fruits InstancedMesh: 1 draw call for all ripe apples
       const bigFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
-      const bigAppleMat = new THREE.MeshStandardMaterial({
-        color: 0xd32f2f,
-        roughness: 0.25,
-        metalness: 0.08,
-      });
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x388e3c, roughness: 0.5 });
+      const bigFruitInst = new THREE.InstancedMesh(getSharedBigAppleGeo(), treeMats.bigMat, bigFruitCount);
+      bigFruitInst.castShadow = false;
+      bigFruitInst.receiveShadow = false;
 
       for (let i = 0; i < bigFruitCount; i++) {
         const puff = branchPuffs[(i + 2) % branchPuffs.length];
-        const mGroup = new THREE.Group();
         const bigR = t.size === 2 ? 1.10 : t.size === 1 ? 0.75 : 0.45;
-        const mBody = new THREE.Mesh(new THREE.SphereGeometry(bigR, 12, 10), bigAppleMat);
-        mBody.scale.set(1.0, 0.94, 1.0);
-        mGroup.add(mBody);
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, bigR * 0.55, 6), appleStemMat);
-        stem.position.y = bigR * 1.05;
-        stem.rotation.z = 0.25;
-        mGroup.add(stem);
-        const leaf = new THREE.Mesh(new THREE.ConeGeometry(bigR * 0.22, bigR * 0.55, 4), leafMat);
-        leaf.position.set(bigR * 0.18, bigR * 1.15, 0);
-        leaf.rotation.z = -0.8;
-        mGroup.add(leaf);
-
         const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.65) + 0.28) * Math.PI;
         const mTheta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
         const mR = puff.radius * (0.88 + 0.14 * Math.sin(i * 5.3));
-        mGroup.position.set(
+        dummy.position.set(
           puff.pos.x + Math.sin(mPhi) * Math.cos(mTheta) * mR,
           puff.pos.y + Math.cos(mPhi) * mR * 0.80 - 0.2,
           puff.pos.z + Math.sin(mPhi) * Math.sin(mTheta) * mR
         );
-        mGroup.visible = false;
-        canopyGroup.add(mGroup);
-        bigFruitMeshes.push(mGroup);
+        dummy.scale.set(bigR, bigR, bigR);
+        dummy.updateMatrix();
+        bigFruitInst.setMatrixAt(i, dummy.matrix);
       }
+      bigFruitInst.instanceMatrix.needsUpdate = true;
+      bigFruitInst.count = 0;
+      bigFruitInst.visible = false;
+      canopyGroup.add(bigFruitInst);
 
       this.farmTreeGroup.add(g);
       this.farmTrees.push({
@@ -2072,9 +2142,12 @@ export class WorldRenderer {
         group: g,
         trunkMesh,
         canopyGroup,
-        flowerMeshes,
-        smallFruitMeshes,
-        bigFruitMeshes,
+        flowerInst,
+        maxFlowers: flowerCount,
+        smallFruitInst,
+        maxSmallFruits: smallFruitCount,
+        bigFruitInst,
+        maxBigFruits: bigFruitCount,
         shakeTimer: 0,
         stage: 0,
         bigCount: 0,
@@ -2095,29 +2168,24 @@ export class WorldRenderer {
 
       // Flowers visible: when stage === 1 or flowers > 0
       const showFlowers = stage === 1 || flowers > 0;
-      vis.flowerMeshes.forEach((fm) => {
-        fm.visible = showFlowers;
-      });
+      vis.flowerInst.count = showFlowers ? vis.maxFlowers : 0;
+      vis.flowerInst.visible = showFlowers;
 
       // Small fruits visible: when stage >= 2 or small > 0
       const showSmall = stage >= 2 || small > 0;
-      const smallSlots = vis.smallFruitMeshes.length;
       const smallVisCount = showSmall
-        ? Math.max(1, Math.min(smallSlots, Math.ceil((small / (vis.size === 2 ? 14 : vis.size === 1 ? 9 : 5)) * smallSlots)))
+        ? Math.max(1, Math.min(vis.maxSmallFruits, Math.ceil((small / (vis.size === 2 ? 14 : vis.size === 1 ? 9 : 5)) * vis.maxSmallFruits)))
         : 0;
-      vis.smallFruitMeshes.forEach((sm, idx) => {
-        sm.visible = showSmall && idx < smallVisCount;
-      });
+      vis.smallFruitInst.count = smallVisCount;
+      vis.smallFruitInst.visible = smallVisCount > 0;
 
       // Big ripe fruits visible: when stage === 3 or big > 0
       const showBig = stage === 3 || big > 0;
-      const bigSlots = vis.bigFruitMeshes.length;
       const bigVisCount = showBig
-        ? Math.max(1, Math.min(bigSlots, Math.ceil((big / (vis.size === 2 ? 18 : vis.size === 1 ? 12 : 6)) * bigSlots)))
+        ? Math.max(1, Math.min(vis.maxBigFruits, Math.ceil((big / (vis.size === 2 ? 18 : vis.size === 1 ? 12 : 6)) * vis.maxBigFruits)))
         : 0;
-      vis.bigFruitMeshes.forEach((bm, idx) => {
-        bm.visible = showBig && idx < bigVisCount;
-      });
+      vis.bigFruitInst.count = bigVisCount;
+      vis.bigFruitInst.visible = bigVisCount > 0;
     }
   }
 
@@ -2127,7 +2195,7 @@ export class WorldRenderer {
       vis.shakeTimer = 1.2;
     }
 
-    // Spawn falling fruit projectiles from canopy to ground
+    // Spawn falling fruit projectiles from canopy to ground (pooled geometry & materials)
     const canopyY = size === 2 ? 5.2 : size === 1 ? 4.0 : 3.0;
     const totalDrop = Math.min(10, droppedBig + droppedSmall);
     for (let i = 0; i < totalDrop; i++) {
@@ -2137,11 +2205,8 @@ export class WorldRenderer {
       const startX = x + Math.cos(ang) * dist;
       const startZ = z + Math.sin(ang) * dist;
 
-      const fruitGeo = new THREE.SphereGeometry(isBig ? 0.35 : 0.2, 7, 6);
-      const fruitMat = new THREE.MeshStandardMaterial({
-        color: isBig ? 0x2e7d32 : 0xe53935,
-        roughness: 0.35,
-      });
+      const fruitGeo = isBig ? sharedFallingBigGeo : sharedFallingSmallGeo;
+      const fruitMat = isBig ? sharedFallingBigMat : sharedFallingSmallMat;
       const mesh = new THREE.Mesh(fruitGeo, fruitMat);
       mesh.position.set(startX, canopyY + Math.random() * 0.5, startZ);
       this.scene.add(mesh);
@@ -2176,7 +2241,7 @@ export class WorldRenderer {
       }
     }
 
-    // 2. Falling fruit physics
+    // 2. Falling fruit physics (recycles pooled meshes without GC buffer thrashing)
     for (let i = this.fallingFruits.length - 1; i >= 0; i--) {
       const f = this.fallingFruits[i];
       f.life -= dt;
@@ -2190,8 +2255,6 @@ export class WorldRenderer {
 
       if (f.y <= 0.25 || f.life <= 0) {
         this.scene.remove(f.mesh);
-        f.mesh.geometry.dispose();
-        (f.mesh.material as THREE.Material).dispose();
         this.fallingFruits.splice(i, 1);
       }
     }

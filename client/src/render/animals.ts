@@ -84,6 +84,16 @@ function setRainbow(vis: AnimalVisual, on: boolean, now: number): void {
 const ringGeo = new THREE.RingGeometry(0.88, 1.05, 32);
 ringGeo.rotateX(-Math.PI / 2);
 
+const mudSplatGeo = new THREE.CircleGeometry(0.42, 12);
+mudSplatGeo.rotateX(-Math.PI / 2);
+
+const sharedMudSplatMat = new THREE.MeshBasicMaterial({
+  color: 0x16100c, // Deep dark black mud puddle
+  transparent: true,
+  opacity: 0.90,
+  depthWrite: false,
+});
+
 const SPECIES_RING_COLOR: Record<Species, number> = {
   chicken: 0xffb74d,
   sheep: 0xf3f1ea,
@@ -1258,9 +1268,7 @@ export class AnimalRenderer {
       if (vis.mudSplats) {
         for (const s of vis.mudSplats) {
           this.scene.remove(s);
-          s.geometry.dispose();
         }
-        vis.mudSplatMat.dispose();
       }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
@@ -1767,18 +1775,10 @@ export class AnimalRenderer {
     const ring = new THREE.Mesh(ringGeo, ringMat);
     this.scene.add(ring);
 
-    // Large dark mud patches under each foot (visible when wading through mud)
+    // Large dark mud patches under each foot (visible when wading through mud, shared static resources)
     const mudSplats: THREE.Mesh[] = [];
-    const mudSplatMat = new THREE.MeshBasicMaterial({
-      color: 0x16100c, // Deep dark black mud puddle
-      transparent: true,
-      opacity: 0.90,
-      depthWrite: false,
-    });
     for (let i = 0; i < legs.length; i++) {
-      const sGeo = new THREE.CircleGeometry(0.42, 16);
-      sGeo.rotateX(-Math.PI / 2);
-      const splat = new THREE.Mesh(sGeo, mudSplatMat);
+      const splat = new THREE.Mesh(mudSplatGeo, sharedMudSplatMat);
       splat.visible = false;
       splat.renderOrder = 2; // Flat on ground, below animal ring
       this.scene.add(splat);
@@ -1811,7 +1811,7 @@ export class AnimalRenderer {
       shockwaveTimer: 0,
       rainbowTimer: 0,
       mudSplats,
-      mudSplatMat,
+      mudSplatMat: sharedMudSplatMat,
     };
   }
 }
