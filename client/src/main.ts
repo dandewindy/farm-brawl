@@ -20,6 +20,7 @@ import { AnimalRenderer } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
 import { MinimapRenderer } from './render/minimap';
+import { MinionRenderer } from './render/minions';
 import { ToolRenderer } from './render/tools';
 import { WorldRenderer } from './render/world';
 import { HudManager } from './ui/hud';
@@ -39,6 +40,7 @@ animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
 animals.onRainbowTrail = (x, y, z, a, r, isDash) => foodParts.rainbowTrail(x, y, z, a, r, isDash);
 animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
+const minions = new MinionRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -47,6 +49,7 @@ onThemeChange((theme) => {
   animals.setTheme(theme);
   tools.setTheme(theme);
   foodParts.setTheme(theme);
+  minions.clear();
 });
 
 let transport: Transport | null = null;
@@ -1114,6 +1117,7 @@ const gameState = new GameState({
         animals.clear();
       }
       tools.clear();
+      minions.clear();
     }
     tools.sync(gameState.tools ? Array.from(gameState.tools.values()) : []);
   },
@@ -1594,10 +1598,26 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'tool': {
-      foodParts.burst(ev.x, 1, ev.z, 0xe8b641, 14, 5, 6, 0.7);
-      if (ev.id === myId) {
+      const isMine = ev.id === myId;
+      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : 0xe8b641;
+      foodParts.burst(ev.x, 1, ev.z, toolColor, 18, 6, 6, 0.8);
+      if (isMine) {
         sfxReward();
-        hud.showToast(t(`tk_${ev.kind}`));
+        if (ev.kind === 'wheel') {
+          hud.showBanner(`🛞 ${t('wheel_head')}`, t('tk_wheel'));
+        } else if (ev.kind === 'star') {
+          hud.showBanner(`⭐ ${t('star_head')}`, t('tk_star'));
+        } else {
+          hud.showToast(t(`tk_${ev.kind}`));
+        }
+      } else {
+        const pickerMeta = gameState.metas.get(ev.id);
+        const pName = pickerMeta ? pickerMeta.name : 'Ai đó';
+        if (ev.kind === 'wheel') {
+          hud.showToast(t('wheel_other', { name: pName }));
+        } else if (ev.kind === 'star') {
+          hud.showToast(t('star_other', { name: pName }));
+        }
       }
       break;
     }
@@ -2309,6 +2329,10 @@ function animate(now: number): void {
 
   // Update floating bonus tools on the farm
   tools.update(now);
+
+  // Update mini clone minions
+  minions.sync(Array.from(gameState.minions.values()));
+  minions.update(dt, now);
 
   // 3D Render
   world.render();

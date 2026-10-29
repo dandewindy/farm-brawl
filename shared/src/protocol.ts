@@ -52,12 +52,16 @@ export const FLAG = {
   SQUISHED: 2048,
   SUPER: 32768,
   FLYING: 65536,
+  WHEEL: 131072,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
 
-export type ToolKind = 'pitchfork' | 'dynamite' | 'song';
+export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
+
+/** [id, ownerId, x, z, angle, mass, species, skin] */
+export type MinionWire = [id: number, ownerId: number, x: number, z: number, a: number, mass: number, species: Species, skin: number];
 
 export type HofRow = [name: string, species: Species, dur: number];
 
@@ -134,6 +138,8 @@ export interface Snapshot {
   ev: GameEvent[];
   /** bonus tools on the ground: [id, kind, x, z] */
   tl?: ToolWire[];
+  /** mini clones / zombie minions: [id, ownerId, x, z, a, mass, species, skin] */
+  mn?: MinionWire[];
   /** top 10, sent every few ticks */
   lb?: LeaderRow[];
   total?: number;

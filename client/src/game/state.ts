@@ -3,7 +3,7 @@
 import { TICK_MS, type Cfg, type FoodKind } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import { wrapAngle } from '@shared/math';
-import type { GameEvent, HofRow, LeaderRow, PlayerMeta, ServerMsg, Snapshot, ToolWire } from '@shared/protocol';
+import type { GameEvent, HofRow, LeaderRow, MinionWire, PlayerMeta, ServerMsg, Snapshot, ToolWire } from '@shared/protocol';
 
 /** [tick, x, z, angle] */
 type Sample = [number, number, number, number];
@@ -54,6 +54,7 @@ export class GameState {
   pod: [number, number, boolean] = [0, 0, false];
   podShield: [boolean, number] = [true, 30];
   tools = new Map<number, ToolWire>();
+  minions = new Map<number, MinionWire>();
   napoleonId = 0;
   rule = '';
   reign = 0;
@@ -162,6 +163,12 @@ export class GameState {
     if (s.tl) {
       this.tools.clear();
       for (const t of s.tl) this.tools.set(t[0], t);
+    }
+    if (s.mn) {
+      this.minions.clear();
+      for (const m of s.mn) this.minions.set(m[0], m);
+    } else {
+      this.minions.clear();
     }
     if (s.lb) this.lb = s.lb;
     if (s.total) this.total = s.total;

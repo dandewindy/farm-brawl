@@ -82,7 +82,7 @@ export class ToolRenderer {
         loopR.rotation.y = -Math.PI / 4;
         g.add(loopR);
         g.add(mesh(new THREE.SphereGeometry(0.12, 10, 8), 0xffd700, 0, 1.88, 0, { metalness: 0.6, roughness: 0.25 }));
-      } else {
+      } else if (kind === 'song') {
         // Thư tình & Trái tim (Love Letter / Heart Melody)
         // Pearl envelope
         g.add(mesh(new THREE.BoxGeometry(1.6, 1.2, 0.12), 0xfff8f0, 0, 1.5, 0, { roughness: 0.5 }));
@@ -100,6 +100,28 @@ export class ToolRenderer {
         const topHeartPt = mesh(new THREE.ConeGeometry(0.19, 0.28, 8), 0xff4081, 0, 2.25, 0);
         topHeartPt.rotation.z = Math.PI;
         g.add(topHeartL, topHeartR, topHeartPt);
+      } else if (kind === 'wheel') {
+        // Bánh xe hoa (Floral Chariot Wheel)
+        g.add(mesh(new THREE.TorusGeometry(0.75, 0.12, 10, 24), 0xf48fb1, 0, 1.5, 0, { roughness: 0.4 }));
+        g.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.28, 12), 0xffd54f, 0, 1.5, 0, { metalness: 0.7, roughness: 0.3 }));
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const petal = mesh(new THREE.SphereGeometry(0.16, 8, 6), 0xff4081, Math.cos(a) * 0.45, 1.5, Math.sin(a) * 0.45);
+          petal.scale.set(1.5, 0.3, 0.8);
+          petal.rotation.y = a;
+          g.add(petal);
+        }
+        g.add(mesh(new THREE.SphereGeometry(0.18, 10, 8), 0xe91e63, 0, 1.5, 0.14, { roughness: 0.4, emissive: 0x4a0e1c, emissiveIntensity: 0.2 }));
+      } else {
+        // Ngôi sao pha lê hồng (Radiant Pink Crystal Star)
+        g.add(mesh(new THREE.OctahedronGeometry(0.75, 0), 0xff4081, 0, 1.6, 0, { metalness: 0.5, roughness: 0.2, emissive: 0x880e4f, emissiveIntensity: 0.4 }));
+        const ring = mesh(new THREE.TorusGeometry(1.05, 0.04, 8, 24), 0xffd700, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2 });
+        ring.rotation.x = Math.PI / 3;
+        g.add(ring);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          g.add(mesh(new THREE.SphereGeometry(0.12, 8, 6), 0xff80ab, Math.cos(a) * 0.75, 1.6, Math.sin(a) * 0.75));
+        }
       }
     } else if (theme === 'halloween') {
       if (kind === 'pitchfork') {
@@ -135,7 +157,7 @@ export class ToolRenderer {
         g.add(stem);
         // Sizzling spark on top of fuse
         g.add(mesh(new THREE.SphereGeometry(0.1, 8, 6), 0xffd600, 0.08, 2.05, 0, { emissive: 0xff6f00, emissiveIntensity: 2 }));
-      } else {
+      } else if (kind === 'song') {
         // Sách Phù Thủy Ma Thuật (Spooky Witch Grimoire)
         // Dark leather cover
         g.add(mesh(new THREE.BoxGeometry(1.4, 1.7, 0.3), 0x24112e, 0, 1.6, 0, { roughness: 0.7 }));
@@ -144,6 +166,28 @@ export class ToolRenderer {
         // Golden corner brackets
         for (const [cx, cy] of [[-0.6, 2.3], [0.6, 2.3], [-0.6, 0.9], [0.6, 0.9]]) {
           g.add(mesh(new THREE.BoxGeometry(0.15, 0.15, 0.32), 0xffb300, cx, cy, 0, { metalness: 0.7 }));
+        }
+      } else if (kind === 'wheel') {
+        // Bánh xe xương nguyền rủa (Cursed Bone Wheel)
+        g.add(mesh(new THREE.TorusGeometry(0.78, 0.14, 10, 24), 0xded8ce, 0, 1.5, 0, { roughness: 0.8 }));
+        g.add(mesh(new THREE.SphereGeometry(0.25, 10, 8), 0xe8e4dc, 0, 1.5, 0));
+        g.add(mesh(new THREE.SphereGeometry(0.06, 6, 4), 0x111111, -0.09, 1.54, 0.22));
+        g.add(mesh(new THREE.SphereGeometry(0.06, 6, 4), 0x111111, 0.09, 1.54, 0.22));
+        for (let i = 0; i < 6; i++) {
+          const spoke = mesh(new THREE.CylinderGeometry(0.045, 0.04, 1.35, 6), 0xd0cbc2, 0, 1.5, 0);
+          spoke.rotation.z = (i / 6) * Math.PI;
+          g.add(spoke);
+        }
+        g.add(mesh(new THREE.TorusGeometry(0.85, 0.03, 6, 20), 0x9c27b0, 0, 1.5, 0, { emissive: 0x9c27b0, emissiveIntensity: 1 }));
+      } else {
+        // Ngôi sao linh hồn ma thuật (Cursed Soul Gem / Necromancer Star)
+        g.add(mesh(new THREE.OctahedronGeometry(0.78, 0), 0x00e676, 0, 1.6, 0, { emissive: 0x00e676, emissiveIntensity: 0.8, roughness: 0.3 }));
+        const ring = mesh(new THREE.TorusGeometry(1.05, 0.04, 8, 24), 0x7b1fa2, 0, 1.6, 0, { emissive: 0x4a148c });
+        ring.rotation.x = Math.PI / 4;
+        g.add(ring);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          g.add(mesh(new THREE.SphereGeometry(0.14, 8, 6), 0x69f0ae, Math.cos(a) * 0.75, 1.6, Math.sin(a) * 0.75, { emissive: 0x00e676, emissiveIntensity: 0.5 }));
         }
       }
     } else {
@@ -165,7 +209,7 @@ export class ToolRenderer {
         g.add(mesh(new THREE.BoxGeometry(0.9, 0.15, 0.75), 0x3a2a1a, 0, 1.2, 0.1));
         // Fuse cord
         g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), 0x222222, 0, 2.2, 0));
-      } else {
+      } else if (kind === 'song') {
         // Sheet music parchment ("Beasts of England")
         g.add(mesh(new THREE.BoxGeometry(1.4, 1.8, 0.05), 0xf2ead7, 0, 1.6, 0));
         // 4 staff lines
@@ -175,6 +219,26 @@ export class ToolRenderer {
         // Notehead + stem
         g.add(mesh(new THREE.SphereGeometry(0.16, 8, 6), 0x111111, -0.2, 1.3, 0.06));
         g.add(mesh(new THREE.BoxGeometry(0.05, 0.6, 0.05), 0x111111, -0.06, 1.6, 0.06));
+      } else if (kind === 'wheel') {
+        // Classic Oak Wagon Wheel
+        g.add(mesh(new THREE.TorusGeometry(0.75, 0.14, 10, 24), 0x6d4c41, 0, 1.5, 0, { roughness: 0.85 }));
+        g.add(mesh(new THREE.TorusGeometry(0.78, 0.04, 8, 24), 0x37474f, 0, 1.5, 0, { metalness: 0.7, roughness: 0.4 }));
+        g.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.32, 12), 0x263238, 0, 1.5, 0, { metalness: 0.6, roughness: 0.4 }));
+        for (let i = 0; i < 6; i++) {
+          const spoke = mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.35, 6), 0x8d6e63, 0, 1.5, 0);
+          spoke.rotation.z = (i / 6) * Math.PI;
+          g.add(spoke);
+        }
+        g.add(mesh(new THREE.SphereGeometry(0.09, 8, 6), 0xffb300, 0, 1.5, 0.16, { metalness: 0.8, roughness: 0.25 }));
+      } else {
+        // Golden Radiant Star
+        g.add(mesh(new THREE.OctahedronGeometry(0.8, 0), 0xffc107, 0, 1.6, 0, { metalness: 0.85, roughness: 0.18, emissive: 0xff8f00, emissiveIntensity: 0.4 }));
+        const star2 = mesh(new THREE.OctahedronGeometry(0.55, 0), 0xffd54f, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2, emissive: 0xffa000, emissiveIntensity: 0.3 });
+        star2.rotation.z = Math.PI / 4;
+        g.add(star2);
+        const halo = mesh(new THREE.TorusGeometry(1.1, 0.04, 8, 24), 0xffea00, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2 });
+        halo.rotation.x = Math.PI / 3;
+        g.add(halo);
       }
     }
 

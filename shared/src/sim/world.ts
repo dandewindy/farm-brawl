@@ -10,7 +10,7 @@ import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
-  FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type PlayerMeta,
+  FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type MinionWire, type PlayerMeta,
   type PlayerWire, type ServerMsg, type Snapshot, type ToolKind, type TreeSyncWire,
 } from '../protocol';
 
@@ -53,6 +53,7 @@ export interface Player extends Body {
   flyT: number;
   lastEatT: number;
   squishT: number;
+  wheelT: number;
   prevX?: number;
   prevZ?: number;
   pendingEatHints?: number[];
@@ -60,6 +61,23 @@ export interface Player extends Body {
   team?: number;
   origSpecies?: Species;
   ai: BotBrain | null;
+}
+
+export interface Minion {
+  id: number;
+  ownerId: number;
+  x: number;
+  z: number;
+  vx: number;
+  vz: number;
+  a: number;
+  mass: number;
+  species: Species;
+  skin: number;
+  targetId: number;
+  alive: boolean;
+  cd: number;
+  orbitAngle: number;
 }
 
 export interface ToolItem {
@@ -167,6 +185,8 @@ export class World {
   private nextId = 1;
   private nextFood = 1;
   private nextTool = 1;
+  private nextMinionId = 1;
+  minions = new Map<number, Minion>();
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
   private rnd: () => number;
@@ -254,7 +274,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -288,6 +308,9 @@ export class World {
 
   removePlayer(id: number): void {
     if (!this.players.delete(id)) return;
+    for (const [mid, m] of this.minions) {
+      if (m.ownerId === id) this.minions.delete(mid);
+    }
     if (id === this.napoleonId) {
       this.napoleonId = 0;
       this.napoleonReign = 0;
@@ -363,7 +386,7 @@ export class World {
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
-      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0,
+      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
     });
     p.input.btn = false;
     p.dashHit.clear();
@@ -577,11 +600,38 @@ export class World {
           p.pressed = false;
           p.btnLatch = false;
         }
-        const tillSpeedMult = (this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0;
-        stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
-        if (p.slowT > 0) {
-          p.vx *= 0.85;
-          p.vz *= 0.85;
+        if (p.wheelT > 0) {
+          // Wheel vehicle mode: cannot stop! Continuous forward motion at speed 19
+          p.a = p.input.a;
+          const cartSpeed = 19;
+          p.vx = Math.cos(p.a) * cartSpeed;
+          p.vz = Math.sin(p.a) * cartSpeed;
+          p.x += p.vx * h;
+          p.z += p.vz * h;
+          p.stunT = 0;
+          p.charging = false;
+          p.holdT = 0;
+          // Boundary bounce to keep cart inside the farm
+          const d = Math.hypot(p.x, p.z);
+          const maxR = CFG.R - 3.5;
+          if (d > maxR && d > 1e-5) {
+            const nx = p.x / d, nz = p.z / d;
+            p.x = nx * maxR;
+            p.z = nz * maxR;
+            const vn = p.vx * nx + p.vz * nz;
+            if (vn > 0) {
+              p.vx -= 1.8 * vn * nx;
+              p.vz -= 1.8 * vn * nz;
+              p.a = Math.atan2(p.vz, p.vx);
+            }
+          }
+        } else {
+          const tillSpeedMult = (this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0;
+          stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
+          if (p.slowT > 0) {
+            p.vx *= 0.85;
+            p.vz *= 0.85;
+          }
         }
         const wasStunned = p.stunT >= 1.4;
         const hayHit = collideHay(p, this.map.hay);
@@ -813,6 +863,7 @@ export class World {
       if (p.superT > 0) p.superT = Math.max(0, p.superT - DT);
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
+      if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
 
       const pr = radiusOf(p.mass) + 1.2;
       for (const t of this.tools.values()) {
@@ -824,6 +875,36 @@ export class World {
             p.pitchforkT = 10;
           } else if (t.kind === 'dynamite') {
             p.hasDynamite = true;
+          } else if (t.kind === 'wheel') {
+            p.wheelT = 10;
+          } else if (t.kind === 'star') {
+            let count = 0;
+            for (const m of this.minions.values()) {
+              if (m.ownerId === p.id && m.alive) count++;
+            }
+            const spawnCount = Math.min(2, 6 - count);
+            for (let i = 0; i < spawnCount; i++) {
+              const mid = this.nextMinionId++;
+              const offsetAng = (i * Math.PI) + (count * 1.05);
+              const mx = p.x + Math.cos(offsetAng) * 2.2;
+              const mz = p.z + Math.sin(offsetAng) * 2.2;
+              this.minions.set(mid, {
+                id: mid,
+                ownerId: p.id,
+                x: r2(mx),
+                z: r2(mz),
+                vx: 0,
+                vz: 0,
+                a: p.a,
+                mass: 50,
+                species: p.species,
+                skin: p.skin,
+                targetId: 0,
+                alive: true,
+                cd: 0,
+                orbitAngle: offsetAng,
+              });
+            }
           } else if (t.kind === 'song') {
             if (this.napoleonId > 0) {
               const nap = this.players.get(this.napoleonId);
@@ -839,6 +920,8 @@ export class World {
         }
       }
     }
+
+    this.updateMinions(DT, alive);
 
     // Podium shield & cyclical battle logic
     const [podX, podZ] = this.map.podium;
@@ -1298,6 +1381,21 @@ export class World {
         const va = a.vx * nx + a.vz * nz; // a's speed towards b
         const vb = -(b.vx * nx + b.vz * nz); // b's speed towards a
         const sameTeam = a.team !== undefined && b.team !== undefined && a.team === b.team;
+        const aWheel = a.wheelT > 0;
+        const bWheel = b.wheelT > 0;
+        if ((aWheel || bWheel) && !sameTeam) {
+          if (aWheel && !bWheel) {
+            this.wheelCrush(a, b, nx, nz);
+          } else if (bWheel && !aWheel) {
+            this.wheelCrush(b, a, -nx, -nz);
+          } else {
+            a.vx -= nx * 22; a.vz -= nz * 22;
+            b.vx += nx * 22; b.vz += nz * 22;
+            this.events.push({ k: 'hit', a: a.id, v: b.id, x: r2(b.x), z: r2(b.z), s: 22 });
+          }
+          continue;
+        }
+
         const aHits = !sameTeam && a.dashT > 0 && va > CFG.HIT_MIN_SPEED && !a.dashHit.has(b.id);
         const bHits = !sameTeam && b.dashT > 0 && vb > CFG.HIT_MIN_SPEED && !b.dashHit.has(a.id);
         if (aHits && bHits) {
@@ -1314,6 +1412,186 @@ export class World {
             const jImp = (1.2 * closing) / (1 / ma + 1 / mb);
             a.vx -= (jImp / ma) * nx; a.vz -= (jImp / ma) * nz;
             b.vx += (jImp / mb) * nx; b.vz += (jImp / mb) * nz;
+          }
+        }
+      }
+    }
+  }
+
+  private wheelCrush(attacker: Player, victim: Player, nx: number, nz: number): void {
+    victim.squishT = 3.0; // Flattened squished animation
+    victim.stunT = 1.2;
+    victim.lastHitBy = attacker.id;
+    victim.lastHitT = this.time;
+    const launchSpeed = 34;
+    victim.vx = nx * launchSpeed;
+    victim.vz = nz * launchSpeed;
+
+    if (victim.mass < 80) {
+      this.kill(victim, 'crush');
+    } else {
+      const lostMass = Math.min(victim.mass - 20, Math.max(50, Math.round(victim.mass * 0.4)));
+      victim.mass = Math.max(20, victim.mass - lostMass);
+      attacker.mass += Math.round(lostMass * 0.5);
+      this.scatter(victim.x, victim.z, Math.round(lostMass * 0.5), 1.2);
+      this.events.push({
+        k: 'hit',
+        a: attacker.id,
+        v: victim.id,
+        x: r2(victim.x),
+        z: r2(victim.z),
+        s: launchSpeed,
+        loss: Math.round(lostMass),
+      });
+    }
+  }
+
+  private updateMinions(dt: number, alive: Player[]): void {
+    const LEASH_R = 15;
+    for (const [mid, m] of this.minions) {
+      const owner = this.players.get(m.ownerId);
+      if (!owner || !owner.alive || m.mass <= 5) {
+        this.minions.delete(mid);
+        continue;
+      }
+
+      m.cd = Math.max(0, m.cd - dt);
+      const dxO = m.x - owner.x;
+      const dzO = m.z - owner.z;
+      const distToOwner = Math.hypot(dxO, dzO);
+
+      // Leash limit: if too far from owner, abandon chase and return
+      if (distToOwner > LEASH_R) {
+        m.targetId = 0;
+      }
+
+      // Check current target
+      let target: Player | undefined;
+      if (m.targetId > 0) {
+        target = this.players.get(m.targetId);
+        if (!target || !target.alive || Math.hypot(target.x - owner.x, target.z - owner.z) > LEASH_R) {
+          m.targetId = 0;
+          target = undefined;
+        }
+      }
+
+      // Find new target if none
+      if (!target) {
+        // Priority 1: enemy that recently hit owner
+        if (owner.lastHitBy > 0 && this.time - owner.lastHitT < 3.5) {
+          const attacker = this.players.get(owner.lastHitBy);
+          if (attacker && attacker.alive && attacker.id !== owner.id) {
+            const sameT = owner.team !== undefined && attacker.team !== undefined && owner.team === attacker.team;
+            if (!sameT && Math.hypot(attacker.x - owner.x, attacker.z - owner.z) < LEASH_R) {
+              m.targetId = attacker.id;
+              target = attacker;
+            }
+          }
+        }
+      }
+
+      if (!target) {
+        // Priority 2: nearest enemy within 9 units of owner
+        let bestDist = 9;
+        for (const p of alive) {
+          if (p.id === owner.id) continue;
+          const sameT = owner.team !== undefined && p.team !== undefined && owner.team === p.team;
+          if (sameT) continue;
+          const d = Math.hypot(p.x - owner.x, p.z - owner.z);
+          if (d < bestDist) {
+            bestDist = d;
+            m.targetId = p.id;
+            target = p;
+          }
+        }
+      }
+
+      if (target) {
+        // Chase & ram target
+        const toX = target.x - m.x;
+        const toZ = target.z - m.z;
+        const dist = Math.hypot(toX, toZ);
+        const aimA = Math.atan2(toZ, toX);
+        m.a = aimA;
+        const chaseSpeed = 15;
+        m.vx = Math.cos(aimA) * chaseSpeed;
+        m.vz = Math.sin(aimA) * chaseSpeed;
+        m.x += m.vx * dt;
+        m.z += m.vz * dt;
+
+        const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
+        if (dist < hitDist && m.cd <= 0) {
+          m.cd = 0.8;
+          target.vx += Math.cos(aimA) * 18;
+          target.vz += Math.sin(aimA) * 18;
+          target.stunT = 0.4;
+          target.lastHitBy = owner.id;
+          target.lastHitT = this.time;
+          const loss = Math.min(target.mass - 10, 8);
+          if (loss > 0) {
+            target.mass -= loss;
+            owner.mass += loss;
+          }
+          this.events.push({
+            k: 'hit',
+            a: owner.id,
+            v: target.id,
+            x: r2(target.x),
+            z: r2(target.z),
+            s: 18,
+            loss: Math.round(loss),
+          });
+          if (target.mass < 10) {
+            this.kill(target, 'fence');
+          }
+        }
+      } else {
+        // Orbit / follow bodyguard formation around owner
+        m.orbitAngle = (m.orbitAngle + 1.8 * dt) % (Math.PI * 2);
+        const orbitDist = 2.4 + (m.id % 3) * 0.7;
+        const desiredX = owner.x + Math.cos(m.orbitAngle) * orbitDist;
+        const desiredZ = owner.z + Math.sin(m.orbitAngle) * orbitDist;
+        const toX = desiredX - m.x;
+        const toZ = desiredZ - m.z;
+        const dist = Math.hypot(toX, toZ);
+        if (dist > 0.15) {
+          m.a = Math.atan2(toZ, toX);
+          const speed = Math.min(18, Math.max(8, dist * 6));
+          m.vx = (toX / dist) * speed;
+          m.vz = (toZ / dist) * speed;
+          m.x += m.vx * dt;
+          m.z += m.vz * dt;
+        } else {
+          m.vx = owner.vx;
+          m.vz = owner.vz;
+          m.a = owner.a;
+        }
+      }
+
+      // Check if enemy dashes into minion: minion loses mass
+      for (const enemy of alive) {
+        if (enemy.id === owner.id) continue;
+        const sameT = owner.team !== undefined && enemy.team !== undefined && owner.team === enemy.team;
+        if (sameT) continue;
+        const d = Math.hypot(enemy.x - m.x, enemy.z - m.z);
+        const colDist = radiusOf(m.mass) + radiusOf(enemy.mass);
+        if (d < colDist && enemy.dashT > 0) {
+          m.mass -= 18;
+          enemy.vx *= 0.5;
+          enemy.vz *= 0.5;
+          this.events.push({
+            k: 'hit',
+            a: enemy.id,
+            v: owner.id,
+            x: r2(m.x),
+            z: r2(m.z),
+            s: 14,
+            loss: 18,
+          });
+          if (m.mass <= 5) {
+            m.alive = false;
+            this.minions.delete(mid);
+            break;
           }
         }
       }
@@ -1602,7 +1880,10 @@ export class World {
   private kill(p: Player, cause: DeathCause): void {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
-    p.superT = 0; p.flyT = 0;
+    p.superT = 0; p.flyT = 0; p.wheelT = 0;
+    for (const [mid, m] of this.minions) {
+      if (m.ownerId === p.id) this.minions.delete(mid);
+    }
 
     const wasKing = (p.id === this.napoleonId && this.napoleonId > 0);
     const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
@@ -1819,7 +2100,7 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'dynamite', 'song'];
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
     for (let tries = 0; tries < 25; tries++) {
@@ -1887,7 +2168,8 @@ export class World {
         | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0)
         | (o.squishT > 0 ? FLAG.SQUISHED : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
-        | (o.flyT > 0 ? FLAG.FLYING : 0);
+        | (o.flyT > 0 ? FLAG.FLYING : 0)
+        | (o.wheelT > 0 ? FLAG.WHEEL : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;
@@ -1916,6 +2198,16 @@ export class World {
       fr: this.foodRemoved,
       ev: this.events,
       tl: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
+      mn: [...this.minions.values()].map((m): MinionWire => [
+        m.id,
+        m.ownerId,
+        r2(m.x),
+        r2(m.z),
+        r2(m.a),
+        Math.round(m.mass),
+        m.species,
+        m.skin,
+      ]),
       pod: [this.podiumCaptor, Math.round(this.podiumProgress * 100) / 100, this.podiumContested],
       nap: this.napoleonId,
       rule: this.currentRule,

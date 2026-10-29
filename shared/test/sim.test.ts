@@ -1446,7 +1446,96 @@ describe('fruit trees', () => {
       expect(f.v).toBe(100);
     }
   });
+
+  describe('wheel item (crushing cart)', () => {
+    it('sets wheelT = 10 and moves continuously without stopping', () => {
+      const w = emptyWorld();
+      const id = w.addPlayer('Driver', 'pig');
+      const p = w.players.get(id)!;
+      place(w, id, 0, 0);
+      w.tools.set(101, { id: 101, kind: 'wheel', x: 0, z: 0 });
+      w.step();
+      expect(p.wheelT).toBe(10);
+
+      // Simulates forward movement along input.a (e.g. angle 0 = moving +x)
+      p.input.a = 0;
+      const prevX = p.x;
+      w.step();
+      expect(p.x).toBeGreaterThan(prevX);
+    });
+
+    it('flattens and strips 40% mass or instant KOs if victim < 80kg', () => {
+      const w = emptyWorld();
+      const id1 = w.addPlayer('Cart', 'horse');
+      const id2 = w.addPlayer('Victim', 'sheep');
+      const cart = place(w, id1, -1.0, 0, 100);
+      const victim = place(w, id2, 0, 0, 200);
+
+      cart.wheelT = 10;
+      cart.input.a = 0;
+
+      w.step();
+      // Victim squished and lost mass
+      expect(victim.squishT).toBeGreaterThan(0);
+      expect(victim.mass).toBeLessThan(200);
+
+      // Test instant KO if victim < 80kg
+      const id3 = w.addPlayer('LightVictim', 'chicken');
+      const light = place(w, id3, 0, 0, 50);
+      place(w, id1, -1.0, 0, 100);
+      cart.wheelT = 10;
+      cart.input.a = 0;
+      w.step();
+      expect(light.alive).toBe(false);
+      expect(w.events.some((e) => e.k === 'die' && e.id === id3 && e.cause === 'crush')).toBe(true);
+    });
+  });
+
+  describe('star item (mini clones)', () => {
+    it('summons 2 mini clones of owner up to max 6', () => {
+      const w = emptyWorld();
+      const id = w.addPlayer('Boss', 'cow');
+      place(w, id, 0, 0);
+
+      // First pickup: 2 minions
+      w.tools.set(201, { id: 201, kind: 'star', x: 0, z: 0 });
+      w.step();
+      const bossMinions = [...w.minions.values()].filter((m) => m.ownerId === id);
+      expect(bossMinions.length).toBe(2);
+      expect(bossMinions[0].mass).toBe(50);
+      expect(bossMinions[0].species).toBe('cow');
+
+      // Second pickup: +2 = 4
+      const p = w.players.get(id)!;
+      w.tools.set(202, { id: 202, kind: 'star', x: p.x, z: p.z });
+      w.step();
+      expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(4);
+
+      // Third pickup: +2 = 6
+      w.tools.set(203, { id: 203, kind: 'star', x: p.x, z: p.z });
+      w.step();
+      expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(6);
+
+      // Fourth pickup: capped at 6
+      w.tools.set(204, { id: 204, kind: 'star', x: p.x, z: p.z });
+      w.step();
+      expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(6);
+    });
+
+    it('cleans up minions when owner dies or leaves', () => {
+      const w = emptyWorld();
+      const id = w.addPlayer('Boss', 'duck');
+      place(w, id, 0, 0);
+      w.tools.set(301, { id: 301, kind: 'star', x: 0, z: 0 });
+      w.step();
+      expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(2);
+
+      w.removePlayer(id);
+      expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(0);
+    });
+  });
 });
+
 
 
 

@@ -148,13 +148,32 @@ export class MinimapRenderer {
       }
     }
 
-    // Bonus tools / weapons (gold squares like original game)
+    // Bonus tools / weapons (gold squares like original game, or wheel / star icons)
     if (tools) {
-      ctx.fillStyle = '#e8b641';
       for (const t of tools.values()) {
         const tx = center + t[2] * scale;
         const tz = center + t[3] * scale;
-        ctx.fillRect(tx - 3, tz - 3, 6, 6);
+        const kind = t[1];
+        if (kind === 'wheel') {
+          ctx.beginPath();
+          ctx.arc(tx, tz, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff9800';
+          ctx.fill();
+          ctx.strokeStyle = '#5d4037';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else if (kind === 'star') {
+          ctx.beginPath();
+          ctx.arc(tx, tz, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffea00';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = '#e8b641';
+          ctx.fillRect(tx - 3, tz - 3, 6, 6);
+        }
       }
     }
 

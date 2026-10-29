@@ -37,6 +37,13 @@ interface AnimalVisual {
   waterRippleTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
+  cartGroup: THREE.Group;
+  cartThemeGroups: {
+    classic: THREE.Group;
+    womenDay: THREE.Group;
+    halloween: THREE.Group;
+  };
+  cartWheels: THREE.Mesh[];
 }
 
 function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
@@ -1028,6 +1035,165 @@ export function buildWitchHat(species: Species): THREE.Group {
   return g;
 }
 
+export function buildCartVisual(theme: ArenaTheme): {
+  cartGroup: THREE.Group;
+  cartThemeGroups: {
+    classic: THREE.Group;
+    womenDay: THREE.Group;
+    halloween: THREE.Group;
+  };
+  cartWheels: THREE.Mesh[];
+} {
+  const cartGroup = new THREE.Group();
+  const wheels: THREE.Mesh[] = [];
+
+  // 1. Classic Farm Tractor / Bumper Cart
+  const classic = new THREE.Group();
+  {
+    const chassisMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.75 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: 0.4, metalness: 0.6 });
+    const redMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.5 });
+
+    const chassis = part(new THREE.BoxGeometry(1.6, 0.5, 1.1), chassisMat.color.getHex(), 0, 0.58, 0);
+    classic.add(chassis);
+
+    const plow = part(new THREE.ConeGeometry(0.55, 0.65, 4), redMat.color.getHex(), 0.95, 0.5, 0, { roughness: 0.4 });
+    plow.rotation.z = -Math.PI / 2;
+    plow.scale.set(0.9, 1.0, 1.5);
+    classic.add(plow);
+
+    const stack = part(new THREE.CylinderGeometry(0.08, 0.09, 0.75, 8), metalMat.color.getHex(), 0.4, 1.15, 0.38, { metalness: 0.7 });
+    classic.add(stack);
+    const stackCap = part(new THREE.CylinderGeometry(0.12, 0.08, 0.12, 8), 0xffb300, 0.4, 1.55, 0.38, { metalness: 0.8 });
+    classic.add(stackCap);
+
+    const steering = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 8, 16), metalMat);
+    steering.position.set(-0.15, 1.0, 0);
+    steering.rotation.y = Math.PI / 2;
+    steering.rotation.z = 0.4;
+    classic.add(steering);
+
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x212121, roughness: 0.85 });
+    const wheelGeo = new THREE.CylinderGeometry(0.40, 0.40, 0.22, 14);
+    wheelGeo.rotateX(Math.PI / 2);
+    const wheelOffsets = [
+      [0.55, 0.40, 0.64],
+      [0.55, 0.40, -0.64],
+      [-0.55, 0.40, 0.64],
+      [-0.55, 0.40, -0.64],
+    ];
+    for (const [wx, wy, wz] of wheelOffsets) {
+      const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
+      wMesh.position.set(wx, wy, wz);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.24, 8), new THREE.MeshStandardMaterial({ color: 0xffc107, metalness: 0.5 }));
+      hub.rotation.x = Math.PI / 2;
+      wMesh.add(hub);
+      classic.add(wMesh);
+      wheels.push(wMesh);
+    }
+  }
+
+  // 2. Women's Day: Floral Chariot
+  const womenDay = new THREE.Group();
+  {
+    const carriageMat = new THREE.MeshStandardMaterial({ color: 0xfff5f8, roughness: 0.3, metalness: 0.1 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.25, metalness: 0.85 });
+    const roseMat = new THREE.MeshStandardMaterial({ color: 0xff4081, roughness: 0.4, emissive: 0xe91e63, emissiveIntensity: 0.2 });
+
+    const chassis = part(new THREE.BoxGeometry(1.5, 0.5, 1.05), carriageMat.color.getHex(), 0, 0.58, 0, { roughness: 0.3, metalness: 0.1 });
+    womenDay.add(chassis);
+
+    const ram = part(new THREE.SphereGeometry(0.36, 12, 10), roseMat.color.getHex(), 0.85, 0.55, 0, { roughness: 0.3, metalness: 0.2 });
+    ram.scale.set(0.9, 1.1, 1.3);
+    womenDay.add(ram);
+
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.04, 8, 16), goldMat);
+    trim.position.set(0, 0.85, 0);
+    trim.rotation.x = Math.PI / 2;
+    womenDay.add(trim);
+
+    const lantern = part(new THREE.CylinderGeometry(0.09, 0.06, 0.45, 8), goldMat.color.getHex(), -0.5, 1.0, 0.35, { metalness: 0.8 });
+    womenDay.add(lantern);
+
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.75 });
+    const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.14, 12);
+    wheelGeo.rotateX(Math.PI / 2);
+    const wheelOffsets = [
+      [0.55, 0.36, 0.6],
+      [0.55, 0.36, -0.6],
+      [-0.55, 0.36, 0.6],
+      [-0.55, 0.36, -0.6],
+    ];
+    for (const [wx, wy, wz] of wheelOffsets) {
+      const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
+      wMesh.position.set(wx, wy, wz);
+      const roseHub = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), roseMat);
+      wMesh.add(roseHub);
+      womenDay.add(wMesh);
+      wheels.push(wMesh);
+    }
+  }
+
+  // 3. Halloween: Bone Hearse / Skull Roadster
+  const halloween = new THREE.Group();
+  {
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x181424, roughness: 0.5, metalness: 0.3 });
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xe0d7bf, roughness: 0.65 });
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0xff3d00, emissive: 0xff1744, emissiveIntensity: 0.8 });
+
+    const chassis = part(new THREE.BoxGeometry(1.6, 0.45, 1.1), bodyMat.color.getHex(), 0, 0.55, 0, { roughness: 0.5, metalness: 0.3 });
+    halloween.add(chassis);
+
+    const skullPlow = part(new THREE.ConeGeometry(0.5, 0.7, 6), boneMat.color.getHex(), 0.95, 0.52, 0);
+    skullPlow.rotation.z = -Math.PI / 2;
+    halloween.add(skullPlow);
+
+    for (const z of [-0.35, 0.35]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), glowMat);
+      eye.position.set(0.85, 0.65, z);
+      halloween.add(eye);
+    }
+
+    const stack = part(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), 0x241d30, -0.45, 1.05, 0.35);
+    halloween.add(stack);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xba68c8 });
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.28, 6), flameMat);
+    flame.position.set(-0.45, 1.5, 0.35);
+    halloween.add(flame);
+
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x221a2c, roughness: 0.8 });
+    const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.18, 12);
+    wheelGeo.rotateX(Math.PI / 2);
+    const wheelOffsets = [
+      [0.55, 0.38, 0.62],
+      [0.55, 0.38, -0.62],
+      [-0.55, 0.38, 0.62],
+      [-0.55, 0.38, -0.62],
+    ];
+    for (const [wx, wy, wz] of wheelOffsets) {
+      const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
+      wMesh.position.set(wx, wy, wz);
+      const hub = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), glowMat);
+      wMesh.add(hub);
+      halloween.add(wMesh);
+      wheels.push(wMesh);
+    }
+  }
+
+  classic.visible = theme === 'classic';
+  womenDay.visible = theme === 'women_day';
+  halloween.visible = theme === 'halloween';
+
+  cartGroup.add(classic, womenDay, halloween);
+  cartGroup.visible = false;
+
+  return {
+    cartGroup,
+    cartThemeGroups: { classic, womenDay, halloween },
+    cartWheels: wheels,
+  };
+}
+
 // Height where name label floats for each species
 const LABEL_Y: Record<Species, number> = {
   chicken: 2.3,
@@ -1353,6 +1519,7 @@ export class AnimalRenderer {
     const isSuper = (flags & FLAG.SUPER) !== 0;
     const isFlying = (flags & FLAG.FLYING) !== 0;
     const isSquished = (flags & FLAG.SQUISHED) !== 0;
+    const isWheel = (flags & FLAG.WHEEL) !== 0;
     const lvl = (charge || 0) / 10;
 
     // Smooth squish factor transition: fast flatten on impact (dt * 16), gentle cartoon pop back up (dt * 5)
@@ -1666,9 +1833,38 @@ export class AnimalRenderer {
     }
 
     // Regalia (crown + cape): visible on King, or on all if Squealer rule active
-    const showCrown = isKing || activeRule === 'squealer';
+    const showCrown = (isKing || activeRule === 'squealer') && !isWheel;
     if (vis.regalia) {
       vis.regalia.visible = showCrown;
+    }
+
+    // Wheel cart transformation: transforms animal into a continuous driving vehicle
+    if (isWheel) {
+      vis.body.visible = false;
+      vis.flowerHat.visible = false;
+      vis.witchHat.visible = false;
+      vis.cartGroup.visible = true;
+      vis.cartWheels.forEach((w) => {
+        w.rotation.z -= dt * 26;
+      });
+      if (this.onPuff && Math.random() < 0.4) {
+        const theme = getArenaTheme();
+        const puffColor = theme === 'halloween' ? 0xba68c8 : (theme === 'women_day' ? 0xff80ab : 0x3e2723);
+        this.onPuff(
+          x - Math.cos(angle) * r * 0.95 + (Math.random() - 0.5) * 0.3 * r,
+          sc * 1.4,
+          z - Math.sin(angle) * r * 0.95 + (Math.random() - 0.5) * 0.3 * r,
+          puffColor,
+          0.65 * r,
+          0.6,
+          2.0
+        );
+      }
+    } else {
+      vis.body.visible = true;
+      vis.cartGroup.visible = false;
+      vis.flowerHat.visible = getArenaTheme() === 'women_day';
+      vis.witchHat.visible = getArenaTheme() === 'halloween';
     }
 
     // Update label matching original game:
@@ -1678,6 +1874,7 @@ export class AnimalRenderer {
     const isTraitor = (flags & FLAG.TRAITOR) !== 0;
 
     let iconPrefix = '';
+    if (flags & FLAG.WHEEL) iconPrefix += '🛞 ';
     if (flags & FLAG.SONG) iconPrefix += '🎵 ';
     if (flags & FLAG.DYNAMITE) iconPrefix += '🧨 ';
     if (flags & FLAG.PITCHFORK) iconPrefix += '🍴 ';
@@ -1719,7 +1916,11 @@ export class AnimalRenderer {
     vis.ring.visible = !isWater;
     vis.ring.position.set(x, smoothBaseY + 0.06, z);
     vis.ring.scale.setScalar(sq > 0.3 ? r * (1 + 0.45 * sq) : r);
-    if (isSuper) {
+    if (isWheel) {
+      vis.ring.scale.setScalar(r * 1.35);
+      vis.ringMat.color.set(0xff5722);
+      vis.ringMat.opacity = 0.95;
+    } else if (isSuper) {
       vis.ring.scale.setScalar(r * 1.25);
       vis.ringMat.color.setHSL((now / 500) % 1, 1, 0.6);
       vis.ringMat.opacity = 0.9;
@@ -1759,11 +1960,14 @@ export class AnimalRenderer {
     for (const vis of this.visuals.values()) {
       vis.flowerHat.visible = isWomenDay;
       vis.witchHat.visible = isHalloween;
+      vis.cartThemeGroups.classic.visible = theme === 'classic';
+      vis.cartThemeGroups.womenDay.visible = isWomenDay;
+      vis.cartThemeGroups.halloween.visible = isHalloween;
     }
   }
 
   private buildAnimal(meta: PlayerMeta, isMe = false): AnimalVisual {
-    const { root, body, legs, collarMat, flowerHat, witchHat } = buildFullAnimal(meta.species, meta.skin, meta.team);
+    const { root, body, legs, collarMat, flowerHat, witchHat, cartGroup, cartThemeGroups, cartWheels } = buildFullAnimal(meta.species, meta.skin, meta.team);
 
     // Add King regalia (crown + cape)
     const regalia = buildRegalia(meta.species);
@@ -1823,6 +2027,9 @@ export class AnimalRenderer {
       rainbowTimer: 0,
       mudSplats,
       mudSplatMat: sharedMudSplatMat,
+      cartGroup,
+      cartThemeGroups,
+      cartWheels,
     };
   }
 }
@@ -1834,6 +2041,13 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   collarMat: THREE.MeshStandardMaterial;
   flowerHat: THREE.Group;
   witchHat: THREE.Group;
+  cartGroup: THREE.Group;
+  cartThemeGroups: {
+    classic: THREE.Group;
+    womenDay: THREE.Group;
+    halloween: THREE.Group;
+  };
+  cartWheels: THREE.Mesh[];
 } {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -1867,7 +2081,12 @@ export function buildFullAnimal(species: Species, skinIdx: number, team?: number
   witchHat.visible = getArenaTheme() === 'halloween';
   root.add(witchHat);
 
-  return { root, body, legs, collarMat, flowerHat, witchHat };
+  // Wheel cart vehicle model (attached to root, visible when FLAG.WHEEL active)
+  const { cartGroup, cartThemeGroups, cartWheels } = buildCartVisual(getArenaTheme());
+  cartGroup.name = 'cartGroup';
+  root.add(cartGroup);
+
+  return { root, body, legs, collarMat, flowerHat, witchHat, cartGroup, cartThemeGroups, cartWheels };
 }
 
 export function buildCorpseAnimal(species: Species, skinIdx: number, crowned = false, team?: number): { group: THREE.Group; regalia: THREE.Group | null } {
