@@ -708,8 +708,6 @@ export interface FallingFruit {
 }
 
 // Shared base geometries and materials for farm fruit trees (Zero GC & Single Draw-Call Instancing)
-let sharedSmallAppleGeo: THREE.BufferGeometry | null = null;
-let sharedBigAppleGeo: THREE.BufferGeometry | null = null;
 let sharedFlowerGeo: THREE.BufferGeometry | null = null;
 
 function getSharedFlowerGeo(): THREE.BufferGeometry {
@@ -719,76 +717,104 @@ function getSharedFlowerGeo(): THREE.BufferGeometry {
   return sharedFlowerGeo;
 }
 
-function getSharedSmallAppleGeo(): THREE.BufferGeometry {
-  if (!sharedSmallAppleGeo) {
-    const bodyGeo = new THREE.SphereGeometry(1.0, 8, 6);
-    bodyGeo.scale(1, 0.95, 1);
-    const stemGeo = new THREE.CylinderGeometry(0.05, 0.065, 0.55, 5);
-    stemGeo.translate(0, 1.05, 0);
-    stemGeo.rotateZ(0.2);
-    sharedSmallAppleGeo = BufferGeometryUtils.mergeGeometries([bodyGeo, stemGeo]);
-    bodyGeo.dispose();
-    stemGeo.dispose();
+function setGeoColor(geo: THREE.BufferGeometry, colorHex: number): void {
+  const c = new THREE.Color(colorHex);
+  const count = geo.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
   }
-  return sharedSmallAppleGeo;
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
-function getSharedBigAppleGeo(): THREE.BufferGeometry {
-  if (!sharedBigAppleGeo) {
-    const bodyGeo = new THREE.SphereGeometry(1.0, 10, 8);
-    bodyGeo.scale(1.0, 0.94, 1.0);
-    const stemGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.55, 5);
-    stemGeo.translate(0, 1.05, 0);
-    stemGeo.rotateZ(0.25);
-    const leafGeo = new THREE.ConeGeometry(0.22, 0.55, 4);
-    leafGeo.translate(0.18, 1.15, 0);
-    leafGeo.rotateZ(-0.8);
-    sharedBigAppleGeo = BufferGeometryUtils.mergeGeometries([bodyGeo, stemGeo, leafGeo]);
-    bodyGeo.dispose();
-    stemGeo.dispose();
-    leafGeo.dispose();
-  }
-  return sharedBigAppleGeo;
+interface TreeThemeResources {
+  trunkMat: THREE.MeshStandardMaterial;
+  folMat1: THREE.MeshStandardMaterial;
+  folMat2: THREE.MeshStandardMaterial;
+  folMat3: THREE.MeshStandardMaterial;
+  flowerMat: THREE.MeshStandardMaterial;
+  fruitMat: THREE.MeshStandardMaterial;
+  smallAppleGeo: THREE.BufferGeometry;
+  bigAppleGeo: THREE.BufferGeometry;
+  fallingBigMat: THREE.MeshStandardMaterial;
+  fallingSmallMat: THREE.MeshStandardMaterial;
 }
 
-let sharedFlowerYellowMat: THREE.MeshStandardMaterial | null = null;
-let sharedSmallAppleMat: THREE.MeshStandardMaterial | null = null;
-let sharedBigAppleMat: THREE.MeshStandardMaterial | null = null;
+const themeTreeResources: Partial<Record<ArenaTheme, TreeThemeResources>> = {};
 
-function getSharedTreeMaterials() {
-  if (!sharedFlowerYellowMat) {
-    sharedFlowerYellowMat = new THREE.MeshStandardMaterial({
-      color: 0xffd600,
-      emissive: 0x332200,
-      roughness: 0.35,
-      flatShading: true,
-    });
+function getTreeThemeResources(theme: ArenaTheme): TreeThemeResources {
+  if (themeTreeResources[theme]) return themeTreeResources[theme]!;
+
+  let trunkColor = 0x6d4022;
+  let f1 = 0x43a047, f2 = 0x388e3c, f3 = 0x2e7d32;
+  let flowerCol = 0xffd600, flowerEmiss = 0x332200;
+  let smallBody = 0xe53935, smallStem = 0x5d4037;
+  let bigBody = 0xd32f2f, bigStem = 0x5d4037, bigLeaf = 0x388e3c;
+
+  if (theme === 'women_day') {
+    trunkColor = 0x4a2e2b;
+    f1 = 0xd81b60; f2 = 0xec407a; f3 = 0xf48fb1;
+    flowerCol = 0xffffff; flowerEmiss = 0x442222;
+    smallBody = 0xff80ab; smallStem = 0x4a2e2b;
+    bigBody = 0xc2185b; bigStem = 0x4a2e2b; bigLeaf = 0x4caf50;
+  } else if (theme === 'halloween') {
+    trunkColor = 0x251a22;
+    f1 = 0xd96414; f2 = 0x5e192c; f3 = 0x38123d;
+    flowerCol = 0xc6ff00; flowerEmiss = 0x335500;
+    smallBody = 0xff9100; smallStem = 0x251a22;
+    bigBody = 0xff6d00; bigStem = 0x251a22; bigLeaf = 0x5e192c;
   }
-  if (!sharedSmallAppleMat) {
-    sharedSmallAppleMat = new THREE.MeshStandardMaterial({
-      color: 0xe53935,
-      roughness: 0.28,
-      metalness: 0.1,
-    });
-  }
-  if (!sharedBigAppleMat) {
-    sharedBigAppleMat = new THREE.MeshStandardMaterial({
-      color: 0xd32f2f,
-      roughness: 0.25,
-      metalness: 0.08,
-    });
-  }
-  return {
-    flowerMat: sharedFlowerYellowMat,
-    smallMat: sharedSmallAppleMat,
-    bigMat: sharedBigAppleMat,
+
+  // Small apple merged geo with vertex colors (body + stem)
+  const sBody = new THREE.SphereGeometry(1.0, 8, 6);
+  sBody.scale(1.0, 0.94, 1.0);
+  setGeoColor(sBody, smallBody);
+  const sStem = new THREE.CylinderGeometry(0.05, 0.065, 0.50, 5);
+  sStem.translate(0, 1.02, 0);
+  sStem.rotateZ(0.20);
+  setGeoColor(sStem, smallStem);
+  const smallAppleGeo = BufferGeometryUtils.mergeGeometries([sBody, sStem]);
+  sBody.dispose();
+  sStem.dispose();
+
+  // Big apple merged geo with vertex colors (body + stem + leaf)
+  const bBody = new THREE.SphereGeometry(1.0, 10, 8);
+  bBody.scale(1.0, 0.92, 1.0);
+  setGeoColor(bBody, bigBody);
+  const bStem = new THREE.CylinderGeometry(0.06, 0.075, 0.55, 5);
+  bStem.translate(0, 1.05, 0);
+  bStem.rotateZ(0.25);
+  setGeoColor(bStem, bigStem);
+  const bLeaf = new THREE.ConeGeometry(0.24, 0.60, 4);
+  bLeaf.translate(0.18, 1.15, 0);
+  bLeaf.rotateZ(-0.8);
+  setGeoColor(bLeaf, bigLeaf);
+  const bigAppleGeo = BufferGeometryUtils.mergeGeometries([bBody, bStem, bLeaf]);
+  bBody.dispose();
+  bStem.dispose();
+  bLeaf.dispose();
+
+  const res: TreeThemeResources = {
+    trunkMat: new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.85, flatShading: true }),
+    folMat1: new THREE.MeshStandardMaterial({ color: f1, roughness: 0.75, flatShading: true }),
+    folMat2: new THREE.MeshStandardMaterial({ color: f2, roughness: 0.75, flatShading: true }),
+    folMat3: new THREE.MeshStandardMaterial({ color: f3, roughness: 0.75, flatShading: true }),
+    flowerMat: new THREE.MeshStandardMaterial({ color: flowerCol, emissive: flowerEmiss, roughness: 0.35, flatShading: true }),
+    fruitMat: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.08 }),
+    smallAppleGeo,
+    bigAppleGeo,
+    fallingBigMat: new THREE.MeshStandardMaterial({ color: bigBody, roughness: 0.35 }),
+    fallingSmallMat: new THREE.MeshStandardMaterial({ color: smallBody, roughness: 0.35 }),
   };
+
+  themeTreeResources[theme] = res;
+  return res;
 }
 
 const sharedFallingBigGeo = new THREE.SphereGeometry(0.35, 7, 6);
 const sharedFallingSmallGeo = new THREE.SphereGeometry(0.2, 7, 6);
-const sharedFallingBigMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.35 });
-const sharedFallingSmallMat = new THREE.MeshStandardMaterial({ color: 0xe53935, roughness: 0.35 });
 
 export class WorldRenderer {
   readonly scene: THREE.Scene;
@@ -1938,7 +1964,8 @@ export class WorldRenderer {
     this.farmTreeGroup.clear();
     this.farmTrees.length = 0;
     const theme = getArenaTheme();
-    const treeMats = getSharedTreeMaterials();
+    const res = getTreeThemeResources(theme);
+    const flowerGeo = getSharedFlowerGeo();
     const dummy = new THREE.Object3D();
 
     for (const t of trees) {
@@ -1946,133 +1973,140 @@ export class WorldRenderer {
       g.position.set(t.x, 0, t.z);
 
       // Distinct sizes (+100% scale, +100% trunk height):
-      // Size 2 (Large, 1000kg): trunkH = 9.0m, trunk r ~ 1.3..1.9m, canopy 3 tiers (r=8.4, 6.6, 4.6)
-      // Size 1 (Medium, 500kg): trunkH = 7.0m, trunk r ~ 0.96..1.44m, canopy 2 tiers (r=6.2, 4.6)
-      // Size 0 (Small, 100kg): trunkH = 5.0m, trunk r ~ 0.70..1.00m, canopy 1 tier (r=4.4)
+      // Size 2 (Large, 1000kg): forkH = 4.8m, trunkH = 10.5m, spread = 6.4m, folRadius = 3.6m
+      // Size 1 (Medium, 500kg): forkH = 3.8m, trunkH = 8.0m, spread = 4.8m, folRadius = 2.7m
+      // Size 0 (Small, 100kg): forkH = 2.8m, trunkH = 5.8m, spread = 3.5m, folRadius = 2.0m
 
-      const trunkH = t.size === 2 ? 9.0 : t.size === 1 ? 7.0 : 5.0;
-      const trunkRTop = t.size === 2 ? 1.30 : t.size === 1 ? 0.96 : 0.70;
-      const trunkRBot = t.size === 2 ? 1.90 : t.size === 1 ? 1.44 : 1.00;
+      const forkH = t.size === 2 ? 4.8 : t.size === 1 ? 3.8 : 2.8;
+      const trunkRTop = t.size === 2 ? 1.30 : t.size === 1 ? 0.95 : 0.68;
+      const trunkRBot = t.size === 2 ? 1.95 : t.size === 1 ? 1.45 : 1.02;
+      const bSpread = t.size === 2 ? 6.4 : t.size === 1 ? 4.8 : 3.5;
+      const bElev = t.size === 2 ? 3.6 : t.size === 1 ? 2.7 : 1.9;
+      const folRadius = t.size === 2 ? 3.6 : t.size === 1 ? 2.7 : 2.0;
 
-      const trunkMat = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0x4e342e : theme === 'halloween' ? 0x2b1d1d : 0x5d3a1a,
-        roughness: 0.85,
-        flatShading: true,
-      });
-
-      const trunkMesh = new THREE.Mesh(new THREE.CylinderGeometry(trunkRTop, trunkRBot, trunkH, 8), trunkMat);
-      trunkMesh.position.y = trunkH * 0.5;
+      // 1. Tapered Trunk base reaching up to fork height
+      const trunkGeo = new THREE.CylinderGeometry(trunkRTop, trunkRBot, forkH, 8);
+      const trunkMesh = new THREE.Mesh(trunkGeo, res.trunkMat);
+      trunkMesh.position.y = forkH * 0.5;
       trunkMesh.castShadow = true;
       trunkMesh.receiveShadow = true;
       g.add(trunkMesh);
 
-      // Canopy group (animates/shakes on impact, includes branches, foliage, flowers, and fruits)
+      // 3 subtle root flares at base grounding the tree into the earth
+      for (let r = 0; r < 3; r++) {
+        const rAng = (r / 3) * Math.PI * 2 + (t.id * 1.3);
+        const root = new THREE.Mesh(new THREE.ConeGeometry(trunkRBot * 0.55, forkH * 0.45, 5), res.trunkMat);
+        root.position.set(Math.cos(rAng) * (trunkRBot * 0.85), forkH * 0.16, Math.sin(rAng) * (trunkRBot * 0.85));
+        root.rotation.z = -0.32;
+        root.rotation.y = -rAng;
+        root.castShadow = false;
+        g.add(root);
+      }
+
+      // Canopy group (animates / shakes on impact)
       const canopyGroup = new THREE.Group();
       g.add(canopyGroup);
 
-      // Organic wooden tree branches splitting out from upper trunk into the canopy
-      const nBranches = t.size === 2 ? 4 : 3;
-      const bSpread = t.size === 2 ? 6.2 : t.size === 1 ? 4.6 : 3.4;
-      const bTipElev = t.size === 2 ? 3.4 : t.size === 1 ? 2.6 : 1.8;
-      const folRadius = t.size === 2 ? 4.0 : t.size === 1 ? 3.0 : 2.2;
-      const branchBaseY = trunkH * 0.80;
-
-      // Foliage materials based on theme
-      const folMat1 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xd81b60 : theme === 'halloween' ? 0xd96414 : 0x2e7d32,
-        roughness: 0.75,
-        flatShading: true,
-      });
-      const folMat2 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xec407a : theme === 'halloween' ? 0x5e192c : 0x388e3c,
-        roughness: 0.75,
-        flatShading: true,
-      });
-      const folMat3 = new THREE.MeshStandardMaterial({
-        color: theme === 'women_day' ? 0xf48fb1 : theme === 'halloween' ? 0x331038 : 0x43a047,
-        roughness: 0.75,
-        flatShading: true,
-      });
-
       const branchPuffs: { pos: THREE.Vector3; radius: number }[] = [];
+      const nPrimary = t.size === 2 ? 4 : 3;
 
-      for (let b = 0; b < nBranches; b++) {
-        const bAngle = (b / nBranches) * Math.PI * 2 + (t.id * 1.57);
+      // 2. Sculpted Branch Network (Chạc cây rẽ nhánh đan xen giữa các lùm cây)
+      for (let b = 0; b < nPrimary; b++) {
+        const bAngle = (b / nPrimary) * Math.PI * 2 + (t.id * 1.57);
         const pStart = new THREE.Vector3(
-          Math.cos(bAngle) * (trunkRTop * 0.75),
-          branchBaseY,
-          Math.sin(bAngle) * (trunkRTop * 0.75)
+          Math.cos(bAngle) * (trunkRTop * 0.72),
+          forkH * 0.95,
+          Math.sin(bAngle) * (trunkRTop * 0.72)
         );
         const pEnd = new THREE.Vector3(
           Math.cos(bAngle) * bSpread,
-          trunkH + bTipElev,
+          forkH + bElev,
           Math.sin(bAngle) * bSpread
         );
 
-        // Main primary bough
-        const mainLimb = this.createTreeLimb(pStart, pEnd, trunkRTop * 0.70, trunkRTop * 0.38, trunkMat);
+        // Main primary bough reaching outward
+        const mainLimb = this.createTreeLimb(pStart, pEnd, trunkRTop * 0.65, trunkRTop * 0.35, res.trunkMat);
         canopyGroup.add(mainLimb);
 
-        // Secondary forked branch splitting outward from mid-limb
-        const midP = pStart.clone().lerp(pEnd, 0.52);
-        const forkSpreadAngle = bAngle + (b % 2 === 0 ? 0.45 : -0.45);
-        const forkTip = new THREE.Vector3(
-          Math.cos(forkSpreadAngle) * (bSpread * 0.95),
-          trunkH + bTipElev + 0.6,
-          Math.sin(forkSpreadAngle) * (bSpread * 0.95)
+        // Outer clump on primary branch tip
+        const branchFolMat = (b % 3 === 0) ? res.folMat1 : (b % 3 === 1) ? res.folMat2 : res.folMat3;
+        const puffTip = new THREE.Mesh(new THREE.DodecahedronGeometry(folRadius * 0.92, 1), branchFolMat);
+        puffTip.position.copy(pEnd);
+        puffTip.castShadow = false;
+        puffTip.receiveShadow = true;
+        canopyGroup.add(puffTip);
+        branchPuffs.push({ pos: pEnd, radius: folRadius * 0.92 });
+
+        // Secondary fork splitting out from mid-limb
+        const midP = pStart.clone().lerp(pEnd, 0.46);
+        const forkSpreadAngle = bAngle + (b % 2 === 0 ? 0.42 : -0.42);
+        const forkEnd = new THREE.Vector3(
+          Math.cos(forkSpreadAngle) * (bSpread * 0.85),
+          forkH + bElev + 0.5,
+          Math.sin(forkSpreadAngle) * (bSpread * 0.85)
         );
-        const forkLimb = this.createTreeLimb(midP, forkTip, trunkRTop * 0.42, trunkRTop * 0.22, trunkMat);
+        const forkLimb = this.createTreeLimb(midP, forkEnd, trunkRTop * 0.40, trunkRTop * 0.22, res.trunkMat);
         canopyGroup.add(forkLimb);
 
-        // Foliage cloud nestled on the end of each branch
-        const branchFolMat = (b % 3 === 0) ? folMat1 : (b % 3 === 1) ? folMat2 : folMat3;
-        const branchPuff = new THREE.Mesh(new THREE.DodecahedronGeometry(folRadius, 1), branchFolMat);
-        branchPuff.position.copy(pEnd);
-        branchPuff.castShadow = false;
-        branchPuff.receiveShadow = true;
-        canopyGroup.add(branchPuff);
-
-        branchPuffs.push({ pos: pEnd, radius: folRadius });
+        // Clump on secondary fork tip
+        const midFolMat = (b % 3 === 1) ? res.folMat1 : (b % 3 === 2) ? res.folMat2 : res.folMat3;
+        const puffFork = new THREE.Mesh(new THREE.DodecahedronGeometry(folRadius * 0.76, 1), midFolMat);
+        puffFork.position.copy(forkEnd);
+        puffFork.castShadow = false;
+        puffFork.receiveShadow = true;
+        canopyGroup.add(puffFork);
+        branchPuffs.push({ pos: forkEnd, radius: folRadius * 0.76 });
       }
 
-      // Central crown foliage tiers (resting above the branched trunk)
-      const crownCenterY = trunkH + (t.size === 2 ? 2.8 : t.size === 1 ? 2.2 : 1.6);
-      const crownR1 = t.size === 2 ? 5.2 : t.size === 1 ? 4.0 : 2.8;
-      const crownPuff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR1, 1), folMat1);
+      // 3. Central Crown Limbs & Clumps
+      // Lower crown puff
+      const crownCenterY = forkH + (t.size === 2 ? 3.0 : t.size === 1 ? 2.3 : 1.6);
+      const crownR1 = folRadius * (t.size === 2 ? 1.25 : t.size === 1 ? 1.15 : 1.05);
+      const crownPuff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR1, 1), res.folMat1);
       crownPuff1.position.set(0, crownCenterY, 0);
-      crownPuff1.castShadow = true;
+      crownPuff1.castShadow = true; // Central crown casts shadow on ground
       crownPuff1.receiveShadow = true;
       canopyGroup.add(crownPuff1);
+      branchPuffs.push({ pos: new THREE.Vector3(0, crownCenterY, 0), radius: crownR1 });
 
-      const crownTopY = crownCenterY + (t.size === 2 ? 3.0 : t.size === 1 ? 2.2 : 1.6);
-      const crownR2 = t.size === 2 ? 3.6 : t.size === 1 ? 2.6 : 1.8;
-      const crownPuff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR2, 1), folMat3);
+      // Upper crown puff (top dome)
+      const crownTopY = crownCenterY + (t.size === 2 ? 3.2 : t.size === 1 ? 2.4 : 1.7);
+      const crownR2 = folRadius * (t.size === 2 ? 0.90 : t.size === 1 ? 0.82 : 0.75);
+      const crownPuff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(crownR2, 1), res.folMat3);
       crownPuff2.position.set(0, crownTopY, 0);
       crownPuff2.castShadow = false;
       crownPuff2.receiveShadow = true;
       canopyGroup.add(crownPuff2);
-
-      branchPuffs.push({ pos: new THREE.Vector3(0, crownCenterY, 0), radius: crownR1 });
       branchPuffs.push({ pos: new THREE.Vector3(0, crownTopY, 0), radius: crownR2 });
 
-      // 1. Flowers InstancedMesh: 1 draw call for all yellow flowers
+      // Supporting bough up into central crown
+      const crownLimb = this.createTreeLimb(
+        new THREE.Vector3(0, forkH * 0.95, 0),
+        new THREE.Vector3(0, crownCenterY * 0.85, 0),
+        trunkRTop * 0.65,
+        trunkRTop * 0.35,
+        res.trunkMat
+      );
+      canopyGroup.add(crownLimb);
+
+      // 4. Yellow Blooming Flowers InstancedMesh: 1 draw call, strictly on outer surface
       const flowerCount = t.size === 2 ? 48 : t.size === 1 ? 32 : 20;
-      const flowerInst = new THREE.InstancedMesh(getSharedFlowerGeo(), treeMats.flowerMat, flowerCount);
+      const flowerInst = new THREE.InstancedMesh(flowerGeo, res.flowerMat, flowerCount);
       flowerInst.castShadow = false;
       flowerInst.receiveShadow = false;
 
       for (let i = 0; i < flowerCount; i++) {
         const puff = branchPuffs[i % branchPuffs.length];
         const fR = t.size === 2 ? 0.45 : t.size === 1 ? 0.38 : 0.30;
-        const fPhi = (((i * 1.6180339887) % 1) * 0.70 + 0.15) * Math.PI;
-        const fTheta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
-        const r = puff.radius * (0.85 + 0.15 * Math.sin(i * 3.7));
-        dummy.position.set(
-          puff.pos.x + Math.sin(fPhi) * Math.cos(fTheta) * r,
-          puff.pos.y + Math.cos(fPhi) * r * 0.85,
-          puff.pos.z + Math.sin(fPhi) * Math.sin(fTheta) * r
-        );
+        const phi = (0.15 + ((i * 1.6180339887) % 1) * 0.55) * Math.PI;
+        const theta = (i * 2.399963229728 + t.id * 1.7) % (Math.PI * 2);
+        const sinP = Math.sin(phi);
+        const normal = new THREE.Vector3(sinP * Math.cos(theta), Math.cos(phi), sinP * Math.sin(theta)).normalize();
+        const fPos = puff.pos.clone().addScaledVector(normal, puff.radius * 1.03);
+
+        dummy.position.copy(fPos);
         dummy.scale.set(fR, fR, fR);
+        dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
         dummy.updateMatrix();
         flowerInst.setMatrixAt(i, dummy.matrix);
       }
@@ -2081,24 +2115,28 @@ export class WorldRenderer {
       flowerInst.visible = false;
       canopyGroup.add(flowerInst);
 
-      // 2. Small Fruits InstancedMesh: 1 draw call for all growing apples
+      // 5. Small Growing Apples InstancedMesh: 1 draw call, strictly on exterior surface (1.06 * R)
       const smallFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
-      const smallFruitInst = new THREE.InstancedMesh(getSharedSmallAppleGeo(), treeMats.smallMat, smallFruitCount);
+      const smallFruitInst = new THREE.InstancedMesh(res.smallAppleGeo, res.fruitMat, smallFruitCount);
       smallFruitInst.castShadow = false;
       smallFruitInst.receiveShadow = false;
 
       for (let i = 0; i < smallFruitCount; i++) {
         const puff = branchPuffs[(i + 1) % branchPuffs.length];
         const smallR = t.size === 2 ? 0.60 : t.size === 1 ? 0.40 : 0.25;
-        const aPhi = (((((i + 0.5) * 1.6180339887) % 1) * 0.68) + 0.22) * Math.PI;
-        const aTheta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
-        const aR = puff.radius * (0.88 + 0.12 * Math.cos(i * 4.1));
-        dummy.position.set(
-          puff.pos.x + Math.sin(aPhi) * Math.cos(aTheta) * aR,
-          puff.pos.y + Math.cos(aPhi) * aR * 0.85,
-          puff.pos.z + Math.sin(aPhi) * Math.sin(aTheta) * aR
-        );
+        const phi = (0.20 + ((((i + 0.5) * 1.6180339887) % 1)) * 0.65) * Math.PI;
+        const theta = (i * 2.718281828 + t.id * 2.3) % (Math.PI * 2);
+        const sinP = Math.sin(phi);
+        const normal = new THREE.Vector3(sinP * Math.cos(theta), Math.cos(phi), sinP * Math.sin(theta)).normalize();
+        const sPos = puff.pos.clone().addScaledVector(normal, puff.radius * 1.06);
+
+        dummy.position.copy(sPos);
         dummy.scale.set(smallR, smallR, smallR);
+        if (phi > 0.65 * Math.PI) {
+          dummy.rotation.set(0.25 * Math.sin(i * 1.3), i * 1.7, 0.25 * Math.cos(i * 1.3));
+        } else {
+          dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+        }
         dummy.updateMatrix();
         smallFruitInst.setMatrixAt(i, dummy.matrix);
       }
@@ -2107,24 +2145,28 @@ export class WorldRenderer {
       smallFruitInst.visible = false;
       canopyGroup.add(smallFruitInst);
 
-      // 3. Big Fruits InstancedMesh: 1 draw call for all ripe apples
+      // 6. Big Ripe Apples InstancedMesh: 1 draw call, strictly proud of exterior (1.10 * R)
       const bigFruitCount = t.size === 2 ? 28 : t.size === 1 ? 18 : 12;
-      const bigFruitInst = new THREE.InstancedMesh(getSharedBigAppleGeo(), treeMats.bigMat, bigFruitCount);
+      const bigFruitInst = new THREE.InstancedMesh(res.bigAppleGeo, res.fruitMat, bigFruitCount);
       bigFruitInst.castShadow = false;
       bigFruitInst.receiveShadow = false;
 
       for (let i = 0; i < bigFruitCount; i++) {
         const puff = branchPuffs[(i + 2) % branchPuffs.length];
         const bigR = t.size === 2 ? 1.10 : t.size === 1 ? 0.75 : 0.45;
-        const mPhi = (((((i + 0.25) * 1.6180339887) % 1) * 0.65) + 0.28) * Math.PI;
-        const mTheta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
-        const mR = puff.radius * (0.88 + 0.14 * Math.sin(i * 5.3));
-        dummy.position.set(
-          puff.pos.x + Math.sin(mPhi) * Math.cos(mTheta) * mR,
-          puff.pos.y + Math.cos(mPhi) * mR * 0.80 - 0.2,
-          puff.pos.z + Math.sin(mPhi) * Math.sin(mTheta) * mR
-        );
+        const phi = (0.22 + ((((i + 0.25) * 1.6180339887) % 1)) * 0.64) * Math.PI;
+        const theta = (i * 3.14159265 + t.id * 3.1) % (Math.PI * 2);
+        const sinP = Math.sin(phi);
+        const normal = new THREE.Vector3(sinP * Math.cos(theta), Math.cos(phi), sinP * Math.sin(theta)).normalize();
+        const bPos = puff.pos.clone().addScaledVector(normal, puff.radius * 1.10);
+
+        dummy.position.copy(bPos);
         dummy.scale.set(bigR, bigR, bigR);
+        if (phi > 0.65 * Math.PI) {
+          dummy.rotation.set(0.2 * Math.sin(i * 2.1), (i * 2.3) % 6.28, 0.2 * Math.cos(i * 2.1));
+        } else {
+          dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+        }
         dummy.updateMatrix();
         bigFruitInst.setMatrixAt(i, dummy.matrix);
       }
@@ -2195,18 +2237,20 @@ export class WorldRenderer {
       vis.shakeTimer = 1.2;
     }
 
-    // Spawn falling fruit projectiles from canopy to ground (pooled geometry & materials)
-    const canopyY = size === 2 ? 5.2 : size === 1 ? 4.0 : 3.0;
+    // Spawn falling fruit projectiles from canopy to ground (pooled geometry & theme materials)
+    const theme = getArenaTheme();
+    const res = getTreeThemeResources(theme);
+    const canopyY = size === 2 ? 6.5 : size === 1 ? 5.0 : 3.8;
     const totalDrop = Math.min(10, droppedBig + droppedSmall);
     for (let i = 0; i < totalDrop; i++) {
       const isBig = i < droppedBig;
       const ang = Math.random() * Math.PI * 2;
-      const dist = (size === 2 ? 3.0 : size === 1 ? 2.2 : 1.5) * (0.6 + Math.random() * 0.5);
+      const dist = (size === 2 ? 3.5 : size === 1 ? 2.5 : 1.8) * (0.6 + Math.random() * 0.5);
       const startX = x + Math.cos(ang) * dist;
       const startZ = z + Math.sin(ang) * dist;
 
       const fruitGeo = isBig ? sharedFallingBigGeo : sharedFallingSmallGeo;
-      const fruitMat = isBig ? sharedFallingBigMat : sharedFallingSmallMat;
+      const fruitMat = isBig ? res.fallingBigMat : res.fallingSmallMat;
       const mesh = new THREE.Mesh(fruitGeo, fruitMat);
       mesh.position.set(startX, canopyY + Math.random() * 0.5, startZ);
       this.scene.add(mesh);
