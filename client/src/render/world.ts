@@ -1902,13 +1902,13 @@ export class WorldRenderer {
       const g = new THREE.Group();
       g.position.set(fx, 0, fz);
 
-      const wall = new THREE.Mesh(new THREE.CylinderGeometry(fr + 0.6, fr + 0.8, 1.2, 12, 1, true), T.brickMat);
+      const wall = new THREE.Mesh(new THREE.CylinderGeometry(fr + 0.6, fr + 0.8, 1.2, 16, 1, true), T.brickMat);
       wall.position.y = 0.6;
       wall.castShadow = true;
       g.add(wall);
 
       const rimMat = new THREE.MeshStandardMaterial({ color: 0x6e2f22, roughness: 0.8 });
-      const rim = new THREE.Mesh(new THREE.RingGeometry(fr, fr + 0.8, 12), rimMat);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(fr, fr + 0.8, 16), rimMat);
       rim.rotation.x = -Math.PI / 2;
       rim.position.y = 1.2;
       g.add(rim);
@@ -1918,26 +1918,36 @@ export class WorldRenderer {
       coals.position.y = 0.7;
       g.add(coals);
 
-      const chimney = new THREE.Mesh(new THREE.BoxGeometry(1, 4.5, 1), T.chimneyMat);
+      const chimney = new THREE.Mesh(new THREE.BoxGeometry(1.2, 4.5, 1.2), T.chimneyMat);
       chimney.position.set(fr + 0.7, 2.25, 0);
       chimney.castShadow = true;
       g.add(chimney);
 
-      // Animated flame cones
-      for (let i = 0; i < 5; i++) {
+      // Chimney top trim / cap
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x4a2016, roughness: 0.85 });
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.25, 1.4), capMat);
+      cap.position.set(fr + 0.7, 4.55, 0);
+      cap.castShadow = true;
+      g.add(cap);
+
+      // Animated flame cones (anchored at coals surface)
+      for (let i = 0; i < 7; i++) {
         const flMat = new THREE.MeshBasicMaterial({
-          color: i % 2 ? 0xffb21a : 0xff6a1a,
+          color: i % 3 === 0 ? 0xffcc22 : i % 3 === 1 ? 0xff7711 : 0xff3300,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.88,
         });
-        const fl = new THREE.Mesh(new THREE.ConeGeometry(0.6, 2.2, 6), flMat);
-        const a = (i / 5) * Math.PI * 2;
-        const d = i ? fr * 0.5 : 0;
-        fl.position.set(Math.cos(a) * d, 1.6, Math.sin(a) * d);
+        const coneGeo = new THREE.ConeGeometry(0.55 + 0.1 * (i % 2), 2.2, 6);
+        coneGeo.translate(0, 1.1, 0);
+        const fl = new THREE.Mesh(coneGeo, flMat);
+        const a = (i / 7) * Math.PI * 2;
+        const d = i === 0 ? 0 : fr * (0.35 + 0.25 * ((i * 3) % 2));
+        fl.position.set(Math.cos(a) * d, 0.7, Math.sin(a) * d);
         g.add(fl);
         this.flames.push({ mesh: fl, idx: i });
       }
 
+      this.hazardGroup.add(g);
     }
   }
 
@@ -2318,6 +2328,20 @@ export class WorldRenderer {
     for (const f of this.flames) {
       f.mesh.scale.y = 0.8 + 0.45 * Math.sin(now / 90 + f.idx * 1.7);
       f.mesh.scale.x = f.mesh.scale.z = 0.9 + 0.15 * Math.sin(now / 70 + f.idx);
+    }
+    if (parts && this.lastMapData?.fire) {
+      for (const [fx, fz, fr] of this.lastMapData.fire) {
+        if (Math.random() < 0.12) {
+          // Smoke puff rising from chimney top
+          parts.puff(fx + fr + 0.7 + (Math.random() - 0.5) * 0.2, 4.7, fz + (Math.random() - 0.5) * 0.2, 0x4a4542, 0.45, 1.2, 1.2);
+        }
+        if (Math.random() < 0.08) {
+          // Fire spark / ember from furnace pit
+          const a = Math.random() * Math.PI * 2;
+          const d = Math.random() * fr * 0.6;
+          parts.puff(fx + Math.cos(a) * d, 1.8, fz + Math.sin(a) * d, 0xffa01a, 0.2, 0.5, 2.0);
+        }
+      }
     }
     this.updateElectricFence(now, parts, playerPos);
   }
