@@ -1533,6 +1533,60 @@ describe('fruit trees', () => {
       w.removePlayer(id);
       expect([...w.minions.values()].filter((m) => m.ownerId === id).length).toBe(0);
     });
+
+    it('minions do NOT attack peaceful bystanders, only attack on retaliate or active owner attack', () => {
+      const w = emptyWorld();
+      const ownerId = w.addPlayer('Boss', 'cow');
+      place(w, ownerId, 0, 0);
+
+      // Summon minions
+      w.tools.set(401, { id: 401, kind: 'star', x: 0, z: 0 });
+      w.step();
+      const bossMinions = [...w.minions.values()].filter((m) => m.ownerId === ownerId);
+      expect(bossMinions.length).toBe(2);
+
+      // Add a nearby bystander within 5 units
+      const bystanderId = w.addPlayer('Bystander', 'sheep');
+      place(w, bystanderId, 4, 0);
+
+      // Step simulation: bystander has not attacked owner and owner has not attacked bystander
+      for (let i = 0; i < 10; i++) {
+        w.step();
+      }
+      for (const m of bossMinions) {
+        expect(m.targetId).toBe(0); // Minions must not target innocent bystander
+      }
+
+      // Condition A: Enemy attacks owner
+      const bystander = w.players.get(bystanderId)!;
+      const owner = w.players.get(ownerId)!;
+      owner.lastHitBy = bystanderId;
+      owner.lastHitT = w.time;
+
+      w.step();
+      // Minions should now engage retaliatory chase on the attacker
+      for (const m of bossMinions) {
+        expect(m.targetId).toBe(bystanderId);
+      }
+
+      // If target moves beyond leash (> 15 units), minions disengage
+      place(w, bystanderId, 30, 30);
+      w.step();
+      for (const m of bossMinions) {
+        expect(m.targetId).toBe(0);
+      }
+
+      // Condition B: Owner actively attacks an enemy
+      const enemy2Id = w.addPlayer('Enemy2', 'pig');
+      place(w, enemy2Id, 5, 0);
+      owner.lastAttackedId = enemy2Id;
+      owner.lastAttackedT = w.time;
+
+      w.step();
+      for (const m of bossMinions) {
+        expect(m.targetId).toBe(enemy2Id);
+      }
+    });
   });
 });
 

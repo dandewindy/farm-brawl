@@ -38,6 +38,8 @@ export interface Player extends Body {
   dashHit: Set<number>;
   lastHitBy: number;
   lastHitT: number;
+  lastAttackedId: number;
+  lastAttackedT: number;
   kills: number;
   totalKills: number;
   score: number;
@@ -245,7 +247,7 @@ export class World {
     if (this.foodEnabled) {
       for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     }
-    for (let i = 0; i < 6; i++) this.spawnTool();
+    for (let i = 0; i < 7; i++) this.spawnTool();
     this.flush();
   }
 
@@ -273,7 +275,7 @@ export class World {
       bot, alive: false,
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
-      terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
+      terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, lastAttackedId: 0, lastAttackedT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
       respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
@@ -384,6 +386,7 @@ export class World {
     Object.assign(p, {
       alive: true, x, z, vx: 0, vz: 0, a: Math.atan2(-z, -x), mass: spawnMass, dashT: 0, stunT: 0,
       charging: false, pressed: false, holdT: 0, cd: 0, plow: false, power: 1, lastHitBy: 0, lastHitT: -99,
+      lastAttackedId: 0, lastAttackedT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
@@ -834,11 +837,11 @@ export class World {
 
     this.eat(alive);
 
-    // Tool & Super Candy spawning (special items spawn 2x faster, max 7 tools)
+    // Tool & Super Candy spawning (special items spawn 2x faster, max 8 tools)
     this.toolSpawnTimer -= DT;
     if (this.toolSpawnTimer <= 0) {
       this.toolSpawnTimer = 6 + this.rnd() * 4;
-      if (this.tools.size < 7) {
+      if (this.tools.size < 8) {
         this.spawnTool();
       }
     }
@@ -1423,6 +1426,8 @@ export class World {
     victim.stunT = 1.2;
     victim.lastHitBy = attacker.id;
     victim.lastHitT = this.time;
+    attacker.lastAttackedId = victim.id;
+    attacker.lastAttackedT = this.time;
     const launchSpeed = 34;
     victim.vx = nx * launchSpeed;
     victim.vz = nz * launchSpeed;
@@ -1465,24 +1470,28 @@ export class World {
         m.targetId = 0;
       }
 
-      // Check current target
+      // Check current target: must still be alive, within leash of owner, and combat active (< 6s)
       let target: Player | undefined;
       if (m.targetId > 0) {
         target = this.players.get(m.targetId);
-        if (!target || !target.alive || Math.hypot(target.x - owner.x, target.z - owner.z) > LEASH_R) {
+        const inLeash = target && target.alive && Math.hypot(target.x - owner.x, target.z - owner.z) <= LEASH_R && distToOwner <= LEASH_R;
+        const isEnemyAttacker = target ? (owner.lastHitBy === target.id && this.time - owner.lastHitT < 6.0) : false;
+        const isOwnerAttacked = target ? ((owner.lastAttackedId === target.id && this.time - owner.lastAttackedT < 6.0) || (target.lastHitBy === owner.id && this.time - target.lastHitT < 6.0)) : false;
+
+        if (!inLeash || (!isEnemyAttacker && !isOwnerAttacked)) {
           m.targetId = 0;
           target = undefined;
         }
       }
 
-      // Find new target if none
+      // Find new target if none: ONLY if candidate attacked owner OR owner attacked candidate
       if (!target) {
-        // Priority 1: enemy that recently hit owner
-        if (owner.lastHitBy > 0 && this.time - owner.lastHitT < 3.5) {
+        // Condition A: enemy that recently hit owner within leash
+        if (owner.lastHitBy > 0 && this.time - owner.lastHitT < 6.0) {
           const attacker = this.players.get(owner.lastHitBy);
           if (attacker && attacker.alive && attacker.id !== owner.id) {
             const sameT = owner.team !== undefined && attacker.team !== undefined && owner.team === attacker.team;
-            if (!sameT && Math.hypot(attacker.x - owner.x, attacker.z - owner.z) < LEASH_R) {
+            if (!sameT && Math.hypot(attacker.x - owner.x, attacker.z - owner.z) <= LEASH_R) {
               m.targetId = attacker.id;
               target = attacker;
             }
@@ -1491,17 +1500,16 @@ export class World {
       }
 
       if (!target) {
-        // Priority 2: nearest enemy within 9 units of owner
-        let bestDist = 9;
-        for (const p of alive) {
-          if (p.id === owner.id) continue;
-          const sameT = owner.team !== undefined && p.team !== undefined && owner.team === p.team;
-          if (sameT) continue;
-          const d = Math.hypot(p.x - owner.x, p.z - owner.z);
-          if (d < bestDist) {
-            bestDist = d;
-            m.targetId = p.id;
-            target = p;
+        // Condition B: enemy that owner recently attacked within leash
+        const candidateId = owner.lastAttackedId;
+        if (candidateId > 0 && this.time - owner.lastAttackedT < 6.0) {
+          const victim = this.players.get(candidateId);
+          if (victim && victim.alive && victim.id !== owner.id) {
+            const sameT = owner.team !== undefined && victim.team !== undefined && owner.team === victim.team;
+            if (!sameT && Math.hypot(victim.x - owner.x, victim.z - owner.z) <= LEASH_R) {
+              m.targetId = victim.id;
+              target = victim;
+            }
           }
         }
       }
@@ -1544,6 +1552,8 @@ export class World {
           });
           if (target.mass < 10) {
             this.kill(target, 'fence');
+            m.targetId = 0;
+            target = undefined;
           }
         }
       } else {
@@ -1804,6 +1814,8 @@ export class World {
       vic.plow = false;
       vic.lastHitBy = att.id;
       vic.lastHitT = this.time;
+      att.lastAttackedId = vic.id;
+      att.lastAttackedT = this.time;
       const rv = radiusOf(vic.mass);
       this.events.push({
         k: 'hit',
@@ -1821,6 +1833,8 @@ export class World {
     if (isDynamite) {
       vic.lastHitBy = att.id;
       vic.lastHitT = this.time;
+      att.lastAttackedId = vic.id;
+      att.lastAttackedT = this.time;
       // Animals under 100kg immediately explode and die
       if (vic.mass < 100) {
         this.kill(vic, 'dynamite');
@@ -1867,6 +1881,8 @@ export class World {
     }
     vic.lastHitBy = att.id;
     vic.lastHitT = this.time;
+    att.lastAttackedId = vic.id;
+    att.lastAttackedT = this.time;
     const rv = radiusOf(vic.mass);
     this.events.push({
       k: 'hit',
@@ -2102,7 +2118,7 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star'];
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
     for (let tries = 0; tries < 25; tries++) {
