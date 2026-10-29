@@ -964,9 +964,11 @@ export function buildWitchHat(species: Species): THREE.Group {
   const [hx, hy] = HEAD[species] || [0.5, 1.8];
 
   const hatGroup = new THREE.Group();
-  const yOffset = species === 'elephant' ? 0.45 : species === 'horse' ? 0.35 : species === 'cow' ? 0.30 : 0.22;
+  // Sit the hat snugly on the crown of each species' head
+  const yOffset = species === 'elephant' ? 0.18 : species === 'horse' ? 0.22 : species === 'cow' ? 0.18 : 0.14;
   hatGroup.position.set(hx, hy + yOffset, 0);
-  hatGroup.rotation.z = -0.15;
+  // Slight forward lean (toward the face) for style
+  hatGroup.rotation.z = -0.12;
 
   const darkMat = new THREE.MeshStandardMaterial({
     color: 0x1a1528,
@@ -984,34 +986,43 @@ export function buildWitchHat(species: Species): THREE.Group {
     roughness: 0.25,
   });
 
-  const brimRadius = species === 'elephant' ? 0.65 : species === 'cow' || species === 'horse' ? 0.48 : 0.36;
-  const brimGeo = new THREE.CylinderGeometry(brimRadius, brimRadius, 0.04, 16);
+  const brimRadius = species === 'elephant' ? 0.60 : species === 'cow' || species === 'horse' ? 0.46 : 0.34;
+  const brimGeo = new THREE.CylinderGeometry(brimRadius, brimRadius * 1.08, 0.05, 16);
   const brim = new THREE.Mesh(brimGeo, darkMat);
   hatGroup.add(brim);
 
   const ribbonRadius = brimRadius * 0.58;
   const ribbon = new THREE.Mesh(
-    new THREE.CylinderGeometry(ribbonRadius * 0.95, ribbonRadius, 0.1, 16),
+    new THREE.CylinderGeometry(ribbonRadius * 0.95, ribbonRadius, 0.12, 16),
     orangeMat
   );
-  ribbon.position.y = 0.05;
+  ribbon.position.y = 0.06;
   hatGroup.add(ribbon);
 
   const buckle = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 0.08, 0.04),
+    new THREE.BoxGeometry(0.09, 0.09, 0.05),
     goldMat
   );
-  buckle.position.set(ribbonRadius + 0.02, 0.05, 0);
+  buckle.position.set(ribbonRadius + 0.02, 0.06, 0);
   hatGroup.add(buckle);
 
-  const coneHeight = species === 'elephant' ? 1.0 : 0.75;
+  const coneHeight = species === 'elephant' ? 0.95 : 0.72;
+  const coneRadius = ribbonRadius * 0.88;
   const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(ribbonRadius * 0.9, coneHeight, 16),
+    new THREE.ConeGeometry(coneRadius, coneHeight, 16),
     darkMat
   );
-  cone.position.set(-0.06, coneHeight * 0.5 + 0.08, 0);
-  cone.rotation.z = -0.22;
+  // Center the cone directly above the brim — no X offset
+  cone.position.set(0, coneHeight * 0.5 + 0.10, 0);
+  // Slight lean matching the hatGroup tilt, not additional off-axis skew
+  cone.rotation.z = 0;
   hatGroup.add(cone);
+
+  // Pointy tip accent (small bright orange sphere at cone apex)
+  const tipMat = new THREE.MeshStandardMaterial({ color: 0xff8f00, emissive: 0x331500, roughness: 0.4 });
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(coneRadius * 0.18, 8, 6), tipMat);
+  tip.position.set(0, coneHeight + 0.10, 0);
+  hatGroup.add(tip);
 
   g.add(hatGroup);
   return g;
