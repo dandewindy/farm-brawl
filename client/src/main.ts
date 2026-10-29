@@ -1310,7 +1310,37 @@ function handleGameEvent(ev: GameEvent): void {
   const myId = gameState.myId;
   switch (ev.k) {
     case 'hit': {
-      const isMine = ev.a === myId || ev.v === myId;
+      if (ev.minion) {
+        // Minion hit: render visual fluff/burst and sound at impact location,
+        // but NEVER disturb player's position, predictor, camera, or velocity!
+        sfxHit(ev.s, 0.35);
+        foodParts.burst(ev.x, 1.4, ev.z, 0xfff3a0, 14, 6, 6, 0.5);
+        const vm = gameState.metas.get(ev.v);
+        if (vm) {
+          if (ev.v !== myId) {
+            animals.notifyHit(ev.v);
+            yelp(vm.species, 0.4);
+          }
+          const FLUFF_COLORS: Record<Species, number> = {
+            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892,
+          };
+          foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
+        }
+        if (ev.loss && ev.loss >= 1) {
+          const lossNum = Math.round(ev.loss);
+          const victimPos = animals.getPosition(ev.v);
+          const initPos = victimPos ? { x: victimPos.x, z: victimPos.z, mass: 50 } : { x: ev.x, z: ev.z, mass: 50 };
+          hud.floatText(`-${lossNum} kg`, 'loss', ev.v, initPos);
+        }
+        break;
+      }
+
+      const meEnt = gameState.ents.get(myId);
+      const myRadius = radiusOf(meEnt ? meEnt.mass : CFG.START_MASS);
+      const distToHit = Math.hypot(predictor.x - ev.x, predictor.z - ev.z);
+      const isPhysicallyNearHit = distToHit <= myRadius + 3.2;
+
+      const isMine = (ev.a === myId || ev.v === myId) && isPhysicallyNearHit;
       sfxHit(ev.s, isMine ? 1 : 0.4);
       animals.notifyHit(ev.v);
       const vm = gameState.metas.get(ev.v);
@@ -1337,12 +1367,10 @@ function handleGameEvent(ev: GameEvent): void {
       }
 
       // Attacker hit someone with normal (non-plow) dash: stop dash velocity immediately on impact!
-      if (ev.a === myId && !predictor.plow) {
+      if (ev.a === myId && !predictor.plow && isPhysicallyNearHit) {
         predictor.dashT = 0;
         predictor.vx *= 0.25;
         predictor.vz *= 0.25;
-        const meEnt = gameState.ents.get(myId);
-        const myRadius = radiusOf(meEnt ? meEnt.mass : CFG.START_MASS);
         const toContactX = ev.x - predictor.x;
         const toContactZ = ev.z - predictor.z;
         const dot = toContactX * Math.cos(predictor.a) + toContactZ * Math.sin(predictor.a);
@@ -1352,7 +1380,7 @@ function handleGameEvent(ev: GameEvent): void {
         }
       }
       // Victim hit by someone: stop dash and charging immediately, apply knockback impulse
-      if (ev.v === myId && ev.a !== 0) {
+      if (ev.v === myId && ev.a !== 0 && isPhysicallyNearHit) {
         predictor.dashT = 0;
         predictor.plow = false;
         input.cancelRam();
@@ -1370,7 +1398,7 @@ function handleGameEvent(ev: GameEvent): void {
 
       // Stun lockout ONLY when hitting a post/obstacle ("trúng cọc" / "trúng bục", ev.a === 0)!
       // Normal ramming between animals does NOT cause stun!
-      if (ev.v === myId && ev.a === 0) {
+      if (ev.v === myId && ev.a === 0 && isPhysicallyNearHit) {
         const stunDur = 1.5;
         localStunTimer = stunDur;
         lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;

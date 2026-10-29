@@ -73,7 +73,7 @@ export interface ChoiceWire {
 export type GameEvent =
   | ({ k: 'join' } & PlayerMeta)
   | { k: 'leave'; id: number }
-  | { k: 'hit'; a: number; v: number; x: number; z: number; s: number; loss?: number }
+  | { k: 'hit'; a: number; v: number; x: number; z: number; s: number; loss?: number; minion?: boolean }
   | {
       k: 'die';
       id: number;

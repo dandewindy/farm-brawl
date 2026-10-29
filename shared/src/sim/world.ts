@@ -1540,6 +1540,7 @@ export class World {
             z: r2(target.z),
             s: 18,
             loss: Math.round(loss),
+            minion: true,
           });
           if (target.mass < 10) {
             this.kill(target, 'fence');
@@ -1587,6 +1588,7 @@ export class World {
             z: r2(m.z),
             s: 14,
             loss: 18,
+            minion: true,
           });
           if (m.mass <= 5) {
             m.alive = false;
