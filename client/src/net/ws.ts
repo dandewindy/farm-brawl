@@ -20,6 +20,7 @@ export class WsClient implements Transport {
   public colo = '';
   public doColo = '';
   public inGame = false;
+  public activeUrl: string;
   private reconnectTimer: number | null = null;
   private readonly rttRawSamples: number[] = [];
   private smoothedPing = 0;
@@ -32,19 +33,18 @@ export class WsClient implements Transport {
   private migrationLockTimer: number | null = null;
 
   public get displayColo(): string {
-    if (this.doColo && /^(SIN|HKG|APAC)$/i.test(this.doColo)) {
-      return this.doColo;
-    }
-    return this.colo || 'SIN';
+    // Luôn ưu tiên hiển thị trạm Edge POP thực tế (nơi người chơi kết nối vào)
+    return this.colo || this.doColo || 'SIN';
   }
 
   public isColoHealthy(): boolean {
-    const isAsianDo = /^(SIN|HKG|APAC|SGN|HAN|DAD|BKK|KUL)$/i.test(this.doColo);
-    const isAsianEdge = isFastColo(this.colo);
-    return isAsianDo || isAsianEdge || (this.rttMin > 0 && this.rttMin <= 140);
+    // Kết nối chỉ khỏe khi độ trễ thực tế <= 160ms VÀ trạm biên thuộc châu Á
+    if (this.rttMin <= 0) return true; // Chưa có mẫu ping
+    if (this.rttMin > 160) return false;
+    return isFastColo(this.colo) && this.rttMin <= 140;
   }
 
-  private lockMigration(durationMs = 60000): void {
+  private lockMigration(durationMs = 12000): void {
     this.migrationLocked = true;
     if (this.migrationLockTimer !== null) clearTimeout(this.migrationLockTimer);
     this.migrationLockTimer = window.setTimeout(() => {
@@ -67,6 +67,7 @@ export class WsClient implements Transport {
     private readonly onMsg: Handler,
     private readonly onStatus?: (status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error') => void
   ) {
+    this.activeUrl = url;
     try {
       this.sessionToken = sessionStorage.getItem(`fb_tok_${this.getRoomKey()}`) || sessionStorage.getItem('fb_session_token');
     } catch (_) {}
@@ -92,7 +93,7 @@ export class WsClient implements Transport {
 
     let socket: WebSocket;
     try {
-      socket = new WebSocket(this.url);
+      socket = new WebSocket(this.activeUrl);
       this.ws = socket;
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
@@ -161,11 +162,11 @@ export class WsClient implements Transport {
               this.rtt = sorted[Math.floor(sorted.length / 2)];
 
               // 3. Asymmetric EWMA (Làm mượt bất đối xứng)
-              if (this.smoothedPing === 0) {
+              if (this.smoothedPing === 0 || this.rttRawSamples.length <= 2) {
                 this.smoothedPing = baseRtt;
               } else {
-                // Giảm nhanh (alpha = 0.25) khi mạng tốt, tăng cực kỳ điềm tĩnh (alpha = 0.05) khi có spike/jitter
-                const alpha = baseRtt < this.smoothedPing ? 0.25 : 0.05;
+                // Giảm nhanh (alpha = 0.4) khi mạng tốt hơn, tăng điềm tĩnh (alpha = 0.1) khi có spike/jitter
+                const alpha = baseRtt < this.smoothedPing ? 0.4 : 0.1;
                 this.smoothedPing = alpha * baseRtt + (1 - alpha) * this.smoothedPing;
               }
 
@@ -179,12 +180,12 @@ export class WsClient implements Transport {
                 this.lastPingUpdateTs = now;
               }
 
-              // 5. Watchdog kiểm tra định tuyến (Ngưỡng thực tế tránh false-positive trên 4G/Wi-Fi)
+              // 5. Watchdog kiểm tra định tuyến
               const isHealthy = this.isColoHealthy();
-              const isOptimal = (this.doColo === 'SIN' || this.colo === 'SIN') && this.rttMin <= 120;
-              const isCriticalSlow = !isHealthy && this.rttMin > 180;
+              const isOptimal = (this.colo === 'SIN' || this.colo === 'HKG') && this.rttMin <= 90;
+              const isCriticalSlow = !isHealthy && (this.rttMin > 160 || !isFastColo(this.colo));
 
-              if (isOptimal || isHealthy) {
+              if (isOptimal || (isHealthy && this.rttMin <= 120)) {
                 this.lobbySteerAttempts = 0;
                 this.badPingStreak = 0;
               } else if (isCriticalSlow) {
@@ -193,20 +194,20 @@ export class WsClient implements Transport {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // Silent Lobby Steer (Max 2 attempts, only for truly broken distant routes):
+              // Silent Lobby Steer: khi ở sảnh nếu kết nối bị chậm (>160ms) hoặc ngoài châu Á
               if (!this.inGame && isCriticalSlow && !this.closed) {
-                if (this.rttRawSamples.length >= 3 && this.lobbySteerAttempts < 2) {
-                  if (now - this.lastLobbyReconnectTime > 8000) {
+                if (this.rttRawSamples.length >= 2 && this.lobbySteerAttempts < 3) {
+                  if (now - this.lastLobbyReconnectTime > 3000) {
                     this.lastLobbyReconnectTime = now;
                     this.lobbySteerAttempts++;
-                    console.log(`[WS Watchdog] Lobby on non-optimal node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/2 to find SIN route...`);
-                    this.forceReconnect();
+                    console.log(`[WS Watchdog] Lobby on non-optimal node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/3 switching route...`);
+                    this.steerToBestRoute();
                   }
                 }
               }
 
-              // Chỉ kích hoạt hot migration khi thực sự tắc nghẽn liên tục (streak >= 8, rtt > 200ms) và chưa bị lock
-              if (this.inGame && this.badPingStreak >= 8 && this.rttMin > 200 && !this.migrationLocked && !this.closed) {
+              // Hot migration trong trận: khi lag liên tục (streak >= 3, rttMin > 170ms hoặc ngoài châu Á)
+              if (this.inGame && this.badPingStreak >= 3 && !this.migrationLocked && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -258,24 +259,66 @@ export class WsClient implements Transport {
     };
   }
 
+  private getCandidateUrls(): string[] {
+    const urls: string[] = [];
+    try {
+      const u = new URL(this.activeUrl);
+      const isDev = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+      if (isDev) return [this.activeUrl];
+
+      const search = u.search;
+      const isCustom = u.hostname.includes('get-go.site');
+
+      if (isCustom) {
+        // Tên miền riêng bị ISP đưa qua châu Âu -> Thử ngay workers.dev cùng tài khoản và tài khoản 1
+        urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
+        urls.push(`wss://farm-brawl.farm-brawl.workers.dev/ws${search}`);
+        urls.push(this.activeUrl);
+      } else if (u.hostname.includes('windydande.workers.dev')) {
+        urls.push(`wss://brawl.get-go.site/ws${search}`);
+        urls.push(`wss://farm-brawl.farm-brawl.workers.dev/ws${search}`);
+        urls.push(this.activeUrl);
+      } else {
+        urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
+        urls.push(`wss://brawl.get-go.site/ws${search}`);
+        urls.push(this.activeUrl);
+      }
+    } catch (_) {
+      urls.push(this.activeUrl);
+    }
+    return urls;
+  }
+
+  public steerToBestRoute(): void {
+    if (this.closed || this.inGame) return;
+    const candidates = this.getCandidateUrls();
+    const nextUrl = candidates[this.lobbySteerAttempts % candidates.length];
+    this.activeUrl = nextUrl;
+    try { sessionStorage.setItem('fb_fast_host', new URL(nextUrl).host); } catch (_) {}
+    this.forceReconnect();
+  }
+
   public triggerHotMigration(force = false): void {
     if (!this.inGame || this.closed) return;
     if (!force && this.migrationLocked) return;
-    // Strict Guard: If currently on a healthy node or DO in SIN/HKG/APAC with good ping (<= 160ms), NEVER auto-migrate!
-    if (!force && this.isColoHealthy() && (this.rttMin <= 160 || this.rtt <= 160)) {
+    // Strict Guard: Nếu ping đang tốt (<= 120ms) và trạm châu Á thì không cần di dời
+    if (!force && this.isColoHealthy() && this.rttMin <= 120) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;
     }
     const now = performance.now();
-    // Throttle attempts: probe at most once every 3.0 seconds
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 3000) return;
+    // Throttle attempts: probe cách nhau tối thiểu 2.5s
+    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 2500) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
     this.onMigrationStatus?.('probing', this.colo);
-    console.log(`[WS Watchdog] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting zero-downtime hot migration probe...`);
 
-    const probeUrl = this.url + (this.url.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
+    const candidates = this.getCandidateUrls();
+    const candidateUrl = candidates[this.probeAttempts % candidates.length];
+    const probeUrl = candidateUrl + (candidateUrl.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
+
+    console.log(`[WS Watchdog] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting hot migration probe on ${new URL(candidateUrl).host}...`);
     let probeSocket: WebSocket;
     try {
       probeSocket = new WebSocket(probeUrl);
@@ -296,10 +339,10 @@ export class WsClient implements Transport {
         this.isMigrating = false;
         this.probeAttempts++;
         this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= 2) {
+        if (this.probeAttempts >= candidates.length) {
           this.probeAttempts = 0;
           this.badPingStreak = 0;
-          this.lockMigration(60000);
+          this.lockMigration(12000);
         }
       }
     }, 2000);
@@ -323,18 +366,24 @@ export class WsClient implements Transport {
         if (msg.t === 'pong') {
           const probeColo = msg.colo;
           const probeRtt = performance.now() - msg.c;
-          console.log(`[WS Watchdog] Hot migration probe response colo: ${probeColo}, rtt: ${Math.round(probeRtt)}ms`);
+          console.log(`[WS Watchdog] Hot migration probe response from ${new URL(candidateUrl).host}: colo=${probeColo}, rtt=${Math.round(probeRtt)}ms`);
           const currentlyFast = isFastColo(this.colo);
-          // Prioritize Singapore (SIN) edge POP, especially when mobile/iPad is routed to HKG or latency > 90ms
-          const isBetter = probeColo === 'SIN'
-            ? (probeRtt > 0 && (this.colo !== 'SIN' || probeRtt < this.rttMin * 0.9))
-            : currentlyFast
-            ? (isFastColo(probeColo) && probeRtt > 0 && probeRtt < this.rttMin * 0.8)
-            : (isFastColo(probeColo) || (probeRtt > 0 && probeRtt < this.rttMin * 0.65));
+          const isProbeFast = isFastColo(probeColo);
+
+          // Điều kiện chuyển tuyến ưu tiên:
+          // 1. Trạm hiện tại ngoài châu Á (WAW/FRA/CDG/SJC) và trạm probe thuộc châu Á
+          // 2. Hoặc trạm probe có độ trễ thấp hơn rõ rệt (< 85% rtt hiện tại)
+          // 3. Hoặc trạm probe là SIN/HKG với ping <= 120ms và ping hiện tại > 130ms
+          const isBetter = (!currentlyFast && isProbeFast)
+            || (isProbeFast && probeRtt > 0 && probeRtt < this.rttMin * 0.85)
+            || (probeRtt > 0 && probeRtt < this.rttMin * 0.65)
+            || ((probeColo === 'SIN' || probeColo === 'HKG') && probeRtt <= 120 && this.rttMin > 130);
 
           if (isBetter) {
             this.probeAttempts = 0;
-            // Optimal edge node found! Hand over existing session token
+            this.activeUrl = candidateUrl;
+            try { sessionStorage.setItem('fb_fast_host', new URL(candidateUrl).host); } catch (_) {}
+            // Hand over existing session token
             if (this.lastJoinMsg) {
               probeSocket.send(JSON.stringify({
                 ...this.lastJoinMsg,
@@ -355,11 +404,11 @@ export class WsClient implements Transport {
             this.isMigrating = false;
             this.probeAttempts++;
             this.onMigrationStatus?.('failed', this.colo);
-            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/2).`);
-            if (this.probeAttempts >= 2 || probeColo === this.colo) {
+            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/${candidates.length}).`);
+            if (this.probeAttempts >= candidates.length) {
               this.probeAttempts = 0;
               this.badPingStreak = 0;
-              this.lockMigration(60000);
+              this.lockMigration(12000);
             }
           }
         } else if (msg.t === 'init') {
@@ -369,7 +418,9 @@ export class WsClient implements Transport {
           // Handover acknowledged by server! Seamlessly swap active socket
           clearTimeout(probeTimeout);
           this.probeAttempts = 0;
-          console.log(`[WS Watchdog] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'}`);
+          this.activeUrl = candidateUrl;
+          try { sessionStorage.setItem('fb_fast_host', new URL(candidateUrl).host); } catch (_) {}
+          console.log(`[WS Watchdog] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'} on ${new URL(candidateUrl).host}`);
           const oldWs = this.ws;
           this.ws = probeSocket;
           this.migrationWs = null;

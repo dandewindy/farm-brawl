@@ -1821,7 +1821,11 @@ function getClientId(): string {
 
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = isViteDev ? 'localhost:8787' : window.location.host;
+  let host = isViteDev ? 'localhost:8787' : window.location.host;
+  const savedFastHost = sessionStorage.getItem('fb_fast_host');
+  if (!isViteDev && savedFastHost && (savedFastHost === 'farm-brawl.windydande.workers.dev' || savedFastHost === 'brawl.get-go.site' || savedFastHost === 'farm-brawl.farm-brawl.workers.dev')) {
+    host = savedFastHost;
+  }
   const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
   const wsUrl = `${proto}//${host}${query}`;
 
