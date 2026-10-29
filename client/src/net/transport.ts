@@ -13,6 +13,8 @@ export interface Transport {
   readonly netRtt?: number;
   readonly clockOffset?: number | null;
   readonly colo?: string;
+  readonly doColo?: string;
+  readonly displayColo?: string;
   inGame?: boolean;
   isMigrating?: boolean;
   sessionToken?: string | null;

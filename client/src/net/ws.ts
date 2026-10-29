@@ -16,8 +16,9 @@ export class WsClient implements Transport {
   private pingInterval: number | null = null;
   public rtt = 0;
   public rttMin = 0;
-  public displayPing = 0; // Giá trị làm dịu mượt mà dành riêng cho HUD
+  public displayPing = 0;
   public colo = '';
+  public doColo = '';
   public inGame = false;
   private reconnectTimer: number | null = null;
   private readonly rttRawSamples: number[] = [];
@@ -27,6 +28,30 @@ export class WsClient implements Transport {
   private lastLobbyReconnectTime = 0;
   private lobbySteerAttempts = 0;
   private currentPingDelay = 1000; // Cố định chu kỳ 1s (1000ms), tránh flooding socket
+  private migrationLocked = false;
+  private migrationLockTimer: number | null = null;
+
+  public get displayColo(): string {
+    if (this.doColo && /^(SIN|HKG|APAC)$/i.test(this.doColo)) {
+      return this.doColo;
+    }
+    return this.colo || 'SIN';
+  }
+
+  public isColoHealthy(): boolean {
+    const isAsianDo = /^(SIN|HKG|APAC|SGN|HAN|DAD|BKK|KUL)$/i.test(this.doColo);
+    const isAsianEdge = isFastColo(this.colo);
+    return isAsianDo || isAsianEdge || (this.rttMin > 0 && this.rttMin <= 140);
+  }
+
+  private lockMigration(durationMs = 60000): void {
+    this.migrationLocked = true;
+    if (this.migrationLockTimer !== null) clearTimeout(this.migrationLockTimer);
+    this.migrationLockTimer = window.setTimeout(() => {
+      this.migrationLocked = false;
+      this.migrationLockTimer = null;
+    }, durationMs);
+  }
 
   // In-Game Zero-Downtime Hot Migration
   public isMigrating = false;
@@ -118,6 +143,7 @@ export class WsClient implements Transport {
           const msg = JSON.parse(raw) as ServerMsg;
           if (msg.t === 'pong') {
             if (msg.colo) this.colo = msg.colo;
+            if (msg.doColo) this.doColo = msg.doColo;
             if (typeof document !== 'undefined' && document.hidden) return;
             const sample = performance.now() - msg.c;
             if (sample > 0 && sample < 1500) {
@@ -154,11 +180,11 @@ export class WsClient implements Transport {
               }
 
               // 5. Watchdog kiểm tra định tuyến (Ngưỡng thực tế tránh false-positive trên 4G/Wi-Fi)
-              const onFastNode = isFastColo(this.colo);
-              const isOptimal = (this.colo === 'SIN' && this.rttMin <= 110) || (this.colo === 'HKG' && this.rttMin <= 100);
-              const isCriticalSlow = !onFastNode || this.rttMin > 180;
+              const isHealthy = this.isColoHealthy();
+              const isOptimal = (this.doColo === 'SIN' || this.colo === 'SIN') && this.rttMin <= 120;
+              const isCriticalSlow = !isHealthy && this.rttMin > 180;
 
-              if (isOptimal) {
+              if (isOptimal || isHealthy) {
                 this.lobbySteerAttempts = 0;
                 this.badPingStreak = 0;
               } else if (isCriticalSlow) {
@@ -167,7 +193,7 @@ export class WsClient implements Transport {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // Silent Lobby Steer (Max 2 attempts, for distant non-Asian nodes):
+              // Silent Lobby Steer (Max 2 attempts, only for truly broken distant routes):
               if (!this.inGame && isCriticalSlow && !this.closed) {
                 if (this.rttRawSamples.length >= 3 && this.lobbySteerAttempts < 2) {
                   if (now - this.lastLobbyReconnectTime > 8000) {
@@ -179,8 +205,8 @@ export class WsClient implements Transport {
                 }
               }
 
-              // Chỉ kích hoạt hot migration khi thực sự tắc nghẽn liên tục (streak >= 5)
-              if (this.inGame && this.badPingStreak >= 5 && !this.closed) {
+              // Chỉ kích hoạt hot migration khi thực sự tắc nghẽn liên tục (streak >= 8, rtt > 200ms) và chưa bị lock
+              if (this.inGame && this.badPingStreak >= 8 && this.rttMin > 200 && !this.migrationLocked && !this.closed) {
                 this.triggerHotMigration();
               }
             }
@@ -191,6 +217,7 @@ export class WsClient implements Transport {
         const msg = JSON.parse(raw) as ServerMsg;
         if (msg.t === 'joined') {
           if (msg.colo) this.colo = msg.colo;
+          if (msg.doColo) this.doColo = msg.doColo;
           if (msg.token) {
             this.sessionToken = msg.token;
             try {
@@ -231,10 +258,11 @@ export class WsClient implements Transport {
     };
   }
 
-  public triggerHotMigration(): void {
+  public triggerHotMigration(force = false): void {
     if (!this.inGame || this.closed) return;
-    // Strict Guard: If currently on an optimal Asian node (SIN, HKG, etc.) with good ping (<= 150ms), NEVER migrate!
-    if (isFastColo(this.colo) && (this.rttMin <= 150 || this.rtt <= 150)) {
+    if (!force && this.migrationLocked) return;
+    // Strict Guard: If currently on a healthy node or DO in SIN/HKG/APAC with good ping (<= 160ms), NEVER auto-migrate!
+    if (!force && this.isColoHealthy() && (this.rttMin <= 160 || this.rtt <= 160)) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;
@@ -268,9 +296,10 @@ export class WsClient implements Transport {
         this.isMigrating = false;
         this.probeAttempts++;
         this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= 3) {
+        if (this.probeAttempts >= 2) {
           this.probeAttempts = 0;
           this.badPingStreak = 0;
+          this.lockMigration(60000);
         }
       }
     }, 2000);
@@ -326,10 +355,11 @@ export class WsClient implements Transport {
             this.isMigrating = false;
             this.probeAttempts++;
             this.onMigrationStatus?.('failed', this.colo);
-            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/3).`);
-            if (this.probeAttempts >= 3) {
+            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/2).`);
+            if (this.probeAttempts >= 2 || probeColo === this.colo) {
               this.probeAttempts = 0;
               this.badPingStreak = 0;
+              this.lockMigration(60000);
             }
           }
         } else if (msg.t === 'init') {
@@ -350,6 +380,7 @@ export class WsClient implements Transport {
             this.reconnectTimer = null;
           }
           if (msg.colo) this.colo = msg.colo;
+          if (msg.doColo) this.doColo = msg.doColo;
           if (msg.token) {
             this.sessionToken = msg.token;
             if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
@@ -467,6 +498,17 @@ export class WsClient implements Transport {
     try {
       this.send({ t: 'leave' });
     } catch (_) {}
+  }
+
+  public manualRetune(): void {
+    this.migrationLocked = false;
+    this.probeAttempts = 0;
+    this.badPingStreak = 0;
+    if (this.inGame) {
+      this.triggerHotMigration(true);
+    } else {
+      this.forceReconnect();
+    }
   }
 
   public forceReconnect(): void {

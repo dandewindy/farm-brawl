@@ -1852,9 +1852,7 @@ function getClientId(): string {
       hud.showToast(t('migratedToast', { colo: newColo }), 3000);
     };
     transport.onMigrationStatus = (status, colo) => {
-      if (status === 'probing') {
-        hud.showToast(t('coloProbingToast'), 2000);
-      } else if (status === 'migrated') {
+      if (status === 'migrated') {
         hud.showToast(t('migratedSinToast', { colo: colo || 'SIN' }), 3000);
       }
     };
@@ -1934,7 +1932,7 @@ function animate(now: number): void {
     fpsFrames = 0;
     lastFpsTime = now;
     const currentPing = transport ? Math.round((transport as any).displayPing ?? (transport.rtt > 0 ? transport.rtt : transport.rttMin)) : 0;
-    hud.updatePerf(currentFps, currentPing, transport?.colo, transport?.isMigrating);
+    hud.updatePerf(currentFps, currentPing, (transport as any)?.displayColo ?? transport?.colo, transport?.isMigrating);
     if (debugEl && transport) {
       const predErr = Math.hypot(predictor.ex, predictor.ez).toFixed(2);
       debugEl.textContent = `RTT ${Math.round(transport.rtt)}ms (min ${Math.round(transport.rttMin)}) · buffer ${Math.round(gameState.interpDelay)}ms · late90 ${Math.round(gameState.lateAvg)}ms · err ${predErr}m · ${currentFps} fps`;

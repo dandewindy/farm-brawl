@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Species } from '@shared/constants';
+import { radiusOf, type Species } from '@shared/constants';
 import type { MinionWire } from '@shared/protocol';
 import { getArenaTheme } from '../theme';
 import { buildFullAnimal } from './animals';
@@ -8,6 +8,8 @@ interface MinionVisual {
   id: number;
   ownerId: number;
   root: THREE.Group;
+  animalRoot: THREE.Group;
+  ring: THREE.Mesh;
   legs: THREE.Group[];
   x: number;
   z: number;
@@ -30,14 +32,27 @@ export class MinionRenderer {
     this.scene.add(this.group);
   }
 
-  private buildMinionMesh(species: Species, skinIdx: number): { root: THREE.Group; legs: THREE.Group[]; ringMat: THREE.MeshBasicMaterial } {
+  private buildMinionMesh(species: Species, skinIdx: number, mass = 50): {
+    root: THREE.Group;
+    animalRoot: THREE.Group;
+    ring: THREE.Mesh;
+    legs: THREE.Group[];
+    ringMat: THREE.MeshBasicMaterial;
+  } {
     const root = new THREE.Group();
     const theme = getArenaTheme();
+    const r = radiusOf(mass);
+    const sc = r * 1.35;
+
+    let animalRoot: THREE.Group;
+    let legs: THREE.Group[];
 
     if (theme === 'halloween') {
       // Zombie mini warrior: green rotting flesh & glowing red eyes
-      const { root: animalRoot, body, legs } = buildFullAnimal(species, skinIdx);
-      body.traverse((child) => {
+      const full = buildFullAnimal(species, skinIdx);
+      animalRoot = full.root;
+      legs = full.legs;
+      full.body.traverse((child) => {
         if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
           child.material = child.material.clone();
           child.material.color.setHex(0x546e50); // Rotting zombie skin
@@ -51,44 +66,33 @@ export class MinionRenderer {
       const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), eyeMat);
       rightEye.position.set(0.6, 1.4, -0.2);
       animalRoot.add(leftEye, rightEye);
-
-      animalRoot.scale.set(0.42, 0.42, 0.42);
-      root.add(animalRoot);
-
-      // Eerie green ground aura ring
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x39ff14,
-        transparent: true,
-        opacity: 0.65,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 16), ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.05;
-      root.add(ring);
-
-      return { root, legs, ringMat };
     } else {
       // Cute mini animal clone with golden bodyguard ring
-      const { root: animalRoot, legs } = buildFullAnimal(species, skinIdx);
-      animalRoot.scale.set(0.45, 0.45, 0.45);
-      root.add(animalRoot);
-
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: theme === 'women_day' ? 0xff4081 : 0xffd700,
-        transparent: true,
-        opacity: 0.75,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.8, 16), ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.05;
-      root.add(ring);
-
-      return { root, legs, ringMat };
+      const full = buildFullAnimal(species, skinIdx);
+      animalRoot = full.root;
+      legs = full.legs;
     }
+
+    // Exact 50kg animal scale (r * 1.35 = 2.209)
+    animalRoot.scale.set(sc, sc, sc);
+    root.add(animalRoot);
+
+    // Ground aura ring matching exact radiusOf(mass)
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: theme === 'halloween' ? 0x39ff14 : (theme === 'women_day' ? 0xff4081 : 0xffd700),
+      transparent: true,
+      opacity: theme === 'halloween' ? 0.65 : 0.75,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const ringGeo = new THREE.RingGeometry(0.88, 1.08, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.y = 0.05;
+    ring.scale.setScalar(r);
+    root.add(ring);
+
+    return { root, animalRoot, ring, legs, ringMat };
   }
 
   sync(list: MinionWire[]): void {
@@ -97,7 +101,7 @@ export class MinionRenderer {
       live.add(id);
       let vis = this.minions.get(id);
       if (!vis) {
-        const { root, legs, ringMat } = this.buildMinionMesh(species, skin);
+        const { root, animalRoot, ring, legs, ringMat } = this.buildMinionMesh(species, skin, mass);
         root.position.set(x, 0, z);
         root.rotation.y = -a;
         this.group.add(root);
@@ -105,6 +109,8 @@ export class MinionRenderer {
           id,
           ownerId,
           root,
+          animalRoot,
+          ring,
           legs,
           x,
           z,
@@ -123,7 +129,13 @@ export class MinionRenderer {
         vis.targetX = x;
         vis.targetZ = z;
         vis.targetA = a;
-        vis.mass = mass;
+        if (vis.mass !== mass) {
+          vis.mass = mass;
+          const r = radiusOf(mass);
+          const sc = r * 1.35;
+          vis.animalRoot.scale.set(sc, sc, sc);
+          vis.ring.scale.setScalar(r);
+        }
       }
     }
 

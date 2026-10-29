@@ -2052,7 +2052,7 @@ export class HudManager {
     if (this.coloVal && colo) {
       this.coloVal.hidden = false;
       const isSin = colo === 'SIN';
-      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo);
+      const isFast = isSin || /^(HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo) || (ping > 0 && ping <= 130);
       if (isMigrating) {
         this.coloVal.textContent = `${colo} ⚡`;
         this.coloVal.className = 'perf-colo warn';
