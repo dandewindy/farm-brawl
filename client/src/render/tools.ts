@@ -92,6 +92,57 @@ function buildSparklingEgg(g: THREE.Group, c: EggColors): void {
   }
 }
 
+function buildSparklingBanana(g: THREE.Group): void {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.45, 0.35, 0),
+    new THREE.Vector3(-0.15, 0.08, 0),
+    new THREE.Vector3(0.20, 0.12, 0),
+    new THREE.Vector3(0.50, 0.40, 0),
+  ]);
+  const tubeGeo = new THREE.TubeGeometry(curve, 18, 0.22, 10, false);
+  const bananaMesh = mesh(tubeGeo, 0xffeb3b, 0, 1.45, 0, {
+    metalness: 0.65,
+    roughness: 0.2,
+    emissive: 0xffc107,
+    emissiveIntensity: 0.6,
+  });
+  g.add(bananaMesh);
+
+  // Green stem at top tip
+  const stem = mesh(new THREE.CylinderGeometry(0.065, 0.085, 0.28, 8), 0x43a047, -0.48, 1.88, 0);
+  stem.rotation.z = 0.5;
+  g.add(stem);
+
+  // Dark tip at bottom
+  const tip = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0x3e2723, 0.52, 1.87, 0);
+  g.add(tip);
+
+  // Orbiting Golden Halo Ring
+  const halo = mesh(new THREE.TorusGeometry(1.05, 0.045, 8, 32), 0xffd700, 0, 1.55, 0, {
+    metalness: 0.85,
+    roughness: 0.15,
+    emissive: 0xffb300,
+    emissiveIntensity: 0.65,
+  });
+  halo.rotation.x = Math.PI / 3;
+  halo.rotation.y = Math.PI / 6;
+  g.add(halo);
+
+  // 6 orbiting sparkling diamond stars
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const sparkle = mesh(new THREE.OctahedronGeometry(0.12, 0), 0xffffff, Math.cos(a) * 0.95, 1.55 + Math.sin(a * 3) * 0.25, Math.sin(a) * 0.95, {
+      metalness: 0.8,
+      roughness: 0.15,
+      emissive: 0xffea00,
+      emissiveIntensity: 0.9,
+    });
+    sparkle.rotation.y = a;
+    sparkle.rotation.z = Math.PI / 4;
+    g.add(sparkle);
+  }
+}
+
 export class ToolRenderer {
   private readonly toolObjs = new Map<number, ToolObject>();
   private readonly group = new THREE.Group();
@@ -106,6 +157,24 @@ export class ToolRenderer {
 
   private buildTool(kind: ToolKind): THREE.Group {
     const g = new THREE.Group();
+    if (kind === 'banana') {
+      buildSparklingBanana(g);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.5, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0xffd700,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = 0.08;
+      g.add(glow);
+      return g;
+    }
+
     const theme = getArenaTheme();
     if (theme === 'women_day') {
       if (kind === 'pitchfork') {

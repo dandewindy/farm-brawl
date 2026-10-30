@@ -53,11 +53,13 @@ export const FLAG = {
   SUPER: 32768,
   FLYING: 65536,
   WHEEL: 131072,
+  MONKEY_LEAP: 262144,
+  TREE_SHAKE: 524288,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
 
-export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star';
+export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star' | 'banana';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
 
 /** [id, ownerId, x, z, angle, mass, species, skin] */
@@ -120,6 +122,11 @@ export type GameEvent =
   | { k: 'podWarn'; willShield: boolean; left: number }
   | { k: 'mapWarn'; left: number }
   | { k: 'treeHit'; id: number; by: number; x: number; z: number; size: number; droppedBig: number; droppedSmall: number }
+  | { k: 'bananaThrow'; id: number; x: number; z: number; a: number; count: number; giant: boolean }
+  | { k: 'bananaHit'; id: number; x: number; z: number; giant: boolean }
+  | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number }
+  | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number }
+  | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
 /** [id, stage: 0..3, big, small, flowers] */

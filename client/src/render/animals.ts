@@ -35,6 +35,9 @@ interface AnimalVisual {
   squishFactor?: number;
   visualY?: number;
   waterRippleTimer?: number;
+  arms?: THREE.Group[];
+  tailSegments?: THREE.Mesh[];
+  leapTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -126,6 +129,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   pig: 0xf48fb1,
   dog: 0xffa726,
   elephant: 0x90a4ae,
+  monkey: 0x8d5b38,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -177,6 +181,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0xf2ede4, tusk: 0xffd700, innerEar: 0xf5c6c6, toenails: 0xe8dfd5, tuft: 0xffd700 },
     { body: 0x6d5e54, tusk: 0xf0eee6, innerEar: 0xc99b9b, toenails: 0xbaa89b, tuft: 0x261d18 },
     { body: 0x607d8b, tusk: 0xffffff, innerEar: 0xf8bbd0, toenails: 0xcfd8dc, tuft: 0x37474f },
+  ],
+  monkey: [
+    { fur: 0x6e472b, skin: 0xf3cfb3, dark: 0x1a1412 },
+    { fur: 0x362b28, skin: 0xd9c2b0, dark: 0x120f0e },
+    { fur: 0xd4a373, skin: 0xffe5d9, dark: 0x2e1c0c },
+    { fur: 0x934b28, skin: 0xf6d5c2, dark: 0x1c120c },
   ],
 };
 
@@ -702,6 +712,99 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
+function buildMonkey(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const furColor = s.fur ?? 0x6e472b;
+  const skinColor = s.skin ?? 0xf3cfb3;
+  const darkColor = s.dark ?? 0x1a1412;
+
+  // 1. Torso (capsule tilted forward)
+  const torsoGeo = new THREE.CapsuleGeometry(0.32, 0.45, 8, 16);
+  const torsoMesh = part(torsoGeo, furColor, 0, 1.05, 0, undefined, true);
+  torsoMesh.rotation.z = -0.18;
+  g.add(torsoMesh);
+
+  // Belly (cream sphere on front of torso)
+  const belly = blob(g, skinColor, 0.26, [0.85, 1.15, 0.6], 0.18, 1.02, 0);
+  belly.rotation.z = -0.18;
+
+  // 2. Head
+  g.add(part(new THREE.SphereGeometry(0.34, 16, 14), furColor, 0.12, 1.55, 0));
+  blob(g, skinColor, 0.27, [0.75, 0.95, 0.9], 0.28, 1.55, 0);
+  blob(g, skinColor, 0.18, [0.95, 0.75, 0.9], 0.40, 1.45, 0);
+
+  // Nostrils
+  for (const z of [-0.05, 0.05]) {
+    g.add(part(new THREE.SphereGeometry(0.024, 8, 6), darkColor, 0.52, 1.48, z));
+  }
+
+  // Eyes
+  addEyes(g, 0.38, 1.62, 0.14, 0.065);
+
+  // Large round ears
+  for (const z of [-0.34, 0.34]) {
+    const earOuter = part(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 16), furColor, 0.10, 1.57, z);
+    earOuter.rotation.x = Math.PI / 2;
+    earOuter.rotation.y = z > 0 ? 0.2 : -0.2;
+    g.add(earOuter);
+
+    const earInner = part(new THREE.CylinderGeometry(0.09, 0.09, 0.055, 14), skinColor, 0.10, 1.57, z > 0 ? z - 0.01 : z + 0.01);
+    earInner.rotation.x = Math.PI / 2;
+    earInner.rotation.y = z > 0 ? 0.2 : -0.2;
+    g.add(earInner);
+  }
+
+  // Hair tuft
+  const hair = part(new THREE.ConeGeometry(0.08, 0.18, 8), furColor, 0.08, 1.90, 0);
+  hair.rotation.z = 0.25;
+  g.add(hair);
+
+  // 3. Two flexible long arms
+  const arms: THREE.Group[] = [];
+  for (const z of [-0.32, 0.32]) {
+    const armPivot = new THREE.Group();
+    armPivot.position.set(0.05, 1.25, z);
+    armPivot.userData.origY = 1.25;
+
+    const upperArm = part(new THREE.CapsuleGeometry(0.08, 0.34, 6, 12), furColor, 0, -0.17, 0);
+    upperArm.rotation.x = z > 0 ? 0.15 : -0.15;
+    armPivot.add(upperArm);
+
+    const forearm = part(new THREE.CapsuleGeometry(0.07, 0.32, 6, 12), furColor, 0.05, -0.44, z > 0 ? 0.05 : -0.05);
+    forearm.rotation.z = -0.25;
+    armPivot.add(forearm);
+
+    const hand = part(new THREE.SphereGeometry(0.085, 10, 8), skinColor, 0.08, -0.62, z > 0 ? 0.06 : -0.06);
+    hand.scale.set(0.9, 1.1, 0.7);
+    armPivot.add(hand);
+
+    g.add(armPivot);
+    arms.push(armPivot);
+  }
+  g.userData.arms = arms;
+
+  // 4. Multi-segment curved tail
+  const tailSegments: THREE.Mesh[] = [];
+  let parentNode: THREE.Object3D = g;
+  for (let i = 0; i < 6; i++) {
+    const rad = 0.062 * (1 - i * 0.08);
+    const seg = part(new THREE.CapsuleGeometry(rad, 0.18, 6, 10), furColor, 0, 0, 0);
+    if (i === 0) {
+      seg.position.set(-0.35, 0.95, 0);
+      seg.rotation.z = 0.95;
+    } else {
+      seg.position.set(-0.14, 0.14, 0);
+      seg.rotation.z = -0.32;
+    }
+    parentNode.add(seg);
+    tailSegments.push(seg);
+    parentNode = seg;
+  }
+  g.userData.tail = tailSegments;
+
+  // 5. Bipedal legs (2 legs)
+  return addLegs(g, furColor, [[-0.05, 0.20], [-0.05, -0.20]], 0.72, 0.09, skinColor);
+}
+
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
   chicken: buildChicken,
   sheep: buildSheep,
@@ -711,6 +814,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   pig: buildPig,
   dog: buildDog,
   elephant: buildElephant,
+  monkey: buildMonkey,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -812,6 +916,17 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'monkey': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.034, 8, 24), mat);
+      band.position.set(0.12, 1.28, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.18;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), goldMat);
+      medal.position.set(0.26, 1.20, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -826,6 +941,7 @@ const HEAD: Record<Species, [number, number]> = {
   pig: [0.85, 1.83],
   dog: [0.72, 1.85],
   elephant: [0.95, 2.15],
+  monkey: [0.12, 1.95],
 };
 
 // Back of each species for the cape
@@ -838,6 +954,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   pig: [-0.25, 1.0, 0.77, 0.77, 1.3],
   dog: [-0.15, 1.1, 0.55, 0.55, 1.05],
   elephant: [-0.15, 1.35, 0.65, 0.65, 1.3],
+  monkey: [-0.15, 1.10, 0.45, 0.45, 1.0],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -909,6 +1026,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     pig: 0.20,
     dog: 0.18,
     elephant: 0.28,
+    monkey: 0.16,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -919,6 +1037,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     pig: 0.06,
     dog: 0.06,
     elephant: 0.08,
+    monkey: 0.06,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -1220,6 +1339,7 @@ const LABEL_Y: Record<Species, number> = {
   pig: 2.1,
   dog: 2.1,
   elephant: 2.6,
+  monkey: 2.2,
 };
 
 function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -1549,7 +1669,15 @@ export class AnimalRenderer {
     const isFlying = (flags & FLAG.FLYING) !== 0;
     const isSquished = (flags & FLAG.SQUISHED) !== 0;
     const isWheel = (flags & FLAG.WHEEL) !== 0;
+    const isMonkeyLeap = (flags & FLAG.MONKEY_LEAP) !== 0;
+    const isTreeShake = (flags & FLAG.TREE_SHAKE) !== 0;
     const lvl = (charge || 0) / 10;
+
+    if (isMonkeyLeap) {
+      vis.leapTimer = (vis.leapTimer || 0) + dt;
+    } else {
+      vis.leapTimer = 0;
+    }
 
     // Smooth squish factor transition: fast flatten on impact (dt * 16), gentle cartoon pop back up (dt * 5)
     vis.squishFactor = isSquished
@@ -1643,6 +1771,15 @@ export class AnimalRenderer {
 
     // Body hopping & positioning
     let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r);
+    // Monkey bipedal bobbing run
+    if (vis.species === 'monkey' && !isMonkeyLeap && !isWater && speed > 0.02) {
+      bodyY += Math.abs(Math.sin(vis.phase * 1.3)) * 0.15 * r;
+    }
+    // Super Leap parabolic arc
+    if (isMonkeyLeap) {
+      const arc = Math.sin(Math.min(Math.PI, (vis.leapTimer || 0) * 3.8));
+      bodyY += arc * (3.0 + 2.5 * r);
+    }
     if (isFlying) bodyY += 1.1 * r;
     if (sq > 0) bodyY = (y + 0.05) * sq + bodyY * (1 - sq);
     vis.root.position.set(x, bodyY, z);
@@ -1653,6 +1790,10 @@ export class AnimalRenderer {
       ? Math.sin(now / 120) * 0.05
       : isStunned
       ? Math.sin(now / 90) * 0.15
+      : isMonkeyLeap
+      ? -0.45
+      : isTreeShake
+      ? 0.25
       : isFlying
       ? -0.5
       : isPlowing
@@ -1745,12 +1886,63 @@ export class AnimalRenderer {
         leg.rotation.z = 0;
         leg.rotation.x = 0;
         leg.position.y = leg.userData.origY;
+      } else if (isMonkeyLeap) {
+        leg.rotation.z = 0.35;
+        leg.rotation.x = idx % 2 === 0 ? 0.15 : -0.15;
+        leg.position.y = leg.userData.origY;
       } else {
         leg.rotation.z = baseSwing * 0.7;
         leg.rotation.x = 0;
         leg.position.y = leg.userData.origY;
       }
     });
+
+    // Monkey arms dynamic animation
+    if (vis.arms && vis.arms.length === 2) {
+      const [armL, armR] = vis.arms;
+      if (isTreeShake) {
+        // Both hands grip and shake the tree vigorously
+        const shakeVibe = Math.sin(now * 0.04) * 0.35;
+        armL.rotation.z = -1.25 + shakeVibe;
+        armR.rotation.z = -1.25 + shakeVibe;
+        armL.rotation.x = 0.25;
+        armR.rotation.x = -0.25;
+      } else if (isMonkeyLeap) {
+        // Athletic superhero leap posture
+        armL.rotation.z = -1.45;
+        armR.rotation.z = -1.45;
+        armL.rotation.x = 0.35;
+        armR.rotation.x = -0.35;
+      } else if (isCharging) {
+        // Winding up muscles before leap
+        armL.rotation.z = 0.45 * lvl;
+        armR.rotation.z = 0.45 * lvl;
+        armL.rotation.x = 0.2;
+        armR.rotation.x = -0.2;
+      } else if (isStunned || sq > 0.3) {
+        armL.rotation.z = 0.8;
+        armR.rotation.z = 0.8;
+        armL.rotation.x = Math.PI / 3;
+        armR.rotation.x = -Math.PI / 3;
+      } else {
+        // Natural bipedal running swing (opposite to legs)
+        const armSwing = Math.sin(vis.phase) * 0.65;
+        armL.rotation.z = -armSwing;
+        armR.rotation.z = armSwing;
+        armL.rotation.x = 0.12;
+        armR.rotation.x = -0.12;
+      }
+    }
+
+    // Monkey multi-segment tail smooth sinusoidal sway
+    if (vis.tailSegments && vis.tailSegments.length > 0) {
+      vis.tailSegments.forEach((seg, i) => {
+        if (i > 0) {
+          seg.rotation.z = -0.32 + Math.sin(now * 0.005 + i * 0.45) * 0.12;
+          seg.rotation.x = Math.cos(now * 0.004 + i * 0.4) * 0.08;
+        }
+      });
+    }
 
     // Under-foot dark mud patches (prominent black mud pools on ground under each foot)
     if (vis.mudSplats && vis.mudSplats.length > 0) {
@@ -2100,6 +2292,8 @@ export class AnimalRenderer {
       legs,
       species: meta.species,
       skin: meta.skin,
+      arms: body.userData.arms,
+      tailSegments: body.userData.tail,
       label,
       labelKey: meta.name,
       regalia,

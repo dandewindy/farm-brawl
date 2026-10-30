@@ -62,7 +62,26 @@ export interface Player extends Body {
   lastInputSeq?: number;
   team?: number;
   origSpecies?: Species;
+  monkeyLeapT?: number;
+  monkeyLeapDur?: number;
+  monkeyLeapHeight?: number;
+  monkeyLeapRatio?: number;
+  treeShakeT?: number;
+  morphT?: number;
+  morphOrigSpecies?: Species;
   ai: BotBrain | null;
+}
+
+export interface BananaProjectile {
+  id: number;
+  ownerId: number;
+  x: number;
+  z: number;
+  vx: number;
+  vz: number;
+  life: number;
+  giant: boolean;
+  r: number;
 }
 
 export interface Minion {
@@ -181,6 +200,7 @@ export class World {
   readonly food = new Map<number, Food>();
   readonly tools = new Map<number, ToolItem>();
   readonly treeSims: TreeSimState[] = [];
+  readonly bananaProjectiles: BananaProjectile[] = [];
   tick = 0;
   time = 0;
   /** alive animals, heaviest first (refreshed every tick) */
@@ -190,6 +210,7 @@ export class World {
   private nextFood = 1;
   private nextTool = 1;
   private nextMinionId = 1;
+  private nextBananaId = 1;
   minions = new Map<number, Minion>();
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
@@ -393,7 +414,10 @@ export class World {
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
+      monkeyLeapT: 0, treeShakeT: 0,
     });
+    delete p.morphOrigSpecies;
+    delete p.morphT;
     p.input.btn = false;
     p.dashHit.clear();
     this.events.push({ k: 'join', ...this.meta(p) });
@@ -422,7 +446,7 @@ export class World {
 
     const BOT_SPECIES: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
     if (this.players.size < CFG.BOT_FILL) {
-      const sp = BOT_SPECIES[Math.floor(this.rnd() * BOT_SPECIES.length)];
+      const sp: Species = this.rnd() < 0.10 ? 'monkey' : BOT_SPECIES[Math.floor(this.rnd() * BOT_SPECIES.length)];
       const used = new Set([...this.players.values()].map((p) => p.name));
       const pool = SPECIES_BOT_NAMES[sp] || [];
       const free = pool.filter((n) => !used.has(n));
@@ -620,7 +644,14 @@ export class World {
           p.pressed = false;
           p.btnLatch = false;
         }
-        if (p.wheelT > 0) {
+        const isLeaping = (p.monkeyLeapT !== undefined && p.monkeyLeapT > 0);
+        if (isLeaping) {
+          p.x += p.vx * h;
+          p.z += p.vz * h;
+          p.stunT = 0;
+          p.charging = false;
+          p.holdT = 0;
+        } else if (p.wheelT > 0) {
           // Wheel vehicle mode: cannot stop! Continuous forward motion at speed 19
           p.a = p.input.a;
           const cartSpeed = 19;
@@ -646,26 +677,28 @@ export class World {
             }
           }
         } else {
-          const tillSpeedMult = (this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0;
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * (p.species === 'monkey' && p.superT > 0 ? 1.30 : 1.0);
           stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
           if (p.slowT > 0) {
             p.vx *= 0.85;
             p.vz *= 0.85;
           }
         }
-        const wasStunned = p.stunT >= 1.4;
-        const hayHit = collideHay(p, this.map.hay);
-        if (hayHit && !wasStunned) {
-          p.plow = false;
-          p.charging = false;
-          p.holdT = 0;
-          p.pressed = false;
-          p.btnLatch = false;
-          this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 3 });
+        if (!isLeaping) {
+          const wasStunned = p.stunT >= 1.4;
+          const hayHit = collideHay(p, this.map.hay);
+          if (hayHit && !wasStunned) {
+            p.plow = false;
+            p.charging = false;
+            p.holdT = 0;
+            p.pressed = false;
+            p.btnLatch = false;
+            this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 3 });
+          }
         }
 
         // Podium protective shield barrier: blocks all animals from entering the podium area
-        if (this.podiumShield) {
+        if (!isLeaping && this.podiumShield) {
           const [podX, podZ] = this.map.podium;
           const dx = p.x - podX, dz = p.z - podZ;
           const d = Math.hypot(dx, dz);
@@ -689,7 +722,7 @@ export class World {
         }
 
         // 3 Fruit Trees: solid cylindrical obstacle collision + ramming shaking / fruit drop / 3s stun
-        if (this.treeSims.length > 0) {
+        if (!isLeaping && this.treeSims.length > 0) {
           for (const tree of this.treeSims) {
             const dx = p.x - tree.x, dz = p.z - tree.z;
             const d = Math.hypot(dx, dz);
@@ -795,7 +828,7 @@ export class World {
 
       // 1. Electric fence
       if (outsideFence(p)) {
-        if (p.flyT > 0) {
+        if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.flyT > 0) {
           const d = Math.hypot(p.x, p.z), lim = CFG.R - radiusOf(p.mass) * 0.3 - 1;
           if (d > 0) {
             p.x = (p.x / d) * lim;
@@ -809,6 +842,11 @@ export class World {
           this.kill(p, 'fence');
           continue;
         }
+      }
+
+      // Monkey leaping over terrain hazards (well, fire, water, etc.)
+      if (p.monkeyLeapT && p.monkeyLeapT > 0) {
+        continue;
       }
 
       // 2. Stone pit / Well
@@ -853,6 +891,7 @@ export class World {
     }
 
     this.eat(alive);
+    this.updateBananaProjectiles(DT);
 
     // Tool & Super Candy spawning (special items spawn 2x faster, max 8 tools)
     this.toolSpawnTimer -= DT;
@@ -903,6 +942,68 @@ export class World {
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
       if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
+      if (p.treeShakeT && p.treeShakeT > 0) p.treeShakeT = Math.max(0, p.treeShakeT - DT);
+
+      // Monkey Leap landing check
+      if (p.monkeyLeapT && p.monkeyLeapT > 0) {
+        p.monkeyLeapT = Math.max(0, p.monkeyLeapT - DT);
+        if (p.monkeyLeapT <= 0) {
+          const ratio = p.monkeyLeapRatio ?? 0.5;
+          const bodyR = radiusOf(p.mass);
+          const shockwaveR = bodyR + 3.0 + ratio * 4.5;
+
+          for (const other of this.players.values()) {
+            if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
+            const dx = other.x - p.x;
+            const dz = other.z - p.z;
+            const dist = Math.hypot(dx, dz);
+            if (dist <= shockwaveR) {
+              if (other.mass <= 50) {
+                // <= 50kg: Flattened / squashed like elephant for 2 seconds
+                other.squishT = 2.0;
+                other.stunT = 1.5;
+                other.vx = 0;
+                other.vz = 0;
+                other.dashT = 0;
+                other.plow = false;
+              } else {
+                // > 50kg: Knocked back away from monkey landing spot and lose mass
+                const pushAng = Math.atan2(dz, dx);
+                const force = 16.0 + ratio * 22.0;
+                other.vx += Math.cos(pushAng) * force;
+                other.vz += Math.sin(pushAng) * force;
+                other.dashT = 0;
+                other.plow = false;
+
+                const massLoss = Math.max(2, Math.round(other.mass * (0.03 + ratio * 0.04)));
+                other.mass = Math.max(10, other.mass - massLoss);
+                this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
+              }
+            }
+          }
+
+          this.events.push({
+            k: 'monkeyLand',
+            id: p.id,
+            x: r2(p.x),
+            z: r2(p.z),
+            r: r2(shockwaveR),
+            ratio: r2(ratio),
+          });
+        }
+      }
+
+      // Morph 30s timer
+      if (p.morphT && p.morphT > 0) {
+        p.morphT = Math.max(0, p.morphT - DT);
+        if (p.morphT <= 0) {
+          const orig = p.morphOrigSpecies || 'pig';
+          p.species = orig;
+          delete p.morphOrigSpecies;
+          delete p.morphT;
+          this.events.push({ k: 'morph', id: p.id, species: orig, dur: 0 });
+        }
+      }
 
       const pr = radiusOf(p.mass) + 1.2;
       for (const t of this.tools.values()) {
@@ -956,6 +1057,14 @@ export class World {
             } else {
               this.events.push({ k: 'song', id: p.id, nap: 0 });
             }
+          } else if (t.kind === 'banana') {
+            if (!p.morphOrigSpecies) {
+              p.morphOrigSpecies = p.species;
+            }
+            const targetSpecies: Species = this.rnd() < 0.5 ? 'monkey' : 'elephant';
+            p.species = targetSpecies;
+            p.morphT = 30;
+            this.events.push({ k: 'morph', id: p.id, species: targetSpecies, dur: 30 });
           }
           break;
         }
@@ -1374,6 +1483,12 @@ export class World {
   private dash(p: Player): void {
     if (p.terrain === 1) return;
     if (p.superT > 0) {
+      if (p.species === 'monkey') {
+        // Rainbow Monkey: Cannot dash, continuous cone of 5 giant bananas
+        this.spawnBananaCone(p, 5, true);
+        p.cd = 0.35;
+        return;
+      }
       p.a = p.input.a;
       p.vx = Math.cos(p.a) * 62;
       p.vz = Math.sin(p.a) * 62;
@@ -1386,6 +1501,105 @@ export class World {
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
       return;
     }
+
+    if (p.species === 'monkey') {
+      // Tap ram (hold <= 0.15): tree shake if near tree, or throw banana
+      if (p.holdT <= 0.15) {
+        const bodyR = radiusOf(p.mass);
+        let nearbyTree: TreeSimState | null = null;
+        let minD = bodyR + 2.5;
+        for (const t of this.treeSims) {
+          const d = Math.hypot(p.x - t.x, p.z - t.z);
+          if (d <= t.r + minD) {
+            nearbyTree = t;
+            minD = d - t.r;
+          }
+        }
+
+        if (nearbyTree) {
+          // Monkey Tree Shake (2 hands grip and shake!)
+          p.treeShakeT = 0.5;
+          p.a = Math.atan2(nearbyTree.z - p.z, nearbyTree.x - p.x);
+          p.cd = 0.6;
+          nearbyTree.cooldownHit = 0.5;
+
+          const dropBig = Math.ceil(nearbyTree.big / 3);
+          const dropSmall = Math.ceil(nearbyTree.small / 3);
+          const totalDropped = dropBig + dropSmall;
+          if (totalDropped > 0) {
+            nearbyTree.big = Math.max(0, nearbyTree.big - dropBig);
+            nearbyTree.small = Math.max(0, nearbyTree.small - dropSmall);
+
+            for (let i = 0; i < totalDropped; i++) {
+              const ang = this.rnd() * Math.PI * 2;
+              const dist = nearbyTree.r + 1.2 + this.rnd() * 3.5;
+              const fx = clamp(nearbyTree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+              const fz = clamp(nearbyTree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+              const fruitWeight = nearbyTree.size === 2
+                ? 100
+                : nearbyTree.size === 1
+                ? Math.round(20 + this.rnd() * 30)
+                : Math.round(5 + this.rnd() * 5);
+              this.addFood(fx, fz, 1, fruitWeight);
+            }
+
+            nearbyTree.batches.push({
+              timer: 0,
+              count: totalDropped,
+              bigCount: dropBig,
+              smallCount: dropSmall,
+            });
+          }
+
+          this.events.push({
+            k: 'treeHit',
+            id: nearbyTree.id,
+            by: p.id,
+            x: r2(nearbyTree.x),
+            z: r2(nearbyTree.z),
+            size: nearbyTree.size,
+            droppedBig: dropBig,
+            droppedSmall: dropSmall,
+          });
+          return;
+        } else {
+          // Throw 1 banana projectile
+          p.a = p.input.a;
+          this.spawnBananaCone(p, 1, false);
+          p.cd = 0.5;
+          return;
+        }
+      }
+
+      // Charged Leap (hold > 0.15s, 0.2s -> 1.2s)
+      const clampedHold = Math.max(0.2, Math.min(1.2, p.holdT));
+      const ratio = (clampedHold - 0.2) / 1.0;
+      const leapDist = 8.0 + ratio * 14.0;
+      const leapDur = 0.5 + ratio * 0.4;
+      const peakHeight = 3.5 + ratio * 5.5;
+
+      p.monkeyLeapT = leapDur;
+      p.monkeyLeapDur = leapDur;
+      p.monkeyLeapHeight = peakHeight;
+      p.monkeyLeapRatio = ratio;
+      p.a = p.input.a;
+      const leapSpeed = leapDist / leapDur;
+      p.vx = Math.cos(p.a) * leapSpeed;
+      p.vz = Math.sin(p.a) * leapSpeed;
+      p.dashT = leapDur;
+      p.cd = CFG.DASH_CD + ratio * 0.5;
+      this.events.push({
+        k: 'monkeyLeap',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        dur: r2(leapDur),
+        height: r2(peakHeight),
+        ratio: r2(ratio),
+      });
+      return;
+    }
+
     const d = dashParams(p.species, p.holdT, p.terrain);
     p.a = p.input.a;
     p.vx = Math.cos(p.a) * d.speed;
@@ -1396,6 +1610,84 @@ export class World {
     const baseCd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
     p.cd = baseCd + (d.plow ? CFG.PLOW_CD * (p.species === 'chicken' ? 0.65 : 1) : 0);
     p.dashHit.clear();
+  }
+
+  private spawnBananaCone(p: Player, count: number, giant: boolean): void {
+    const spreadAngle = count > 1 ? (Math.PI / 3.2) : 0;
+    const speed = giant ? 26.0 : 22.0;
+    const life = giant ? 0.9 : 0.7;
+    const bodyR = radiusOf(p.mass);
+    const startX = p.x + Math.cos(p.a) * (bodyR + 0.6);
+    const startZ = p.z + Math.sin(p.a) * (bodyR + 0.6);
+
+    for (let i = 0; i < count; i++) {
+      const offsetRatio = count > 1 ? (i / (count - 1)) - 0.5 : 0;
+      const angle = p.a + offsetRatio * spreadAngle;
+      this.bananaProjectiles.push({
+        id: this.nextBananaId++,
+        ownerId: p.id,
+        x: startX,
+        z: startZ,
+        vx: Math.cos(angle) * speed,
+        vz: Math.sin(angle) * speed,
+        life,
+        giant,
+        r: giant ? 1.15 : 0.45,
+      });
+    }
+
+    this.events.push({
+      k: 'bananaThrow',
+      id: p.id,
+      x: r2(startX),
+      z: r2(startZ),
+      a: r2(p.a),
+      count,
+      giant,
+    });
+  }
+
+  private updateBananaProjectiles(dt: number): void {
+    for (let i = this.bananaProjectiles.length - 1; i >= 0; i--) {
+      const proj = this.bananaProjectiles[i];
+      proj.x += proj.vx * dt;
+      proj.z += proj.vz * dt;
+      proj.life -= dt;
+
+      let hit = false;
+      for (const target of this.players.values()) {
+        if (!target.alive || target.id === proj.ownerId || (target.monkeyLeapT && target.monkeyLeapT > 0)) continue;
+        const tr = radiusOf(target.mass);
+        const dist = Math.hypot(target.x - proj.x, target.z - proj.z);
+        if (dist <= tr + proj.r) {
+          hit = true;
+          const sizeFactor = Math.min(1.0, target.mass / 300);
+          const lossRatio = proj.giant ? 0.05 : (0.015 + 0.035 * sizeFactor);
+          const massLoss = Math.min(Math.round(target.mass * 0.05), Math.max(1, Math.round(target.mass * lossRatio)));
+
+          target.mass = Math.max(10, target.mass - massLoss);
+          this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
+
+          const hitAngle = Math.atan2(proj.vz, proj.vx);
+          const knockback = proj.giant ? 28.0 : 7.5;
+          target.vx += Math.cos(hitAngle) * knockback;
+          target.vz += Math.sin(hitAngle) * knockback;
+
+          this.events.push({
+            k: 'bananaHit',
+            id: target.id,
+            x: r2(target.x),
+            z: r2(target.z),
+            giant: proj.giant,
+          });
+          break;
+        }
+      }
+
+      if (hit || proj.life <= 0) {
+        this.bananaProjectiles.splice(i, 1);
+      }
+    }
   }
 
   private collidePlayers(list: Player[]): void {
@@ -2025,6 +2317,12 @@ export class World {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0; p.wheelT = 0;
+    p.monkeyLeapT = 0; p.treeShakeT = 0;
+    if (p.morphOrigSpecies) {
+      p.species = p.morphOrigSpecies;
+      delete p.morphOrigSpecies;
+      delete p.morphT;
+    }
     for (const [mid, m] of this.minions) {
       if (m.ownerId === p.id) this.minions.delete(mid);
     }
@@ -2253,7 +2551,7 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star'];
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star', 'banana', 'banana'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
 
@@ -2327,7 +2625,9 @@ export class World {
         | (o.squishT > 0 ? FLAG.SQUISHED : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
         | (o.flyT > 0 ? FLAG.FLYING : 0)
-        | (o.wheelT > 0 ? FLAG.WHEEL : 0);
+        | (o.wheelT > 0 ? FLAG.WHEEL : 0)
+        | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
+        | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;

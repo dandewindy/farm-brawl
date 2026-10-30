@@ -16,13 +16,14 @@ import { InputManager } from './input/controls';
 import { LocalServer, type Transport } from './net/transport';
 import { WsClient } from './net/ws';
 import { registerFriendRoom } from './net/firebase';
-import { AnimalRenderer } from './render/animals';
+import { AnimalRenderer, SPECIES_RING_COLOR } from './render/animals';
 import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
 import { MinimapRenderer } from './render/minimap';
 import { MinionRenderer } from './render/minions';
 import { ToolRenderer } from './render/tools';
 import { WorldRenderer } from './render/world';
+import { BananaRenderer } from './render/bananas';
 import { HudManager } from './ui/hud';
 import { getArenaTheme, onThemeChange } from './theme';
 
@@ -41,6 +42,7 @@ animals.onRainbowTrail = (x, y, z, a, r, isDash) => foodParts.rainbowTrail(x, y,
 animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
 const minions = new MinionRenderer(world.scene);
+const bananas = new BananaRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -55,6 +57,7 @@ onThemeChange((theme) => {
   tools.setTheme(theme);
   foodParts.setTheme(theme);
   minions.clear();
+  bananas.clear();
 });
 
 let transport: Transport | null = null;
@@ -1328,7 +1331,7 @@ function handleGameEvent(ev: GameEvent): void {
             yelp(vm.species, 0.4);
           }
           const FLUFF_COLORS: Record<Species, number> = {
-            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892,
+            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38,
           };
           foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
         }
@@ -1354,7 +1357,7 @@ function handleGameEvent(ev: GameEvent): void {
         yelp(vm.species, isMine ? 1 : 0.5);
       }
       const FLUFF_COLORS: Record<Species, number> = {
-        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892,
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -1645,7 +1648,7 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'tool': {
       const isMine = ev.id === myId;
-      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : 0xe8b641;
+      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : ev.kind === 'banana' ? 0xffeb3b : 0xe8b641;
       foodParts.burst(ev.x, 1, ev.z, toolColor, 18, 6, 6, 0.8);
       if (isMine) {
         sfxReward();
@@ -1653,6 +1656,8 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner(`🛞 ${t('wheel_head')}`, t('tk_wheel'));
         } else if (ev.kind === 'star') {
           hud.showBanner(`⭐ ${t('star_head')}`, t('tk_star'));
+        } else if (ev.kind === 'banana') {
+          hud.showBanner(`🍌 ${t('banana_head')}`, t('tk_banana'));
         } else {
           hud.showToast(t(`tk_${ev.kind}`));
         }
@@ -1663,6 +1668,8 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showToast(t('wheel_other', { name: pName }));
         } else if (ev.kind === 'star') {
           hud.showToast(t('star_other', { name: pName }));
+        } else if (ev.kind === 'banana') {
+          hud.showToast(t('banana_other', { name: pName }));
         }
       }
       break;
@@ -1768,6 +1775,7 @@ function handleGameEvent(ev: GameEvent): void {
         minions.setMap(ev.map);
         animals.clear();
         tools.clear();
+        bananas.clear();
         gameState.hof = [];
         hud.updateHof([]);
         hud.showToast(t('mapResetToast'));
@@ -1792,6 +1800,55 @@ function handleGameEvent(ev: GameEvent): void {
         hud.showToast(t('podCloseWarn', { s: ev.left }));
       } else {
         hud.showToast(t('podOpenWarn', { s: ev.left }));
+      }
+      break;
+    }
+    case 'bananaThrow': {
+      const spd = ev.giant ? 28 : 22;
+      if (ev.count > 1) {
+        for (let i = 0; i < ev.count; i++) {
+          const offsetAng = ev.a + (i - (ev.count - 1) / 2) * 0.22;
+          const vx = Math.cos(offsetAng) * spd;
+          const vz = Math.sin(offsetAng) * spd;
+          bananas.spawn(ev.x, ev.z, vx, vz, ev.giant);
+        }
+      } else {
+        const vx = Math.cos(ev.a) * spd;
+        const vz = Math.sin(ev.a) * spd;
+        bananas.spawn(ev.x, ev.z, vx, vz, ev.giant);
+      }
+      sfxHit(1.2, ev.id === myId ? 1.0 : 0.35);
+      break;
+    }
+    case 'bananaHit': {
+      foodParts.burst(ev.x, 1.2, ev.z, 0xffeb3b, 16, 6, 6, 0.6);
+      foodParts.burst(ev.x, 1.4, ev.z, 0xff9800, 10, 4, 4, 0.4);
+      sfxHit(2.0, ev.id === myId ? 1.0 : 0.4);
+      break;
+    }
+    case 'monkeyLand': {
+      animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r, 0xffd54f);
+      foodParts.burst(ev.x, 0.2, ev.z, 0x8d5b38, 20, 8, 8, 0.6);
+      foodParts.burst(ev.x, 0.2, ev.z, 0xd4a373, 15, 6, 6, 0.5);
+      sfxHit(3.5, ev.id === myId ? 1.0 : 0.5);
+      const me = gameState.ents.get(myId);
+      const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+      if (dist < 28) {
+        shake = Math.max(shake, 1.4 * ev.ratio * (1 - dist / 28));
+      }
+      break;
+    }
+    case 'morph': {
+      const targetMeta = gameState.metas.get(ev.id);
+      if (targetMeta) {
+        targetMeta.species = ev.species;
+      }
+      if (ev.id === myId) {
+        sfxReward();
+        hud.showBanner(
+          ev.species === 'monkey' ? '🐒 ' + t('name_monkey') : '🐘 ' + t('name_elephant'),
+          ev.dur > 0 ? t('tk_banana') : t('sp_' + ev.species)
+        );
       }
       break;
     }
@@ -2103,7 +2160,7 @@ function animate(now: number): void {
         prevPredZ = predictor.z;
         hasPrevPred = true;
       }
-      const tillSpeedMult = gameState.truck !== undefined ? 1.5 : 1.0;
+      const tillSpeedMult = (gameState.truck !== undefined ? 1.5 : 1.0) * (myMeta.species === 'monkey' && (stepFlags & FLAG.SUPER) !== 0 ? 1.30 : 1.0);
       predictor.step(
         dt,
         now,
@@ -2347,6 +2404,7 @@ function animate(now: number): void {
   // Update dynamic food and particle effects
   foodParts.updateFood(gameState.food, now, gameState.map?.podium);
   foodParts.updateParticles(dt);
+  bananas.update(dt, (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy));
   animals.updateShockwaves(dt);
   animals.updateWaterRipples(dt);
 
@@ -2360,7 +2418,7 @@ function animate(now: number): void {
     const capColor = capMeta
       ? (capMeta.team !== undefined
         ? (capMeta.team === 0 ? 0x4fc3f7 : 0xf44336)
-        : (({ chicken: 0xffb74d, sheep: 0xf3f1ea, horse: 0x8b5a2b, cow: 0x4fc3f7, duck: 0xffd54f, pig: 0xf48fb1 } as Record<string, number>)[capMeta.species] ?? 0xffc928))
+        : (SPECIES_RING_COLOR[capMeta.species] ?? 0xffc928))
       : 0xffc928;
     world.updatePodiumRing(capProg, capContested, now, capColor);
     world.updatePodiumShield(gameState.podShield[0], gameState.podShield[1], now);

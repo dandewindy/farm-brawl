@@ -191,6 +191,7 @@ export class HudManager {
     pig: 0,
     dog: 0,
     elephant: 0,
+    monkey: 0,
   };
 
   private readonly friendPanel: HTMLElement | null;
@@ -427,6 +428,7 @@ export class HudManager {
       pig: [0xf6a5b5, 0x2f2a2c, 0xd2773a, 0x3a3335],
       dog: [0xd9822b, 0x48505c, 0xc47b38, 0x242228],
       elephant: [0x828892, 0xf2ede4, 0x6d5e54, 0x607d8b],
+      monkey: [0x6e472b, 0x362b28, 0xd4a373, 0x934b28],
     };
 
     SPECIES.forEach((sp) => {
@@ -817,7 +819,9 @@ export class HudManager {
         const roll = Math.random();
         if (roll < 0.10) {
           chosenSpecies = 'elephant';
-        } else if (roll < 0.40) {
+        } else if (roll < 0.20) {
+          chosenSpecies = 'monkey';
+        } else if (roll < 0.45) {
           chosenSpecies = 'dog';
         } else {
           const normalSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
@@ -2199,7 +2203,7 @@ export class HudManager {
 
   updateHof(hof: HofRow[]): void {
     const emojis: Record<Species, string> = {
-      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘',
+      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘', monkey: '🐒',
     };
     if (this.hofList) this.hofList.innerHTML = '';
     if (this.drawerHofList) this.drawerHofList.innerHTML = '';

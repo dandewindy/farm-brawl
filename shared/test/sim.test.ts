@@ -1615,6 +1615,138 @@ describe('fruit trees', () => {
       }
     });
   });
+
+  describe('monkey mechanics', () => {
+    it('monkey tap ram near tree shakes tree and drops 1/3 fruits', () => {
+      const w = new World(1234, { bots: false, food: false });
+      const mId = w.addPlayer('Wukong', 'monkey');
+      // Tree at (10, 0)
+      const tree = w.treeSims[0];
+      tree.x = 10;
+      tree.z = 0;
+      tree.big = 9;
+      tree.small = 6;
+      const monkey = place(w, mId, 10 - tree.r - 1.5, 0);
+
+      // Tap ram (holdT <= 0.15)
+      monkey.input.btn = false;
+      monkey.holdT = 0.1;
+      monkey.pressed = true;
+      w.step();
+
+      expect(tree.big).toBe(6); // 9 - ceil(9/3) = 6
+      expect(tree.small).toBe(4); // 6 - ceil(6/3) = 4
+      expect(monkey.treeShakeT).toBeGreaterThan(0);
+      expect(monkey.stunT).toBe(0); // Not stunned!
+    });
+
+    it('monkey tap ram away from tree throws banana projectile and deals <= 5% mass loss', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('Wukong', 'monkey');
+      const monkey = place(w, mId, 0, 0, 100);
+      monkey.input.a = 0;
+
+      // Target far enough so projectile flies towards it
+      const targetId = w.addPlayer('TargetPig', 'pig');
+      const target = place(w, targetId, 14.0, 0, 200);
+
+      // Tap ram throws banana
+      monkey.holdT = 0.1;
+      monkey.pressed = true;
+      w.step();
+
+      // Projectile spawned and in flight
+      expect(w.bananaProjectiles.length).toBe(1);
+
+      // Step until banana reaches target
+      for (let i = 0; i < 15; i++) {
+        w.step();
+      }
+
+      // Target took hit, loses mass <= 5% of 200 (10kg max)
+      expect(target.mass).toBeLessThan(200);
+      expect(target.mass).toBeGreaterThanOrEqual(190);
+    });
+
+    it('monkey charged leap jumps over fire hazard and lands with shockwave', () => {
+      const w = emptyWorld();
+      // Add a fire pit at (5, 0)
+      w.map.fire = [[5, 0, 2.5]];
+
+      const mId = w.addPlayer('Wukong', 'monkey');
+      const monkey = place(w, mId, 0, 0, 80);
+      monkey.input.a = 0;
+
+      // Small animal (< 50kg) and heavy animal (> 50kg) at landing area (~19m ahead)
+      const smallId = w.addPlayer('SmallChick', 'chicken');
+      const small = place(w, smallId, 18, 0, 30);
+      const heavyId = w.addPlayer('HeavyCow', 'cow');
+      const heavy = place(w, heavyId, 19, 2, 200);
+
+      // Full charge leap (hold 1.0s)
+      monkey.holdT = 1.0;
+      monkey.pressed = true;
+      w.step();
+
+      expect(monkey.monkeyLeapT).toBeGreaterThan(0);
+
+      // Fly through and land (20 ticks = 1.0s)
+      for (let i = 0; i < 20; i++) {
+        w.step();
+      }
+
+      // Monkey did not die to fire pit
+      expect(monkey.alive).toBe(true);
+      // Small animal <= 50kg is squashed
+      expect(small.squishT).toBeGreaterThan(0);
+      // Heavy animal > 50kg lost mass
+      expect(heavy.mass).toBeLessThan(200);
+    });
+
+    it('banana item morphs player into monkey or elephant for 30s', () => {
+      const w = emptyWorld();
+      const pId = w.addPlayer('Player1', 'pig');
+      const p = place(w, pId, 0, 0, 50);
+
+      // Spawn banana item at player position
+      w.tools.set(999, { id: 999, kind: 'banana', x: 0, z: 0 });
+      w.step();
+
+      expect(['monkey', 'elephant']).toContain(p.species);
+      expect(p.morphT).toBe(30);
+      expect(p.morphOrigSpecies).toBe('pig');
+
+      // Fast-forward 30s
+      for (let i = 0; i < 30 * 20; i++) {
+        w.step();
+      }
+
+      // Reverts back to pig
+      expect(p.species).toBe('pig');
+      expect(p.morphT).toBeUndefined();
+    });
+
+    it('rainbow monkey fires 5 giant bananas in cone spread and gains 30% speed', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('RainbowMonkey', 'monkey');
+      const monkey = place(w, mId, 0, 0, 100);
+      monkey.superT = 10;
+      monkey.input.a = 0;
+
+      // Trigger action
+      monkey.holdT = 0;
+      monkey.pressed = true;
+      w.step();
+
+      // 5 giant bananas spawned!
+      expect(w.bananaProjectiles.length).toBe(5);
+      for (const b of w.bananaProjectiles) {
+        expect(b.giant).toBe(true);
+      }
+      // Monkey did not fly/dash
+      expect(monkey.flyT).toBe(0);
+    });
+  });
 });
 
 

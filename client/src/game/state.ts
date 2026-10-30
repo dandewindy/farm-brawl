@@ -130,6 +130,11 @@ export class GameState {
         this.map = ev.map;
         this.food.clear();
         for (const f of ev.food) this.addFood(f);
+      } else if (ev.k === 'morph') {
+        const meta = this.metas.get(ev.id);
+        if (meta) {
+          meta.species = ev.species;
+        }
       }
       this.hooks.onEvent(ev);
     }
