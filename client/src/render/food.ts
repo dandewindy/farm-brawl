@@ -53,6 +53,7 @@ function createWatermelonTexture(): THREE.CanvasTexture {
 export class FoodAndParticleRenderer {
 
   private readonly foodMeshes: THREE.InstancedMesh[] = [];
+  public transitionScale = 1.0;
   private readonly foodTops: Partial<Record<FoodKind, THREE.InstancedMesh>> = {};
   private readonly foodMats: THREE.Material[];
   private readonly foodShadow: THREE.InstancedMesh;
@@ -475,9 +476,10 @@ export class FoodAndParticleRenderer {
       const sz = k === 1
         ? 0.85 * Math.cbrt((f.v || baseKg) / baseKg)
         : Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)));
-      const grow = f.born ? Math.max(0, Math.min(1, (now - f.born) / 350)) : 1;
+      const grow = (f.born ? Math.max(0, Math.min(1, (now - f.born) / 350)) : 1) * this.transitionScale;
       const seed = f.id * 1.37;
-      const onPod = Math.hypot(f.x - podX, f.z - podZ) < CFG.PODIUM_R ? 0.53 : 0;
+      const ySink = - (1 - this.transitionScale) * 2.5;
+      const onPod = (Math.hypot(f.x - podX, f.z - podZ) < CFG.PODIUM_R ? 0.53 : 0) + ySink;
 
       if (k === 6) {
         // Rainbow candy: floats high, spins fast, cycles colors and sparkles
@@ -757,5 +759,9 @@ export class FoodAndParticleRenderer {
     this.particleMesh.count = aliveCount;
     this.particleMesh.instanceMatrix.needsUpdate = true;
     if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
+  }
+
+  setTransitionScale(sc: number): void {
+    this.transitionScale = sc;
   }
 }

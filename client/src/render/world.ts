@@ -1848,6 +1848,7 @@ export class WorldRenderer {
   }
 
   // Map Transformation Smooth Transition Animation
+  public onTransitionScale?: (sc: number) => void;
   private mapTransition: {
     phase: 'shrink' | 'grow';
     progress: number;
@@ -1868,12 +1869,23 @@ export class WorldRenderer {
     if (!this.mapTransition) return;
     const tr = this.mapTransition;
     if (tr.phase === 'shrink') {
-      tr.progress += dt / 0.55; // ~0.55s smooth shrink
+      tr.progress += dt / 0.65; // ~0.65s smooth shrink into ground
       const p = Math.min(1, tr.progress);
-      const sc = Math.max(0, 1 - p * p);
-      this.hazardGroup.scale.set(sc, sc, sc);
-      this.farmTreeGroup.scale.set(sc, sc, sc);
+      // Smooth cubic ease out
+      const sc = Math.max(0, Math.pow(1 - p, 2));
+      const ySink = - (1 - sc) * 10.0;
+
+      for (const child of this.farmTreeGroup.children) {
+        child.scale.set(sc, sc, sc);
+        child.position.y = ySink;
+      }
+      for (const child of this.hazardGroup.children) {
+        child.scale.set(sc, sc, sc);
+        child.position.y = - (1 - sc) * 5.0;
+      }
       this.podiumGroup.scale.set(sc, sc, sc);
+      this.podiumGroup.position.y = - (1 - sc) * 3.5;
+      this.onTransitionScale?.(sc);
 
       if (p >= 1) {
         if (tr.nextMap) {
@@ -1882,22 +1894,49 @@ export class WorldRenderer {
         tr.onMidpoint?.();
         tr.phase = 'grow';
         tr.progress = 0;
-        this.hazardGroup.scale.set(0, 0, 0);
-        this.farmTreeGroup.scale.set(0, 0, 0);
+        // Start newly placed trees and obstacles completely submerged
+        for (const child of this.farmTreeGroup.children) {
+          child.scale.set(0, 0, 0);
+          child.position.y = -10.0;
+        }
+        for (const child of this.hazardGroup.children) {
+          child.scale.set(0, 0, 0);
+          child.position.y = -5.0;
+        }
         this.podiumGroup.scale.set(0, 0, 0);
+        this.podiumGroup.position.y = -3.5;
+        this.onTransitionScale?.(0);
       }
     } else if (tr.phase === 'grow') {
-      tr.progress += dt / 0.65; // ~0.65s smooth grow
+      tr.progress += dt / 0.75; // ~0.75s smooth grow out of ground
       const p = Math.min(1, tr.progress);
       const sc = Math.sin(p * Math.PI * 0.5);
-      this.hazardGroup.scale.set(sc, sc, sc);
-      this.farmTreeGroup.scale.set(sc, sc, sc);
+      const ySink = - (1 - sc) * 10.0;
+
+      for (const child of this.farmTreeGroup.children) {
+        child.scale.set(sc, sc, sc);
+        child.position.y = ySink;
+      }
+      for (const child of this.hazardGroup.children) {
+        child.scale.set(sc, sc, sc);
+        child.position.y = - (1 - sc) * 5.0;
+      }
       this.podiumGroup.scale.set(sc, sc, sc);
+      this.podiumGroup.position.y = - (1 - sc) * 3.5;
+      this.onTransitionScale?.(sc);
 
       if (p >= 1) {
-        this.hazardGroup.scale.set(1, 1, 1);
-        this.farmTreeGroup.scale.set(1, 1, 1);
+        for (const child of this.farmTreeGroup.children) {
+          child.scale.set(1, 1, 1);
+          child.position.y = 0;
+        }
+        for (const child of this.hazardGroup.children) {
+          child.scale.set(1, 1, 1);
+          child.position.y = 0;
+        }
         this.podiumGroup.scale.set(1, 1, 1);
+        this.podiumGroup.position.y = 0;
+        this.onTransitionScale?.(1);
         this.mapTransition = null;
       }
     }
@@ -1905,11 +1944,8 @@ export class WorldRenderer {
 
   buildMap(map: MapData): void {
     this.lastMapData = map;
-    if (!this.mapTransition) {
-      this.hazardGroup.scale.set(1, 1, 1);
-      this.farmTreeGroup.scale.set(1, 1, 1);
-      this.podiumGroup.scale.set(1, 1, 1);
-    }
+    this.hazardGroup.scale.set(1, 1, 1);
+    this.farmTreeGroup.scale.set(1, 1, 1);
     this.hazardGroup.clear();
     this.flames.length = 0;
     this.podiumGroup.position.set(map.podium[0], 0, map.podium[1]);

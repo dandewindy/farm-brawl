@@ -118,6 +118,7 @@ export type GameEvent =
   | { k: 'dice'; id: number; roll: number }
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }
+  | { k: 'mapWarn'; left: number }
   | { k: 'treeHit'; id: number; by: number; x: number; z: number; size: number; droppedBig: number; droppedSmall: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 

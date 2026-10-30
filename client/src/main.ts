@@ -44,6 +44,11 @@ const minions = new MinionRenderer(world.scene);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
+world.onTransitionScale = (sc: number) => {
+  tools.setTransitionScale(sc);
+  foodParts.setTransitionScale(sc);
+};
+
 onThemeChange((theme) => {
   world.setTheme(theme);
   animals.setTheme(theme);
@@ -1603,6 +1608,9 @@ function handleGameEvent(ev: GameEvent): void {
       hud.showRuleBanner(ev.id);
       const kingMeta = gameState.metas.get(gameState.napoleonId);
       hud.updateBoard(ev.id, gameState.reign, kingMeta?.name, gameState.napoleonId === gameState.myId);
+      if (ev.id === 'sunday') {
+        animals.triggerSundaySummon(1.5);
+      }
       break;
     }
     case 'flowerBloom': {
@@ -1740,15 +1748,20 @@ function handleGameEvent(ev: GameEvent): void {
       }
       break;
     }
+    case 'mapWarn': {
+      hud.showToast(t('mapShiftCountdown', { s: ev.left }), 1200);
+      sfxHit(0.5, 0.4);
+      break;
+    }
     case 'map': {
       if (ev.transition) {
-        // Requirement 3: Smooth 5-minute map shift animation without resetting animals or player progress
+        // Requirement 2: Smooth 5-minute map shift animation without resetting animals or player progress
         world.transitionToMap(ev.map, () => {
           corpses.setMap(ev.map);
           minions.setMap(ev.map);
           tools.clear();
         });
-        hud.showToast(t('mapShiftToast') || 'Bản đồ vừa biến đổi kỳ ảo! ✨', 2600);
+        hud.showToast(t('mapShifted'), 3000);
       } else {
         world.buildMap(ev.map);
         corpses.setMap(ev.map);

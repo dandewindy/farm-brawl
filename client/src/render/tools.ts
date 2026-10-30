@@ -231,14 +231,63 @@ export class ToolRenderer {
         }
         g.add(mesh(new THREE.SphereGeometry(0.09, 8, 6), 0xffb300, 0, 1.5, 0.16, { metalness: 0.8, roughness: 0.25 }));
       } else {
-        // Golden Radiant Star
-        g.add(mesh(new THREE.OctahedronGeometry(0.8, 0), 0xffc107, 0, 1.6, 0, { metalness: 0.85, roughness: 0.18, emissive: 0xff8f00, emissiveIntensity: 0.4 }));
-        const star2 = mesh(new THREE.OctahedronGeometry(0.55, 0), 0xffd54f, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2, emissive: 0xffa000, emissiveIntensity: 0.3 });
-        star2.rotation.z = Math.PI / 4;
-        g.add(star2);
-        const halo = mesh(new THREE.TorusGeometry(1.1, 0.04, 8, 24), 0xffea00, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2 });
-        halo.rotation.x = Math.PI / 3;
-        g.add(halo);
+        // Quả Trứng Lấp Lánh (Sparkling Golden Egg)
+        const eggGeo = new THREE.SphereGeometry(0.66, 24, 20);
+        const pos = eggGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          let x = pos.getX(i);
+          let y = pos.getY(i);
+          let z = pos.getZ(i);
+          const t = (y + 0.66) / 1.32; // 0 at bottom, 1 at top
+          const taper = 1.0 - 0.28 * Math.pow(t, 1.2);
+          x *= taper;
+          z *= taper;
+          y *= 1.32;
+          pos.setXYZ(i, x, y, z);
+        }
+        eggGeo.computeVertexNormals();
+
+        // Plump golden sparkling egg
+        const eggMesh = mesh(eggGeo, 0xfff9c4, 0, 1.55, 0, {
+          metalness: 0.55,
+          roughness: 0.2,
+          emissive: 0xffd54f,
+          emissiveIntensity: 0.4,
+        });
+        g.add(eggMesh);
+
+        // Golden celestial ring
+        const ring = mesh(new THREE.TorusGeometry(1.05, 0.045, 8, 32), 0xffea00, 0, 1.55, 0, {
+          metalness: 0.85,
+          roughness: 0.15,
+          emissive: 0xffb300,
+          emissiveIntensity: 0.5,
+        });
+        ring.rotation.x = Math.PI / 3;
+        ring.rotation.y = Math.PI / 6;
+        g.add(ring);
+
+        // Equatorial golden jewel band
+        const band = mesh(new THREE.TorusGeometry(0.68, 0.035, 8, 24), 0xffd700, 0, 1.45, 0, {
+          metalness: 0.9,
+          roughness: 0.15,
+        });
+        band.rotation.x = Math.PI / 2;
+        g.add(band);
+
+        // 4 orbiting sparkling diamond stars
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2;
+          const sparkle = mesh(new THREE.OctahedronGeometry(0.13, 0), 0xffffff, Math.cos(a) * 0.88, 1.55 + Math.sin(a * 2) * 0.25, Math.sin(a) * 0.88, {
+            metalness: 0.7,
+            roughness: 0.2,
+            emissive: 0xffea00,
+            emissiveIntensity: 0.8,
+          });
+          sparkle.rotation.y = a;
+          sparkle.rotation.z = Math.PI / 4;
+          g.add(sparkle);
+        }
       }
     }
 
@@ -305,5 +354,10 @@ export class ToolRenderer {
       });
     }
     this.toolObjs.clear();
+  }
+
+  setTransitionScale(sc: number): void {
+    this.group.scale.set(sc, sc, sc);
+    this.group.position.y = - (1 - sc) * 4.0;
   }
 }

@@ -578,9 +578,14 @@ export class World {
       }
     }
 
-    // Requirement 3: Automatic map transformation every 5 minutes (300s) without disrupting active players
+    // Requirement 2: Automatic map transformation every 5 minutes (300s) with 5s countdown
     if (!this.matchEnded) {
+      const prevSec = Math.ceil(this.mapShiftTimer);
       this.mapShiftTimer -= DT;
+      const currSec = Math.ceil(this.mapShiftTimer);
+      if (currSec <= 5 && currSec > 0 && currSec !== prevSec) {
+        this.events.push({ k: 'mapWarn', left: currSec });
+      }
       if (this.mapShiftTimer <= 0) {
         this.mapShiftTimer = 300;
         this.shiftMap();
@@ -916,7 +921,9 @@ export class World {
             for (const m of this.minions.values()) {
               if (m.ownerId === p.id && m.alive) count++;
             }
-            const spawnCount = Math.min(2, 6 - count);
+            // Requirement 3: Max 6 normally, 8 at 1000kg (1 ton), 10 at 3000kg (3 tons)
+            const maxMinions = p.mass >= 3000 ? 10 : (p.mass >= 1000 ? 8 : 6);
+            const spawnCount = Math.min(2, Math.max(0, maxMinions - count));
             for (let i = 0; i < spawnCount; i++) {
               const mid = this.nextMinionId++;
               const offsetAng = (i * Math.PI) + (count * 1.05);
@@ -2090,13 +2097,22 @@ export class World {
 
   private spawnFood(): void {
     let x = 0, z = 0;
-    for (let i = 0; i < 16; i++) {
-      const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 3);
-      x = Math.cos(a) * d; z = Math.sin(a) * d;
-      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) continue;
-      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 1.8)) continue;
-      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 1.8)) continue;
-      break;
+    // Requirement 1: 8% chance to place food directly on campfire as a tempting trap for greedy players
+    if (this.map.fire && this.map.fire.length > 0 && this.rnd() < 0.08) {
+      const [fx, fz, fr] = this.map.fire[Math.floor(this.rnd() * this.map.fire.length)];
+      const a = this.rnd() * Math.PI * 2;
+      const d = this.rnd() * Math.max(0.6, (fr || 2.2) * 0.7);
+      x = fx + Math.cos(a) * d;
+      z = fz + Math.sin(a) * d;
+    } else {
+      for (let i = 0; i < 16; i++) {
+        const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 3);
+        x = Math.cos(a) * d; z = Math.sin(a) * d;
+        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 1.8)) continue;
+        // Food is allowed on fire as a trap for greedy players
+        break;
+      }
     }
     let roll = this.rnd() * (FOOD_WEIGHT as readonly number[]).reduce((s, w) => s + w, 0);
     let k = 0 as FoodKind;
@@ -2153,27 +2169,20 @@ export class World {
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
 
-    // Requirement 2: 12% chance to place directly on a campfire as an intentional trap for greedy players
-    if (this.map.fire && this.map.fire.length > 0 && this.rnd() < 0.12) {
-      const [fx, fz] = this.map.fire[Math.floor(this.rnd() * this.map.fire.length)];
-      bx = fx;
-      bz = fz;
-    } else {
-      for (let tries = 0; tries < 30; tries++) {
-        const a = this.rnd() * Math.PI * 2;
-        const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
-        const x = Math.cos(a) * d;
-        const z = Math.sin(a) * d;
-        if (terrainAt(this.map, x, z) === 1) continue;
-        if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
-        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
-        // Requirement 2: Avoid obstacles where animals cannot reach (hay bales and tree trunks)
-        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
-        if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
-        // Fire is intentionally NOT rejected, allowing greedy trap placements
-        bx = x; bz = z;
-        break;
-      }
+    for (let tries = 0; tries < 40; tries++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
+      const x = Math.cos(a) * d;
+      const z = Math.sin(a) * d;
+      if (terrainAt(this.map, x, z) === 1) continue;
+      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
+      // Requirement 1: Special items avoid hay bales, trees, and strictly avoid campfire
+      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
+      if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
+      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < (fr || 2.5) + 2.8)) continue;
+      bx = x; bz = z;
+      break;
     }
     const id = this.nextTool++;
     this.tools.set(id, { id, kind, x: r2(bx), z: r2(bz), age: 0 });
@@ -2181,27 +2190,20 @@ export class World {
 
   private spawnSuperCandy(): void {
     let bx = 0, bz = 0;
-    // 10% chance to spawn on fire as a greedy trap
-    if (this.map.fire && this.map.fire.length > 0 && this.rnd() < 0.10) {
-      const [fx, fz] = this.map.fire[Math.floor(this.rnd() * this.map.fire.length)];
-      bx = fx;
-      bz = fz;
-    } else {
-      for (let tries = 0; tries < 30; tries++) {
-        const a = this.rnd() * Math.PI * 2;
-        const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
-        const x = Math.cos(a) * d;
-        const z = Math.sin(a) * d;
-        if (terrainAt(this.map, x, z) === 1) continue;
-        if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
-        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
-        // Requirement 2: Avoid trees and hay
-        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
-        if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
-        // Fire is intentionally NOT rejected
-        bx = x; bz = z;
-        break;
-      }
+    for (let tries = 0; tries < 40; tries++) {
+      const a = this.rnd() * Math.PI * 2;
+      const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
+      const x = Math.cos(a) * d;
+      const z = Math.sin(a) * d;
+      if (terrainAt(this.map, x, z) === 1) continue;
+      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
+      // Requirement 1: Super Candy strictly avoids hay bales, trees, and campfire
+      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
+      if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
+      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < (fr || 2.5) + 2.8)) continue;
+      bx = x; bz = z;
+      break;
     }
     this.addFood(bx, bz, 6, 3);
     this.events.push({ k: 'superFood', x: r2(bx), z: r2(bz) });

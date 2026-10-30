@@ -44,6 +44,14 @@ interface AnimalVisual {
     halloween: THREE.Group;
   };
   cartWheels: THREE.Mesh[];
+  summonRingTimer?: number;
+  summonGroup: THREE.Group;
+  summonOuter: THREE.Mesh;
+  summonInner: THREE.Mesh;
+  summonBeam: THREE.Mesh;
+  summonOuterMat: THREE.MeshBasicMaterial;
+  summonInnerMat: THREE.MeshBasicMaterial;
+  summonBeamMat: THREE.MeshBasicMaterial;
 }
 
 function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
@@ -100,6 +108,14 @@ const sharedMudSplatMat = new THREE.MeshBasicMaterial({
   opacity: 0.90,
   depthWrite: false,
 });
+
+const summonOuterGeo = new THREE.RingGeometry(1.15, 1.55, 32);
+summonOuterGeo.rotateX(-Math.PI / 2);
+
+const summonInnerGeo = new THREE.RingGeometry(0.65, 0.90, 24);
+summonInnerGeo.rotateX(-Math.PI / 2);
+
+const summonBeamGeo = new THREE.CylinderGeometry(1.35, 1.35, 3.8, 20, 1, true);
 
 const SPECIES_RING_COLOR: Record<Species, number> = {
   chicken: 0xffb74d,
@@ -1447,6 +1463,9 @@ export class AnimalRenderer {
           this.scene.remove(s);
         }
       }
+      if (vis.summonGroup) {
+        this.scene.remove(vis.summonGroup);
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
       this.visuals.delete(id);
@@ -1473,6 +1492,9 @@ export class AnimalRenderer {
         }
         vis.mudSplatMat.dispose();
       }
+      if (vis.summonGroup) {
+        this.scene.remove(vis.summonGroup);
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
     }
@@ -1484,6 +1506,13 @@ export class AnimalRenderer {
     for (const wr of this.waterRipplePool) {
       wr.active = false;
       wr.mesh.visible = false;
+    }
+  }
+
+  triggerSundaySummon(duration = 1.5): void {
+    for (const vis of this.visuals.values()) {
+      vis.summonRingTimer = duration;
+      vis.summonGroup.visible = true;
     }
   }
 
@@ -1952,6 +1981,32 @@ export class AnimalRenderer {
       ? (meta.team === 0 ? 0x2196f3 : 0xf44336)
       : (SPECIES_RING_COLOR[vis.species] ?? 0xff9800);
     vis.collarMat.color.setHex(isKing ? 0xffc928 : collarColor);
+
+    // Requirement 4: Sunday Meeting Summoning Ring animation (1.5s)
+    if (vis.summonRingTimer !== undefined && vis.summonRingTimer > 0) {
+      vis.summonRingTimer = Math.max(0, vis.summonRingTimer - dt);
+      const prog = vis.summonRingTimer / 1.5; // 1 down to 0
+      if (prog <= 0) {
+        vis.summonGroup.visible = false;
+      } else {
+        vis.summonGroup.visible = true;
+        vis.summonGroup.position.set(x, smoothBaseY, z);
+        const baseSc = r * (1.1 + (1 - prog) * 0.35);
+        vis.summonGroup.scale.set(baseSc, 1, baseSc);
+
+        // Rotation of magic rings
+        vis.summonOuter.rotation.z = now * 0.003;
+        vis.summonInner.rotation.z = -now * 0.005;
+
+        // Pulsing glowing opacity
+        const pulse = 0.7 + 0.3 * Math.sin(now * 0.012);
+        vis.summonOuterMat.opacity = Math.min(1, prog * 1.2) * pulse * 0.95;
+        vis.summonInnerMat.opacity = Math.min(1, prog * 1.2) * (1.3 - pulse) * 0.9;
+        vis.summonBeamMat.opacity = Math.min(1, prog * 1.4) * pulse * 0.45;
+      }
+    } else {
+      vis.summonGroup.visible = false;
+    }
   }
 
   setTheme(theme: ArenaTheme): void {
@@ -2000,6 +2055,45 @@ export class AnimalRenderer {
       mudSplats.push(splat);
     }
 
+    // Summoning light circle for Sunday Meeting rule (1.5s visual)
+    const summonGroup = new THREE.Group();
+    summonGroup.visible = false;
+
+    const summonOuterMat = new THREE.MeshBasicMaterial({
+      color: 0xffea00,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const summonOuter = new THREE.Mesh(summonOuterGeo, summonOuterMat);
+    summonOuter.position.y = 0.08;
+    summonGroup.add(summonOuter);
+
+    const summonInnerMat = new THREE.MeshBasicMaterial({
+      color: 0x40c4ff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const summonInner = new THREE.Mesh(summonInnerGeo, summonInnerMat);
+    summonInner.position.y = 0.09;
+    summonGroup.add(summonInner);
+
+    const summonBeamMat = new THREE.MeshBasicMaterial({
+      color: 0xfff59d,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const summonBeam = new THREE.Mesh(summonBeamGeo, summonBeamMat);
+    summonBeam.position.y = 1.9;
+    summonGroup.add(summonBeam);
+
+    this.scene.add(summonGroup);
+
     return {
       root,
       body,
@@ -2030,6 +2124,14 @@ export class AnimalRenderer {
       cartGroup,
       cartThemeGroups,
       cartWheels,
+      summonRingTimer: 0,
+      summonGroup,
+      summonOuter,
+      summonInner,
+      summonBeam,
+      summonOuterMat,
+      summonInnerMat,
+      summonBeamMat,
     };
   }
 }
