@@ -270,16 +270,10 @@ export class WsClient implements Transport {
       const isCustom = u.hostname.includes('get-go.site');
 
       if (isCustom) {
-        // Tên miền riêng bị ISP đưa qua châu Âu -> Thử ngay workers.dev cùng tài khoản và tài khoản 1
+        // Tên miền riêng bị ISP đưa qua châu Âu -> Thử ngay workers.dev cùng tài khoản
         urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
-        urls.push(`wss://farm-brawl.farm-brawl.workers.dev/ws${search}`);
-        urls.push(this.activeUrl);
-      } else if (u.hostname.includes('windydande.workers.dev')) {
-        urls.push(`wss://brawl.get-go.site/ws${search}`);
-        urls.push(`wss://farm-brawl.farm-brawl.workers.dev/ws${search}`);
         urls.push(this.activeUrl);
       } else {
-        urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
         urls.push(`wss://brawl.get-go.site/ws${search}`);
         urls.push(this.activeUrl);
       }
