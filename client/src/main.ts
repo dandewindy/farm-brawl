@@ -1113,6 +1113,7 @@ const gameState = new GameState({
     if (!isReconnecting) {
       world.buildMap(map);
       corpses.setMap(map);
+      minions.setMap(map);
       if (!gameState.alive) {
         animals.clear();
       }
@@ -1521,13 +1522,22 @@ function handleGameEvent(ev: GameEvent): void {
         }, 1500);
       } else if (ev.by === myId) {
         sfxReward();
-        hud.showToast(t('youKO', { name: victimName }));
-        if (ev.spoils > 0) {
-          hud.showToast(t('spoils', { kg: ev.spoils }));
-        }
-        if (ev.streak >= 2) {
-          const sKey = `streak${Math.min(5, ev.streak)}` as const;
-          hud.showToast(t(sKey));
+        const isMobile = document.body.classList.contains('mobile-phone') ||
+          (!document.body.classList.contains('ipad') && !document.body.classList.contains('is-pc') && window.innerWidth <= 640);
+        if (isMobile) {
+          // Trên điện thoại: gộp thành 1 thông báo ngắn gọn tại cùng 1 vị trí, không đè nhiều lớp
+          const spoilsText = ev.spoils > 0 ? ` (+${ev.spoils}kg)` : '';
+          const streakText = ev.streak >= 2 ? ` 🔥 ${t((`streak${Math.min(5, ev.streak)}` as const))}` : '';
+          hud.showToast(`${t('youKO', { name: victimName })}${spoilsText}${streakText}`, 1800);
+        } else {
+          hud.showToast(t('youKO', { name: victimName }));
+          if (ev.spoils > 0) {
+            hud.showToast(t('spoils', { kg: ev.spoils }));
+          }
+          if (ev.streak >= 2) {
+            const sKey = `streak${Math.min(5, ev.streak)}` as const;
+            hud.showToast(t(sKey));
+          }
         }
       }
 
@@ -1731,13 +1741,24 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'map': {
-      world.buildMap(ev.map);
-      corpses.setMap(ev.map);
-      animals.clear();
-      tools.clear();
-      gameState.hof = [];
-      hud.updateHof([]);
-      hud.showToast(t('mapResetToast'));
+      if (ev.transition) {
+        // Requirement 3: Smooth 5-minute map shift animation without resetting animals or player progress
+        world.transitionToMap(ev.map, () => {
+          corpses.setMap(ev.map);
+          minions.setMap(ev.map);
+          tools.clear();
+        });
+        hud.showToast(t('mapShiftToast') || 'Bản đồ vừa biến đổi kỳ ảo! ✨', 2600);
+      } else {
+        world.buildMap(ev.map);
+        corpses.setMap(ev.map);
+        minions.setMap(ev.map);
+        animals.clear();
+        tools.clear();
+        gameState.hof = [];
+        hud.updateHof([]);
+        hud.showToast(t('mapResetToast'));
+      }
       break;
     }
     case 'podBlast': {

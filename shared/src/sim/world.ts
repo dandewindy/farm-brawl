@@ -87,6 +87,7 @@ export interface ToolItem {
   kind: ToolKind;
   x: number;
   z: number;
+  age?: number;
 }
 
 export interface Food {
@@ -95,6 +96,7 @@ export interface Food {
   z: number;
   k: FoodKind;
   v: number;
+  age?: number;
 }
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -191,6 +193,7 @@ export class World {
   minions = new Map<number, Minion>();
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
+  private mapShiftTimer = 300;
   private rnd: () => number;
   private events: GameEvent[] = [];
   private foodAdded: FoodWire[] = [];
@@ -575,6 +578,15 @@ export class World {
       }
     }
 
+    // Requirement 3: Automatic map transformation every 5 minutes (300s) without disrupting active players
+    if (!this.matchEnded) {
+      this.mapShiftTimer -= DT;
+      if (this.mapShiftTimer <= 0) {
+        this.mapShiftTimer = 300;
+        this.shiftMap();
+      }
+    }
+
     for (const tree of this.treeSims) {
       tree.step(DT);
     }
@@ -855,6 +867,25 @@ export class World {
       }
       if (!hasSuper) {
         this.spawnSuperCandy();
+      }
+    }
+
+    // Requirement 4: Items despawn after 3 minutes (180s) without being picked up, and respawn at a new position
+    for (const [id, t] of this.tools) {
+      t.age = (t.age || 0) + DT;
+      if (t.age >= 180) {
+        this.tools.delete(id);
+        this.spawnTool();
+      }
+    }
+    for (const f of this.food.values()) {
+      if (f.k === 6) {
+        f.age = (f.age || 0) + DT;
+        if (f.age >= 180) {
+          this.food.delete(f.id);
+          this.foodRemoved.push(f.id);
+          this.spawnSuperCandy();
+        }
       }
     }
 
@@ -2121,37 +2152,56 @@ export class World {
     const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
-    for (let tries = 0; tries < 25; tries++) {
-      const a = this.rnd() * Math.PI * 2;
-      const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
-      const x = Math.cos(a) * d;
-      const z = Math.sin(a) * d;
-      if (terrainAt(this.map, x, z) === 1) continue;
-      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
-      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 3)) continue;
-      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 3)) continue;
-      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2)) continue;
-      bx = x; bz = z;
-      break;
+
+    // Requirement 2: 12% chance to place directly on a campfire as an intentional trap for greedy players
+    if (this.map.fire && this.map.fire.length > 0 && this.rnd() < 0.12) {
+      const [fx, fz] = this.map.fire[Math.floor(this.rnd() * this.map.fire.length)];
+      bx = fx;
+      bz = fz;
+    } else {
+      for (let tries = 0; tries < 30; tries++) {
+        const a = this.rnd() * Math.PI * 2;
+        const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
+        const x = Math.cos(a) * d;
+        const z = Math.sin(a) * d;
+        if (terrainAt(this.map, x, z) === 1) continue;
+        if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
+        // Requirement 2: Avoid obstacles where animals cannot reach (hay bales and tree trunks)
+        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
+        if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
+        // Fire is intentionally NOT rejected, allowing greedy trap placements
+        bx = x; bz = z;
+        break;
+      }
     }
     const id = this.nextTool++;
-    this.tools.set(id, { id, kind, x: r2(bx), z: r2(bz) });
+    this.tools.set(id, { id, kind, x: r2(bx), z: r2(bz), age: 0 });
   }
 
   private spawnSuperCandy(): void {
     let bx = 0, bz = 0;
-    for (let tries = 0; tries < 25; tries++) {
-      const a = this.rnd() * Math.PI * 2;
-      const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
-      const x = Math.cos(a) * d;
-      const z = Math.sin(a) * d;
-      if (terrainAt(this.map, x, z) === 1) continue;
-      if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
-      if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 3)) continue;
-      if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < fr + 3)) continue;
-      if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 1.5)) continue;
-      bx = x; bz = z;
-      break;
+    // 10% chance to spawn on fire as a greedy trap
+    if (this.map.fire && this.map.fire.length > 0 && this.rnd() < 0.10) {
+      const [fx, fz] = this.map.fire[Math.floor(this.rnd() * this.map.fire.length)];
+      bx = fx;
+      bz = fz;
+    } else {
+      for (let tries = 0; tries < 30; tries++) {
+        const a = this.rnd() * Math.PI * 2;
+        const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
+        const x = Math.cos(a) * d;
+        const z = Math.sin(a) * d;
+        if (terrainAt(this.map, x, z) === 1) continue;
+        if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 2.8)) continue;
+        // Requirement 2: Avoid trees and hay
+        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
+        if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
+        // Fire is intentionally NOT rejected
+        bx = x; bz = z;
+        break;
+      }
     }
     this.addFood(bx, bz, 6, 3);
     this.events.push({ k: 'superFood', x: r2(bx), z: r2(bz) });
@@ -2291,6 +2341,7 @@ export class World {
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < 6; i++) this.spawnTool();
     this.matchClock = this.mode === 'friend' ? this.matchDuration : 300;
+    this.mapShiftTimer = 300;
     this.teamScores = [0, 0];
     this.matchEnded = false;
     this.matchEndTimer = 0;
@@ -2329,6 +2380,48 @@ export class World {
       map: this.map,
       food: [...this.food.values()].map((f) => [f.id, r2(f.x), r2(f.z), f.k, Math.round(f.v * 10) / 10]),
       tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
+    });
+  }
+
+  /** Requirement 3: Transform map layout every 5 minutes without disrupting active players */
+  shiftMap(newSeed?: number): void {
+    const seed = newSeed ?? ((Math.random() * 2 ** 31) | 0);
+    this.rnd = mulberry32(seed ^ 0x9e3779b9);
+    this.map = generateMap(seed);
+    this.initTrees();
+    this.food.clear();
+    this.tools.clear();
+    for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
+    for (let i = 0; i < 6; i++) this.spawnTool();
+
+    // Nudge alive players safely if they overlap with newly spawned trees or hay
+    for (const p of this.players.values()) {
+      if (!p.alive) continue;
+      for (const t of this.treeSims) {
+        const d = Math.hypot(p.x - t.x, p.z - t.z);
+        if (d < t.r + 2.0) {
+          const ang = d > 0.01 ? Math.atan2(p.z - t.z, p.x - t.x) : Math.random() * Math.PI * 2;
+          p.x = t.x + Math.cos(ang) * (t.r + 2.2);
+          p.z = t.z + Math.sin(ang) * (t.r + 2.2);
+        }
+      }
+      for (const [hx, hz, hr] of this.map.hay) {
+        const d = Math.hypot(p.x - hx, p.z - hz);
+        if (d < hr + 1.8) {
+          const ang = d > 0.01 ? Math.atan2(p.z - hz, p.x - hx) : Math.random() * Math.PI * 2;
+          p.x = hx + Math.cos(ang) * (hr + 2.0);
+          p.z = hz + Math.sin(ang) * (hr + 2.0);
+        }
+      }
+    }
+
+    // Broadcast map transition event with transition: true flag
+    this.events.push({
+      k: 'map',
+      map: this.map,
+      food: [...this.food.values()].map((f) => [f.id, r2(f.x), r2(f.z), f.k, Math.round(f.v * 10) / 10]),
+      tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
+      transition: true,
     });
   }
 

@@ -815,7 +815,7 @@ describe('bonus weapons and tools', () => {
   it('King continuously gets to choose commandments every 30 seconds', () => {
     const w = emptyWorld();
     const kingId = w.addPlayer('KingPig', 'pig', false);
-    const king = place(w, kingId, 0, 0, 40);
+    const king = place(w, kingId, 25, 25, 200);
     w.napoleonId = kingId;
 
     // Coronation triggers commandment choice
@@ -823,8 +823,8 @@ describe('bonus weapons and tools', () => {
     expect(w.kingChoice).not.toBeNull();
     expect(w.kingChoice!.options.length).toBe(3);
 
-    // King picks first option
-    const choice1 = w.kingChoice!.options[0];
+    // King picks a non-till option so tractor doesn't squish idle King during fast-forward
+    const choice1 = w.kingChoice!.options.find((r) => r !== 'till') ?? w.kingChoice!.options[0];
     w.chooseRule(kingId, choice1);
     expect(w.currentRule).toBe(choice1);
     expect(w.ruleTimer).toBe(30);

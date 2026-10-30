@@ -119,7 +119,7 @@ export type GameEvent =
   | { k: 'podBlast'; x: number; z: number }
   | { k: 'podWarn'; willShield: boolean; left: number }
   | { k: 'treeHit'; id: number; by: number; x: number; z: number; size: number; droppedBig: number; droppedSmall: number }
-  | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[] };
+  | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
 /** [id, stage: 0..3, big, small, flowers] */
 export type TreeSyncWire = [id: number, stage: number, big: number, small: number, flowers: number];

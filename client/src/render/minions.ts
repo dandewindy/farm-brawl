@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { radiusOf, type Species } from '@shared/constants';
 import type { MinionWire } from '@shared/protocol';
+import type { MapData } from '@shared/map';
+import { terrainAt } from '@shared/physics';
 import { getArenaTheme } from '../theme';
 import { buildFullAnimal } from './animals';
 
@@ -22,14 +24,20 @@ interface MinionVisual {
   species: Species;
   skin: number;
   ringMat: THREE.MeshBasicMaterial;
+  sinkProgress?: number;
 }
 
 export class MinionRenderer {
   private readonly minions = new Map<number, MinionVisual>();
   private readonly group = new THREE.Group();
+  private map: MapData | null = null;
 
   constructor(private readonly scene: THREE.Scene) {
     this.scene.add(this.group);
+  }
+
+  setMap(map: MapData): void {
+    this.map = map;
   }
 
   private buildMinionMesh(species: Species, skinIdx: number, mass = 50): {
@@ -170,15 +178,71 @@ export class MinionRenderer {
       while (da < -Math.PI) da += Math.PI * 2;
       vis.a += da * lerpRate;
 
-      vis.root.position.set(vis.x, 0, vis.z);
       vis.root.rotation.y = -vis.a;
 
-      // Leg running animation
-      const moveSpeed = dist / Math.max(dt, 0.001);
-      vis.phase += dt * (8 + Math.min(16, moveSpeed * 8));
-      vis.legs.forEach((leg, idx) => {
-        leg.rotation.z = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI)) * 0.7;
-      });
+      const r = radiusOf(vis.mass);
+      const sc = r * 1.35;
+      const isWater = this.map ? terrainAt(this.map, vis.x, vis.z) === 1 : false;
+
+      if (isWater) {
+        // Requirement 5: Water animation - swimming or sinking like real animals
+        vis.sinkProgress = Math.min(1, (vis.sinkProgress || 0) + dt * 0.4);
+        let y = 0;
+        if (vis.species === 'duck') {
+          // Ducks float peacefully on the surface with subtle bobbing
+          y = -0.20 * sc + Math.sin(now / 300) * 0.035;
+          vis.root.rotation.z = Math.sin(vis.phase * 0.7) * 0.08;
+          vis.root.rotation.x = 0;
+          vis.legs.forEach((leg, idx) => {
+            leg.visible = true;
+            leg.rotation.z = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI)) * 0.4;
+            leg.rotation.x = 0;
+          });
+        } else if (vis.species === 'dog') {
+          // Dogs swim, half body submerged with paddling bob
+          y = -0.90 * sc + Math.sin(now / 220) * 0.022;
+          vis.root.rotation.z = Math.sin(vis.phase * 0.5) * 0.06;
+          vis.root.rotation.x = 0;
+          // Hide legs while swimming like the real dog
+          vis.legs.forEach((leg) => {
+            leg.visible = false;
+          });
+        } else {
+          // Other animals sink into water with struggling paddle motion
+          const sinkProgress = vis.sinkProgress || 0;
+          const sinkDepth = 0.25 + Math.pow(sinkProgress, 1.3) * 0.95;
+          const rippleBob = Math.sin(now / 160) * 0.035 * (1 - sinkProgress);
+          y = -sinkDepth * sc + (sinkProgress < 0.95 ? rippleBob : 0);
+
+          vis.root.rotation.z = Math.sin(now / 180) * 0.25;
+          vis.root.rotation.x = Math.sin(now / 200) * 0.18;
+
+          const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
+          vis.legs.forEach((leg, idx) => {
+            leg.visible = true;
+            const baseSwing = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI) + (idx > 1 ? Math.PI : 0));
+            leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
+            leg.rotation.x = Math.sin(now / 160 + idx * 1.5) * 0.35 * paddleSpeed;
+          });
+        }
+        vis.ring.visible = false;
+        vis.root.position.set(vis.x, y, vis.z);
+      } else {
+        // On land: keep terrain unaffected, run normally
+        vis.sinkProgress = Math.max(0, (vis.sinkProgress || 0) - dt * 2.0);
+        const moveSpeed = dist / Math.max(dt, 0.001);
+        vis.phase += dt * (8 + Math.min(16, moveSpeed * 8));
+        const hopY = Math.abs(Math.sin(vis.phase)) * 0.08 * r;
+        vis.root.position.set(vis.x, hopY, vis.z);
+        vis.root.rotation.z = 0;
+        vis.root.rotation.x = 0;
+        vis.ring.visible = true;
+        vis.legs.forEach((leg, idx) => {
+          leg.visible = true;
+          leg.rotation.z = Math.sin(vis.phase + (idx % 2 === 0 ? 0 : Math.PI)) * 0.7;
+          leg.rotation.x = 0;
+        });
+      }
 
       // Pulse ring opacity
       vis.ringMat.opacity = 0.5 + 0.3 * Math.sin(now / 150 + vis.id);

@@ -2137,16 +2137,34 @@ body.mobile-phone #teamBar:not([hidden]) ~ #hud #board {
 /* Mobile only: Sub-notifications (toasts & banner) placed right below commandment board to keep center play area clear */
 body:not(.ipad):not(.is-pc) #toasts,
 body.mobile-phone #toasts {
+  position: fixed !important;
+  left: 50% !important;
   top: 38px !important;
-  gap: 4px !important;
+  transform: translateX(-50%) !important;
+  display: grid !important;
+  grid-template-areas: "toast" !important;
+  justify-items: center !important;
+  align-items: center !important;
+  gap: 0 !important;
   max-width: 90vw !important;
+  pointer-events: none !important;
+  z-index: 9 !important;
 }
-body:not(.ipad):not(.is-pc) #toasts div,
-body.mobile-phone #toasts div {
-  padding: 4px 10px !important;
+body:not(.ipad):not(.is-pc) #toasts > div,
+body.mobile-phone #toasts > div {
+  grid-area: toast !important;
+  margin: 0 !important;
+  padding: 5px 12px !important;
   font-size: 12px !important;
   border-radius: 8px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+  background: rgba(28, 22, 18, 0.94) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+  white-space: nowrap !important;
+  max-width: 88vw !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 body:not(.ipad):not(.is-pc).mode-team #toasts,
 body.mobile-phone.mode-team #toasts,

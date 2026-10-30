@@ -1769,8 +1769,69 @@ export class WorldRenderer {
     }
   }
 
+  // Map Transformation Smooth Transition Animation
+  private mapTransition: {
+    phase: 'shrink' | 'grow';
+    progress: number;
+    nextMap?: MapData;
+    onMidpoint?: () => void;
+  } | null = null;
+
+  transitionToMap(nextMap: MapData, onMidpoint?: () => void): void {
+    this.mapTransition = {
+      phase: 'shrink',
+      progress: 0,
+      nextMap,
+      onMidpoint,
+    };
+  }
+
+  private updateMapTransition(dt = 0.016): void {
+    if (!this.mapTransition) return;
+    const tr = this.mapTransition;
+    if (tr.phase === 'shrink') {
+      tr.progress += dt / 0.55; // ~0.55s smooth shrink
+      const p = Math.min(1, tr.progress);
+      const sc = Math.max(0, 1 - p * p);
+      this.hazardGroup.scale.set(sc, sc, sc);
+      this.farmTreeGroup.scale.set(sc, sc, sc);
+      this.podiumGroup.scale.set(sc, sc, sc);
+
+      if (p >= 1) {
+        if (tr.nextMap) {
+          this.buildMap(tr.nextMap);
+        }
+        tr.onMidpoint?.();
+        tr.phase = 'grow';
+        tr.progress = 0;
+        this.hazardGroup.scale.set(0, 0, 0);
+        this.farmTreeGroup.scale.set(0, 0, 0);
+        this.podiumGroup.scale.set(0, 0, 0);
+      }
+    } else if (tr.phase === 'grow') {
+      tr.progress += dt / 0.65; // ~0.65s smooth grow
+      const p = Math.min(1, tr.progress);
+      const sc = Math.sin(p * Math.PI * 0.5);
+      this.hazardGroup.scale.set(sc, sc, sc);
+      this.farmTreeGroup.scale.set(sc, sc, sc);
+      this.podiumGroup.scale.set(sc, sc, sc);
+
+      if (p >= 1) {
+        this.hazardGroup.scale.set(1, 1, 1);
+        this.farmTreeGroup.scale.set(1, 1, 1);
+        this.podiumGroup.scale.set(1, 1, 1);
+        this.mapTransition = null;
+      }
+    }
+  }
+
   buildMap(map: MapData): void {
     this.lastMapData = map;
+    if (!this.mapTransition) {
+      this.hazardGroup.scale.set(1, 1, 1);
+      this.farmTreeGroup.scale.set(1, 1, 1);
+      this.podiumGroup.scale.set(1, 1, 1);
+    }
     this.hazardGroup.clear();
     this.flames.length = 0;
     this.podiumGroup.position.set(map.podium[0], 0, map.podium[1]);
@@ -2319,6 +2380,7 @@ export class WorldRenderer {
     parts?: { puff: (x: number, y: number, z: number, color: number, scale: number, life: number, vy?: number) => void },
     playerPos?: { x: number; z: number }
   ): void {
+    this.updateMapTransition(0.016);
     this.updateFarmTrees(0.016, now);
     if (this.tex) {
       this.tex.waterMat.map!.offset.set(now * 0.000012, now * 0.000008);

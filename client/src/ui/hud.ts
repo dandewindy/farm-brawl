@@ -2249,6 +2249,15 @@ export class HudManager {
   }
 
   showToast(text: string, durationMs = 2600): void {
+    const isMobile = document.body.classList.contains('mobile-phone') ||
+      (!document.body.classList.contains('ipad') && !document.body.classList.contains('is-pc') && window.innerWidth <= 640);
+    if (isMobile) {
+      // Trên điện thoại: dọn bớt thông báo cũ, giữ tối đa 1-2 cái xếp chồng cùng 1 vị trí
+      while (this.toastsEl.children.length >= 2) {
+        this.toastsEl.firstElementChild?.remove();
+      }
+      durationMs = Math.min(durationMs, 1800);
+    }
     const div = document.createElement('div');
     div.textContent = text;
     this.toastsEl.appendChild(div);

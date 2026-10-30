@@ -359,10 +359,11 @@ export class FoodAndParticleRenderer {
       m0.color.setHex(0xe91e63);
       m0.emissive.setHex(0x4a0e1c);
 
-      // 1: Perfume bottle (Apple) -> Rose blossom pink
+      // 1: Apple / Tree fruit on ground -> Matches exact tree fruit color (0xc2185b)
       const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
-      m1.color.setHex(0xff4081);
-      m1.emissive.setHex(0x330018);
+      m1.color.setHex(0xc2185b);
+      m1.emissive.setHex(0x33081a);
+      m1.needsUpdate = true;
 
       // 2: Golden Rose (Golden Corn)
       const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
@@ -389,10 +390,11 @@ export class FoodAndParticleRenderer {
       m0.color.setHex(0xff9800);
       m0.emissive.setHex(0x442200);
 
-      // 1: Poison Apple (Táo độc) -> Deep blood/plum red
+      // 1: Halloween Apple / Tree fruit on ground -> Matches exact tree fruit color (0xff6d00)
       const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
-      m1.color.setHex(0x5c0011);
-      m1.emissive.setHex(0x2a0008);
+      m1.color.setHex(0xff6d00);
+      m1.emissive.setHex(0x331500);
+      m1.needsUpdate = true;
 
       // 2: Golden Candy (Kẹo vàng Halloween)
       const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
@@ -421,6 +423,7 @@ export class FoodAndParticleRenderer {
       const m1 = this.foodMats[1] as THREE.MeshStandardMaterial;
       m1.color.setHex(0xdb2828);
       m1.emissive.setHex(0x220000);
+      m1.needsUpdate = true;
 
       const m2 = this.foodMats[2] as THREE.MeshStandardMaterial;
       m2.color.setHex(0xffd700);
@@ -437,6 +440,18 @@ export class FoodAndParticleRenderer {
       const m5 = this.foodMats[5] as THREE.MeshStandardMaterial;
       m5.color.setHex(0xf5f5f0);
       m5.emissive.setHex(0x222222);
+    }
+
+    const appleStem = this.foodTops[1];
+    if (appleStem && appleStem.material instanceof THREE.MeshStandardMaterial) {
+      if (theme === 'women_day') {
+        appleStem.material.color.setHex(0x4a2e2b);
+      } else if (theme === 'halloween') {
+        appleStem.material.color.setHex(0x251a22);
+      } else {
+        appleStem.material.color.setHex(0x5d4037);
+      }
+      appleStem.material.needsUpdate = true;
     }
   }
 
