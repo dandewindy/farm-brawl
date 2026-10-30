@@ -766,6 +766,8 @@ export class GameRoom extends DurableObject {
       } catch {
         // Socket error handled in close event listener
       }
+    }
+
     this.world.flush();
 
     // Periodic Server Garbage Collection every 600 ticks (~30 seconds)
