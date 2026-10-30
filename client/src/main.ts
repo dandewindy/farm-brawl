@@ -112,6 +112,9 @@ function runClientOptimisticFoodPass(
       optimisticEatenMap.delete(fid);
     }
   }
+  if (optimisticEatenMap.size > 200) {
+    optimisticEatenMap.clear();
+  }
 
   const baseR = radiusOf(currentMass) + 0.45;
   const baseRSq = baseR * baseR;
@@ -1862,7 +1865,7 @@ let currentRoomName = '';
 let fallbackLocal = false;
 
 function connectToRoom(targetRoom: string): void {
-  if (currentRoomName === targetRoom && transport) {
+  if (currentRoomName === targetRoom && transport && !transport.isAfk) {
     return;
   }
 
@@ -2008,6 +2011,116 @@ if (modeParam === 'team' || roomParam?.startsWith('team-')) {
 }
 connectToRoom(initialRoom);
 
+// AFK Disconnect & Auto-Reconnect Manager (Tối ưu tiết kiệm pin, băng thông & tài nguyên server)
+let lastUserActivityTime = Date.now();
+let isAfkSleeping = false;
+let tabHiddenStartTime = 0;
+const afkModal = document.getElementById('afkModal') as HTMLElement | null;
+const btnWakeUp = document.getElementById('btnWakeUp') as HTMLButtonElement | null;
+
+function onUserActivity(): void {
+  lastUserActivityTime = Date.now();
+  if (isAfkSleeping) {
+    wakeUpFromAfk();
+  }
+}
+
+function enterAfkSleep(): void {
+  if (isAfkSleeping) return;
+  // Chỉ ngắt kết nối khi đang ở sảnh chờ (chưa vào trận) và không xem người khác chơi
+  if (gameState.alive || (transport && transport.inGame) || isSpectating) {
+    return;
+  }
+  isAfkSleeping = true;
+  if (transport && typeof (transport as any).disconnectForAfk === 'function') {
+    (transport as any).disconnectForAfk();
+  }
+  if (afkModal) {
+    afkModal.hidden = false;
+  }
+}
+
+function wakeUpFromAfk(): void {
+  if (!isAfkSleeping) return;
+  isAfkSleeping = false;
+  lastUserActivityTime = Date.now();
+  if (afkModal) {
+    afkModal.hidden = true;
+  }
+  if (transport && typeof (transport as any).reconnectFromAfk === 'function') {
+    (transport as any).reconnectFromAfk();
+  } else {
+    connectToRoom(currentRoomName);
+  }
+  hud.showToast(t('afkWakeToast'), 2000);
+}
+
+if (btnWakeUp) {
+  btnWakeUp.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wakeUpFromAfk();
+  });
+}
+if (afkModal) {
+  afkModal.addEventListener('click', () => wakeUpFromAfk());
+}
+
+// User activity listeners: chuột, chạm, bàn phím
+window.addEventListener('pointerdown', onUserActivity, { passive: true });
+window.addEventListener('keydown', onUserActivity, { passive: true });
+window.addEventListener('touchstart', onUserActivity, { passive: true });
+window.addEventListener('wheel', onUserActivity, { passive: true });
+
+let lastMoveTrack = 0;
+window.addEventListener('pointermove', () => {
+  const now = Date.now();
+  if (now - lastMoveTrack > 1000) {
+    lastMoveTrack = now;
+    onUserActivity();
+  }
+}, { passive: true });
+
+// Theo dõi chuyển tab & tự động đánh thức / nghỉ
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    tabHiddenStartTime = Date.now();
+  } else {
+    lastUserActivityTime = Date.now();
+    tabHiddenStartTime = 0;
+    if (isAfkSleeping) {
+      wakeUpFromAfk();
+    }
+  }
+});
+
+// Kiểm tra định kỳ trạng thái không hoạt động (mỗi 5 giây)
+setInterval(() => {
+  const now = Date.now();
+  const idleMs = now - lastUserActivityTime;
+
+  // 1. Ở sảnh chờ (Lobby): ngắt kết nối sau 120s không có thao tác
+  if (!gameState.alive && (!transport || !transport.inGame) && !isSpectating && !isAfkSleeping) {
+    if (idleMs >= 120_000) {
+      enterAfkSleep();
+      return;
+    }
+    // Nếu tab bị ẩn xuống nền quá 45s khi đang ở sảnh chờ: đưa vào chế độ ngủ
+    if (document.hidden && tabHiddenStartTime > 0 && now - tabHiddenStartTime >= 45_000) {
+      enterAfkSleep();
+      return;
+    }
+  }
+
+  // 2. Ở màn hình chết (Death Screen): nếu ngồi ngắm màn hình chết quá 90s không bấm chơi lại
+  if (!gameState.alive && (deathCamTarget || isDeadAwaitingScreen || !document.getElementById('death')?.hidden)) {
+    if (idleMs >= 90_000) {
+      hud.onExitLobby?.();
+      enterAfkSleep();
+      return;
+    }
+  }
+}, 5000);
+
 // Optional Debug status bar (shows RTT, jitter, prediction error, and FPS)
 const showDebug = params.has('debug') || window.location.hostname === 'localhost';
 let debugEl: HTMLDivElement | null = null;
@@ -2030,6 +2143,13 @@ if (showDebug) {
 // Main Animation & Render Loop
 function animate(now: number): void {
   requestAnimationFrame(animate);
+
+  // Khi ẩn tab: bỏ qua 100% việc render Three.js để tiết kiệm GPU & pin
+  if (document.hidden) {
+    lastRenderTime = now;
+    lastPhysicsTime = now;
+    return;
+  }
 
   if (lastRenderTime === 0) {
     lastRenderTime = now;

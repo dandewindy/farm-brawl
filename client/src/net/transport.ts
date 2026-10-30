@@ -17,11 +17,14 @@ export interface Transport {
   readonly displayColo?: string;
   inGame?: boolean;
   isMigrating?: boolean;
+  isAfk?: boolean;
   sessionToken?: string | null;
   forceReconnect?(): void;
   triggerHotMigration?(): void;
   leaveGame?(): void;
   manualRetune?(): void;
+  disconnectForAfk?(): void;
+  reconnectFromAfk?(): void;
   onMigrationSuccess?: (newColo: string) => void;
   onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
 }

@@ -1463,6 +1463,19 @@ body.ipad #lb {
   gap: 12px;
   justify-content: center;
 }
+.afk-card {
+  max-width: min(90vw, 360px);
+  border-color: #64b5f6;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(100, 181, 246, 0.25);
+}
+.afk-card .cm-icon {
+  font-size: 44px;
+  animation: afkSleepPulse 2.4s ease-in-out infinite;
+}
+@keyframes afkSleepPulse {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 2px 8px rgba(100, 181, 246, 0.3)); }
+  50% { transform: translateY(-5px) scale(1.08); filter: drop-shadow(0 4px 14px rgba(100, 181, 246, 0.6)); }
+}
 .cm-btn {
   flex: 1;
   padding: 10px 14px;

@@ -218,6 +218,17 @@ export class CorpseRenderer {
   clear(): void {
     for (const c of this.corpses) {
       this.scene.remove(c.group);
+      c.group.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mesh = obj as THREE.Mesh;
+          mesh.geometry?.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => m.dispose());
+          } else if (mesh.material !== charMat) {
+            mesh.material?.dispose();
+          }
+        }
+      });
     }
     this.corpses.length = 0;
   }

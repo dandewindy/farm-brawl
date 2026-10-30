@@ -381,6 +381,10 @@ const vi = {
   copiedRoomCodeToast: 'Đã sao chép mã phòng: {code} 📋',
   podLockTimer: 'Khóa: {s}s',
   kingOnPodium: 'Vua tại vị',
+  afkTitle: 'Tạm nghỉ để tiết kiệm pin & mạng',
+  afkDesc: 'Bạn đã ở màn hình chờ trong giây lát. Đã tạm ngắt kết nối để tiết kiệm tài nguyên máy & đường truyền.',
+  afkWakeUp: '⚡ Tiếp tục chơi',
+  afkWakeToast: '⚡ Đã kết nối lại sảnh chờ!',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -765,6 +769,10 @@ const en: Record<keyof typeof vi, string> = {
   copiedRoomCodeToast: 'Copied room code: {code} 📋',
   podLockTimer: 'Locked: {s}s',
   kingOnPodium: 'Reigning King',
+  afkTitle: 'Resting to save battery & data',
+  afkDesc: 'You have been idle in the lobby. Connection paused to save device battery and network bandwidth.',
+  afkWakeUp: '⚡ Resume Playing',
+  afkWakeToast: '⚡ Reconnected to lobby!',
 };
 
 export function formatTeamCount(count: number): string {

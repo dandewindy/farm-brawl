@@ -460,12 +460,48 @@ export class World {
     }
   }
 
+  collectGarbage(): void {
+    // 1. Trim excess food if accumulated significantly above target
+    if (this.food.size > CFG.FOOD_TARGET * 1.4) {
+      const excess = this.food.size - CFG.FOOD_TARGET;
+      let removed = 0;
+      for (const [fid, f] of this.food.entries()) {
+        if (removed >= excess) break;
+        if (f.k === 6 || f.k === 8 || f.k === 9) continue;
+        this.food.delete(fid);
+        this.foodRemoved.push(fid);
+        removed++;
+      }
+    }
+
+    // 2. Orphaned minions cleanup (owner missing, dead, or dropped below min mass)
+    for (const [mid, m] of this.minions.entries()) {
+      const owner = this.players.get(m.ownerId);
+      if (!owner || !owner.alive || m.mass <= 5) {
+        this.minions.delete(mid);
+      }
+    }
+
+    // 3. Projectile out-of-bounds or expired cleanup
+    for (let i = this.bananaProjectiles.length - 1; i >= 0; i--) {
+      const b = this.bananaProjectiles[i];
+      if (b.life <= 0 || Math.hypot(b.x, b.z) > CFG.R + 10) {
+        this.bananaProjectiles.splice(i, 1);
+      }
+    }
+  }
+
   // ------------------------------------------------------------------ tick
 
   step(): void {
     this.tick++;
     this.time += DT;
     this.fillBots();
+
+    // Periodic entity garbage collection every 600 ticks (~30 seconds)
+    if (this.tick % 600 === 0) {
+      this.collectGarbage();
+    }
 
     // Team mode match clock & scoring
     if (this.mode === 'team') {

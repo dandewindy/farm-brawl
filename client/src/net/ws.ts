@@ -20,6 +20,7 @@ export class WsClient implements Transport {
   public colo = '';
   public doColo = '';
   public inGame = false;
+  public isAfk = false;
   public activeUrl: string;
   private reconnectTimer: number | null = null;
   private readonly rttRawSamples: number[] = [];
@@ -239,6 +240,10 @@ export class WsClient implements Transport {
     socket.onclose = (ev) => {
       if (this.ws !== socket) return; // Stale socket guard: IGNORE if closed intentionally
       this.stopPing();
+      if (this.isAfk) {
+        this.onStatus?.('closed');
+        return;
+      }
       if (this.isMigrating || this.migrationWs !== null) {
         // Handover handled cleanly by migration probe; ignore close of old socket
         return;
@@ -494,13 +499,13 @@ export class WsClient implements Transport {
   }
 
   private scheduleReconnect(): void {
-    if (this.closed) return;
+    if (this.closed || this.isAfk) return;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
     }
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
-      if (!this.closed) this.connect();
+      if (!this.closed && !this.isAfk) this.connect();
     }, 800);
   }
 
@@ -512,6 +517,9 @@ export class WsClient implements Transport {
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       if (m.t !== 'input') {
+        if (this.queue.length >= 10) {
+          this.queue.shift(); // Drop oldest to prevent unbounded memory growth
+        }
         this.queue.push(toSend);
       }
       return;
@@ -589,6 +597,40 @@ export class WsClient implements Transport {
         this.connect();
       }
     }, 80);
+  }
+
+  disconnectForAfk(): void {
+    if (this.closed || this.isAfk) return;
+    this.isAfk = true;
+    this.stopPing();
+    if (this.migrationWs) {
+      try { this.migrationWs.close(); } catch (_) {}
+      this.migrationWs = null;
+    }
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) {
+      const oldWs = this.ws;
+      this.ws = null;
+      oldWs.onopen = null;
+      oldWs.onmessage = null;
+      oldWs.onclose = null;
+      oldWs.onerror = null;
+      try {
+        oldWs.close(1000, 'AFK');
+      } catch (_) {}
+    }
+    this.onStatus?.('closed');
+  }
+
+  reconnectFromAfk(): void {
+    if (!this.isAfk) return;
+    this.isAfk = false;
+    this.closed = false;
+    this.isReconnecting = true;
+    this.connect();
   }
 
   close(): void {

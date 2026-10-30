@@ -279,22 +279,76 @@ export class GameRoom extends DurableObject {
   private checkRoomEmpty(): void {
     if (this.sockets.size === 0 && this.disconnectedPlayers.size === 0) {
       this.stopLoop();
-      // If private or friend room, clear all state immediately to free system resources
-      if (this.world.mode === 'friend') {
-        for (const [id] of [...this.world.players.entries()]) {
-          this.world.removePlayer(id);
+
+      // If room is completely empty (no sockets connected at all, not even in lobby):
+      if (this.allSockets.size === 0) {
+        if (this.world.mode === 'friend') {
+          // Friend/Private room: purge everything
+          for (const [id] of [...this.world.players.entries()]) {
+            this.world.removePlayer(id);
+          }
+          this.world.matchDuration = 0;
+          this.world.matchClock = 0;
+          this.world.matchEnded = false;
+          this.world.matchEndTimer = 0;
+          this.world.napoleonId = 0;
+          this.world.clearRule();
+          this.world.tools.clear();
+          this.world.minions.clear();
+          this.world.bananaProjectiles.length = 0;
+          this.lobbyTeams.clear();
+          this.clientSockets.clear();
+          this.socketClientIds.clear();
+          this.playerTokens.clear();
+          this.clientPlayerIds.clear();
+          this.disconnectedPlayers.clear();
+          this.playerLastSeq.clear();
+          this.playerLastDashSeq.clear();
+          this.playerTiming.clear();
+          this.socketEdgeColo.clear();
+        } else if (this.world.mode === 'team') {
+          // Team room: reset team scores & clock, clear players & entities
+          for (const [id] of [...this.world.players.entries()]) {
+            this.world.removePlayer(id);
+          }
+          this.world.teamScores = [0, 0];
+          this.world.matchClock = 300;
+          this.world.matchEnded = false;
+          this.world.matchEndTimer = 0;
+          this.world.napoleonId = 0;
+          this.world.clearRule();
+          this.world.tools.clear();
+          this.world.minions.clear();
+          this.world.bananaProjectiles.length = 0;
+          this.lobbyTeams.clear();
+          this.clientSockets.clear();
+          this.socketClientIds.clear();
+          this.playerTokens.clear();
+          this.clientPlayerIds.clear();
+          this.disconnectedPlayers.clear();
+          this.playerLastSeq.clear();
+          this.playerLastDashSeq.clear();
+          this.playerTiming.clear();
+          this.socketEdgeColo.clear();
+        } else {
+          // Public FFA room: purge bots and lingering entities, leaving only dormant base state
+          for (const [id] of [...this.world.players.entries()]) {
+            this.world.removePlayer(id);
+          }
+          this.world.napoleonId = 0;
+          this.world.clearRule();
+          this.world.minions.clear();
+          this.world.bananaProjectiles.length = 0;
+          this.clientSockets.clear();
+          this.socketClientIds.clear();
+          this.playerTokens.clear();
+          this.clientPlayerIds.clear();
+          this.disconnectedPlayers.clear();
+          this.playerLastSeq.clear();
+          this.playerLastDashSeq.clear();
+          this.playerTiming.clear();
+          this.socketEdgeColo.clear();
         }
-        this.world.matchDuration = 0;
-        this.world.matchClock = 0;
-        this.world.matchEnded = false;
-        this.world.matchEndTimer = 0;
-        this.world.napoleonId = 0;
-        this.lobbyTeams.clear();
-        this.clientSockets.clear();
-        this.socketClientIds.clear();
-        this.playerTokens.clear();
-        this.clientPlayerIds.clear();
-        this.disconnectedPlayers.clear();
       }
     }
   }
@@ -712,8 +766,34 @@ export class GameRoom extends DurableObject {
       } catch {
         // Socket error handled in close event listener
       }
-    }
-
     this.world.flush();
+
+    // Periodic Server Garbage Collection every 600 ticks (~30 seconds)
+    if (this.world.tick % 600 === 0) {
+      this.performPeriodicGarbageCollection();
+    }
+  }
+
+  private performPeriodicGarbageCollection(): void {
+    // 1. Clean up orphaned player mappings
+    for (const [pid] of this.playerTokens.entries()) {
+      if (!this.world.players.has(pid) && ![...this.disconnectedPlayers.values()].some((e) => e.playerId === pid)) {
+        this.playerTokens.delete(pid);
+        this.playerLastSeq.delete(pid);
+        this.playerLastDashSeq.delete(pid);
+        this.playerTiming.delete(pid);
+      }
+    }
+    for (const [c, pid] of this.clientPlayerIds.entries()) {
+      if (!this.world.players.has(pid) && ![...this.disconnectedPlayers.values()].some((e) => e.playerId === pid)) {
+        this.clientPlayerIds.delete(c);
+      }
+    }
+    // 2. Clean up stale clientSockets if disconnected
+    for (const [c, s] of this.clientSockets.entries()) {
+      if (!this.allSockets.has(s) || s.readyState !== 1) {
+        this.clientSockets.delete(c);
+      }
+    }
   }
 }
