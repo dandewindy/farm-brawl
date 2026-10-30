@@ -1491,157 +1491,245 @@ export class World {
 
   private updateMinions(dt: number, alive: Player[]): void {
     const LEASH_R = 15;
+
+    // Group active minions by owner to compute balanced, stable formation slots
+    const byOwner = new Map<number, Minion[]>();
     for (const [mid, m] of this.minions) {
       const owner = this.players.get(m.ownerId);
       if (!owner || !owner.alive || m.mass <= 5) {
         this.minions.delete(mid);
         continue;
       }
-
-      m.cd = Math.max(0, m.cd - dt);
-      const dxO = m.x - owner.x;
-      const dzO = m.z - owner.z;
-      const distToOwner = Math.hypot(dxO, dzO);
-
-      // Leash limit: if too far from owner, abandon chase and return
-      if (distToOwner > LEASH_R) {
-        m.targetId = 0;
+      let arr = byOwner.get(m.ownerId);
+      if (!arr) {
+        arr = [];
+        byOwner.set(m.ownerId, arr);
       }
+      arr.push(m);
+    }
 
-      // Check current target: must still be alive, within leash of owner, and combat active (< 6s)
-      let target: Player | undefined;
-      if (m.targetId > 0) {
-        target = this.players.get(m.targetId);
-        const inLeash = target && target.alive && Math.hypot(target.x - owner.x, target.z - owner.z) <= LEASH_R && distToOwner <= LEASH_R;
-        const isEnemyAttacker = target ? (owner.lastHitBy === target.id && this.time - owner.lastHitT < 6.0) : false;
-        const isOwnerAttacked = target ? ((owner.lastAttackedId === target.id && this.time - owner.lastAttackedT < 6.0) || (target.lastHitBy === owner.id && this.time - target.lastHitT < 6.0)) : false;
+    for (const [ownerId, squad] of byOwner) {
+      const owner = this.players.get(ownerId)!;
+      // Sort deterministically so minion slots are fixed and stable
+      squad.sort((a, b) => a.id - b.id);
+      const totalInSquad = squad.length;
 
-        if (!inLeash || (!isEnemyAttacker && !isOwnerAttacked)) {
+      for (let slot = 0; slot < totalInSquad; slot++) {
+        const m = squad[slot];
+        m.cd = Math.max(0, m.cd - dt);
+        const dxO = m.x - owner.x;
+        const dzO = m.z - owner.z;
+        const distToOwner = Math.hypot(dxO, dzO);
+
+        // Leash limit: if too far from owner, abandon chase and return
+        if (distToOwner > LEASH_R) {
           m.targetId = 0;
-          target = undefined;
         }
-      }
 
-      // Find new target if none: ONLY if candidate attacked owner OR owner attacked candidate
-      if (!target) {
-        // Condition A: enemy that recently hit owner within leash
-        if (owner.lastHitBy > 0 && this.time - owner.lastHitT < 6.0) {
-          const attacker = this.players.get(owner.lastHitBy);
-          if (attacker && attacker.alive && attacker.id !== owner.id) {
-            const sameT = owner.team !== undefined && attacker.team !== undefined && owner.team === attacker.team;
-            if (!sameT && Math.hypot(attacker.x - owner.x, attacker.z - owner.z) <= LEASH_R) {
-              m.targetId = attacker.id;
-              target = attacker;
-            }
-          }
-        }
-      }
+        // Check current target: must still be alive, within leash of owner, and combat active (< 6s)
+        let target: Player | undefined;
+        if (m.targetId > 0) {
+          target = this.players.get(m.targetId);
+          const inLeash = target && target.alive && Math.hypot(target.x - owner.x, target.z - owner.z) <= LEASH_R && distToOwner <= LEASH_R;
+          const isEnemyAttacker = target ? (owner.lastHitBy === target.id && this.time - owner.lastHitT < 6.0) : false;
+          const isOwnerAttacked = target ? ((owner.lastAttackedId === target.id && this.time - owner.lastAttackedT < 6.0) || (target.lastHitBy === owner.id && this.time - target.lastHitT < 6.0)) : false;
 
-      if (!target) {
-        // Condition B: enemy that owner recently attacked within leash
-        const candidateId = owner.lastAttackedId;
-        if (candidateId > 0 && this.time - owner.lastAttackedT < 6.0) {
-          const victim = this.players.get(candidateId);
-          if (victim && victim.alive && victim.id !== owner.id) {
-            const sameT = owner.team !== undefined && victim.team !== undefined && owner.team === victim.team;
-            if (!sameT && Math.hypot(victim.x - owner.x, victim.z - owner.z) <= LEASH_R) {
-              m.targetId = victim.id;
-              target = victim;
-            }
-          }
-        }
-      }
-
-      if (target) {
-        // Chase & ram target
-        const toX = target.x - m.x;
-        const toZ = target.z - m.z;
-        const dist = Math.hypot(toX, toZ);
-        const aimA = Math.atan2(toZ, toX);
-        m.a = aimA;
-        const chaseSpeed = 15;
-        m.vx = Math.cos(aimA) * chaseSpeed;
-        m.vz = Math.sin(aimA) * chaseSpeed;
-        m.x += m.vx * dt;
-        m.z += m.vz * dt;
-
-        const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
-        if (dist < hitDist && m.cd <= 0) {
-          m.cd = 0.8;
-          target.vx += Math.cos(aimA) * 18;
-          target.vz += Math.sin(aimA) * 18;
-          target.stunT = 0.4;
-          target.lastHitBy = owner.id;
-          target.lastHitT = this.time;
-          const loss = Math.min(target.mass - 10, 8);
-          if (loss > 0) {
-            target.mass -= loss;
-            owner.mass += loss;
-          }
-          this.events.push({
-            k: 'hit',
-            a: owner.id,
-            v: target.id,
-            x: r2(target.x),
-            z: r2(target.z),
-            s: 18,
-            loss: Math.round(loss),
-            minion: true,
-          });
-          if (target.mass < 10) {
-            this.kill(target, 'fence');
+          if (!inLeash || (!isEnemyAttacker && !isOwnerAttacked)) {
             m.targetId = 0;
             target = undefined;
           }
         }
-      } else {
-        // Orbit / follow bodyguard formation around owner
-        m.orbitAngle = (m.orbitAngle + 1.8 * dt) % (Math.PI * 2);
-        const orbitDist = 2.4 + (m.id % 3) * 0.7;
-        const desiredX = owner.x + Math.cos(m.orbitAngle) * orbitDist;
-        const desiredZ = owner.z + Math.sin(m.orbitAngle) * orbitDist;
-        const toX = desiredX - m.x;
-        const toZ = desiredZ - m.z;
-        const dist = Math.hypot(toX, toZ);
-        if (dist > 0.15) {
-          m.a = Math.atan2(toZ, toX);
-          const speed = Math.min(18, Math.max(8, dist * 6));
-          m.vx = (toX / dist) * speed;
-          m.vz = (toZ / dist) * speed;
+
+        // Find new target if none: ONLY if candidate attacked owner OR owner attacked candidate
+        if (!target) {
+          // Condition A: enemy that recently hit owner within leash
+          if (owner.lastHitBy > 0 && this.time - owner.lastHitT < 6.0) {
+            const attacker = this.players.get(owner.lastHitBy);
+            if (attacker && attacker.alive && attacker.id !== owner.id) {
+              const sameT = owner.team !== undefined && attacker.team !== undefined && owner.team === attacker.team;
+              if (!sameT && Math.hypot(attacker.x - owner.x, attacker.z - owner.z) <= LEASH_R) {
+                m.targetId = attacker.id;
+                target = attacker;
+              }
+            }
+          }
+        }
+
+        if (!target) {
+          // Condition B: enemy that owner recently attacked within leash
+          const candidateId = owner.lastAttackedId;
+          if (candidateId > 0 && this.time - owner.lastAttackedT < 6.0) {
+            const victim = this.players.get(candidateId);
+            if (victim && victim.alive && victim.id !== owner.id) {
+              const sameT = owner.team !== undefined && victim.team !== undefined && owner.team === victim.team;
+              if (!sameT && Math.hypot(victim.x - owner.x, victim.z - owner.z) <= LEASH_R) {
+                m.targetId = victim.id;
+                target = victim;
+              }
+            }
+          }
+        }
+
+        if (target) {
+          // Chase & ram target
+          const toX = target.x - m.x;
+          const toZ = target.z - m.z;
+          const dist = Math.hypot(toX, toZ);
+          const aimA = Math.atan2(toZ, toX);
+
+          // Smooth turn when chasing
+          let da = aimA - m.a;
+          while (da > Math.PI) da -= Math.PI * 2;
+          while (da < -Math.PI) da += Math.PI * 2;
+          m.a += Math.sign(da) * Math.min(Math.abs(da), 8.0 * dt);
+
+          const chaseSpeed = 15;
+          m.vx = Math.cos(m.a) * chaseSpeed;
+          m.vz = Math.sin(m.a) * chaseSpeed;
           m.x += m.vx * dt;
           m.z += m.vz * dt;
+
+          const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
+          if (dist < hitDist && m.cd <= 0) {
+            m.cd = 0.8;
+            target.vx += Math.cos(aimA) * 18;
+            target.vz += Math.sin(aimA) * 18;
+            target.stunT = 0.4;
+            target.lastHitBy = owner.id;
+            target.lastHitT = this.time;
+            const loss = Math.min(target.mass - 10, 8);
+            if (loss > 0) {
+              target.mass -= loss;
+              owner.mass += loss;
+            }
+            this.events.push({
+              k: 'hit',
+              a: owner.id,
+              v: target.id,
+              x: r2(target.x),
+              z: r2(target.z),
+              s: 18,
+              loss: Math.round(loss),
+              minion: true,
+            });
+            if (target.mass < 10) {
+              this.kill(target, 'fence');
+              m.targetId = 0;
+              target = undefined;
+            }
+          }
         } else {
-          m.vx = owner.vx;
-          m.vz = owner.vz;
-          m.a = owner.a;
+          // Guarding owner: stable bodyguard formation around owner
+          // Rotate formation gently (~0.6 rad/s) so it doesn't spin wildly
+          m.orbitAngle = (this.time * 0.6) % (Math.PI * 2);
+          const slotAngle = m.orbitAngle + (slot / totalInSquad) * Math.PI * 2;
+          const baseR = radiusOf(owner.mass) + 0.95;
+          // Stagger distance slightly for larger squads (8-10 minions) for clean concentric distribution
+          const slotDist = baseR + (totalInSquad > 6 ? (slot % 2 === 0 ? 0 : 0.65) : (slot % 2 === 0 ? 0 : 0.35));
+          const desiredX = owner.x + Math.cos(slotAngle) * slotDist;
+          const desiredZ = owner.z + Math.sin(slotAngle) * slotDist;
+          const toX = desiredX - m.x;
+          const toZ = desiredZ - m.z;
+          const dist = Math.hypot(toX, toZ);
+
+          if (dist > 0.08) {
+            const speed = Math.min(22, Math.max(6, dist * 8));
+            m.vx = (toX / dist) * speed;
+            m.vz = (toZ / dist) * speed;
+            m.x += m.vx * dt;
+            m.z += m.vz * dt;
+          } else {
+            m.vx = owner.vx;
+            m.vz = owner.vz;
+            m.x = desiredX;
+            m.z = desiredZ;
+          }
+
+          // Smooth orientation without erratic spinning:
+          // If owner is running fast, minions face movement heading.
+          // If stationary/slow and guarding, face outward along slot direction.
+          const ownerSpeed = Math.hypot(owner.vx, owner.vz);
+          let targetFacing: number;
+          if (ownerSpeed > 1.8) {
+            targetFacing = owner.a;
+          } else if (dist > 0.4) {
+            targetFacing = Math.atan2(toZ, toX);
+          } else {
+            targetFacing = slotAngle;
+          }
+
+          let diff = targetFacing - m.a;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const maxTurn = 4.5 * dt;
+          m.a += Math.sign(diff) * Math.min(Math.abs(diff), maxTurn);
+        }
+
+        // Check if enemy dashes into minion: minion loses mass
+        for (const enemy of alive) {
+          if (enemy.id === owner.id) continue;
+          const sameT = owner.team !== undefined && enemy.team !== undefined && owner.team === enemy.team;
+          if (sameT) continue;
+          const d = Math.hypot(enemy.x - m.x, enemy.z - m.z);
+          const colDist = radiusOf(m.mass) + radiusOf(enemy.mass);
+          if (d < colDist && enemy.dashT > 0) {
+            m.mass -= 18;
+            enemy.vx *= 0.5;
+            enemy.vz *= 0.5;
+            this.events.push({
+              k: 'hit',
+              a: enemy.id,
+              v: owner.id,
+              x: r2(m.x),
+              z: r2(m.z),
+              s: 14,
+              loss: 18,
+              minion: true,
+            });
+            if (m.mass <= 5) {
+              m.alive = false;
+              this.minions.delete(m.id);
+              break;
+            }
+          }
         }
       }
+    }
 
-      // Check if enemy dashes into minion: minion loses mass
-      for (const enemy of alive) {
-        if (enemy.id === owner.id) continue;
-        const sameT = owner.team !== undefined && enemy.team !== undefined && owner.team === enemy.team;
-        if (sameT) continue;
-        const d = Math.hypot(enemy.x - m.x, enemy.z - m.z);
-        const colDist = radiusOf(m.mass) + radiusOf(enemy.mass);
-        if (d < colDist && enemy.dashT > 0) {
-          m.mass -= 18;
-          enemy.vx *= 0.5;
-          enemy.vz *= 0.5;
-          this.events.push({
-            k: 'hit',
-            a: enemy.id,
-            v: owner.id,
-            x: r2(m.x),
-            z: r2(m.z),
-            s: 14,
-            loss: 18,
-            minion: true,
-          });
-          if (m.mass <= 5) {
-            m.alive = false;
-            this.minions.delete(mid);
-            break;
+    // Soft separation between minions to keep them close but never clipping/overlapping
+    const activeList = [...this.minions.values()];
+    const MIN_MINION_DIST = 1.35;
+    for (let iter = 0; iter < 2; iter++) {
+      for (let i = 0; i < activeList.length; i++) {
+        const m1 = activeList[i];
+        for (let j = i + 1; j < activeList.length; j++) {
+          const m2 = activeList[j];
+          const dx = m1.x - m2.x;
+          const dz = m1.z - m2.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < MIN_MINION_DIST * MIN_MINION_DIST && d2 > 0.0001) {
+            const d = Math.sqrt(d2);
+            const overlap = MIN_MINION_DIST - d;
+            const push = overlap * 0.5;
+            const nx = dx / d;
+            const nz = dz / d;
+            m1.x += nx * push;
+            m1.z += nz * push;
+            m2.x -= nx * push;
+            m2.z -= nz * push;
+          }
+        }
+        // Also ensure minion doesn't penetrate inside owner's body
+        const owner = this.players.get(m1.ownerId);
+        if (owner && owner.alive) {
+          const minOwnerDist = radiusOf(owner.mass) + 0.65;
+          const dxO = m1.x - owner.x;
+          const dzO = m1.z - owner.z;
+          const dO = Math.hypot(dxO, dzO);
+          if (dO < minOwnerDist && dO > 0.0001) {
+            const pushO = minOwnerDist - dO;
+            m1.x += (dxO / dO) * pushO;
+            m1.z += (dzO / dO) * pushO;
           }
         }
       }

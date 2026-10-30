@@ -1587,6 +1587,33 @@ describe('fruit trees', () => {
         expect(m.targetId).toBe(enemy2Id);
       }
     });
+
+    it('minions maintain separation and do not overlap', () => {
+      const w = emptyWorld();
+      const ownerId = w.addPlayer('Boss', 'pig');
+      place(w, ownerId, 0, 0);
+
+      // Summon 6 minions
+      for (let i = 0; i < 3; i++) {
+        w.tools.set(500 + i, { id: 500 + i, kind: 'star', x: 0, z: 0 });
+        w.step();
+      }
+      const minions = [...w.minions.values()].filter((m) => m.ownerId === ownerId);
+      expect(minions.length).toBe(6);
+
+      // Run simulation steps
+      for (let i = 0; i < 25; i++) {
+        w.step();
+      }
+
+      // Verify no minions are overlapping (dist >= 1.25)
+      for (let i = 0; i < minions.length; i++) {
+        for (let j = i + 1; j < minions.length; j++) {
+          const dist = Math.hypot(minions[i].x - minions[j].x, minions[i].z - minions[j].z);
+          expect(dist).toBeGreaterThanOrEqual(1.25);
+        }
+      }
+    });
   });
 });
 

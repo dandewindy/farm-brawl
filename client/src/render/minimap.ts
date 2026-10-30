@@ -2,6 +2,7 @@ import { CFG } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import type { ToolWire } from '@shared/protocol';
 import type { Ent } from '../game/state';
+import { getArenaTheme } from '../theme';
 
 export class MinimapRenderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -164,8 +165,9 @@ export class MinimapRenderer {
           ctx.stroke();
         } else if (kind === 'star') {
           ctx.beginPath();
-          ctx.arc(tx, tz, 4, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffea00';
+          const theme = getArenaTheme();
+          ctx.fillStyle = theme === 'women_day' ? '#ff4081' : (theme === 'halloween' ? '#00e676' : '#ffea00');
+          ctx.ellipse(tx, tz, 3.2, 4.4, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1;

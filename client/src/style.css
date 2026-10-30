@@ -1753,19 +1753,18 @@ body.mobile-phone #spPreviewWrap {
     margin-top: 1px;
   }
   .arena-picker {
-    gap: 6px;
+    gap: 4px;
     margin-bottom: 4px;
   }
   .btn-arena {
-    padding: 6px 6px;
-    min-height: 44px;
+    padding: 5px 3px;
+    min-height: 38px;
     border-radius: 8px;
-    gap: 6px;
+    gap: 4px;
   }
-  .btn-arena .ico { font-size: 16px; }
-  .btn-arena .txt-main { font-size: 11.5px; }
-  .btn-arena[data-arena="classic"] .txt-main { font-size: 12px; }
-  .btn-arena .txt-sub { font-size: 10px; }
+  .btn-arena .ico { font-size: 14px; }
+  .btn-arena .txt-main { font-size: 10.5px; }
+  .btn-arena[data-arena="classic"] .txt-main { font-size: 10.5px; }
   .team-pick-wrap {
     margin: 3px 0 4px;
     padding: 4px 6px;
@@ -2534,18 +2533,16 @@ body.mobile-phone #teamBar {
     margin-bottom: 2px !important;
   }
   .btn-arena {
-    padding: 3px 6px !important;
-    font-size: 9.5px !important;
+    padding: 3px 2px !important;
     border-radius: 6px !important;
-    min-height: 38px !important;
-    gap: 5px !important;
+    min-height: 32px !important;
+    gap: 3px !important;
   }
   .btn-arena .ico {
-    font-size: 14px !important;
+    font-size: 13px !important;
   }
-  .btn-arena .txt-main { font-size: 10px !important; }
-  .btn-arena[data-arena="classic"] .txt-main { font-size: 10.5px !important; }
-  .btn-arena .txt-sub { font-size: 8.5px !important; }
+  .btn-arena .txt-main { font-size: 9px !important; }
+  .btn-arena[data-arena="classic"] .txt-main { font-size: 9px !important; }
   .sp-carousel-row {
     margin: 0 0 1px !important;
     gap: 4px !important;
@@ -3351,20 +3348,20 @@ body.is-pc #sbmPwa {
 /* Arena Theme Picker */
 .arena-picker {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   margin-bottom: 8px;
 }
 .btn-arena {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 5px;
   background: #2e2622;
   border: 2px solid #3a302a;
-  border-radius: 12px;
-  padding: 8px 10px;
-  min-height: 54px;
+  border-radius: 10px;
+  padding: 6px 4px;
+  min-height: 44px;
   color: var(--paper);
   font-family: var(--f-display);
   font-weight: 700;
@@ -3373,36 +3370,24 @@ body.is-pc #sbmPwa {
   box-sizing: border-box;
 }
 .btn-arena .ico {
-  font-size: 20px;
+  font-size: 16px;
   line-height: 1;
   flex-shrink: 0;
 }
-.arena-text-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  line-height: 1.22;
-  min-width: 0;
-}
 .btn-arena .txt-main {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.15px;
   white-space: nowrap;
 }
 .btn-arena[data-arena="classic"] .txt-main {
-  font-size: 14.5px;
+  font-size: 12px;
 }
 .btn-arena[data-arena="women_day"] .txt-main {
-  font-size: 13.5px;
+  font-size: 11.5px;
 }
-.btn-arena .txt-sub {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  opacity: 0.85;
-  margin-top: 1px;
+.btn-arena[data-arena="halloween"] .txt-main {
+  font-size: 11.5px;
 }
 .btn-arena.on {
   border-color: var(--gold);
@@ -3415,9 +3400,11 @@ body.is-pc #sbmPwa {
   color: #ffc0cb;
   box-shadow: 0 0 12px rgba(255, 105, 180, 0.35);
 }
-.btn-arena[data-arena="women_day"].on .txt-sub {
-  color: #ff99cc;
-  opacity: 1;
+.btn-arena[data-arena="halloween"].on {
+  border-color: #ff7043;
+  background: #3e2723;
+  color: #ffccbc;
+  box-shadow: 0 0 12px rgba(255, 112, 67, 0.35);
 }
 
 /* Simple Gameplay Preview Box for FFA Mode */

@@ -168,7 +168,6 @@ export class MinionRenderer {
     for (const vis of this.minions.values()) {
       const dx = vis.targetX - vis.x;
       const dz = vis.targetZ - vis.z;
-      const dist = Math.hypot(dx, dz);
       vis.x += dx * lerpRate;
       vis.z += dz * lerpRate;
 
@@ -179,6 +178,33 @@ export class MinionRenderer {
       vis.a += da * lerpRate;
 
       vis.root.rotation.y = -vis.a;
+    }
+
+    // Client-side visual soft separation to guarantee minions never visually clip into each other
+    const minionList = Array.from(this.minions.values());
+    const MIN_VIS_DIST = 1.35;
+    for (let i = 0; i < minionList.length; i++) {
+      const v1 = minionList[i];
+      for (let j = i + 1; j < minionList.length; j++) {
+        const v2 = minionList[j];
+        if (v1.ownerId !== v2.ownerId) continue;
+        const cdx = v1.x - v2.x;
+        const cdz = v1.z - v2.z;
+        const cd2 = cdx * cdx + cdz * cdz;
+        if (cd2 < MIN_VIS_DIST * MIN_VIS_DIST && cd2 > 0.0001) {
+          const cd = Math.sqrt(cd2);
+          const push = (MIN_VIS_DIST - cd) * 0.5;
+          const nx = cdx / cd;
+          const nz = cdz / cd;
+          v1.x += nx * push;
+          v1.z += nz * push;
+          v2.x -= nx * push;
+          v2.z -= nz * push;
+        }
+      }
+    }
+
+    for (const vis of this.minions.values()) {
 
       const r = radiusOf(vis.mass);
       const sc = r * 1.35;
@@ -230,7 +256,8 @@ export class MinionRenderer {
       } else {
         // On land: keep terrain unaffected, run normally
         vis.sinkProgress = Math.max(0, (vis.sinkProgress || 0) - dt * 2.0);
-        const moveSpeed = dist / Math.max(dt, 0.001);
+        const moveDist = Math.hypot(vis.targetX - vis.x, vis.targetZ - vis.z);
+        const moveSpeed = moveDist / Math.max(dt, 0.001);
         vis.phase += dt * (8 + Math.min(16, moveSpeed * 8));
         const hopY = Math.abs(Math.sin(vis.phase)) * 0.08 * r;
         vis.root.position.set(vis.x, hopY, vis.z);

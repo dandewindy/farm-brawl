@@ -23,6 +23,75 @@ function mesh(
   return m;
 }
 
+interface EggColors {
+  egg: number;
+  eggEmissive: number;
+  ring: number;
+  ringEmissive: number;
+  band: number;
+  sparkle: number;
+  sparkleEmissive: number;
+}
+
+function buildSparklingEgg(g: THREE.Group, c: EggColors): void {
+  const eggGeo = new THREE.SphereGeometry(0.66, 24, 20);
+  const pos = eggGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
+    const t = (y + 0.66) / 1.32; // 0 at bottom, 1 at top
+    const taper = 1.0 - 0.28 * Math.pow(t, 1.2);
+    x *= taper;
+    z *= taper;
+    y *= 1.32;
+    pos.setXYZ(i, x, y, z);
+  }
+  eggGeo.computeVertexNormals();
+
+  // Plump sparkling egg
+  const eggMesh = mesh(eggGeo, c.egg, 0, 1.55, 0, {
+    metalness: 0.55,
+    roughness: 0.2,
+    emissive: c.eggEmissive,
+    emissiveIntensity: 0.45,
+  });
+  g.add(eggMesh);
+
+  // Celestial ring
+  const ring = mesh(new THREE.TorusGeometry(1.05, 0.045, 8, 32), c.ring, 0, 1.55, 0, {
+    metalness: 0.85,
+    roughness: 0.15,
+    emissive: c.ringEmissive,
+    emissiveIntensity: 0.55,
+  });
+  ring.rotation.x = Math.PI / 3;
+  ring.rotation.y = Math.PI / 6;
+  g.add(ring);
+
+  // Equatorial jewel band
+  const band = mesh(new THREE.TorusGeometry(0.68, 0.035, 8, 24), c.band, 0, 1.45, 0, {
+    metalness: 0.9,
+    roughness: 0.15,
+  });
+  band.rotation.x = Math.PI / 2;
+  g.add(band);
+
+  // 4 orbiting sparkling diamond stars
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const sparkle = mesh(new THREE.OctahedronGeometry(0.13, 0), c.sparkle, Math.cos(a) * 0.88, 1.55 + Math.sin(a * 2) * 0.25, Math.sin(a) * 0.88, {
+      metalness: 0.7,
+      roughness: 0.2,
+      emissive: c.sparkleEmissive,
+      emissiveIntensity: 0.85,
+    });
+    sparkle.rotation.y = a;
+    sparkle.rotation.z = Math.PI / 4;
+    g.add(sparkle);
+  }
+}
+
 export class ToolRenderer {
   private readonly toolObjs = new Map<number, ToolObject>();
   private readonly group = new THREE.Group();
@@ -113,15 +182,16 @@ export class ToolRenderer {
         }
         g.add(mesh(new THREE.SphereGeometry(0.18, 10, 8), 0xe91e63, 0, 1.5, 0.14, { roughness: 0.4, emissive: 0x4a0e1c, emissiveIntensity: 0.2 }));
       } else {
-        // Ngôi sao pha lê hồng (Radiant Pink Crystal Star)
-        g.add(mesh(new THREE.OctahedronGeometry(0.75, 0), 0xff4081, 0, 1.6, 0, { metalness: 0.5, roughness: 0.2, emissive: 0x880e4f, emissiveIntensity: 0.4 }));
-        const ring = mesh(new THREE.TorusGeometry(1.05, 0.04, 8, 24), 0xffd700, 0, 1.6, 0, { metalness: 0.8, roughness: 0.2 });
-        ring.rotation.x = Math.PI / 3;
-        g.add(ring);
-        for (let i = 0; i < 4; i++) {
-          const a = (i / 4) * Math.PI * 2;
-          g.add(mesh(new THREE.SphereGeometry(0.12, 8, 6), 0xff80ab, Math.cos(a) * 0.75, 1.6, Math.sin(a) * 0.75));
-        }
+        // Trứng Thần Tình Yêu / Ngọc Trai Hồng (Love & Rose Pearl Egg)
+        buildSparklingEgg(g, {
+          egg: 0xffe4ec,
+          eggEmissive: 0xff4081,
+          ring: 0xff80ab,
+          ringEmissive: 0xd81b60,
+          band: 0xffd700,
+          sparkle: 0xffffff,
+          sparkleEmissive: 0xff4081,
+        });
       }
     } else if (theme === 'halloween') {
       if (kind === 'pitchfork') {
@@ -180,15 +250,16 @@ export class ToolRenderer {
         }
         g.add(mesh(new THREE.TorusGeometry(0.85, 0.03, 6, 20), 0x9c27b0, 0, 1.5, 0, { emissive: 0x9c27b0, emissiveIntensity: 1 }));
       } else {
-        // Ngôi sao linh hồn ma thuật (Cursed Soul Gem / Necromancer Star)
-        g.add(mesh(new THREE.OctahedronGeometry(0.78, 0), 0x00e676, 0, 1.6, 0, { emissive: 0x00e676, emissiveIntensity: 0.8, roughness: 0.3 }));
-        const ring = mesh(new THREE.TorusGeometry(1.05, 0.04, 8, 24), 0x7b1fa2, 0, 1.6, 0, { emissive: 0x4a148c });
-        ring.rotation.x = Math.PI / 4;
-        g.add(ring);
-        for (let i = 0; i < 4; i++) {
-          const a = (i / 4) * Math.PI * 2;
-          g.add(mesh(new THREE.SphereGeometry(0.14, 8, 6), 0x69f0ae, Math.cos(a) * 0.75, 1.6, Math.sin(a) * 0.75, { emissive: 0x00e676, emissiveIntensity: 0.5 }));
-        }
+        // Trứng Linh Hồn Ma Thuật (Phantom Soul / Spooky Witch Egg)
+        buildSparklingEgg(g, {
+          egg: 0x1f2e24,
+          eggEmissive: 0x00e676,
+          ring: 0x9c27b0,
+          ringEmissive: 0x7b1fa2,
+          band: 0x00e676,
+          sparkle: 0x69f0ae,
+          sparkleEmissive: 0x00e676,
+        });
       }
     } else {
       if (kind === 'pitchfork') {
@@ -231,63 +302,16 @@ export class ToolRenderer {
         }
         g.add(mesh(new THREE.SphereGeometry(0.09, 8, 6), 0xffb300, 0, 1.5, 0.16, { metalness: 0.8, roughness: 0.25 }));
       } else {
-        // Quả Trứng Lấp Lánh (Sparkling Golden Egg)
-        const eggGeo = new THREE.SphereGeometry(0.66, 24, 20);
-        const pos = eggGeo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          let x = pos.getX(i);
-          let y = pos.getY(i);
-          let z = pos.getZ(i);
-          const t = (y + 0.66) / 1.32; // 0 at bottom, 1 at top
-          const taper = 1.0 - 0.28 * Math.pow(t, 1.2);
-          x *= taper;
-          z *= taper;
-          y *= 1.32;
-          pos.setXYZ(i, x, y, z);
-        }
-        eggGeo.computeVertexNormals();
-
-        // Plump golden sparkling egg
-        const eggMesh = mesh(eggGeo, 0xfff9c4, 0, 1.55, 0, {
-          metalness: 0.55,
-          roughness: 0.2,
-          emissive: 0xffd54f,
-          emissiveIntensity: 0.4,
+        // Quả Trứng Lấp Lánh Hoàng Kim (Sparkling Golden Egg)
+        buildSparklingEgg(g, {
+          egg: 0xfff9c4,
+          eggEmissive: 0xffd54f,
+          ring: 0xffea00,
+          ringEmissive: 0xffb300,
+          band: 0xffd700,
+          sparkle: 0xffffff,
+          sparkleEmissive: 0xffea00,
         });
-        g.add(eggMesh);
-
-        // Golden celestial ring
-        const ring = mesh(new THREE.TorusGeometry(1.05, 0.045, 8, 32), 0xffea00, 0, 1.55, 0, {
-          metalness: 0.85,
-          roughness: 0.15,
-          emissive: 0xffb300,
-          emissiveIntensity: 0.5,
-        });
-        ring.rotation.x = Math.PI / 3;
-        ring.rotation.y = Math.PI / 6;
-        g.add(ring);
-
-        // Equatorial golden jewel band
-        const band = mesh(new THREE.TorusGeometry(0.68, 0.035, 8, 24), 0xffd700, 0, 1.45, 0, {
-          metalness: 0.9,
-          roughness: 0.15,
-        });
-        band.rotation.x = Math.PI / 2;
-        g.add(band);
-
-        // 4 orbiting sparkling diamond stars
-        for (let i = 0; i < 4; i++) {
-          const a = (i / 4) * Math.PI * 2;
-          const sparkle = mesh(new THREE.OctahedronGeometry(0.13, 0), 0xffffff, Math.cos(a) * 0.88, 1.55 + Math.sin(a * 2) * 0.25, Math.sin(a) * 0.88, {
-            metalness: 0.7,
-            roughness: 0.2,
-            emissive: 0xffea00,
-            emissiveIntensity: 0.8,
-          });
-          sparkle.rotation.y = a;
-          sparkle.rotation.z = Math.PI / 4;
-          g.add(sparkle);
-        }
       }
     }
 
