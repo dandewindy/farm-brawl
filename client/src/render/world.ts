@@ -655,23 +655,93 @@ function getDeviceInfo(): { isIPad: boolean; isMobile: boolean; dpr: number } {
 export function getOptimalPixelRatio(): number {
   const { isIPad, isMobile, dpr } = getDeviceInfo();
   if (isIPad) {
-    // iPad: Cap at 1.15 to prevent Retina fill-rate thermal throttling while keeping crisp visuals
-    return Math.min(dpr, 1.15);
+    // iPad (2x Retina): 1.35 gives razor-sharp edges without fill-rate bottleneck
+    return Math.min(dpr, 1.35);
   }
   if (isMobile) {
-    // Mobile phones: 1.10 DPR gives crisp Retina display on 350-460ppi screens with zero GPU strain
-    return Math.min(dpr, 1.1);
+    // Mobile phones (3x Retina): 1.45 gives crisp Retina display with zero GPU strain
+    return Math.min(dpr, 1.45);
   }
   // PC / Desktop:
   return Math.min(dpr, 1.5);
 }
 
 export function shouldEnableAntialias(): boolean {
-  const { isMobile } = getDeviceInfo();
-  // On mobile & iPad, disable hardware 4x MSAA to eliminate the heavy multisample resolve pass and prevent thermal throttling.
-  // The high pixel density (300-460 ppi) on mobile displays naturally eliminates jagged edges.
-  // On desktop PC, keep hardware antialiasing enabled.
-  return !isMobile;
+  // Always enable hardware antialiasing across all devices (Desktop, iPad, iPhone, Android)
+  // On mobile TBDR GPUs (Apple Metal, Qualcomm Adreno, ARM Mali), 4x MSAA is hardware-accelerated inside
+  // on-chip tile memory (SRAM), costing only 5-8% while completely eliminating stair-step polygon artifacts.
+  return true;
+}
+
+export class DynamicResolutionManager {
+  private readonly renderer: THREE.WebGLRenderer;
+  readonly isMobile: boolean;
+  readonly isIPad: boolean;
+  readonly nativeDpr: number;
+  readonly minDpr: number;
+  readonly maxDpr: number;
+  private currentDpr: number;
+  private targetDpr: number;
+  private emaFps = 60;
+  private lastApplyTime = 0;
+
+  constructor(renderer: THREE.WebGLRenderer) {
+    this.renderer = renderer;
+    const { isIPad, isMobile, dpr } = getDeviceInfo();
+    this.isIPad = isIPad;
+    this.isMobile = isMobile;
+    this.nativeDpr = dpr;
+
+    if (isIPad) {
+      this.minDpr = Math.min(dpr, 1.15);
+      this.maxDpr = Math.min(dpr, 1.35);
+    } else if (isMobile) {
+      this.minDpr = Math.min(dpr, 1.15);
+      this.maxDpr = Math.min(dpr, 1.50); // 1.50 matches 1:2 integer scaling on 3x Retina
+    } else {
+      this.minDpr = 1.0;
+      this.maxDpr = Math.min(dpr, 1.50);
+    }
+    this.currentDpr = this.maxDpr;
+    this.targetDpr = this.maxDpr;
+    this.apply(this.maxDpr);
+  }
+
+  getDpr(): number {
+    return this.currentDpr;
+  }
+
+  private apply(dpr: number): void {
+    const quantized = Math.round(dpr * 20) / 20; // Step of 0.05
+    if (Math.abs(this.currentDpr - quantized) >= 0.04) {
+      this.currentDpr = quantized;
+      this.renderer.setPixelRatio(quantized);
+    }
+  }
+
+  update(currentFps: number, isMoving: boolean, now: number): void {
+    if (!this.isMobile && !this.isIPad) return;
+
+    this.emaFps = this.emaFps * 0.85 + currentFps * 0.15;
+
+    if (this.emaFps < 46) {
+      // Under heavy load: drop to minDpr to immediately protect 60 FPS
+      this.targetDpr = this.minDpr;
+    } else if (isMoving) {
+      // During fast movement: slight reduction to protect 60 FPS
+      this.targetDpr = this.minDpr + (this.maxDpr - this.minDpr) * 0.65;
+    } else if (this.emaFps >= 55) {
+      // Stationary or high FPS: maximum razor-sharpness
+      this.targetDpr = this.maxDpr;
+    }
+
+    if (now - this.lastApplyTime >= 350) {
+      if (Math.abs(this.currentDpr - this.targetDpr) >= 0.04) {
+        this.apply(this.targetDpr);
+        this.lastApplyTime = now;
+      }
+    }
+  }
 }
 
 export interface FarmFruitTreeVisual {
@@ -871,11 +941,19 @@ export class WorldRenderer {
   // Local player cooldown ground indicator ring & arc
   private readonly cdArc: THREE.Mesh;
   private readonly cdTrack: THREE.Mesh;
+  readonly drs: DynamicResolutionManager;
 
   constructor(canvas: HTMLCanvasElement) {
     const antialias = shouldEnableAntialias();
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(getOptimalPixelRatio());
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias,
+      alpha: false,
+      stencil: false,
+      depth: true,
+      powerPreference: 'high-performance',
+    });
+    this.drs = new DynamicResolutionManager(this.renderer);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     const savedShadows = typeof localStorage !== 'undefined' ? localStorage.getItem('fb_shadows') : null;
@@ -2693,7 +2771,7 @@ export class WorldRenderer {
   resize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(getOptimalPixelRatio());
+    this.renderer.setPixelRatio(this.drs ? this.drs.getDpr() : getOptimalPixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 

@@ -1946,6 +1946,7 @@ let fpsFrames = 0;
 let lastFpsTime = performance.now();
 let currentFps = 60;
 let lastRenderTime = 0;
+let lastPhysicsTime = 0;
 let lowFpsStreakSeconds = 0;
 let shownLpmHint = false;
 
@@ -1962,21 +1963,34 @@ function animate(now: number): void {
 
   if (lastRenderTime === 0) {
     lastRenderTime = now;
+    lastPhysicsTime = now;
   }
 
-  // High-refresh display throttling:
+  // Phase-aligned frame pacing with jitter tolerance (Gemini 4 Argon solution)
   // - PC: throttle above 144 FPS (elapsed < 6.8ms)
-  // - Mobile & iPad (including 120Hz ProMotion): target rock-solid 60 FPS (elapsed < 14.5ms)
-  //   This halves GPU power consumption, prevents thermal throttling and battery drain,
-  //   and prevents WebKit/Android from dropping frames to 30/20 FPS.
-  const elapsed = now - lastRenderTime;
-  const minInterval = isPC ? 6.8 : 14.5;
-  if (elapsed < minInterval) {
-    return;
+  // - Mobile & iPad (including 120Hz ProMotion): target rock-solid 60 FPS without dropping frames on 60Hz
+  if (!isPC) {
+    const rawElapsed = now - lastRenderTime;
+    const targetInterval = 1000 / 60; // 16.6667ms (60 FPS target)
+    const tolerance = 2.0; // 2.0ms tolerance absorbs 60Hz RAF jitter, blocks 8.33ms 120Hz pulses
+    if (rawElapsed < targetInterval - tolerance) {
+      return;
+    }
+    if (rawElapsed > targetInterval * 4) {
+      lastRenderTime = now;
+    } else {
+      lastRenderTime = now - (rawElapsed % targetInterval);
+    }
+  } else {
+    const elapsed = now - lastRenderTime;
+    if (elapsed < 6.8) {
+      return;
+    }
+    lastRenderTime = now;
   }
 
-  const dt = Math.min(0.05, Math.max(0.001, elapsed / 1000));
-  lastRenderTime = now;
+  const dt = Math.min(0.05, Math.max(0.001, (now - lastPhysicsTime) / 1000));
+  lastPhysicsTime = now;
 
   fpsFrames++;
   if (now - lastFpsTime >= 500) {
@@ -2384,6 +2398,13 @@ function animate(now: number): void {
   // Update mini clone minions
   minions.sync(Array.from(gameState.minions.values()));
   minions.update(dt, now);
+
+  // Dynamic Resolution Scaling (DRS) based on EMA FPS and movement speed
+  const isMoving = Boolean(
+    (predictor.on && (predictor.dashT > 0 || Math.hypot(predictor.vx, predictor.vz) > 1.2)) ||
+    (input.aimMove && !isStunned)
+  );
+  world.drs.update(currentFps, isMoving, now);
 
   // 3D Render
   world.render();
