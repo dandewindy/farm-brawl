@@ -1060,6 +1060,15 @@ export class World {
                   const massLoss = Math.max(3, Math.round(other.mass * (0.05 + ratio * 0.07)));
                   other.mass = Math.max(10, other.mass - massLoss);
                   this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
+                  this.events.push({
+                    k: 'hit',
+                    a: p.id,
+                    v: other.id,
+                    x: r2(other.x),
+                    z: r2(other.z),
+                    s: Math.round(force),
+                    loss: massLoss,
+                  });
                 }
               } else {
                 // MONKEY:
@@ -1072,6 +1081,15 @@ export class World {
                 const massLoss = Math.max(1, Math.round(other.mass * (0.02 + ratio * 0.03)));
                 other.mass = Math.max(10, other.mass - massLoss);
                 this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 1.5, Math.cos(pushAng), Math.sin(pushAng));
+                this.events.push({
+                  k: 'hit',
+                  a: p.id,
+                  v: other.id,
+                  x: r2(other.x),
+                  z: r2(other.z),
+                  s: Math.round(force),
+                  loss: massLoss,
+                });
               }
             }
           }

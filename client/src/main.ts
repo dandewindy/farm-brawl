@@ -1830,33 +1830,38 @@ function handleGameEvent(ev: GameEvent): void {
     case 'bananaHit': {
       foodParts.burst(ev.x, 1.2, ev.z, 0xffeb3b, 16, 6, 6, 0.6);
       foodParts.burst(ev.x, 1.4, ev.z, 0xff9800, 10, 4, 4, 0.4);
+      animals.notifyHit(ev.id);
+      const vm = gameState.metas.get(ev.id);
+      if (vm && ev.id !== myId) {
+        yelp(vm.species, 0.45);
+      }
       sfxHit(2.0, ev.id === myId ? 1.0 : 0.4);
       break;
     }
     case 'monkeyLand': {
       if (ev.isGorilla) {
-        // Gorilla devastating ground slam: massive fiery shockwaves, heavy earth dust
-        animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r * 1.35, 0xff5722);
-        animals.spawnShockwave(ev.x, 0.15, ev.z, ev.r * 0.9, 0xffab00);
-        foodParts.burst(ev.x, 0.3, ev.z, 0x3e2723, 35, 12, 12, 0.9);
-        foodParts.burst(ev.x, 0.3, ev.z, 0xff6f00, 25, 9, 9, 0.7);
-        sfxHit(5.0, ev.id === myId ? 1.0 : 0.6);
+        // Gorilla ground slam: focused punchy fiery shockwaves and heavy earth dust
+        animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r * 0.70, 0xff5722);
+        animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.45, 0xffab00);
+        foodParts.burst(ev.x, 0.3, ev.z, 0x3e2723, 22, 8, 8, 0.75);
+        foodParts.burst(ev.x, 0.3, ev.z, 0xff6f00, 16, 6, 6, 0.6);
+        sfxHit(4.2, ev.id === myId ? 1.0 : 0.6);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.5);
         const me = gameState.ents.get(myId);
         const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
-        if (dist < 40) {
-          shake = Math.max(shake, 2.2 * ev.ratio * (1 - dist / 40));
+        if (dist < 35) {
+          shake = Math.max(shake, 1.2 * ev.ratio * (1 - dist / 35));
         }
       } else {
-        // Monkey leap land: reduced visual ring and modest dust
-        animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r * 0.75, 0xffca28);
-        foodParts.burst(ev.x, 0.2, ev.z, 0x8d5b38, 14, 6, 6, 0.45);
-        foodParts.burst(ev.x, 0.2, ev.z, 0xd4a373, 10, 4, 4, 0.4);
-        sfxHit(3.0, ev.id === myId ? 0.9 : 0.4);
+        // Monkey leap land: tight visual ring and modest dust
+        animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r * 0.42, 0xffca28);
+        foodParts.burst(ev.x, 0.2, ev.z, 0x8d5b38, 12, 5, 5, 0.4);
+        foodParts.burst(ev.x, 0.2, ev.z, 0xd4a373, 8, 3, 3, 0.35);
+        sfxHit(2.6, ev.id === myId ? 0.9 : 0.4);
         const me = gameState.ents.get(myId);
         const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
-        if (dist < 26) {
-          shake = Math.max(shake, 1.0 * ev.ratio * (1 - dist / 26));
+        if (dist < 22) {
+          shake = Math.max(shake, 0.6 * ev.ratio * (1 - dist / 22));
         }
       }
       break;
@@ -1868,20 +1873,22 @@ function handleGameEvent(ev: GameEvent): void {
       }
       const vis = animals.getVisual(ev.id, targetMeta);
       if (vis) {
-        vis.morphTimer = 1.5;
+        vis.morphTimer = 1.6;
       }
       if (ev.species === 'gorilla') {
         const ent = gameState.ents.get(ev.id);
         const mx = ent ? ent.x : 0;
         const mz = ent ? ent.z : 0;
-        animals.spawnShockwave(mx, 0.1, mz, 6.0, 0xff6d00);
-        animals.spawnShockwave(mx, 0.15, mz, 3.5, 0xffd54f);
-        foodParts.burst(mx, 1.5, mz, 0xff6d00, 36, 14, 12, 1.2);
-        foodParts.burst(mx, 1.8, mz, 0xffea00, 24, 10, 10, 0.9);
+        // Spectacular 3-stage evolution shockwave rings
+        animals.spawnShockwave(mx, 0.08, mz, 5.0, 0xffd700);
+        animals.spawnShockwave(mx, 0.12, mz, 3.5, 0xff6d00);
+        animals.spawnShockwave(mx, 0.16, mz, 2.0, 0x4fc3f7);
+        foodParts.burst(mx, 1.5, mz, 0xffd700, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xff6d00, 24, 10, 10, 0.9);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
-          shake = Math.max(shake, 1.6);
+          shake = Math.max(shake, 1.8);
           hud.showBanner('🦍 ' + t('name_gorilla'), '🔥 TIẾN HOÁ THÀNH GORILLA KHỔNG LỒ! 🔥');
           const myPos = animals.getPosition(myId) || { x: mx, z: mz };
           hud.floatText('🔥 TIẾN HOÁ GORILLA! 🔥', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });

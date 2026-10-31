@@ -228,9 +228,9 @@ export class AnimalPreviewRenderer {
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
 
-    // Center pig / elephant pivot so their protruding parts stay nicely inside the frame
-    if (species === 'pig' || species === 'elephant') {
-      root.position.x = -0.15;
+    // Center pig / elephant / gorilla pivot so their protruding parts stay nicely inside the frame
+    if (species === 'pig' || species === 'elephant' || species === 'gorilla') {
+      root.position.x = -0.12;
     } else {
       root.position.x = 0;
     }
