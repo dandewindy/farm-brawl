@@ -3134,6 +3134,16 @@ body.is-pc #sbmPwa {
   font-size: 16px;
   display: none;
 }
+body.ipad #startBurgerBtn,
+body.mobile-phone #startBurgerBtn,
+body.touch:not(.is-pc) #startBurgerBtn {
+  display: inline-flex !important;
+}
+@media (max-width: 820px) {
+  #startBurgerBtn {
+    display: inline-flex !important;
+  }
+}
 .start-burger-dropdown {
   position: absolute;
   top: 42px;
@@ -3234,6 +3244,33 @@ body.is-pc #sbmPwa {
   color: #c4b9a5;
   line-height: 1.2;
   margin-top: 1px;
+}
+.sbm-item.sbm-item-danger {
+  background: rgba(185, 45, 35, 0.22);
+  border-color: rgba(255, 90, 80, 0.35);
+  margin-top: 4px;
+}
+.sbm-item.sbm-item-danger .sbm-name {
+  color: #ffb4a8;
+}
+.sbm-item.sbm-item-danger .sbm-val {
+  color: #e5988e;
+}
+.sbm-item.sbm-item-danger .sbm-icon {
+  color: #ff6b60;
+}
+.sbm-item.sbm-item-danger:hover,
+.sbm-item.sbm-item-danger:active {
+  background: rgba(200, 50, 40, 0.9);
+  border-color: rgba(255, 130, 120, 0.8);
+}
+.sbm-item.sbm-item-danger:hover .sbm-name,
+.sbm-item.sbm-item-danger:hover .sbm-val,
+.sbm-item.sbm-item-danger:hover .sbm-icon,
+.sbm-item.sbm-item-danger:active .sbm-name,
+.sbm-item.sbm-item-danger:active .sbm-val,
+.sbm-item.sbm-item-danger:active .sbm-icon {
+  color: #ffffff;
 }
 .sp-skin-hint {
   font-size: 11px;

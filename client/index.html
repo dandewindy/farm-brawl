@@ -226,6 +226,19 @@
     </div>
   </div>
 
+  <!-- Exit App / Close Game Window Confirmation Modal -->
+  <div id="appExitConfirmModal" class="center-modal-wrap" hidden>
+    <div class="center-modal-card">
+      <div class="cm-icon">🚪</div>
+      <h3 class="cm-title" data-i18n="exitAppModalTitle">Xác nhận thoát game?</h3>
+      <p class="cm-desc" data-i18n="exitAppModalDesc">Bạn có chắc muốn đóng và thoát khỏi trò chơi?</p>
+      <div class="cm-actions">
+        <button id="btnCancelAppExit" type="button" class="cm-btn cm-btn-cancel" data-i18n="exitAppCancel">Ở lại</button>
+        <button id="btnConfirmAppExit" type="button" class="cm-btn cm-btn-confirm" data-i18n="exitAppConfirm">Đóng game</button>
+      </div>
+    </div>
+  </div>
+
   <!-- AFK Idle Disconnect Modal -->
   <div id="afkModal" class="center-modal-wrap" hidden>
     <div class="center-modal-card afk-card">
@@ -379,6 +392,19 @@
             <div class="sbm-info">
               <span class="sbm-name" data-i18n="disclaimerTitleShort">Miễn trừ trách nhiệm</span>
               <span class="sbm-val" data-i18n="disclaimerSub">Phi lợi nhuận &amp; Bản quyền</span>
+            </div>
+          </button>
+          <button type="button" id="sbmExit" class="sbm-item sbm-item-danger">
+            <span class="sbm-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"></path>
+                <path d="M2 20h20"></path>
+                <circle cx="14.5" cy="12" r="1.2" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </span>
+            <div class="sbm-info">
+              <span class="sbm-name" data-i18n="exitAppTitle">Thoát trò chơi</span>
+              <span class="sbm-val" data-i18n="exitAppSub">Đóng cửa sổ game</span>
             </div>
           </button>
         </div>

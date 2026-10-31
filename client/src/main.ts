@@ -6,7 +6,7 @@ import {
   chargeStop, chargeUpdate, repaint, setMood,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
-  unlockAudio, yelp,
+  unlockAudio, yelp, setMuted,
   cycleAudioMode, getAudioMode, type AudioMode,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
@@ -866,9 +866,47 @@ const sbmLang = document.getElementById('sbmLang') as HTMLButtonElement | null;
 const sbmShadow = document.getElementById('sbmShadow') as HTMLButtonElement | null;
 const sbmPwa = document.getElementById('sbmPwa') as HTMLButtonElement | null;
 const sbmDisclaimer = document.getElementById('sbmDisclaimer') as HTMLButtonElement | null;
+const sbmExit = document.getElementById('sbmExit') as HTMLButtonElement | null;
+
+// Lobby Exit App Confirmation Modal
+const appExitConfirmModal = document.getElementById('appExitConfirmModal') as HTMLElement | null;
+const btnCancelAppExit = document.getElementById('btnCancelAppExit') as HTMLButtonElement | null;
+const btnConfirmAppExit = document.getElementById('btnConfirmAppExit') as HTMLButtonElement | null;
+
+const showAppExitModal = () => {
+  if (startBurgerMenu) startBurgerMenu.hidden = true;
+  if (appExitConfirmModal) appExitConfirmModal.hidden = false;
+};
+
+const hideAppExitModal = () => {
+  if (appExitConfirmModal) appExitConfirmModal.hidden = true;
+};
+
+const closeGameWindow = () => {
+  try { setMuted(true); } catch (_) {}
+  try {
+    if (transport && typeof (transport as any).close === 'function') {
+      (transport as any).close();
+    }
+  } catch (_) {}
+  window.close();
+  setTimeout(() => {
+    try {
+      window.open('', '_self', '');
+      window.close();
+    } catch (_) {}
+    setTimeout(() => {
+      if (!window.closed) {
+        try {
+          window.location.href = 'about:blank';
+        } catch (_) {}
+      }
+    }, 150);
+  }, 100);
+};
 
 if (startBurgerBtn && startBurgerMenu) {
-  startBurgerBtn.addEventListener('click', (e) => {
+  const toggleStartBurger = (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
     startBurgerMenu.hidden = !startBurgerMenu.hidden;
@@ -877,7 +915,8 @@ if (startBurgerBtn && startBurgerMenu) {
     const curL = getLanguage();
     const sbmLangVal = document.getElementById('sbmLangVal');
     if (sbmLangVal) sbmLangVal.textContent = curL === 'vi' ? 'Tiếng Việt' : 'English';
-  });
+  };
+  startBurgerBtn.addEventListener('click', toggleStartBurger);
 }
 
 if (startBurgerClose && startBurgerMenu) {
@@ -953,6 +992,51 @@ if (sbmDisclaimer) {
     hud.showDisclaimer();
   });
 }
+
+if (sbmExit) {
+  sbmExit.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showAppExitModal();
+  });
+}
+
+if (btnCancelAppExit) {
+  btnCancelAppExit.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideAppExitModal();
+  });
+}
+
+if (btnConfirmAppExit) {
+  btnConfirmAppExit.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideAppExitModal();
+    closeGameWindow();
+  });
+}
+
+if (appExitConfirmModal) {
+  appExitConfirmModal.addEventListener('pointerdown', (e) => {
+    const card = appExitConfirmModal.querySelector('.center-modal-card');
+    if (card && !card.contains(e.target as Node)) {
+      hideAppExitModal();
+    }
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (appExitConfirmModal && !appExitConfirmModal.hidden) {
+      hideAppExitModal();
+    }
+    if (startBurgerMenu && !startBurgerMenu.hidden) {
+      startBurgerMenu.hidden = true;
+    }
+  }
+});
 
 // Mobile & iPad Burger Drawer Modal
 const burgerBtn = document.getElementById('burgerBtn');
