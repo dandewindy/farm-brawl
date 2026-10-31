@@ -205,12 +205,12 @@ describe('bonus weapons and tools', () => {
     expect(w.tools.has(101)).toBe(false);
   });
 
-  it('pitchfork hits harder and strips extra weight off Napoleon', () => {
+  it('pitchfork hits harder and strips extra weight off Napoleon (3 hits: 30%, 20%, 10%)', () => {
     const w = emptyWorld();
     const attacker = w.addPlayer('Attacker', 'pig');
     const king = w.addPlayer('King', 'pig');
     place(w, attacker, 0, 0, 40);
-    place(w, king, 2, 0, 40);
+    place(w, king, 2, 0, 100);
     w.napoleonId = king;
     w.ruleTimer = 40;
 
@@ -221,15 +221,27 @@ describe('bonus weapons and tools', () => {
     pAtt.power = 1.0;
     pAtt.vx = 20;
 
-    const massBefore = w.players.get(king)!.mass;
-    const attMassBefore = pAtt.mass;
+    // Hit 1: 30% of 100kg = 30kg loss
     w.step();
-    const massAfter = w.players.get(king)!.mass;
-    expect(massBefore - massAfter).toBeGreaterThan(1.0);
-    // Pitchfork steals mass directly based on hit force
-    expect(pAtt.mass).toBeGreaterThan(attMassBefore);
-    // Knockback is normal (does not launch victim into fence with > 35 speed)
-    expect(w.players.get(king)!.vx).toBeLessThan(35);
+    const kingP = w.players.get(king)!;
+    expect(kingP.mass).toBe(70);
+    expect(pAtt.mass).toBe(55); // 40 + 15 stolen
+    expect(pAtt.pitchforkHits).toBe(2);
+
+    // Hit 2: 20% of 70kg = 14kg loss
+    pAtt.x = 0; pAtt.z = 0; pAtt.dashT = 0.3; pAtt.vx = 20; pAtt.dashHit.clear();
+    kingP.x = 1.0; kingP.z = 0;
+    w.step();
+    expect(kingP.mass).toBe(56);
+    expect(pAtt.pitchforkHits).toBe(1);
+
+    // Hit 3: 10% of 56kg = 6kg loss
+    pAtt.x = 0; pAtt.z = 0; pAtt.dashT = 0.3; pAtt.vx = 20; pAtt.dashHit.clear();
+    kingP.x = 1.0; kingP.z = 0;
+    w.step();
+    expect(kingP.mass).toBe(50);
+    expect(pAtt.pitchforkHits).toBe(0);
+    expect(pAtt.pitchforkT).toBe(0); // consumed after 3 hits!
   });
 
   it('dynamite explodes on hit and knocks back bystanders', () => {
@@ -1676,9 +1688,10 @@ describe('fruit trees', () => {
         w.step();
       }
 
-      // Target took hit, loses mass <= 5% of 200 (10kg max)
+      // Target took hit, loses mass (fruits scatter on ground), monkey mass does not directly increase
       expect(target.mass).toBeLessThan(200);
-      expect(target.mass).toBeGreaterThanOrEqual(190);
+      expect(monkey.mass).toBe(100);
+      expect(w.food.size).toBeGreaterThan(0);
     });
 
     it('monkey charged leap jumps over fire hazard and lands with shockwave', () => {
@@ -1730,28 +1743,36 @@ describe('fruit trees', () => {
       // Evolves to gorilla!
       expect(gorilla.species).toBe('gorilla');
 
-      // Gorilla leap: squishes animals <= 50kg flat and steals mass
+      // Gorilla leap: instant kills animals <= 50kg, and max charge squishes 50kg..500kg
       const victimId = w.addPlayer('Tiny', 'chicken');
       const victim = place(w, victimId, 20, 0, 40);
+      const medId = w.addPlayer('MediumPig', 'pig');
+      const medVic = place(w, medId, 21, 1, 150);
+
       gorilla.x = 0; gorilla.z = 0;
       gorilla.input.a = 0;
-      gorilla.holdT = 1.0;
+      gorilla.holdT = 1.2;
       gorilla.pressed = true;
       w.step();
 
       expect(gorilla.monkeyLeapT).toBeGreaterThan(0);
 
       for (let i = 0; i < 20; i++) w.step();
-      expect(victim.squishT).toBeGreaterThan(0);
-      expect(victim.mass).toBeLessThan(40);
-      expect(victim.stunT).toBeGreaterThan(0);
-      expect(victim.slowT).toBeGreaterThan(0);
-      expect(gorilla.mass).toBeGreaterThan(3001); // Stole mass!
+      // Tiny animal <= 50kg is instantly crushed & killed
+      expect(victim.alive).toBe(false);
+      expect(gorilla.mass).toBeGreaterThan(3001); // Stole kill spoils!
+
+      // Medium animal (50..500kg) is squished, stunned, slowed, but remains alive with lost mass
+      expect(medVic.alive).toBe(true);
+      expect(medVic.squishT).toBeGreaterThan(0);
+      expect(medVic.mass).toBeLessThan(150);
+      expect(medVic.stunT).toBeGreaterThan(0);
+      expect(medVic.slowT).toBeGreaterThan(0);
 
       // Gorilla throwing banana pays self-mass penalty (<= 5%)
       const massBeforeThrow = gorilla.mass;
       gorilla.x = -30; gorilla.z = -30; // Far from tree
-      gorilla.treeShakeT = 0; gorilla.cd = 0; gorilla.dashT = 0;
+      gorilla.treeShakeT = 0; gorilla.cd = 0; gorilla.dashT = 0; gorilla.stunT = 0; gorilla.vx = 0; gorilla.vz = 0;
       gorilla.holdT = 0.05;
       gorilla.pressed = true;
       w.step();
@@ -1863,6 +1884,112 @@ describe('fruit trees', () => {
       }
       // Monkey did not fly/dash
       expect(monkey.flyT).toBe(0);
+    });
+
+    it('gorilla is immune to stun, flinch, knockback, and damage from animals < 1 ton and minions', () => {
+      const w = emptyWorld();
+      const gId = w.addPlayer('Kong', 'monkey');
+      const gorilla = place(w, gId, 0, 0, 3000);
+      w.step();
+      expect(gorilla.species).toBe('gorilla');
+
+      // 1. Pig with 200kg rams Gorilla
+      const pigId = w.addPlayer('Piggy', 'pig');
+      const pig = place(w, pigId, 2, 0, 200);
+      pig.input = { a: Math.PI, mv: true, btn: true };
+      pig.dashT = 0.3;
+      pig.power = 1.0;
+      pig.vx = -20;
+      const gMassBefore = gorilla.mass;
+
+      w.step();
+
+      // Gorilla takes 0 damage, 0 stun, 0 knockback
+      expect(gorilla.stunT).toBe(0);
+      expect(Math.hypot(gorilla.vx, gorilla.vz)).toBe(0);
+      expect(w.events.some(e => e.k === 'hit' && e.a === pig.id && e.loss === 0)).toBe(true);
+      // Pig rebounds and gets stunned
+      expect(pig.stunT).toBeGreaterThan(0);
+      expect(pig.vx).toBeGreaterThan(0);
+
+      // 2. Minion attacks Gorilla
+      const minionOwnerId = w.addPlayer('Leader', 'pig');
+      const leader = place(w, minionOwnerId, 5, 0, 100);
+      gorilla.lastAttackedId = leader.id;
+      gorilla.lastAttackedT = w.time;
+      leader.lastHitBy = gorilla.id;
+      leader.lastHitT = w.time;
+      w.minions.set(1, {
+        id: 1,
+        ownerId: leader.id,
+        x: 0.5,
+        z: 0,
+        vx: 0,
+        vz: 0,
+        a: 0,
+        mass: 10,
+        cd: 0,
+        targetId: gorilla.id,
+      });
+
+      w.step();
+      // Gorilla remains immune to minions
+      expect(gorilla.stunT).toBe(0);
+      expect(Math.hypot(gorilla.vx, gorilla.vz)).toBe(0);
+      expect(w.events.some(e => e.k === 'hit' && e.v === gorilla.id && e.minion && e.loss === 0)).toBe(true);
+    });
+
+    it('banana projectile carries dynamite and explodes on hit', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('Wukong', 'monkey');
+      const monkey = place(w, mId, 0, 0, 100);
+      monkey.hasDynamite = true;
+
+      const vicId = w.addPlayer('Vic', 'pig');
+      const vic = place(w, vicId, 10, 0, 200);
+
+      // Tap throws banana
+      monkey.holdT = 0.05;
+      monkey.pressed = true;
+      w.step();
+
+      expect(w.bananaProjectiles.length).toBe(1);
+
+      // Fast-forward until banana reaches victim
+      for (let i = 0; i < 15; i++) w.step();
+
+      // Exploded: dynamite consumed, victim took dynamite damage (25%), boom event fired
+      expect(monkey.hasDynamite).toBe(false);
+      expect(vic.mass).toBeLessThanOrEqual(150);
+      expect(w.events.some(e => e.k === 'boom')).toBe(true);
+    });
+
+    it('banana projectile carries pitchfork with 3-hit mass strip', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('Wukong', 'monkey');
+      const monkey = place(w, mId, 0, 0, 100);
+      monkey.pitchforkT = 10;
+      monkey.pitchforkHits = 3;
+
+      const vicId = w.addPlayer('Vic', 'pig');
+      const vic = place(w, vicId, 6, 0, 200);
+      vic.ai = null;
+      vic.input = { a: 0, mv: false, btn: false };
+
+      // Hit 1: 30% of 200 = 60kg lost
+      monkey.input.a = 0;
+      monkey.holdT = 0.05;
+      monkey.pressed = true;
+      w.step();
+      for (let i = 0; i < 15; i++) {
+        w.step();
+        if (w.events.some(e => e.k === 'hit')) break;
+      }
+
+      expect(vic.mass).toBeLessThanOrEqual(140);
+      expect(monkey.pitchforkHits).toBe(2);
+      expect(w.food.size).toBeGreaterThan(0); // drops fruit for pickup
+      expect(monkey.mass).toBe(100); // monkey must pick up fruits to grow
     });
 
     it('secret easter egg: names with Money/Monkey/Khỉ/Khi prefixes get 100% monkey on random', () => {

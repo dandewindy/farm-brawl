@@ -49,6 +49,7 @@ export interface Player extends Body {
   respawnT: number;
   inWaterT: number;
   pitchforkT: number;
+  pitchforkHits?: number;
   hasDynamite: boolean;
   slowT: number;
   superT: number;
@@ -307,7 +308,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, lastAttackedId: 0, lastAttackedT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -425,7 +426,7 @@ export class World {
       lastAttackedId: 0, lastAttackedT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
-      pitchforkT: 0, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
+      pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
       monkeyLeapT: 0, treeShakeT: 0,
     });
     delete p.morphOrigSpecies;
@@ -983,7 +984,10 @@ export class World {
     // Tool pickup & timer updates
     for (const p of alive) {
       if (!p.alive) continue;
-      if (p.pitchforkT > 0) p.pitchforkT = Math.max(0, p.pitchforkT - DT);
+      if (p.pitchforkT > 0) {
+        p.pitchforkT = Math.max(0, p.pitchforkT - DT);
+        if (p.pitchforkT <= 0) p.pitchforkHits = undefined;
+      }
       if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
       if (p.superT > 0) p.superT = Math.max(0, p.superT - DT);
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
@@ -1026,7 +1030,7 @@ export class World {
           p.dashT = 0;
           const isGorilla = (p.species === 'gorilla');
           const ratio = p.monkeyLeapRatio ?? 0.5;
-          const isMaxCharge = ratio >= 0.75;
+          const isMaxCharge = ratio >= 0.85;
           const bodyR = radiusOf(p.mass);
           // Gorilla has massive shockwave, monkey has reduced shockwave
           const shockwaveR = isGorilla
@@ -1047,36 +1051,68 @@ export class World {
             if (dist <= shockwaveR) {
               const pushAng = Math.atan2(dz, dx);
               if (isGorilla) {
-                // Gorilla max hold leap slam: causes 0.5s stun and 1s decaying slow
-                if (isMaxCharge) {
+                if (other.mass <= 50) {
+                  // Đạp dẹp lép và LẬP TỨC KẾT LIỄU con vật <= 50kg!
+                  other.squishT = 3.0;
+                  other.lastHitBy = p.id;
+                  other.lastHitT = this.time;
+                  p.lastAttackedId = other.id;
+                  p.lastAttackedT = this.time;
+                  const stolenKg = other.mass;
+                  p.mass += Math.round(stolenKg * 0.3);
+                  this.events.push({
+                    k: 'hit',
+                    a: p.id,
+                    v: other.id,
+                    x: r2(other.x),
+                    z: r2(other.z),
+                    s: 30,
+                    loss: Math.round(other.mass),
+                  });
+                  this.kill(other, 'crush');
+                } else if (isMaxCharge && other.mass <= 500) {
+                  // Gorila gồng max thanh: dậm nhảy làm con vật từ 500kg đến trên 50kg dẹp lép nhưng vẫn còn sống và phục hồi di chuyển (chỉ giảm kg)
+                  other.squishT = 2.5;
                   other.stunT = Math.max(other.stunT, 0.5);
                   other.slowT = Math.max(other.slowT, 1.0);
-                }
-
-                if (other.mass <= 50) {
-                  // Đạp dẹp lép toàn bộ con vật <= 50kg trong phạm vi!
-                  other.squishT = 2.5;
-                  other.stunT = Math.max(other.stunT, isMaxCharge ? 0.5 : 1.5);
                   other.vx = 0;
                   other.vz = 0;
                   other.dashT = 0;
                   other.plow = false;
-                  // Cướp 1 phần kg của chúng (25% mass)
-                  const stolenKg = Math.max(2, Math.round(other.mass * 0.25));
-                  other.mass = Math.max(10, other.mass - stolenKg);
-                  p.mass += stolenKg; // Gorilla cướp kg trực tiếp!
-                  this.scatter(other.x, other.z, Math.round(stolenKg * 0.5), radiusOf(other.mass) + 1.8, Math.cos(pushAng), Math.sin(pushAng));
+                  other.lastHitBy = p.id;
+                  other.lastHitT = this.time;
+                  p.lastAttackedId = other.id;
+                  p.lastAttackedT = this.time;
+                  const massLoss = Math.max(10, Math.round(other.mass * 0.15));
+                  other.mass = Math.max(10, other.mass - massLoss);
+                  this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
+                  this.events.push({
+                    k: 'hit',
+                    a: p.id,
+                    v: other.id,
+                    x: r2(other.x),
+                    z: r2(other.z),
+                    s: 20,
+                    loss: massLoss,
+                  });
                 } else {
-                  // > 50kg: Bị hất văng cực mạnh
+                  // > 500kg (hoặc không gồng max thanh đối với > 50kg): Bị hất văng bởi sóng chấn động
                   const force = 24.0 + ratio * 32.0;
                   other.vx += Math.cos(pushAng) * force;
                   other.vz += Math.sin(pushAng) * force;
                   other.dashT = 0;
                   other.plow = false;
-                  if (!isMaxCharge) {
+                  if (isMaxCharge) {
+                    other.stunT = Math.max(other.stunT, 0.5);
+                    other.slowT = Math.max(other.slowT, 1.0);
+                  } else {
                     other.stunT = Math.max(other.stunT, 0.6);
                   }
-                  const massLoss = Math.max(3, Math.round(other.mass * (0.05 + ratio * 0.07)));
+                  other.lastHitBy = p.id;
+                  other.lastHitT = this.time;
+                  p.lastAttackedId = other.id;
+                  p.lastAttackedT = this.time;
+                  const massLoss = Math.max(10, Math.round(other.mass * (0.05 + ratio * 0.07)));
                   other.mass = Math.max(10, other.mass - massLoss);
                   this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
                   this.events.push({
@@ -1172,6 +1208,7 @@ export class World {
           this.events.push({ k: 'tool', id: p.id, kind: t.kind, x: t.x, z: t.z });
           if (t.kind === 'pitchfork') {
             p.pitchforkT = 10;
+            p.pitchforkHits = 3;
           } else if (t.kind === 'dynamite') {
             p.hasDynamite = true;
           } else if (t.kind === 'wheel') {
@@ -1863,16 +1900,154 @@ export class World {
         const dist = Math.hypot(target.x - proj.x, target.z - proj.z);
         if (dist <= tr + proj.r) {
           hit = true;
-          // Dù là khỉ hay gorilla mỗi lần quăng tương đương với húc nhanh làm đẩy lùi các con vật khác và mất kg giống với các con vật khác khi húc nhẹ
-          const lossRatio = proj.tier === 2 ? 0.05 : proj.tier === 1 ? 0.04 : 0.03;
-          const minLoss = proj.tier === 2 ? 4 : proj.tier === 1 ? 2 : 1;
-          const massLoss = Math.min(Math.round(target.mass * 0.05), Math.max(minLoss, Math.round(target.mass * lossRatio)));
+          const att = this.players.get(proj.ownerId);
+
+          // Gorilla immunity: Gorilla is immune to stun, flinch, knockback, and loss from animals < 1 ton
+          if (target.species === 'gorilla' && (!att || att.mass < 1000)) {
+            this.events.push({
+              k: 'bananaHit',
+              id: target.id,
+              x: r2(target.x),
+              z: r2(target.z),
+              giant: proj.giant,
+              tier: proj.tier,
+            });
+            break;
+          }
+
+          const hitAngle = Math.atan2(proj.vz, proj.vx);
+
+          // Item Effect 1: Dynamite explosion on banana hit
+          if (att && att.hasDynamite) {
+            att.hasDynamite = false;
+            const boomX = r2(target.x);
+            const boomZ = r2(target.z);
+            this.events.push({ k: 'boom', id: att.id, x: boomX, z: boomZ });
+            const BOOM_R = 9.0;
+            for (const bystander of this.players.values()) {
+              if (!bystander.alive || bystander.id === att.id) continue;
+              const bdx = bystander.x - boomX;
+              const bdz = bystander.z - boomZ;
+              const bdist = Math.hypot(bdx, bdz);
+              if (bdist < BOOM_R && bdist > 0.01) {
+                const bForce = clamp((1 - bdist / BOOM_R) * 38, 10, 34);
+                bystander.vx += (bdx / bdist) * bForce;
+                bystander.vz += (bdz / bdist) * bForce;
+              }
+            }
+            target.lastHitBy = att.id;
+            target.lastHitT = this.time;
+            att.lastAttackedId = target.id;
+            att.lastAttackedT = this.time;
+            if (target.mass < 100) {
+              this.kill(target, 'dynamite');
+            } else {
+              const loss = Math.max(100, Math.round(target.mass * 0.25));
+              target.mass -= loss;
+              if (target.mass <= 10) {
+                this.kill(target, 'dynamite');
+              } else {
+                this.scatter(boomX, boomZ, loss, radiusOf(target.mass) + 3.5, proj.vx, proj.vz);
+                target.vx += Math.cos(hitAngle) * 50;
+                target.vz += Math.sin(hitAngle) * 50;
+                target.dashT = 0; target.plow = false; target.charging = false;
+                this.events.push({
+                  k: 'hit',
+                  a: att.id,
+                  v: target.id,
+                  x: r2(target.x),
+                  z: r2(target.z),
+                  s: 50,
+                  loss: Math.round(loss * 10) / 10,
+                });
+              }
+            }
+            break;
+          }
+
+          // Item Effect 2: Pitchfork on banana hit (10s duration, max 3 hits: hit 1 = 30%, hit 2 = 20%, hit 3 = 10%)
+          if (att && att.pitchforkT > 0 && (att.pitchforkHits ?? 3) > 0) {
+            const hitsLeft = att.pitchforkHits ?? 3;
+            const pct = hitsLeft === 3 ? 0.30 : hitsLeft === 2 ? 0.20 : 0.10;
+            const massLoss = Math.min(target.mass - CFG.MIN_MASS, Math.max(2, Math.round(target.mass * pct)));
+            att.pitchforkHits = hitsLeft - 1;
+            if (att.pitchforkHits <= 0) {
+              att.pitchforkT = 0;
+              att.pitchforkHits = 0;
+            }
+            target.mass -= massLoss;
+            // Rớt kg (trái cây) tương tự húc, không tính kg vào khỉ mà cần nhặt mới tăng
+            this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
+            const knockback = 30.0;
+            target.vx += Math.cos(hitAngle) * knockback;
+            target.vz += Math.sin(hitAngle) * knockback;
+            target.dashT = 0; target.plow = false; target.charging = false;
+            target.lastHitBy = att.id;
+            target.lastHitT = this.time;
+            att.lastAttackedId = target.id;
+            att.lastAttackedT = this.time;
+            this.events.push({
+              k: 'bananaHit',
+              id: target.id,
+              x: r2(target.x),
+              z: r2(target.z),
+              giant: proj.giant,
+              tier: proj.tier,
+            });
+            this.events.push({
+              k: 'hit',
+              a: att.id,
+              v: target.id,
+              x: r2(target.x),
+              z: r2(target.z),
+              s: Math.round(knockback),
+              loss: massLoss,
+            });
+            break;
+          }
+
+          // Item Effect 3: Wheel crush on banana hit
+          if (att && att.wheelT > 0) {
+            target.squishT = 3.0;
+            target.stunT = 1.2;
+            target.lastHitBy = att.id;
+            target.lastHitT = this.time;
+            att.lastAttackedId = target.id;
+            att.lastAttackedT = this.time;
+            const launchSpeed = 34;
+            target.vx += Math.cos(hitAngle) * launchSpeed;
+            target.vz += Math.sin(hitAngle) * launchSpeed;
+            target.dashT = 0; target.plow = false; target.charging = false;
+            if (target.mass < 80) {
+              this.kill(target, 'crush');
+            } else {
+              const lostMass = Math.min(target.mass - 20, Math.max(50, Math.round(target.mass * 0.4)));
+              target.mass = Math.max(20, target.mass - lostMass);
+              this.scatter(target.x, target.z, lostMass, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
+              this.events.push({
+                k: 'hit',
+                a: att.id,
+                v: target.id,
+                x: r2(target.x),
+                z: r2(target.z),
+                s: Math.round(launchSpeed),
+                loss: lostMass,
+              });
+            }
+            break;
+          }
+
+          // Default Banana Hit (Requirement 1):
+          // Rớt kg (trái cây) tương tự húc, nhưng không tính kg vào khỉ mà cần phải nhặt mới tăng. Vẫn giữ hiệu ứng đẩy lùi.
+          // Áp dụng tương tự với sức mạnh cầu vồng (proj.giant) bắn nhiều chuối.
+          const lossPct = proj.giant ? 0.18 : proj.tier === 2 ? 0.15 : proj.tier === 1 ? 0.12 : 0.10;
+          const minLoss = proj.giant ? 8 : proj.tier === 2 ? 6 : proj.tier === 1 ? 3 : 2;
+          const massLoss = Math.min(target.mass - CFG.MIN_MASS, Math.max(minLoss, Math.round(target.mass * lossPct)));
 
           target.mass = Math.max(10, target.mass - massLoss);
           this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
 
-          const hitAngle = Math.atan2(proj.vz, proj.vx);
-          const knockback = proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
+          const knockback = proj.giant ? 44.0 : proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
           target.vx += Math.cos(hitAngle) * knockback;
           target.vz += Math.sin(hitAngle) * knockback;
           target.dashT = 0;
@@ -1880,6 +2055,10 @@ export class World {
           target.charging = false;
           target.lastHitBy = proj.ownerId;
           target.lastHitT = this.time;
+          if (att) {
+            att.lastAttackedId = target.id;
+            att.lastAttackedT = this.time;
+          }
 
           this.events.push({
             k: 'bananaHit',
@@ -2102,30 +2281,46 @@ export class World {
           const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
           if (dist < hitDist && m.cd <= 0) {
             m.cd = 0.8;
-            target.vx += Math.cos(aimA) * 18;
-            target.vz += Math.sin(aimA) * 18;
-            target.stunT = 0.4;
-            target.lastHitBy = owner.id;
-            target.lastHitT = this.time;
-            const loss = Math.min(target.mass - 10, 8);
-            if (loss > 0) {
-              target.mass -= loss;
-              owner.mass += loss;
-            }
-            this.events.push({
-              k: 'hit',
-              a: owner.id,
-              v: target.id,
-              x: r2(target.x),
-              z: r2(target.z),
-              s: 18,
-              loss: Math.round(loss),
-              minion: true,
-            });
-            if (target.mass < 10) {
-              this.kill(target, 'fence');
-              m.targetId = 0;
-              target = undefined;
+            if (target.species === 'gorilla') {
+              // Gorilla is immune to minions: minion bounces off, no stun, no knockback, no loss for gorilla
+              m.vx = -Math.cos(aimA) * 12;
+              m.vz = -Math.sin(aimA) * 12;
+              this.events.push({
+                k: 'hit',
+                a: owner.id,
+                v: target.id,
+                x: r2(target.x),
+                z: r2(target.z),
+                s: 10,
+                loss: 0,
+                minion: true,
+              });
+            } else {
+              target.vx += Math.cos(aimA) * 18;
+              target.vz += Math.sin(aimA) * 18;
+              target.stunT = 0.4;
+              target.lastHitBy = owner.id;
+              target.lastHitT = this.time;
+              const loss = Math.min(target.mass - 10, 8);
+              if (loss > 0) {
+                target.mass -= loss;
+                owner.mass += loss;
+              }
+              this.events.push({
+                k: 'hit',
+                a: owner.id,
+                v: target.id,
+                x: r2(target.x),
+                z: r2(target.z),
+                s: 18,
+                loss: Math.round(loss),
+                minion: true,
+              });
+              if (target.mass < 10) {
+                this.kill(target, 'fence');
+                m.targetId = 0;
+                target = undefined;
+              }
             }
           }
         } else {
@@ -2387,6 +2582,18 @@ export class World {
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
+    // Gorilla immunity: Gorilla is immune to stun, flinch, knockback, and loss from animals < 1 ton
+    if (vic.species === 'gorilla' && att.mass < 1000) {
+      att.vx = -nx * 18;
+      att.vz = -nz * 18;
+      att.dashT = 0;
+      att.plow = false;
+      att.stunT = Math.max(att.stunT, 0.4);
+      att.dashHit.add(vic.id);
+      this.events.push({ k: 'hit', a: att.id, v: vic.id, x: r2(vic.x), z: r2(vic.z), s: 18, loss: 0 });
+      return;
+    }
+
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
     const ramFactor = TRAITS[att.species].ram ?? 1.0;
     // Dynamic knockback ceiling based on mass ratio and charging power (gồng húc)
@@ -2500,11 +2707,16 @@ export class World {
     }
 
     let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
-    // Pitchfork heavily strips weight and grants mass to attacker (normal knockback, massive kg steal)
-    if (att.pitchforkT > 0) {
-      const isKing = vic.id === this.napoleonId;
-      const forceScale = clamp((speed * att.power * ramFactor) / 6, 2.5, 4.0);
-      loss = Math.min(vic.mass - CFG.MIN_MASS, loss * forceScale * (isKing ? 3.0 : 2.0));
+    // Pitchfork (10s duration, max 3 hits: hit 1 = 30%, hit 2 = 20%, hit 3 = 10%)
+    if (att.pitchforkT > 0 && (att.pitchforkHits ?? 3) > 0) {
+      const hitsLeft = att.pitchforkHits ?? 3;
+      const pct = hitsLeft === 3 ? 0.30 : hitsLeft === 2 ? 0.20 : 0.10;
+      loss = Math.min(vic.mass - CFG.MIN_MASS, Math.max(2, Math.round(vic.mass * pct)));
+      att.pitchforkHits = hitsLeft - 1;
+      if (att.pitchforkHits <= 0) {
+        att.pitchforkT = 0;
+        att.pitchforkHits = 0;
+      }
       const steal = Math.round(loss * 0.5);
       if (steal > 0) {
         att.mass += steal;
@@ -2535,6 +2747,7 @@ export class World {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0; p.wheelT = 0;
+    p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
     p.monkeyLeapT = 0; p.treeShakeT = 0;
     p.treeShakeTreeId = undefined;
     p.treeShakeTimer = undefined;
