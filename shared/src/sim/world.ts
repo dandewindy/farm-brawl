@@ -67,6 +67,9 @@ export interface Player extends Body {
   monkeyLeapHeight?: number;
   monkeyLeapRatio?: number;
   treeShakeT?: number;
+  treeShakeTreeId?: number;
+  treeShakeTimer?: number;
+  treeShakeDropStage?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
   ai: BotBrain | null;
@@ -400,6 +403,8 @@ export class World {
     if (this.currentRule === 'poultry') {
       if (!p.origSpecies) p.origSpecies = p.species;
       p.species = this.rnd() < 0.5 ? 'chicken' : 'duck';
+    } else if (p.species === 'gorilla') {
+      p.species = 'monkey';
     }
     let spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
     if (this.currentRule === 'titan') {
@@ -713,7 +718,7 @@ export class World {
             }
           }
         } else {
-          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * (p.species === 'monkey' && p.superT > 0 ? 1.30 : 1.0);
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0);
           stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
           if (p.slowT > 0) {
             p.vx *= 0.85;
@@ -789,11 +794,12 @@ export class World {
 
                 if (hasBigFruits && p.mass >= reqMass) {
                   // SUCCESSFUL RAM!
-                  // Stun for 1.5s
-                  p.stunT = 1.5;
+                  // Stun for 1.5s (Monkey and Gorilla are immune to tree stun!)
+                  const isPrimate = p.species === 'monkey' || p.species === 'gorilla';
+                  p.stunT = isPrimate ? 0 : 1.5;
                   p.dashT = 0;
-                  p.vx = nx * 8;
-                  p.vz = nz * 8;
+                  p.vx = isPrimate ? 0 : nx * 8;
+                  p.vz = isPrimate ? 0 : nz * 8;
 
                   // Each ram drops 1/3 of the remaining fruits
                   const dropBig = Math.ceil(tree.big / 3);
@@ -841,8 +847,9 @@ export class World {
                   });
                 } else {
                   // Insufficient mass or no big fruits ready: bounce off trunk
+                  const isPrimate = p.species === 'monkey' || p.species === 'gorilla';
                   p.dashT = 0;
-                  p.stunT = Math.max(p.stunT, 0.8);
+                  p.stunT = isPrimate ? 0 : Math.max(p.stunT, 0.8);
                   p.vx = nx * 10;
                   p.vz = nz * 10;
                   this.events.push({ k: 'hit', a: 0, v: p.id, x: r2(p.x), z: r2(p.z), s: 2 });
@@ -978,15 +985,47 @@ export class World {
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
       if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
-      if (p.treeShakeT && p.treeShakeT > 0) p.treeShakeT = Math.max(0, p.treeShakeT - DT);
+      if (p.treeShakeT && p.treeShakeT > 0) {
+        p.treeShakeT = Math.max(0, p.treeShakeT - DT);
+        // Gorilla continuous tree shaking progression (drops 1/3 every second, drops all at 3s)
+        if (p.species === 'gorilla' && p.treeShakeTreeId !== undefined) {
+          p.treeShakeTimer = (p.treeShakeTimer ?? p.treeShakeT) - DT;
+          p.vx = 0;
+          p.vz = 0;
+          p.stunT = 0; // immune to stun while shaking tree
+          const tree = this.treeSims.find(t => t.id === p.treeShakeTreeId);
+          if (tree) {
+            if (p.treeShakeDropStage === 1 && p.treeShakeTimer <= 2.0) {
+              p.treeShakeDropStage = 2;
+              const dropBig = Math.ceil(tree.big / 2);
+              const dropSmall = Math.ceil(tree.small / 2);
+              this.dropTreeFruits(tree, p.id, dropBig, dropSmall);
+            } else if (p.treeShakeDropStage === 2 && p.treeShakeTimer <= 1.0) {
+              p.treeShakeDropStage = 3;
+              const dropBig = Math.ceil(tree.big / 2);
+              const dropSmall = Math.ceil(tree.small / 2);
+              this.dropTreeFruits(tree, p.id, dropBig, dropSmall);
+            } else if (p.treeShakeDropStage === 3 && p.treeShakeTimer <= 0.05) {
+              p.treeShakeDropStage = 4;
+              const dropBig = tree.big;
+              const dropSmall = tree.small;
+              this.dropTreeFruits(tree, p.id, dropBig, dropSmall);
+            }
+          }
+        }
+      }
 
-      // Monkey Leap landing check
+      // Monkey & Gorilla Leap landing check
       if (p.monkeyLeapT && p.monkeyLeapT > 0) {
         p.monkeyLeapT = Math.max(0, p.monkeyLeapT - DT);
         if (p.monkeyLeapT <= 0) {
+          const isGorilla = (p.species === 'gorilla');
           const ratio = p.monkeyLeapRatio ?? 0.5;
           const bodyR = radiusOf(p.mass);
-          const shockwaveR = bodyR + 3.0 + ratio * 4.5;
+          // Gorilla has massive shockwave, monkey has reduced shockwave
+          const shockwaveR = isGorilla
+            ? bodyR + 4.5 + ratio * 6.0
+            : bodyR + 2.5 + ratio * 3.5;
 
           for (const other of this.players.values()) {
             if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
@@ -994,26 +1033,45 @@ export class World {
             const dz = other.z - p.z;
             const dist = Math.hypot(dx, dz);
             if (dist <= shockwaveR) {
-              if (other.mass <= 50) {
-                // <= 50kg: Flattened / squashed like elephant for 2 seconds
-                other.squishT = 2.0;
-                other.stunT = 1.5;
-                other.vx = 0;
-                other.vz = 0;
-                other.dashT = 0;
-                other.plow = false;
+              const pushAng = Math.atan2(dz, dx);
+              if (isGorilla) {
+                // GORILLA:
+                if (other.mass <= 50) {
+                  // Đạp dẹp lép toàn bộ con vật <= 50kg trong phạm vi!
+                  other.squishT = 2.5;
+                  other.stunT = 1.5;
+                  other.vx = 0;
+                  other.vz = 0;
+                  other.dashT = 0;
+                  other.plow = false;
+                  // Cướp 1 phần kg của chúng (25% mass)
+                  const stolenKg = Math.max(2, Math.round(other.mass * 0.25));
+                  other.mass = Math.max(10, other.mass - stolenKg);
+                  p.mass += stolenKg; // Gorilla cướp kg trực tiếp!
+                  this.scatter(other.x, other.z, Math.round(stolenKg * 0.5), radiusOf(other.mass) + 1.8, Math.cos(pushAng), Math.sin(pushAng));
+                } else {
+                  // > 50kg: Bị hất văng cực mạnh
+                  const force = 24.0 + ratio * 32.0;
+                  other.vx += Math.cos(pushAng) * force;
+                  other.vz += Math.sin(pushAng) * force;
+                  other.dashT = 0;
+                  other.plow = false;
+                  other.stunT = Math.max(other.stunT, 0.6);
+                  const massLoss = Math.max(3, Math.round(other.mass * (0.05 + ratio * 0.07)));
+                  other.mass = Math.max(10, other.mass - massLoss);
+                  this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
+                }
               } else {
-                // > 50kg: Knocked back away from monkey landing spot and lose mass
-                const pushAng = Math.atan2(dz, dx);
-                const force = 16.0 + ratio * 22.0;
+                // MONKEY:
+                // KHÔNG làm dẹp lép! Chỉ hất văng mọi con vật ra xa (khoảng cách tỉ lệ với độ gồng)
+                const force = 14.0 + ratio * 20.0;
                 other.vx += Math.cos(pushAng) * force;
                 other.vz += Math.sin(pushAng) * force;
                 other.dashT = 0;
                 other.plow = false;
-
-                const massLoss = Math.max(2, Math.round(other.mass * (0.03 + ratio * 0.04)));
+                const massLoss = Math.max(1, Math.round(other.mass * (0.02 + ratio * 0.03)));
                 other.mass = Math.max(10, other.mass - massLoss);
-                this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
+                this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 1.5, Math.cos(pushAng), Math.sin(pushAng));
               }
             }
           }
@@ -1025,8 +1083,22 @@ export class World {
             z: r2(p.z),
             r: r2(shockwaveR),
             ratio: r2(ratio),
+            isGorilla,
           });
         }
+      }
+
+      // Monkey Evolution into Gorilla when reaching 3 tons (3000 kg)
+      if (p.alive && p.species === 'monkey' && p.mass >= 3000) {
+        p.species = 'gorilla';
+        delete p.morphT; // Permanent evolution while alive
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'gorilla',
+          dur: 0,
+        });
       }
 
       // Morph 30s timer
@@ -1516,11 +1588,50 @@ export class World {
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 
+  dropTreeFruits(tree: TreeSimState, byId: number, dropBig: number, dropSmall: number): void {
+    const totalDropped = dropBig + dropSmall;
+    if (totalDropped > 0) {
+      tree.big = Math.max(0, tree.big - dropBig);
+      tree.small = Math.max(0, tree.small - dropSmall);
+
+      for (let i = 0; i < totalDropped; i++) {
+        const ang = this.rnd() * Math.PI * 2;
+        const dist = tree.r + 1.2 + this.rnd() * 3.5;
+        const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+        const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+        const fruitWeight = tree.size === 2
+          ? 100
+          : tree.size === 1
+          ? Math.round(20 + this.rnd() * 30)
+          : Math.round(5 + this.rnd() * 5);
+        this.addFood(fx, fz, 1, fruitWeight);
+      }
+
+      tree.batches.push({
+        timer: 0,
+        count: totalDropped,
+        bigCount: dropBig,
+        smallCount: dropSmall,
+      });
+    }
+
+    this.events.push({
+      k: 'treeHit',
+      id: tree.id,
+      by: byId,
+      x: r2(tree.x),
+      z: r2(tree.z),
+      size: tree.size,
+      droppedBig: dropBig,
+      droppedSmall: dropSmall,
+    });
+  }
+
   private dash(p: Player): void {
     if (p.terrain === 1) return;
     if (p.superT > 0) {
-      if (p.species === 'monkey') {
-        // Rainbow Monkey: Cannot dash, continuous cone of 5 giant bananas
+      if (p.species === 'monkey' || p.species === 'gorilla') {
+        // Rainbow Monkey & Gorilla: Cannot dash, continuous cone of 5 giant bananas
         this.spawnBananaCone(p, 5, true);
         p.cd = 0.35;
         return;
@@ -1538,7 +1649,7 @@ export class World {
       return;
     }
 
-    if (p.species === 'monkey') {
+    if (p.species === 'monkey' || p.species === 'gorilla') {
       // Tap ram (hold <= 0.15): tree shake if near tree, or throw banana
       if (p.holdT <= 0.15) {
         const bodyR = radiusOf(p.mass);
@@ -1553,51 +1664,34 @@ export class World {
         }
 
         if (nearbyTree) {
-          // Monkey Tree Shake (2 hands grip and shake!)
-          p.treeShakeT = 0.5;
-          p.a = Math.atan2(nearbyTree.z - p.z, nearbyTree.x - p.x);
-          p.cd = 0.6;
-          nearbyTree.cooldownHit = 0.5;
+          if (p.species === 'gorilla') {
+            // Gorilla Tree Shake: Rung liên tục trong 3s, rớt toàn bộ trái cây (mỗi giây rớt 1/3, giây 3 rớt sạch)
+            p.treeShakeT = 3.0;
+            p.treeShakeTreeId = nearbyTree.id;
+            p.treeShakeTimer = 3.0;
+            p.treeShakeDropStage = 1; // Stage 1 drops 1/3 immediately
+            p.a = Math.atan2(nearbyTree.z - p.z, nearbyTree.x - p.x);
+            p.cd = 3.2;
+            p.stunT = 0; // Immune to stun!
+            nearbyTree.cooldownHit = 3.0;
 
-          const dropBig = Math.ceil(nearbyTree.big / 3);
-          const dropSmall = Math.ceil(nearbyTree.small / 3);
-          const totalDropped = dropBig + dropSmall;
-          if (totalDropped > 0) {
-            nearbyTree.big = Math.max(0, nearbyTree.big - dropBig);
-            nearbyTree.small = Math.max(0, nearbyTree.small - dropSmall);
+            const dropBig = Math.ceil(nearbyTree.big / 3);
+            const dropSmall = Math.ceil(nearbyTree.small / 3);
+            this.dropTreeFruits(nearbyTree, p.id, dropBig, dropSmall);
+            return;
+          } else {
+            // Monkey Tree Shake (2 hands grip and shake 1 time!)
+            p.treeShakeT = 0.5;
+            p.a = Math.atan2(nearbyTree.z - p.z, nearbyTree.x - p.x);
+            p.cd = 0.6;
+            p.stunT = 0; // Immune to stun!
+            nearbyTree.cooldownHit = 0.5;
 
-            for (let i = 0; i < totalDropped; i++) {
-              const ang = this.rnd() * Math.PI * 2;
-              const dist = nearbyTree.r + 1.2 + this.rnd() * 3.5;
-              const fx = clamp(nearbyTree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-              const fz = clamp(nearbyTree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-              const fruitWeight = nearbyTree.size === 2
-                ? 100
-                : nearbyTree.size === 1
-                ? Math.round(20 + this.rnd() * 30)
-                : Math.round(5 + this.rnd() * 5);
-              this.addFood(fx, fz, 1, fruitWeight);
-            }
-
-            nearbyTree.batches.push({
-              timer: 0,
-              count: totalDropped,
-              bigCount: dropBig,
-              smallCount: dropSmall,
-            });
+            const dropBig = Math.ceil(nearbyTree.big / 3);
+            const dropSmall = Math.ceil(nearbyTree.small / 3);
+            this.dropTreeFruits(nearbyTree, p.id, dropBig, dropSmall);
+            return;
           }
-
-          this.events.push({
-            k: 'treeHit',
-            id: nearbyTree.id,
-            by: p.id,
-            x: r2(nearbyTree.x),
-            z: r2(nearbyTree.z),
-            size: nearbyTree.size,
-            droppedBig: dropBig,
-            droppedSmall: dropSmall,
-          });
-          return;
         } else {
           // Throw 1 banana projectile
           p.a = p.input.a;
@@ -1608,11 +1702,12 @@ export class World {
       }
 
       // Charged Leap (hold > 0.15s, 0.2s -> 1.2s)
+      const isGorilla = (p.species === 'gorilla');
       const clampedHold = Math.max(0.2, Math.min(1.2, p.holdT));
       const ratio = (clampedHold - 0.2) / 1.0;
-      const leapDist = 8.0 + ratio * 14.0;
+      const leapDist = isGorilla ? (10.0 + ratio * 16.0) : (8.0 + ratio * 14.0);
       const leapDur = 0.5 + ratio * 0.4;
-      const peakHeight = 3.5 + ratio * 5.5;
+      const peakHeight = isGorilla ? (4.0 + ratio * 6.5) : (3.5 + ratio * 5.5);
 
       p.monkeyLeapT = leapDur;
       p.monkeyLeapDur = leapDur;
@@ -1729,10 +1824,10 @@ export class World {
   private collidePlayers(list: Player[]): void {
     for (let i = 0; i < list.length; i++) {
       const a = list[i];
-      if (!a.alive) continue;
+      if (!a.alive || (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0)) continue;
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j];
-        if (!b.alive) continue;
+        if (!b.alive || (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0)) continue;
         let dx = b.x - a.x, dz = b.z - a.z;
         const ra = radiusOf(a.mass), rb = radiusOf(b.mass), minD = ra + rb;
         if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
@@ -2354,6 +2449,12 @@ export class World {
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0; p.wheelT = 0;
     p.monkeyLeapT = 0; p.treeShakeT = 0;
+    p.treeShakeTreeId = undefined;
+    p.treeShakeTimer = undefined;
+    p.treeShakeDropStage = undefined;
+    if (p.species === 'gorilla') {
+      p.species = 'monkey';
+    }
     if (p.morphOrigSpecies) {
       p.species = p.morphOrigSpecies;
       delete p.morphOrigSpecies;

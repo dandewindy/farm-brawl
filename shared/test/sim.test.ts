@@ -1697,10 +1697,66 @@ describe('fruit trees', () => {
 
       // Monkey did not die to fire pit
       expect(monkey.alive).toBe(true);
-      // Small animal <= 50kg is squashed
-      expect(small.squishT).toBeGreaterThan(0);
+      // Small animal is knocked back (not squished flat)
+      expect(small.squishT).toBe(0);
+      expect(Math.hypot(small.vx, small.vz)).toBeGreaterThan(0);
       // Heavy animal > 50kg lost mass
       expect(heavy.mass).toBeLessThan(200);
+    });
+
+    it('monkey evolves to gorilla at 3000kg, gorilla squishes small animals and shakes tree for 3s', () => {
+      const w = new World(1234, { bots: false, food: false });
+      const pId = w.addPlayer('Kong', 'monkey');
+      const gorilla = place(w, pId, 0, 0, 2999);
+      expect(gorilla.species).toBe('monkey');
+
+      // Eat 2kg food to cross 3000kg
+      gorilla.mass = 3001;
+      w.step();
+
+      // Evolves to gorilla!
+      expect(gorilla.species).toBe('gorilla');
+
+      // Gorilla leap: squishes animals <= 50kg flat and steals mass
+      const victimId = w.addPlayer('Tiny', 'chicken');
+      const victim = place(w, victimId, 20, 0, 40);
+      gorilla.x = 0; gorilla.z = 0;
+      gorilla.input.a = 0;
+      gorilla.holdT = 1.0;
+      gorilla.pressed = true;
+      w.step();
+
+      expect(gorilla.monkeyLeapT).toBeGreaterThan(0);
+
+      for (let i = 0; i < 20; i++) w.step();
+      expect(victim.squishT).toBeGreaterThan(0);
+      expect(victim.mass).toBeLessThan(40);
+      expect(gorilla.mass).toBeGreaterThan(3001); // Stole mass!
+
+      // Gorilla tree shake: 3 seconds without stun, drops all fruits
+      const tree = w.treeSims[0];
+      tree.x = 10;
+      tree.z = 0;
+      tree.big = 9;
+      tree.small = 6;
+      gorilla.x = 10 - tree.r - 1.5;
+      gorilla.z = 0;
+      gorilla.treeShakeT = 0;
+      gorilla.cd = 0;
+      gorilla.dashT = 0;
+      gorilla.stunT = 0;
+      gorilla.input.btn = false;
+      gorilla.holdT = 0.05; // Tap
+      gorilla.pressed = true;
+      w.step();
+
+      expect(gorilla.treeShakeT).toBeGreaterThan(2.8);
+      expect(gorilla.stunT).toBe(0);
+
+      // Fast-forward 3 seconds (60 ticks): tree should be emptied of all fruits!
+      for (let i = 0; i < 60; i++) w.step();
+      expect(tree.big).toBe(0);
+      expect(tree.small).toBe(0);
     });
 
     it('banana item morphs player into monkey or elephant for 30s', () => {

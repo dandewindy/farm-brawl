@@ -4,7 +4,7 @@ import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp,
   cycleAudioMode, getAudioMode, type AudioMode,
@@ -1334,7 +1334,7 @@ function handleGameEvent(ev: GameEvent): void {
             yelp(vm.species, 0.4);
           }
           const FLUFF_COLORS: Record<Species, number> = {
-            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38,
+            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42,
           };
           foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
         }
@@ -1360,7 +1360,7 @@ function handleGameEvent(ev: GameEvent): void {
         yelp(vm.species, isMine ? 1 : 0.5);
       }
       const FLUFF_COLORS: Record<Species, number> = {
-        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38,
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -1440,15 +1440,19 @@ function handleGameEvent(ev: GameEvent): void {
       sfxHit(3.5, isMine ? 1.0 : 0.4);
       if (isMine) {
         shake = Math.max(shake, 1.2);
-        // Stun for 1.5 seconds on successful ram
-        const stunDur = 1.5;
-        localStunTimer = stunDur;
-        lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
-        predictor.setStun(stunDur);
-        predictor.dashT = 0;
-        predictor.plow = false;
-        input.cancelRam();
-        chargeStop();
+        const myMeta = gameState.metas.get(myId);
+        const isPrimate = myMeta?.species === 'monkey' || myMeta?.species === 'gorilla';
+        if (!isPrimate) {
+          // Stun for 1.5 seconds on successful ram (Monkey & Gorilla immune to tree stun)
+          const stunDur = 1.5;
+          localStunTimer = stunDur;
+          lockedAimA = predictor.dashT > 0 ? predictor.a : input.aimA;
+          predictor.setStun(stunDur);
+          predictor.dashT = 0;
+          predictor.plow = false;
+          input.cancelRam();
+          chargeStop();
+        }
 
         const avgFruitKg = ev.size === 2 ? 100 : ev.size === 1 ? 35 : 7.5;
         const totalDroppedKg = (ev.droppedBig + ev.droppedSmall) * avgFruitKg;
@@ -1830,14 +1834,30 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'monkeyLand': {
-      animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r, 0xffd54f);
-      foodParts.burst(ev.x, 0.2, ev.z, 0x8d5b38, 20, 8, 8, 0.6);
-      foodParts.burst(ev.x, 0.2, ev.z, 0xd4a373, 15, 6, 6, 0.5);
-      sfxHit(3.5, ev.id === myId ? 1.0 : 0.5);
-      const me = gameState.ents.get(myId);
-      const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
-      if (dist < 28) {
-        shake = Math.max(shake, 1.4 * ev.ratio * (1 - dist / 28));
+      if (ev.isGorilla) {
+        // Gorilla devastating ground slam: massive fiery shockwaves, heavy earth dust
+        animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r * 1.35, 0xff5722);
+        animals.spawnShockwave(ev.x, 0.15, ev.z, ev.r * 0.9, 0xffab00);
+        foodParts.burst(ev.x, 0.3, ev.z, 0x3e2723, 35, 12, 12, 0.9);
+        foodParts.burst(ev.x, 0.3, ev.z, 0xff6f00, 25, 9, 9, 0.7);
+        sfxHit(5.0, ev.id === myId ? 1.0 : 0.6);
+        sfxGorillaRoar(ev.id === myId ? 1.0 : 0.5);
+        const me = gameState.ents.get(myId);
+        const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+        if (dist < 40) {
+          shake = Math.max(shake, 2.2 * ev.ratio * (1 - dist / 40));
+        }
+      } else {
+        // Monkey leap land: reduced visual ring and modest dust
+        animals.spawnShockwave(ev.x, 0.1, ev.z, ev.r * 0.75, 0xffca28);
+        foodParts.burst(ev.x, 0.2, ev.z, 0x8d5b38, 14, 6, 6, 0.45);
+        foodParts.burst(ev.x, 0.2, ev.z, 0xd4a373, 10, 4, 4, 0.4);
+        sfxHit(3.0, ev.id === myId ? 0.9 : 0.4);
+        const me = gameState.ents.get(myId);
+        const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+        if (dist < 26) {
+          shake = Math.max(shake, 1.0 * ev.ratio * (1 - dist / 26));
+        }
       }
       break;
     }
@@ -1846,7 +1866,30 @@ function handleGameEvent(ev: GameEvent): void {
       if (targetMeta) {
         targetMeta.species = ev.species;
       }
-      if (ev.id === myId) {
+      const vis = animals.getVisual(ev.id, targetMeta);
+      if (vis) {
+        vis.morphTimer = 1.5;
+      }
+      if (ev.species === 'gorilla') {
+        const ent = gameState.ents.get(ev.id);
+        const mx = ent ? ent.x : 0;
+        const mz = ent ? ent.z : 0;
+        animals.spawnShockwave(mx, 0.1, mz, 6.0, 0xff6d00);
+        animals.spawnShockwave(mx, 0.15, mz, 3.5, 0xffd54f);
+        foodParts.burst(mx, 1.5, mz, 0xff6d00, 36, 14, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffea00, 24, 10, 10, 0.9);
+        sfxGorillaRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.6);
+          hud.showBanner('🦍 ' + t('name_gorilla'), '🔥 TIẾN HOÁ THÀNH GORILLA KHỔNG LỒ! 🔥');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🔥 TIẾN HOÁ GORILLA! 🔥', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        } else {
+          const m = gameState.metas.get(ev.id);
+          hud.showToast(`🦍 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Gorilla!`);
+        }
+      } else if (ev.id === myId) {
         sfxReward();
         hud.showBanner(
           ev.species === 'monkey' ? '🐒 ' + t('name_monkey') : '🐘 ' + t('name_elephant'),

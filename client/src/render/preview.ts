@@ -223,6 +223,7 @@ export class AnimalPreviewRenderer {
       dog: 1.05,
       elephant: 0.85,
       monkey: 1.05,
+      gorilla: 0.95,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
@@ -357,6 +358,7 @@ export class AnimalPreviewRenderer {
       dog: 1.05,
       elephant: 0.85,
       monkey: 1.05,
+      gorilla: 0.95,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);

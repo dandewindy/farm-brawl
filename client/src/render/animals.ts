@@ -36,8 +36,9 @@ interface AnimalVisual {
   visualY?: number;
   waterRippleTimer?: number;
   arms?: THREE.Group[];
-  tailSegments?: THREE.Mesh[];
+  tailSegments?: (THREE.Mesh | THREE.Group)[];
   leapTimer?: number;
+  morphTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -130,6 +131,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   dog: 0xffa726,
   elephant: 0x90a4ae,
   monkey: 0x8d5b38,
+  gorilla: 0xff6d00,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -187,6 +189,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { fur: 0x362b28, skin: 0xd9c2b0, dark: 0x120f0e },
     { fur: 0xd4a373, skin: 0xffe5d9, dark: 0x2e1c0c },
     { fur: 0x934b28, skin: 0xf6d5c2, dark: 0x1c120c },
+  ],
+  gorilla: [
+    { body: 0x242528, chest: 0x3a3c42, face: 0x8a8785, crest: 0x1c1d1f }, // Classic Silverback
+    { body: 0x332822, chest: 0x4a3c35, face: 0x8a786c, crest: 0x28201a }, // Mountain Brown
+    { body: 0x18191c, chest: 0x2b2d30, face: 0x5a5b60, crest: 0x121315 }, // Midnight Obsidian
+    { body: 0x4a4d52, chest: 0x686b72, face: 0xa5a8ad, crest: 0x3b3d42 }, // Albino / Greyback
   ],
 };
 
@@ -782,27 +790,125 @@ function buildMonkey(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   }
   g.userData.arms = arms;
 
-  // 4. Multi-segment curved tail
-  const tailSegments: THREE.Mesh[] = [];
-  let parentNode: THREE.Object3D = g;
+  // 4. Multi-segment kinematic chain curved tail (seamless ball-and-socket joints)
+  const tailSegments: THREE.Group[] = [];
+  let parentJoint: THREE.Group = g;
+  let prevLen = 0.18;
   for (let i = 0; i < 6; i++) {
-    const rad = 0.062 * (1 - i * 0.08);
-    const seg = part(new THREE.CapsuleGeometry(rad, 0.18, 6, 10), furColor, 0, 0, 0);
+    const rad = 0.065 * (1 - i * 0.09);
+    const len = 0.18 * (1 - i * 0.05);
+    const geo = new THREE.CapsuleGeometry(rad, len, 6, 10);
+    geo.translate(0, len / 2, 0); // Bottom spherical cap centered at (0,0,0), top cap at (0,len,0)
+    const joint = new THREE.Group();
     if (i === 0) {
-      seg.position.set(-0.35, 0.95, 0);
-      seg.rotation.z = 0.95;
+      joint.position.set(-0.35, 0.95, 0);
+      joint.rotation.z = 1.05; // upward-backward angle from rump
+      g.add(joint);
     } else {
-      seg.position.set(-0.14, 0.14, 0);
-      seg.rotation.z = -0.32;
+      joint.position.set(0, prevLen, 0); // attached exactly to previous segment's apex
+      joint.rotation.z = -0.36; // smooth continuous upward curl
+      parentJoint.add(joint);
     }
-    parentNode.add(seg);
-    tailSegments.push(seg);
-    parentNode = seg;
+    const mesh = part(geo, furColor, 0, 0, 0);
+    joint.add(mesh);
+    parentJoint = joint;
+    prevLen = len;
+    tailSegments.push(joint);
   }
   g.userData.tail = tailSegments;
 
   // 5. Bipedal legs (2 legs)
   return addLegs(g, furColor, [[-0.05, 0.20], [-0.05, -0.20]], 0.72, 0.09, skinColor);
+}
+
+function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const furColor = s.body ?? 0x242528;
+  const chestColor = s.chest ?? 0x3a3c42;
+  const faceColor = s.face ?? 0x8a8785;
+  const crestColor = s.crest ?? 0x1c1d1f;
+
+  // 1. Massive Torso & Hunchback (knuckle-walking tilt: slopes down toward rear)
+  const bodyGeo = new THREE.CapsuleGeometry(0.52, 0.75, 8, 16);
+  bodyGeo.rotateZ(-0.52);
+  const bodyMesh = part(bodyGeo, furColor, 0.05, 1.25, 0, undefined, true);
+  bodyMesh.scale.set(1.15, 1.1, 1.28);
+  g.add(bodyMesh);
+
+  // 2. Muscular Chest / Pectorals
+  blob(g, chestColor, 0.36, [1.15, 0.75, 1.2], 0.35, 1.22, 0, [0, 0, -0.45]);
+
+  // 3. Upper Back Hump (Trapezius muscle behind neck)
+  blob(g, furColor, 0.40, [1.1, 1.0, 1.25], 0.12, 1.58, 0, [0, 0, -0.28]);
+
+  // 4. Head, Sagittal Crest & Brow Ridge
+  // Head base
+  g.add(part(new THREE.SphereGeometry(0.35, 16, 12), furColor, 0.62, 1.55, 0));
+
+  // Sagittal Crest (peaked crest bone of silverback gorilla)
+  const crestGeo = new THREE.ConeGeometry(0.18, 0.42, 8);
+  crestGeo.rotateZ(-0.35);
+  g.add(part(crestGeo, crestColor, 0.58, 1.88, 0));
+
+  // Heavy Brow Ridge
+  const browGeo = new THREE.CapsuleGeometry(0.11, 0.36, 6, 12);
+  browGeo.rotateX(Math.PI / 2);
+  const brow = part(browGeo, furColor, 0.82, 1.66, 0);
+  g.add(brow);
+
+  // Prominent Muzzle / Face (light grey face)
+  const muzzle = part(new THREE.SphereGeometry(0.24, 14, 10), faceColor, 0.90, 1.42, 0);
+  muzzle.scale.set(1.25, 0.95, 1.15);
+  g.add(muzzle);
+
+  // Nostrils
+  for (const z of [-0.075, 0.075]) {
+    g.add(part(new THREE.SphereGeometry(0.042, 8, 6), 0x161618, 1.04, 1.48, z));
+  }
+
+  // Mouth slit
+  const mouth = part(new THREE.BoxGeometry(0.10, 0.025, 0.24), 0x1e1e20, 0.96, 1.35, 0);
+  g.add(mouth);
+
+  // Eyes (deep set under brow ridge)
+  addEyes(g, 0.82, 1.64, 0.16, 0.065);
+
+  // Small Ears
+  for (const z of [-0.36, 0.36]) {
+    blob(g, furColor, 0.11, [0.5, 0.8, 1.0], 0.52, 1.58, z);
+    blob(g, faceColor, 0.07, [0.4, 0.7, 0.8], 0.53, 1.58, z);
+  }
+
+  // 5. Front Knuckle Arms (pivot at massive shoulder)
+  const arms: THREE.Group[] = [];
+  for (const z of [0.55, -0.55]) {
+    const armPivot = new THREE.Group();
+    armPivot.position.set(0.40, 1.45, z);
+
+    // Shoulder Deltoid
+    const shoulder = part(new THREE.SphereGeometry(0.22, 12, 10), furColor, 0, 0, 0);
+    armPivot.add(shoulder);
+
+    // Upper Arm (massive angled down)
+    const upperArm = part(new THREE.CapsuleGeometry(0.18, 0.46, 8, 12), furColor, 0.08, -0.28, 0);
+    upperArm.rotation.z = -0.32;
+    armPivot.add(upperArm);
+
+    // Forearm (thick muscle down to knuckles)
+    const forearm = part(new THREE.CapsuleGeometry(0.16, 0.48, 8, 12), furColor, 0.16, -0.66, 0);
+    forearm.rotation.z = -0.15;
+    armPivot.add(forearm);
+
+    // Fist / Knuckles (chống mu bàn tay tiếp đất phẳng tại y=0.15)
+    const fist = part(new THREE.BoxGeometry(0.24, 0.18, 0.28), faceColor, 0.20, -0.92, 0);
+    armPivot.add(fist);
+
+    g.add(armPivot);
+    arms.push(armPivot);
+  }
+  g.userData.arms = arms;
+
+  // 6. Hind Legs (shorter, sturdy thighs and flat feet)
+  return addLegs(g, furColor, [[-0.45, 0.36], [-0.45, -0.36]], 0.78, 0.15, faceColor);
 }
 
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
@@ -815,6 +921,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   dog: buildDog,
   elephant: buildElephant,
   monkey: buildMonkey,
+  gorilla: buildGorilla,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -927,6 +1034,17 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'gorilla': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.045, 8, 24), mat);
+      band.position.set(0.48, 1.38, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.35;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
+      medal.position.set(0.62, 1.25, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -942,6 +1060,7 @@ const HEAD: Record<Species, [number, number]> = {
   dog: [0.72, 1.85],
   elephant: [0.95, 2.15],
   monkey: [0.12, 1.95],
+  gorilla: [0.58, 2.15],
 };
 
 // Back of each species for the cape
@@ -955,6 +1074,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   dog: [-0.15, 1.1, 0.55, 0.55, 1.05],
   elephant: [-0.15, 1.35, 0.65, 0.65, 1.3],
   monkey: [-0.15, 1.10, 0.45, 0.45, 1.0],
+  gorilla: [-0.15, 1.45, 0.65, 0.65, 1.35],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -1027,6 +1147,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     dog: 0.18,
     elephant: 0.28,
     monkey: 0.16,
+    gorilla: 0.22,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -1038,6 +1159,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     dog: 0.06,
     elephant: 0.08,
     monkey: 0.06,
+    gorilla: 0.08,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -1340,6 +1462,7 @@ const LABEL_Y: Record<Species, number> = {
   dog: 2.1,
   elephant: 2.6,
   monkey: 2.2,
+  gorilla: 2.6,
 };
 
 function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -1775,6 +1898,10 @@ export class AnimalRenderer {
     if (vis.species === 'monkey' && !isMonkeyLeap && !isWater && speed > 0.02) {
       bodyY += Math.abs(Math.sin(vis.phase * 1.3)) * 0.15 * r;
     }
+    // Gorilla knuckle-walking swagger & bobbing
+    if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && speed > 0.02) {
+      bodyY += Math.abs(Math.sin(vis.phase * 0.9)) * 0.13 * r;
+    }
     // Super Leap parabolic arc
     if (isMonkeyLeap) {
       const arc = Math.sin(Math.min(Math.PI, (vis.leapTimer || 0) * 3.8));
@@ -1819,6 +1946,9 @@ export class AnimalRenderer {
       // Gentle subtle wobble as animal trudges through deep mud
       vis.root.rotation.x = Math.sin(vis.phase * 0.6) * 0.04;
       vis.root.rotation.z += Math.sin(vis.phase * 0.3) * 0.03;
+    } else if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && speed > 0.02 && sq <= 0.4) {
+      // Gorilla walking shoulder roll
+      vis.root.rotation.x = Math.sin(vis.phase * 0.9) * 0.08;
     }
 
     // Charge trembling wind-up
@@ -1833,8 +1963,29 @@ export class AnimalRenderer {
     let baseSy = sc * inWaterShrink * (isDashing ? 0.9 : squash);
     let baseSz = sc * inWaterShrink;
 
+    // Morphing evolution animation (e.g. monkey -> gorilla)
+    if (vis.morphTimer && vis.morphTimer > 0) {
+      vis.morphTimer = Math.max(0, vis.morphTimer - dt);
+      const morphProg = 1 - vis.morphTimer / 1.5; // 0 to 1
+      const morphScale = 0.82 + Math.sin(morphProg * Math.PI) * 0.36 + morphProg * 0.18;
+      baseSx *= morphScale;
+      baseSy *= morphScale;
+      baseSz *= morphScale;
+      if (this.onPuff && Math.random() < 0.25) {
+        this.onPuff(
+          x + (Math.random() - 0.5) * 1.5 * r,
+          1.0 + Math.random() * 1.5 * r,
+          z + (Math.random() - 0.5) * 1.5 * r,
+          0xffab00,
+          0.8 * r,
+          0.7,
+          2.0
+        );
+      }
+    }
+
     if (sq > 0) {
-      // Flattened like a pancake by Farmer Till's tractor!
+      // Flattened like a pancake by Farmer Till's tractor or Gorilla leap slam!
       baseSx *= 1 + 0.55 * sq;
       baseSy *= 1 - 0.90 * sq;
       baseSz *= 1 + 0.55 * sq;
@@ -1849,11 +2000,12 @@ export class AnimalRenderer {
       vis.root.scale.y *= 1 - 0.3 * hk;
       vis.root.scale.x *= 1 + 0.2 * hk;
       vis.root.position.y += hk * 0.8;
-    } else {
+    } else if (vis.species !== 'gorilla' || speed <= 0.02) {
       vis.root.rotation.x = 0;
     }
 
     // Dynamic leg swinging with amplitude 0.7
+    const gorillaCycle = Math.sin(vis.phase * 0.9);
     vis.legs.forEach((leg, idx) => {
       if (isWater && vis.species === 'dog') {
         leg.visible = false;
@@ -1890,6 +2042,11 @@ export class AnimalRenderer {
         leg.rotation.z = 0.35;
         leg.rotation.x = idx % 2 === 0 ? 0.15 : -0.15;
         leg.position.y = leg.userData.origY;
+      } else if (vis.species === 'gorilla') {
+        // Gorilla hind legs step in diagonal synchronization with knuckle arms
+        leg.rotation.z = (idx === 0 ? -gorillaCycle : gorillaCycle) * 0.55;
+        leg.rotation.x = 0;
+        leg.position.y = leg.userData.origY;
       } else {
         leg.rotation.z = baseSwing * 0.7;
         leg.rotation.x = 0;
@@ -1897,40 +2054,84 @@ export class AnimalRenderer {
       }
     });
 
-    // Monkey arms dynamic animation
+    // Monkey and Gorilla arms dynamic animation
     if (vis.arms && vis.arms.length === 2) {
       const [armL, armR] = vis.arms;
-      if (isTreeShake) {
-        // Both hands grip and shake the tree vigorously
-        const shakeVibe = Math.sin(now * 0.04) * 0.35;
-        armL.rotation.z = -1.25 + shakeVibe;
-        armR.rotation.z = -1.25 + shakeVibe;
-        armL.rotation.x = 0.25;
-        armR.rotation.x = -0.25;
-      } else if (isMonkeyLeap) {
-        // Athletic superhero leap posture
-        armL.rotation.z = -1.45;
-        armR.rotation.z = -1.45;
-        armL.rotation.x = 0.35;
-        armR.rotation.x = -0.35;
-      } else if (isCharging) {
-        // Winding up muscles before leap
-        armL.rotation.z = 0.45 * lvl;
-        armR.rotation.z = 0.45 * lvl;
-        armL.rotation.x = 0.2;
-        armR.rotation.x = -0.2;
-      } else if (isStunned || sq > 0.3) {
-        armL.rotation.z = 0.8;
-        armR.rotation.z = 0.8;
-        armL.rotation.x = Math.PI / 3;
-        armR.rotation.x = -Math.PI / 3;
+      if (vis.species === 'gorilla') {
+        if (isTreeShake) {
+          // Requirement 2: Gorilla shakes tree vigorously for 3s
+          const shakeVibe = Math.sin(now * 0.05) * 0.45;
+          armL.rotation.z = -1.25 + shakeVibe;
+          armR.rotation.z = -1.25 + shakeVibe;
+          armL.rotation.x = 0.25;
+          armR.rotation.x = -0.25;
+          // Body vibrations shaking the trunk
+          vis.root.position.x += (Math.random() - 0.5) * 0.09 * r;
+          vis.root.position.z += (Math.random() - 0.5) * 0.09 * r;
+        } else if (isMonkeyLeap) {
+          // Gorilla devastating ground slam leap posture
+          armL.rotation.z = -1.6;
+          armR.rotation.z = -1.6;
+          armL.rotation.x = 0.38;
+          armR.rotation.x = -0.38;
+        } else if (isCharging) {
+          // Chest-beating windup before leap!
+          const beat = Math.sin(now * 0.035);
+          armL.rotation.z = -0.7 + beat * 0.45;
+          armR.rotation.z = -0.7 - beat * 0.45;
+          armL.rotation.x = 0.35;
+          armR.rotation.x = -0.35;
+        } else if (isStunned || sq > 0.3) {
+          armL.rotation.z = 0.7;
+          armR.rotation.z = 0.7;
+          armL.rotation.x = Math.PI / 3;
+          armR.rotation.x = -Math.PI / 3;
+        } else if (speed > 0.02) {
+          // Knuckle-walking arm swing: diagonal stride with hind legs
+          armL.rotation.z = -0.28 + gorillaCycle * 0.48;
+          armR.rotation.z = -0.28 - gorillaCycle * 0.48;
+          armL.rotation.x = 0.15;
+          armR.rotation.x = -0.15;
+        } else {
+          // Idle stance: resting firmly on knuckles
+          armL.rotation.z = -0.28;
+          armR.rotation.z = -0.28;
+          armL.rotation.x = 0.12;
+          armR.rotation.x = -0.12;
+        }
       } else {
-        // Natural bipedal running swing (opposite to legs)
-        const armSwing = Math.sin(vis.phase) * 0.65;
-        armL.rotation.z = -armSwing;
-        armR.rotation.z = armSwing;
-        armL.rotation.x = 0.12;
-        armR.rotation.x = -0.12;
+        if (isTreeShake) {
+          // Both hands grip and shake the tree vigorously
+          const shakeVibe = Math.sin(now * 0.04) * 0.35;
+          armL.rotation.z = -1.25 + shakeVibe;
+          armR.rotation.z = -1.25 + shakeVibe;
+          armL.rotation.x = 0.25;
+          armR.rotation.x = -0.25;
+        } else if (isMonkeyLeap) {
+          // Athletic superhero leap posture
+          armL.rotation.z = -1.45;
+          armR.rotation.z = -1.45;
+          armL.rotation.x = 0.35;
+          armR.rotation.x = -0.35;
+        } else if (isCharging) {
+          // Winding up muscles before leap
+          armL.rotation.z = 0.45 * lvl;
+          armR.rotation.z = 0.45 * lvl;
+          armL.rotation.x = 0.2;
+          armR.rotation.x = -0.2;
+        } else if (isStunned || sq > 0.3) {
+          armL.rotation.z = 0.8;
+          armR.rotation.z = 0.8;
+          armL.rotation.x = Math.PI / 3;
+          armR.rotation.x = -Math.PI / 3;
+        } else {
+          // Natural bipedal running swing (opposite to legs)
+          const armSwing = Math.sin(vis.phase) * 0.65;
+          armL.rotation.z = -armSwing;
+          armR.rotation.z = armSwing;
+          armL.rotation.x = 0.12;
+          armR.rotation.x = -0.12;
+        }
       }
     }
 
