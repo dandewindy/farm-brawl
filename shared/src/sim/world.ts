@@ -1040,11 +1040,12 @@ export class World {
           const isGorilla = (p.species === 'gorilla');
           const ratio = p.monkeyLeapRatio ?? 0.5;
           const isMaxCharge = ratio >= 0.85;
+          const isRainbowLanding = p.superT > 0;
           const bodyR = radiusOf(p.mass);
-          // Gorilla has massive shockwave, monkey has reduced shockwave
-          const shockwaveR = isGorilla
-            ? bodyR + 4.5 + ratio * 6.0
-            : bodyR + 2.5 + ratio * 3.5;
+          // Gorilla has massive shockwave, monkey has focused shockwave; rainbow widens shockwave
+          const shockwaveR = isRainbowLanding
+            ? (isGorilla ? bodyR + 6.5 + ratio * 8.0 : bodyR + 4.5 + ratio * 6.5)
+            : (isGorilla ? bodyR + 4.5 + ratio * 6.0 : bodyR + 2.5 + ratio * 3.5);
 
           // Water landing check: if landed in pond, splash water and initiate drowning
           const inWater = (this.map.pond || []).some((b) => insideBlob(b, p.x, p.z, -0.7));
@@ -1079,11 +1080,11 @@ export class World {
                     loss: Math.round(other.mass),
                   });
                   this.kill(other, 'crush');
-                } else if (isMaxCharge && other.mass <= 500) {
-                  // Gorila gồng max thanh: dậm nhảy làm con vật từ 500kg đến trên 50kg dẹp lép nhưng vẫn còn sống và phục hồi di chuyển (chỉ giảm kg)
-                  other.squishT = 2.5;
-                  other.stunT = Math.max(other.stunT, 0.5);
-                  other.slowT = Math.max(other.slowT, 1.0);
+                } else if (isRainbowLanding || (isMaxCharge && other.mass <= 500)) {
+                  // Gorilla: làm dẹp lép con vật (kể cả khi gồng thường max thanh <= 500kg, hoặc khi có Rainbow)
+                  other.squishT = isRainbowLanding ? 3.0 : 2.5;
+                  other.stunT = Math.max(other.stunT, isRainbowLanding ? 1.0 : 0.5);
+                  other.slowT = Math.max(other.slowT, isRainbowLanding ? 2.0 : 1.0);
                   other.vx = 0;
                   other.vz = 0;
                   other.dashT = 0;
@@ -1092,7 +1093,8 @@ export class World {
                   other.lastHitT = this.time;
                   p.lastAttackedId = other.id;
                   p.lastAttackedT = this.time;
-                  const massLoss = Math.max(10, Math.round(other.mass * 0.15));
+                  const lossFraction = isRainbowLanding ? (0.20 + ratio * 0.10) : 0.15;
+                  const massLoss = Math.max(10, Math.round(other.mass * lossFraction));
                   other.mass = Math.max(10, other.mass - massLoss);
                   this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
                   this.events.push({
@@ -1105,7 +1107,7 @@ export class World {
                     loss: massLoss,
                   });
                 } else {
-                  // > 500kg (hoặc không gồng max thanh đối với > 50kg): Bị hất văng bởi sóng chấn động
+                  // > 500kg khi không có rainbow (hoặc gồng nhẹ không max thanh): Bị hất văng bởi sóng chấn động
                   const force = 24.0 + ratio * 32.0;
                   other.vx += Math.cos(pushAng) * force;
                   other.vz += Math.sin(pushAng) * force;
@@ -1137,12 +1139,16 @@ export class World {
               } else {
                 // MONKEY:
                 // KHÔNG làm dẹp lép! Chỉ hất văng mọi con vật ra xa (khoảng cách tỉ lệ với độ gồng)
-                const force = 14.0 + ratio * 20.0;
+                // Cầu vồng hất văng cực xa!
+                const force = isRainbowLanding
+                  ? (32.0 + ratio * 48.0)
+                  : (14.0 + ratio * 20.0);
                 other.vx += Math.cos(pushAng) * force;
                 other.vz += Math.sin(pushAng) * force;
                 other.dashT = 0;
                 other.plow = false;
-                const massLoss = Math.max(1, Math.round(other.mass * (0.02 + ratio * 0.03)));
+                other.stunT = Math.max(other.stunT, isRainbowLanding ? (0.5 + ratio * 0.8) : 0.2);
+                const massLoss = Math.max(1, Math.round(other.mass * (isRainbowLanding ? (0.04 + ratio * 0.06) : (0.02 + ratio * 0.03))));
                 other.mass = Math.max(10, other.mass - massLoss);
                 this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 1.5, Math.cos(pushAng), Math.sin(pushAng));
                 this.events.push({
@@ -1167,6 +1173,7 @@ export class World {
             ratio: r2(ratio),
             isGorilla,
             inWater,
+            rainbow: isRainbowLanding,
           });
         }
       }
@@ -1754,9 +1761,40 @@ export class World {
     if (p.terrain === 1) return;
     if (p.superT > 0) {
       if (p.species === 'monkey' || p.species === 'gorilla') {
-        // Rainbow Monkey & Gorilla: Cannot dash, continuous cone of 5 giant bananas
-        this.spawnBananaCone(p, 5, true);
-        p.cd = 0.35;
+        if (p.holdT <= 0.15) {
+          // Tap: Continuous cone of 5 giant bananas
+          this.spawnBananaCone(p, 5, true);
+          p.cd = 0.35;
+          return;
+        }
+        // Charged Rainbow Leap (hold > 0.15s, 0.2s -> 1.2s)
+        const isGorilla = (p.species === 'gorilla');
+        const clampedHold = Math.max(0.2, Math.min(1.2, p.holdT));
+        const ratio = (clampedHold - 0.2) / 1.0;
+        const leapDist = isGorilla ? (12.0 + ratio * 20.0) : (10.0 + ratio * 18.0);
+        const leapDur = 0.5 + ratio * 0.4;
+        const peakHeight = isGorilla ? (5.0 + ratio * 7.5) : (4.5 + ratio * 6.5);
+
+        p.monkeyLeapT = leapDur;
+        p.monkeyLeapDur = leapDur;
+        p.monkeyLeapHeight = peakHeight;
+        p.monkeyLeapRatio = ratio;
+        p.a = p.input.a;
+        const leapSpeed = leapDist / leapDur;
+        p.vx = Math.cos(p.a) * leapSpeed;
+        p.vz = Math.sin(p.a) * leapSpeed;
+        p.dashT = leapDur;
+        p.cd = CFG.DASH_CD * 0.5;
+        this.events.push({
+          k: 'monkeyLeap',
+          id: p.id,
+          x: r2(p.x),
+          z: r2(p.z),
+          dur: r2(leapDur),
+          height: r2(peakHeight),
+          ratio: r2(ratio),
+          rainbow: true,
+        });
         return;
       }
       if (p.species === 'mammoth') {
@@ -1965,9 +2003,9 @@ export class World {
     const startZ = p.z + Math.sin(p.a) * (bodyR + 0.6);
     const r = tier === 2 ? 1.3 : tier === 1 ? 0.85 : 0.5;
 
-    // Gorilla khi ném chuối có trả giá bằng kg của bản thân nhưng không quá 5% kg của bản thân
+    // Gorilla khi ném chuối tiêu hao 0.5% kg của cơ thể
     if (isGorilla && !giant) {
-      const penalty = Math.min(Math.round(p.mass * 0.05), Math.max(3, Math.round(p.mass * 0.03)));
+      const penalty = Math.max(1, Math.round(p.mass * 0.005));
       p.mass = Math.max(10, p.mass - penalty);
       this.scatter(p.x, p.z, Math.round(penalty * 0.5), radiusOf(p.mass) + 1.5, Math.cos(p.a), Math.sin(p.a));
     }
@@ -2017,8 +2055,8 @@ export class World {
           hit = true;
           const att = this.players.get(proj.ownerId);
 
-          // Gorilla immunity: Gorilla is immune to stun, flinch, knockback, and loss from animals < 1 ton
-          if (target.species === 'gorilla' && (!att || att.mass < 1000)) {
+          // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton
+          if ((target.species === 'gorilla' || target.species === 'mammoth') && (!att || att.mass < 1000)) {
             this.events.push({
               k: 'bananaHit',
               id: target.id,
@@ -2396,8 +2434,8 @@ export class World {
           const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
           if (dist < hitDist && m.cd <= 0) {
             m.cd = 0.8;
-            if (target.species === 'gorilla') {
-              // Gorilla is immune to minions: minion bounces off, no stun, no knockback, no loss for gorilla
+            if (target.species === 'gorilla' || target.species === 'mammoth') {
+              // Gorilla and Mammoth are immune to minions: minion bounces off, no stun, no knockback, no loss
               m.vx = -Math.cos(aimA) * 12;
               m.vz = -Math.sin(aimA) * 12;
               this.events.push({
@@ -2697,8 +2735,8 @@ export class World {
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
-    // Gorilla immunity: Gorilla is immune to stun, flinch, knockback, and loss from animals < 1 ton
-    if (vic.species === 'gorilla' && att.mass < 1000) {
+    // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton
+    if ((vic.species === 'gorilla' || vic.species === 'mammoth') && att.mass < 1000) {
       att.vx = -nx * 18;
       att.vz = -nz * 18;
       att.dashT = 0;

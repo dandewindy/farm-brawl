@@ -125,8 +125,8 @@ export type GameEvent =
   | { k: 'treeHit'; id: number; by: number; x: number; z: number; size: number; droppedBig: number; droppedSmall: number }
   | { k: 'bananaThrow'; id: number; x: number; z: number; a: number; count: number; giant: boolean; tier?: number }
   | { k: 'bananaHit'; id: number; x: number; z: number; giant: boolean; tier?: number }
-  | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number }
-  | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number; isGorilla?: boolean; inWater?: boolean }
+  | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number; rainbow?: boolean }
+  | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number; isGorilla?: boolean; inWater?: boolean; rainbow?: boolean }
   | { k: 'mammothRoar'; id: number; x: number; z: number; r: number; dur: number; rainbow?: boolean }
   | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };

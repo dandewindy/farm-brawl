@@ -195,6 +195,16 @@ input.onReleaseRam = (held: number) => {
 
   if (canDash) {
     predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
+    if ((myMeta.species === 'monkey' || myMeta.species === 'gorilla') && validHeld > 0.15) {
+      const isGorilla = (myMeta.species === 'gorilla');
+      const clampedHold = Math.max(0.2, Math.min(1.2, validHeld));
+      const ratio = (clampedHold - 0.2) / 1.0;
+      const leapDur = 0.5 + ratio * 0.4;
+      const peakHeight = isSuper
+        ? (isGorilla ? (5.0 + ratio * 7.5) : (4.5 + ratio * 6.5))
+        : (isGorilla ? (4.0 + ratio * 6.5) : (3.5 + ratio * 5.5));
+      animals.notifyLeap(gameState.myId, leapDur, peakHeight);
+    }
     // Locally set cooldown so player cannot spam dash
     const baseCd = myMeta.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
     const isPlow = validHeld >= CFG.CHARGE_MIN;
@@ -1926,6 +1936,14 @@ function handleGameEvent(ev: GameEvent): void {
       sfxHit(tier === 2 ? 2.8 : tier === 1 ? 2.4 : 2.0, ev.id === myId ? 1.0 : 0.4);
       break;
     }
+    case 'monkeyLeap': {
+      animals.notifyLeap(ev.id, ev.dur, ev.height);
+      if (ev.rainbow) {
+        animals.spawnShockwave(ev.x, 0.1, ev.z, 4.0, 0xff007f);
+        foodParts.burst(ev.x, 0.5, ev.z, 0xffeb3b, 16, 4, 6, 0.6);
+      }
+      break;
+    }
     case 'monkeyLand': {
       if (ev.inWater) {
         // Water landing splash explosion
@@ -1940,6 +1958,21 @@ function handleGameEvent(ev: GameEvent): void {
         const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
         if (dist < 28) {
           shake = Math.max(shake, 0.7 * ev.ratio * (1 - dist / 28));
+        }
+      } else if (ev.rainbow) {
+        // Spectacular rainbow slam shockwaves
+        animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r * 1.1, 0xff0055);
+        animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.8, 0x00e5ff);
+        animals.spawnShockwave(ev.x, 0.16, ev.z, ev.r * 0.5, 0xffea00);
+        foodParts.burst(ev.x, 0.5, ev.z, 0xff00ff, 28, 7, 8, 0.8);
+        foodParts.burst(ev.x, 0.8, ev.z, 0x00ffff, 20, 6, 7, 0.7);
+        animals.spawnGroundCracks(ev.x, ev.z, ev.r * 1.2);
+        if (ev.isGorilla) sfxGorillaRoar(ev.id === myId ? 1.0 : 0.6);
+        sfxHit(4.5, ev.id === myId ? 1.0 : 0.6);
+        const me = gameState.ents.get(myId);
+        const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+        if (dist < 40) {
+          shake = Math.max(shake, 1.4 * ev.ratio * (1 - dist / 40));
         }
       } else if (ev.isGorilla) {
         // Gorilla ground slam: focused punchy fiery shockwaves and heavy earth dust
@@ -2643,6 +2676,10 @@ function animate(now: number): void {
           pFlags |= FLAG.FLYING;
         } else {
           pFlags &= ~FLAG.FLYING;
+        }
+        if (predictor.isLeaping || predictor.leapT > 0) {
+          pFlags |= FLAG.MONKEY_LEAP;
+          pFlags &= ~FLAG.STUN;
         }
         if (input.holding && (now - input.holdStart) >= CFG.CHARGE_SLOW_AFTER * 1000) pFlags |= FLAG.CHARGING;
       }

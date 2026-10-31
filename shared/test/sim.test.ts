@@ -2215,6 +2215,113 @@ describe('fruit trees', () => {
       expect(pig.plow).toBe(true);
       expect(pig.mammothRoarT).toBeFalsy();
     });
+
+    it('Rainbow Monkey charged leap blows enemies far away without squishing', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('SunWukong', 'monkey');
+      const monkey = place(w, mId, 0, 0, 500);
+      monkey.superT = 10.0; // Rainbow mode
+
+      const rivalId = w.addPlayer('Rival', 'pig');
+      const rival = place(w, rivalId, 22, 0, 100);
+
+      // Charge leap
+      monkey.input.a = 0;
+      monkey.input.btn = false;
+      monkey.holdT = 1.0;
+      monkey.pressed = true;
+      monkey.btnLatch = false;
+      w.step();
+
+      expect(monkey.monkeyLeapT).toBeGreaterThan(0);
+      const leapEv = w.events.find(e => e.k === 'monkeyLeap' && e.id === mId && e.rainbow);
+      expect(leapEv).toBeDefined();
+
+      // Fast forward until landing
+      while (monkey.monkeyLeapT && monkey.monkeyLeapT > 0) {
+        w.step();
+      }
+
+      // Rival is blown away with massive force, but NOT squished!
+      expect(rival.squishT).toBe(0);
+      expect(Math.abs(rival.vx)).toBeGreaterThan(25); // Heavy knockback
+      expect(rival.stunT).toBeGreaterThan(0.5);
+    });
+
+    it('Rainbow Gorilla charged leap squashes rivals', () => {
+      const w = emptyWorld();
+      const gId = w.addPlayer('KingKong', 'elephant');
+      const gorilla = place(w, gId, 0, 0, 3000);
+      gorilla.species = 'gorilla';
+      gorilla.superT = 10.0; // Rainbow mode
+
+      const rivalId = w.addPlayer('Rival', 'cow');
+      const rival = place(w, rivalId, 25, 0, 200);
+
+      gorilla.input.a = 0;
+      gorilla.input.btn = false;
+      gorilla.holdT = 1.0;
+      gorilla.pressed = true;
+      gorilla.btnLatch = false;
+      w.step();
+
+      expect(gorilla.monkeyLeapT).toBeGreaterThan(0);
+
+      // Fast forward until landing
+      while (gorilla.monkeyLeapT && gorilla.monkeyLeapT > 0) {
+        w.step();
+      }
+
+      // Rival is squashed flat by Gorilla!
+      expect(rival.squishT).toBeGreaterThan(2.0);
+    });
+
+    it('Gorilla banana throw costs exactly 0.5% kg of body mass', () => {
+      const w = emptyWorld();
+      const gId = w.addPlayer('BananaGorilla', 'elephant');
+      const gorilla = place(w, gId, 0, 0, 3000);
+      gorilla.species = 'gorilla';
+
+      gorilla.input = { a: 0, mv: false, btn: false };
+      gorilla.holdT = 0.1; // Tap throw
+      gorilla.pressed = true;
+      gorilla.btnLatch = false;
+      (w as any).dash(gorilla);
+
+      // 3000 * 0.005 = 15kg penalty
+      expect(gorilla.mass).toBe(3000 - 15);
+    });
+
+    it('Mammoth is immune to animals under 1 ton and mini minions', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('AncientMammoth', 'elephant');
+      const mammoth = place(w, mId, 0, 0, 3000);
+      w.step();
+      expect(mammoth.species).toBe('mammoth');
+
+      const smallAttackerId = w.addPlayer('SmallPig', 'pig');
+      const smallPig = place(w, smallAttackerId, 0, 0, 200);
+
+      // Small pig rams mammoth
+      const massBefore = mammoth.mass;
+      smallPig.input.a = 0;
+      smallPig.input.btn = false;
+      smallPig.holdT = 0.5;
+      smallPig.pressed = true;
+      smallPig.dashT = 0.5;
+      smallPig.vx = 20;
+
+      // Call world.hit directly
+      (w as any).hit(smallPig, mammoth, 1, 0, 20);
+
+      // Mammoth took 0 loss and 0 stun!
+      expect(mammoth.mass).toBe(massBefore);
+      expect(mammoth.stunT).toBe(0);
+
+      // Small pig bounced back and got stunned
+      expect(smallPig.stunT).toBeGreaterThan(0);
+      expect(smallPig.vx).toBeLessThan(0);
+    });
   });
 });
 

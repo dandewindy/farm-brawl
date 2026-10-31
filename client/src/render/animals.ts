@@ -39,6 +39,8 @@ interface AnimalVisual {
   tailSegments?: (THREE.Mesh | THREE.Group)[];
   trunk?: THREE.Group;
   leapTimer?: number;
+  leapDur?: number;
+  leapHeight?: number;
   morphTimer?: number;
   throwTimer?: number;
   mudSplats: THREE.Mesh[];
@@ -2139,6 +2141,15 @@ export class AnimalRenderer {
     }
   }
 
+  notifyLeap(id: number, dur: number, height: number): void {
+    const vis = this.visuals.get(id);
+    if (vis) {
+      vis.leapDur = dur;
+      vis.leapHeight = height;
+      vis.leapTimer = 0;
+    }
+  }
+
   getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
     let vis = this.visuals.get(id);
     if (vis && meta && vis.species !== meta.species) {
@@ -2280,6 +2291,8 @@ export class AnimalRenderer {
       vis.leapTimer = (vis.leapTimer || 0) + dt;
     } else {
       vis.leapTimer = 0;
+      vis.leapDur = undefined;
+      vis.leapHeight = undefined;
     }
 
     // Smooth squish factor transition: fast flatten on impact (dt * 16), gentle cartoon pop back up (dt * 5)
@@ -2382,10 +2395,13 @@ export class AnimalRenderer {
     if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && speed > 0.02) {
       bodyY += Math.abs(Math.sin(vis.phase * 0.9)) * 0.13 * r;
     }
-    // Super Leap parabolic arc
+    // Super Leap parabolic arc (chuẩn quỹ đạo ném xiên không rơi sớm, bay vọt qua chướng ngại vật)
     if (isMonkeyLeap) {
-      const arc = Math.sin(Math.min(Math.PI, (vis.leapTimer || 0) * 3.8));
-      bodyY += arc * (3.0 + 2.5 * r);
+      const dur = vis.leapDur || 0.7;
+      const progress = Math.min(1.0, (vis.leapTimer || 0) / dur);
+      const arc = Math.sin(progress * Math.PI);
+      const peakH = vis.leapHeight || (vis.species === 'gorilla' ? 5.5 + 2.5 * r : 4.0 + 2.0 * r);
+      bodyY += arc * peakH;
     }
     if (isFlying) bodyY += 1.1 * r;
     if (sq > 0) bodyY = (y + 0.05) * sq + bodyY * (1 - sq);

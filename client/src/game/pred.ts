@@ -1,4 +1,5 @@
 import { CFG, TICK_MS, TRAITS, radiusOf, type Species } from '@shared/constants';
+import { FLAG } from '@shared/protocol';
 import type { MapData } from '@shared/map';
 import { insideBlob, wrapAngle } from '@shared/math';
 import type { Ent } from './state';
@@ -21,6 +22,8 @@ export class ClientPredictor {
   a = 0;
   dashT = 0;
   flyT = 0;
+  leapT = 0;
+  isLeaping = false;
   ex = 0;
   ez = 0;
   readonly hist: PredSample[] = [];
@@ -43,6 +46,8 @@ export class ClientPredictor {
     this.vz = 0;
     this.dashT = 0;
     this.flyT = 0;
+    this.leapT = 0;
+    this.isLeaping = false;
     this.ex = 0;
     this.ez = 0;
     this.hist.length = 0;
@@ -122,7 +127,15 @@ export class ClientPredictor {
     }
 
     const isServerStun = (flags & 8) !== 0;
-    if (isServerStun) {
+    const isServerLeaping = (flags & FLAG.MONKEY_LEAP) !== 0;
+    if (isServerLeaping) {
+      this.isLeaping = true;
+      this.stunned = false;
+      this.stunT = 0;
+    } else if (this.leapT <= 0) {
+      this.isLeaping = false;
+    }
+    if (isServerStun && !this.isLeaping) {
       if (!this.stunned) {
         this.setStun(1.5);
         if (this.sTick === snapTick - 1 && clockOff !== null) {
@@ -135,7 +148,7 @@ export class ClientPredictor {
           this.flyT = 0;
         }
       }
-    } else {
+    } else if (!isServerStun) {
       this.stunned = false;
       this.stunT = 0;
     }
@@ -150,25 +163,25 @@ export class ClientPredictor {
     if (inWater) return;
 
     if (species === 'monkey' || species === 'gorilla') {
-      if (isSuper) {
-        // Super rainbow primate fires banana cone spread, does not dash
-        return;
-      }
       if (held <= 0.15) {
         // Tap throws banana projectile or shakes tree, does not dash!
         return;
       }
-      // Charged super leap
+      // Charged super leap (both normal and rainbow)
       const isGorilla = (species === 'gorilla');
       const clampedHold = Math.max(0.2, Math.min(1.2, held));
       const ratio = (clampedHold - 0.2) / 1.0;
-      const leapDist = isGorilla ? (10.0 + ratio * 16.0) : (8.0 + ratio * 14.0);
+      const leapDist = isSuper
+        ? (isGorilla ? (12.0 + ratio * 20.0) : (10.0 + ratio * 18.0))
+        : (isGorilla ? (10.0 + ratio * 16.0) : (8.0 + ratio * 14.0));
       const leapDur = 0.5 + ratio * 0.4;
       const leapSpeed = leapDist / leapDur;
       this.vx = Math.cos(aimA) * leapSpeed;
       this.vz = Math.sin(aimA) * leapSpeed;
       this.a = aimA;
       this.dashT = leapDur;
+      this.leapT = leapDur;
+      this.isLeaping = true;
       this.plow = false;
       return;
     }
@@ -278,10 +291,19 @@ export class ClientPredictor {
       const spMult = TRAITS[species]?.speed ?? 1.0;
       const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
 
+      if (this.leapT > 0) {
+        this.leapT = Math.max(0, this.leapT - h);
+        if (this.leapT <= 0) {
+          this.isLeaping = false;
+        }
+      }
+
       if (this.dashT > 0) {
-        const d = Math.exp(-1.2 * h);
-        this.vx *= d;
-        this.vz *= d;
+        if (!this.isLeaping) {
+          const d = Math.exp(-1.2 * h);
+          this.vx *= d;
+          this.vz *= d;
+        }
       } else if (stun || !canMove) {
         const d = Math.exp(-3.5 * h);
         this.vx *= d;
@@ -305,7 +327,7 @@ export class ClientPredictor {
         }
       }
 
-      if (water && species !== 'duck' && this.dashT <= 0) {
+      if (water && species !== 'duck' && this.dashT <= 0 && !this.isLeaping) {
         const d = Math.exp(-2 * h);
         this.vx *= d;
         this.vz *= d;
@@ -318,69 +340,71 @@ export class ClientPredictor {
       this.x += this.vx * h;
       this.z += this.vz * h;
 
-      if (this.dashT > 0 && !plowing) {
+      if (this.dashT > 0 && !plowing && !this.isLeaping) {
         this.ramContact(myMass, rtt, ents, myId, snapTick);
       }
 
-      // Hay collision
-      const r = radiusOf(myMass);
-      for (const [hx, hz, hr] of map.hay) {
-        const dx = this.x - hx, dz = this.z - hz;
-        const d = Math.hypot(dx, dz);
-        if (d < hr + r && d > 0) {
-          const nx = dx / d, nz = dz / d;
-          this.x = hx + nx * (hr + r);
-          this.z = hz + nz * (hr + r);
-          const vn = this.vx * nx + this.vz * nz;
-          const impactSpeed = -vn;
-          if (vn < 0) {
-            this.vx -= 1.6 * vn * nx;
-            this.vz -= 1.6 * vn * nz;
-          }
-          const isDirectDash = this.dashT > 0 && impactSpeed > 10;
-          const isDirectSlam = impactSpeed > 16;
-          if (isDirectDash || isDirectSlam) {
-            this.setStun(1.5);
-          }
-        }
-      }
-
-      // Fruit trees trunk collision
-      if (map.trees && map.trees.length > 0) {
-        for (const t of map.trees) {
-          const dx = this.x - t.x, dz = this.z - t.z;
+      if (!this.isLeaping) {
+        // Hay collision
+        const r = radiusOf(myMass);
+        for (const [hx, hz, hr] of map.hay) {
+          const dx = this.x - hx, dz = this.z - hz;
           const d = Math.hypot(dx, dz);
-          if (d < t.r + r && d > 1e-6) {
+          if (d < hr + r && d > 0) {
             const nx = dx / d, nz = dz / d;
-            this.x = t.x + nx * (t.r + r);
-            this.z = t.z + nz * (t.r + r);
+            this.x = hx + nx * (hr + r);
+            this.z = hz + nz * (hr + r);
             const vn = this.vx * nx + this.vz * nz;
+            const impactSpeed = -vn;
             if (vn < 0) {
               this.vx -= 1.6 * vn * nx;
               this.vz -= 1.6 * vn * nz;
             }
+            const isDirectDash = this.dashT > 0 && impactSpeed > 10;
+            const isDirectSlam = impactSpeed > 16;
+            if (isDirectDash || isDirectSlam) {
+              this.setStun(1.5);
+            }
           }
         }
-      }
 
-      // Podium shield barrier collision
-      if (this.podShieldActive && map.podium) {
-        const [podX, podZ] = map.podium;
-        const dx = this.x - podX, dz = this.z - podZ;
-        const d = Math.hypot(dx, dz);
-        const minD = CFG.PODIUM_R + 0.5 + r;
-        if (d < minD && d > 1e-6) {
-          const nx = dx / d, nz = dz / d;
-          this.x = podX + nx * minD;
-          this.z = podZ + nz * minD;
-          const vn = this.vx * nx + this.vz * nz;
-          if (vn < 0) {
-            this.vx -= 1.4 * vn * nx;
-            this.vz -= 1.4 * vn * nz;
+        // Fruit trees trunk collision
+        if (map.trees && map.trees.length > 0) {
+          for (const t of map.trees) {
+            const dx = this.x - t.x, dz = this.z - t.z;
+            const d = Math.hypot(dx, dz);
+            if (d < t.r + r && d > 1e-6) {
+              const nx = dx / d, nz = dz / d;
+              this.x = t.x + nx * (t.r + r);
+              this.z = t.z + nz * (t.r + r);
+              const vn = this.vx * nx + this.vz * nz;
+              if (vn < 0) {
+                this.vx -= 1.6 * vn * nx;
+                this.vz -= 1.6 * vn * nz;
+              }
+            }
           }
-          if (this.dashT > 0) {
-            this.dashT = 0;
-            this.plow = false;
+        }
+
+        // Podium shield barrier collision
+        if (this.podShieldActive && map.podium) {
+          const [podX, podZ] = map.podium;
+          const dx = this.x - podX, dz = this.z - podZ;
+          const d = Math.hypot(dx, dz);
+          const minD = CFG.PODIUM_R + 0.5 + r;
+          if (d < minD && d > 1e-6) {
+            const nx = dx / d, nz = dz / d;
+            this.x = podX + nx * minD;
+            this.z = podZ + nz * minD;
+            const vn = this.vx * nx + this.vz * nz;
+            if (vn < 0) {
+              this.vx -= 1.4 * vn * nx;
+              this.vz -= 1.4 * vn * nz;
+            }
+            if (this.dashT > 0) {
+              this.dashT = 0;
+              this.plow = false;
+            }
           }
         }
       }
