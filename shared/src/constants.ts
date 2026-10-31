@@ -110,4 +110,48 @@ export const FOOD_KG = [1, 2.5, 6, 1.6, 7, 2.5, 3, 11, 11, 15] as const;
 export const FOOD_WEIGHT = [47, 17, 3, 23, 5, 0, 0, 5, 0, 0] as const;
 export type FoodKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
+/**
+ * Easter egg prefix check:
+ * Names starting with "Monkey" / "Money" / "Khỉ" / "Khi" get 100% monkey on random selection.
+ * Names starting with "Elephant" / "Voi" get 100% elephant on random selection.
+ */
+export function getEasterEggSpeciesFromName(name: string): Species | null {
+  if (!name) return null;
+  let clean = name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Also strip common clan tags in brackets, parentheses, or emojis at start: e.g. "[VN] Khỉ", "(VN) Voi", "👑 Khỉ"
+  clean = clean.replace(/^(\[[^\]]*\]|\([^)]*\)|<[^>]*>|[\s\p{P}\p{S}]+)/u, '').trim();
+
+  if (
+    clean.startsWith('monkey') || clean.startsWith('money') || clean.startsWith('khi')
+  ) {
+    return 'monkey';
+  }
+  if (
+    clean.startsWith('elephant') || clean.startsWith('voi')
+  ) {
+    return 'elephant';
+  }
+  return null;
+}
+
+/**
+ * Roll a random species for a player name, taking into account secret easter egg prefixes.
+ */
+export function pickRandomSpecies(name: string, rnd = Math.random): Species {
+  const egg = getEasterEggSpeciesFromName(name);
+  if (egg) return egg;
+
+  const roll = rnd();
+  if (roll < 0.10) {
+    return 'elephant';
+  } else if (roll < 0.20) {
+    return 'monkey';
+  } else if (roll < 0.45) {
+    return 'dog';
+  } else {
+    const normalSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
+    return normalSpecies[Math.floor(rnd() * normalSpecies.length)];
+  }
+}
+
 

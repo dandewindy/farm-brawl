@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CFG, DT, TRAITS, radiusOf } from '../src/constants';
+import { CFG, DT, TRAITS, radiusOf, getEasterEggSpeciesFromName, pickRandomSpecies } from '../src/constants';
 import { generateMap } from '../src/map';
 import { blobOutline, insideBlob, type Blob } from '../src/math';
 import { dashParams, outsideFence, stepMove } from '../src/physics';
@@ -1863,6 +1863,74 @@ describe('fruit trees', () => {
       }
       // Monkey did not fly/dash
       expect(monkey.flyT).toBe(0);
+    });
+
+    it('secret easter egg: names with Money/Monkey/Khỉ/Khi prefixes get 100% monkey on random', () => {
+      const monkeyNames = [
+        'Khỉ',
+        'khỉ',
+        'KHỈ',
+        'Khỉ Đột',
+        'khỉ con',
+        'khi',
+        'Khi Vàng',
+        'Monkey',
+        'monkeyking',
+        'Monkey 007',
+        'Money',
+        'moneybags',
+        'MoneyMaker',
+        '🐒 Khỉ Chúa',
+        '[VN] Khỉ',
+      ];
+
+      for (const name of monkeyNames) {
+        expect(getEasterEggSpeciesFromName(name)).toBe('monkey');
+        // pickRandomSpecies always yields monkey
+        for (let i = 0; i < 5; i++) {
+          expect(pickRandomSpecies(name)).toBe('monkey');
+        }
+      }
+
+      // World addPlayer with species='random' gives monkey
+      const w = emptyWorld();
+      const pId = w.addPlayer('Khỉ Đột', 'random' as any);
+      expect(w.players.get(pId)!.species).toBe('monkey');
+    });
+
+    it('secret easter egg: names with Elephant/Voi prefixes get 100% elephant on random', () => {
+      const elephantNames = [
+        'Voi',
+        'voi',
+        'VOI',
+        'Voi Rừng',
+        'voi chiến',
+        'Elephant',
+        'elephant123',
+        'ElephantKing',
+        '🐘 Voi Bản Đôn',
+        '[PRO] Voi',
+      ];
+
+      for (const name of elephantNames) {
+        expect(getEasterEggSpeciesFromName(name)).toBe('elephant');
+        // pickRandomSpecies always yields elephant
+        for (let i = 0; i < 5; i++) {
+          expect(pickRandomSpecies(name)).toBe('elephant');
+        }
+      }
+
+      // World addPlayer with species='random' gives elephant
+      const w = emptyWorld();
+      const pId = w.addPlayer('Voi Rừng', 'random' as any);
+      expect(w.players.get(pId)!.species).toBe('elephant');
+    });
+
+    it('other names use normal random selection', () => {
+      expect(getEasterEggSpeciesFromName('Gà Con')).toBeNull();
+      expect(getEasterEggSpeciesFromName('Heo Ụt Ịt')).toBeNull();
+      expect(getEasterEggSpeciesFromName('Cowboy')).toBeNull();
+      expect(getEasterEggSpeciesFromName('')).toBeNull();
     });
   });
 });

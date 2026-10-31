@@ -2,7 +2,7 @@
 // Cloudflare Durable Object. It knows nothing about rendering or networking: inputs in, snapshots out.
 import { thinkBot, newBrain, SPECIES_BOT_NAMES, SPECIES_NAMES_VI, type BotBrain } from './bots';
 import {
-  CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf,
+  CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf, pickRandomSpecies,
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type MapData, type TreeData, type TreeSize } from '../map';
@@ -295,6 +295,9 @@ export class World {
   // ------------------------------------------------------------------ players
 
   addPlayer(name: string, species: Species, bot = false, team?: number, skin?: number): number {
+    if ((species as string) === 'random') {
+      species = pickRandomSpecies(name, this.rnd);
+    }
     const id = this.nextId++;
     const startMass = species === 'elephant' ? 1000 : species === 'cow' ? 100 : CFG.START_MASS;
     const p: Player = {
@@ -316,6 +319,9 @@ export class World {
     const p = this.players.get(id);
     if (!p || p.alive) return;
     if (name !== undefined) p.name = name.slice(0, 16);
+    if ((species as string) === 'random') {
+      species = pickRandomSpecies(p.name, this.rnd);
+    }
     if (species) p.species = species;
     if (skin !== undefined) p.skin = skin % SKIN_COUNT;
     if (team !== undefined) p.team = team;

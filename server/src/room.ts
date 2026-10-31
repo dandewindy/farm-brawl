@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { World } from '@shared/sim/world';
-import { TICK_MS, SKIN_COUNT } from '@shared/constants';
+import { TICK_MS, SKIN_COUNT, pickRandomSpecies } from '@shared/constants';
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 
 const GRACE_PERIOD_MS = 15000;

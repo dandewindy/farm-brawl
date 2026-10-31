@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { radiusOf, SPECIES, type Species } from '@shared/constants';
+import { radiusOf, SPECIES, pickRandomSpecies, type Species } from '@shared/constants';
 import type { ChoiceWire, GameEvent, HofRow, LeaderRow } from '@shared/protocol';
 import { t, getLanguage, toggleLanguage, formatTeamCount, type Lang } from '../i18n';
 import { getArenaTheme, setArenaTheme, type ArenaTheme } from '../theme';
@@ -818,17 +818,7 @@ export class HudManager {
       let chosenSpecies = this.selectedSpecies;
       let chosenSkin = this.mySkins[this.selectedSpecies] ?? 0;
       if (this.isRandomSelected) {
-        const roll = Math.random();
-        if (roll < 0.10) {
-          chosenSpecies = 'elephant';
-        } else if (roll < 0.20) {
-          chosenSpecies = 'monkey';
-        } else if (roll < 0.45) {
-          chosenSpecies = 'dog';
-        } else {
-          const normalSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig'];
-          chosenSpecies = normalSpecies[Math.floor(Math.random() * normalSpecies.length)];
-        }
+        chosenSpecies = pickRandomSpecies(name);
         chosenSkin = Math.floor(Math.random() * 4);
       }
       this.activeSpecies = chosenSpecies;
