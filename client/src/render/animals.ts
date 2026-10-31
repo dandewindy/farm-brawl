@@ -886,65 +886,82 @@ function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   abs.rotation.z = -0.28;
   g.add(abs);
 
-  // 6. Faceted Head Group (skull base, sagittal crest pyramid, brow ridge, snout plate)
+  // 6. Rounded & Protruding Ape Head Group (curved skull, sagittal crest, brow ridge, round cheeks, protruding muzzle & jaw)
   const headGroup = new THREE.Group();
   headGroup.position.set(0.52, 1.62, 0);
 
-  // Skull base (faceted icosahedron)
-  const skullGeo = new THREE.IcosahedronGeometry(0.32, 0);
+  // Skull base (rounded low-poly sphere: curved, powerful, rounded ape cranial dome)
+  const skullGeo = new THREE.SphereGeometry(0.33, 14, 10);
   const skull = part(skullGeo, furColor, 0, 0, 0, facetOpts);
-  skull.scale.set(1.08, 1.0, 0.94);
+  skull.scale.set(1.05, 1.0, 0.96);
   headGroup.add(skull);
 
-  // Sagittal Crest (sharp 4-sided pyramid / cone at crown of skull)
-  const crestGeo = new THREE.ConeGeometry(0.20, 0.50, 4);
-  const crest = part(crestGeo, crestColor, -0.08, 0.32, 0, facetOpts);
-  crest.rotation.z = 0.30; // Tilted backwards naturally
-  crest.rotation.y = Math.PI / 4; // Sharp faceted edge facing forward
+  // Sagittal Crest (rounded muscular cranial ridge)
+  const crestGeo = new THREE.ConeGeometry(0.18, 0.44, 6);
+  const crest = part(crestGeo, crestColor, -0.06, 0.30, 0, facetOpts);
+  crest.scale.set(0.9, 1.0, 0.65);
+  crest.rotation.z = 0.28;
   headGroup.add(crest);
 
-  // Heavy Brow Ridge (angular faceted overhang)
-  const browGeo = new THREE.BoxGeometry(0.20, 0.10, 0.46);
-  const brow = part(browGeo, furColor, 0.20, 0.12, 0, facetOpts);
-  brow.rotation.z = -0.18;
+  // Heavy Arched Brow Ridge (rounded overhang above eyes)
+  const browGeo = new THREE.CylinderGeometry(0.08, 0.085, 0.46, 8);
+  browGeo.rotateZ(Math.PI / 2);
+  const brow = part(browGeo, furColor, 0.22, 0.10, 0, facetOpts);
+  brow.scale.set(1.0, 1.0, 1.05);
   headGroup.add(brow);
 
   // Deep recessed eyes
   for (const z of [-0.10, 0.10]) {
-    const eyeSocket = part(new THREE.BoxGeometry(0.09, 0.07, 0.09), eyeColor, 0.22, 0.08, z, facetOpts);
+    const eyeSocket = part(new THREE.BoxGeometry(0.09, 0.07, 0.09), eyeColor, 0.22, 0.07, z, facetOpts);
     headGroup.add(eyeSocket);
-    const glint = part(new THREE.BoxGeometry(0.03, 0.03, 0.03), 0xffffff, 0.26, 0.09, z > 0 ? z - 0.02 : z + 0.02);
+    const glint = part(new THREE.BoxGeometry(0.035, 0.035, 0.035), 0xffffff, 0.26, 0.085, z > 0 ? z - 0.015 : z + 0.015);
     headGroup.add(glint);
   }
 
-  // Sculpted Faceted Face Mask (slopes naturally down to mouth)
-  const muzzleGeo = new THREE.BoxGeometry(0.18, 0.28, 0.30);
-  const muzzle = part(muzzleGeo, faceColor, 0.22, -0.06, 0, facetOpts);
-  muzzle.rotation.z = -0.14;
-  headGroup.add(muzzle);
-
-  // Angled cheekbones on sides
-  for (const z of [-0.18, 0.18]) {
-    const cheek = part(new THREE.BoxGeometry(0.12, 0.16, 0.08), faceColor, 0.16, -0.04, z, facetOpts);
-    cheek.rotation.y = z > 0 ? 0.30 : -0.30;
+  // Rounded Full Cheeks (makes face rounder as requested)
+  for (const z of [-0.20, 0.20]) {
+    const cheekGeo = new THREE.SphereGeometry(0.15, 10, 8);
+    const cheek = part(cheekGeo, faceColor, 0.16, -0.06, z, facetOpts);
+    cheek.scale.set(1.1, 0.95, 0.85);
     headGroup.add(cheek);
   }
 
-  // Dual dark nostrils
-  for (const z of [-0.045, 0.045]) {
-    const nostril = part(new THREE.BoxGeometry(0.04, 0.05, 0.04), eyeColor, 0.31, -0.02, z, facetOpts);
+  // Protruding Upper Muzzle & Nose Pad ("lồi miệng ra")
+  const upperMuzzleGeo = new THREE.CapsuleGeometry(0.13, 0.16, 6, 10);
+  upperMuzzleGeo.rotateZ(Math.PI / 2);
+  const upperMuzzle = part(upperMuzzleGeo, faceColor, 0.28, -0.02, 0, facetOpts);
+  upperMuzzle.scale.set(1.15, 0.95, 1.15);
+  headGroup.add(upperMuzzle);
+
+  // Dual dark flaring gorilla nostrils
+  for (const z of [-0.05, 0.05]) {
+    const nostril = part(new THREE.BoxGeometry(0.045, 0.05, 0.045), eyeColor, 0.38, -0.01, z, facetOpts);
     headGroup.add(nostril);
   }
 
-  // Mouth slit
-  const mouth = part(new THREE.BoxGeometry(0.04, 0.02, 0.16), eyeColor, 0.30, -0.14, 0, facetOpts);
+  // Protruding Lower Muzzle & Mouth/Jaw (prominent ape prognathism)
+  const lowerMuzzleGeo = new THREE.CapsuleGeometry(0.12, 0.15, 6, 10);
+  lowerMuzzleGeo.rotateZ(Math.PI / 2);
+  const lowerMuzzle = part(lowerMuzzleGeo, faceColor, 0.31, -0.15, 0, facetOpts);
+  lowerMuzzle.scale.set(1.2, 0.9, 1.1);
+  lowerMuzzle.rotation.z = -0.18;
+  headGroup.add(lowerMuzzle);
+
+  // Indented mouth slit
+  const mouth = part(new THREE.BoxGeometry(0.05, 0.025, 0.20), eyeColor, 0.40, -0.13, 0, facetOpts);
+  mouth.rotation.z = -0.16;
   headGroup.add(mouth);
 
-  // Small faceted ears
-  for (const z of [-0.28, 0.28]) {
-    const earGeo = new THREE.BoxGeometry(0.08, 0.12, 0.06);
-    const ear = part(earGeo, faceColor, -0.05, 0.06, z, facetOpts);
-    ear.rotation.y = z > 0 ? 0.35 : -0.35;
+  // Chin under-jaw plate (anchors mouth into jaw/throat)
+  const chin = part(new THREE.BoxGeometry(0.18, 0.14, 0.24), furColor, 0.24, -0.22, 0, facetOpts);
+  chin.rotation.z = -0.25;
+  headGroup.add(chin);
+
+  // Small rounded ape ears
+  for (const z of [-0.29, 0.29]) {
+    const earGeo = new THREE.SphereGeometry(0.08, 8, 6);
+    const ear = part(earGeo, faceColor, -0.04, 0.05, z, facetOpts);
+    ear.scale.set(0.6, 1.1, 0.8);
     headGroup.add(ear);
   }
 

@@ -1133,6 +1133,19 @@ export class World {
         });
       }
 
+      // Gorilla De-evolution into Monkey when dropping below 1 ton (1000 kg)
+      if (p.alive && p.species === 'gorilla' && p.mass < 1000) {
+        p.species = 'monkey';
+        delete p.morphT;
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'monkey',
+          dur: 0,
+        });
+      }
+
       // Morph 30s timer
       if (p.morphT && p.morphT > 0) {
         p.morphT = Math.max(0, p.morphT - DT);

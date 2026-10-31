@@ -1787,6 +1787,40 @@ describe('fruit trees', () => {
       expect(tree.small).toBe(0);
     });
 
+    it('gorilla de-evolves to monkey when dropping below 1000kg and only re-evolves at 3000kg', () => {
+      const w = emptyWorld();
+      const pId = w.addPlayer('Kong', 'monkey');
+      const player = place(w, pId, 0, 0, 3000);
+      w.step();
+      expect(player.species).toBe('gorilla');
+
+      // Gorilla drops below 1000kg (e.g. 999kg due to hits or penalties)
+      player.mass = 999;
+      w.step();
+      expect(player.species).toBe('monkey');
+      expect(w.events.some(e => e.k === 'morph' && e.id === pId && e.species === 'monkey')).toBe(true);
+
+      // Mass increases between 1000kg and 2999kg - stays monkey!
+      player.mass = 1500;
+      w.step();
+      expect(player.species).toBe('monkey');
+
+      player.mass = 2999;
+      w.step();
+      expect(player.species).toBe('monkey');
+
+      // Reaching 3000kg re-evolves into gorilla!
+      player.mass = 3000;
+      w.step();
+      expect(player.species).toBe('gorilla');
+      expect(w.events.some(e => e.k === 'morph' && e.id === pId && e.species === 'gorilla')).toBe(true);
+
+      // Game rule "equal" resets mass to 30kg -> immediately de-evolves into monkey
+      player.mass = 30;
+      w.step();
+      expect(player.species).toBe('monkey');
+    });
+
     it('banana item morphs player into monkey or elephant for 30s', () => {
       const w = emptyWorld();
       const pId = w.addPlayer('Player1', 'pig');
