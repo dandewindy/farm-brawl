@@ -72,6 +72,7 @@ export interface Player extends Body {
   treeShakeTimer?: number;
   treeShakeDropStage?: number;
   mammothRoarT?: number;
+  mammothRoarCd?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
   ai: BotBrain | null;
@@ -430,7 +431,7 @@ export class World {
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
-      monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0,
+      monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -992,7 +993,13 @@ export class World {
         if (p.pitchforkT <= 0) p.pitchforkHits = undefined;
       }
       if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
-      if (p.superT > 0) p.superT = Math.max(0, p.superT - DT);
+      if (p.superT > 0) {
+        p.superT = Math.max(0, p.superT - DT);
+        if (p.species === 'mammoth') {
+          p.cd = 0;
+          p.mammothRoarCd = 0;
+        }
+      }
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
       if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
@@ -1030,6 +1037,9 @@ export class World {
         p.mammothRoarT = Math.max(0, p.mammothRoarT - DT);
         p.vx = 0;
         p.vz = 0;
+      }
+      if (p.mammothRoarCd && p.mammothRoarCd > 0) {
+        p.mammothRoarCd = Math.max(0, p.mammothRoarCd - DT);
       }
 
       // Monkey & Gorilla Leap landing check
@@ -1798,13 +1808,25 @@ export class World {
         return;
       }
       if (p.species === 'mammoth') {
-        // Rainbow Mammoth:
-        // Húc nhẹ (holdT <= 0.15s): húc nhanh văng giống bình thường
-        // Gồng (holdT > 0.15s): choáng toàn bộ bản đồ tối đa 3s
+        // Rainbow Mammoth: Bỏ toàn bộ hồi chiêu!
+        p.cd = 0;
+        p.mammothRoarCd = 0;
         if (p.holdT > 0.15) {
           this.executeMammothRoar(p, true);
+          p.cd = 0;
           return;
         }
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 62;
+        p.vz = Math.sin(p.a) * 62;
+        p.dashT = 0.55;
+        p.flyT = 0.55;
+        p.plow = true;
+        p.power = 5.0;
+        p.cd = 0;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
       }
       p.a = p.input.a;
       p.vx = Math.cos(p.a) * 62;
@@ -1912,10 +1934,12 @@ export class World {
     if (p.species === 'mammoth') {
       // Mammoth:
       // Húc nhẹ (holdT <= 0.15s): lướt giống các con khác, gây dẹp lép và kill < 100kg trong this.hit
-      // Gồng (holdT > 0.15s): sóng âm tại chỗ, khuếch tán 1/4 bản đồ (~35m), choáng 0.5s - 1.5s, hồi chiêu 3s
+      // Gồng (holdT > 0.15s): sóng âm tại chỗ, khuếch tán 1/4 bản đồ (~35m), choáng 0.5s - 1.5s, hồi chiêu gồng 3s
       if (p.holdT > 0.15) {
-        this.executeMammothRoar(p, false);
-        return;
+        if (!p.mammothRoarCd || p.mammothRoarCd <= 0) {
+          this.executeMammothRoar(p, false);
+          return;
+        }
       }
     }
 
@@ -1939,7 +1963,9 @@ export class World {
     p.dashT = 0;
     p.plow = false;
     p.mammothRoarT = 1.0;
-    p.cd = 3.0; // Hồi chiêu 3s
+    // Hồi chiêu gồng 3s nhưng chiêu húc nhẹ vẫn hồi nhanh bình thường (~0.8s); bỏ hồi chiêu khi có cầu vồng
+    p.mammothRoarCd = isRainbow ? 0 : 3.0;
+    p.cd = isRainbow ? 0 : CFG.DASH_CD;
 
     if (isRainbow) {
       // Siêu cầu vồng: toàn bộ bản đồ, choáng max 3s (1.0s đến 3.0s tuỳ thời gian gồng)

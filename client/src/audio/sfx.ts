@@ -215,11 +215,11 @@ export function sfxGorillaRoar(vol = 1): void {
 
 export function sfxMammothRoar(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  tone('sawtooth', 180, 290, 0.45, 0.4 * vol, { attack: 0.08 });
-  tone('sawtooth', 290, 160, 0.75, 0.45 * vol, { delay: 0.35, attack: 0.06 });
-  tone('square', 145, 120, 0.9, 0.25 * vol, { delay: 0.1, attack: 0.05 });
-  tone('sine', 85, 35, 1.2, 0.65 * vol, { attack: 0.06 });
-  noise('bandpass', 450, 150, 3.0, 0.8, 0.35 * vol, { delay: 0.05 });
+  // 1 single powerful, continuous, reverberating mammoth trumpet blast (1.4s sustained)
+  tone('sawtooth', 140, 310, 1.35, 0.55 * vol, { attack: 0.10 });
+  tone('sawtooth', 210, 460, 1.20, 0.40 * vol, { attack: 0.12 });
+  tone('sine', 72, 38, 1.50, 0.85 * vol, { attack: 0.08 });
+  noise('bandpass', 520, 240, 4.2, 1.25, 0.42 * vol, { attack: 0.08 });
 }
 
 // Rising whine while a charged ram is winding up; level 0..1

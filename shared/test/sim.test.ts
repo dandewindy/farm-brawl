@@ -2146,9 +2146,10 @@ describe('fruit trees', () => {
 
       w.step();
 
-      // Mammoth stands in place and has 3.0s cooldown
+      // Mammoth stands in place; charged roar has 3.0s cooldown while light dash recovers quickly (~1.0s)
       expect(mammoth.dashT).toBe(0);
-      expect(mammoth.cd).toBeCloseTo(3.0, 1);
+      expect(mammoth.mammothRoarCd).toBeCloseTo(3.0, 1);
+      expect(mammoth.cd).toBeCloseTo(1.0, 1);
       expect(mammoth.mammothRoarT).toBeGreaterThan(0);
 
       // Rivals within 35m are stunned (~1.3s - 1.5s)
@@ -2162,6 +2163,18 @@ describe('fruit trees', () => {
       expect(roarEvent).toBeDefined();
       expect(roarEvent.r).toBe(35);
       expect(roarEvent.dur).toBeGreaterThanOrEqual(1.2);
+
+      // Advance time by 1.1s so light dash cd finishes, but 3.0s roar cd is still ~1.9s
+      for (let i = 0; i < 22; i++) w.step();
+      expect(mammoth.cd).toBe(0);
+      expect(mammoth.mammothRoarCd).toBeGreaterThan(1.5);
+
+      // Light tap dash works immediately
+      mammoth.input.btn = false;
+      mammoth.holdT = 0.1;
+      mammoth.pressed = true;
+      w.step();
+      expect(mammoth.dashT).toBeGreaterThan(0);
     });
 
     it('mammoth rainbow super mode: tap dashes as normal, charge stuns entire map up to 3.0s', () => {
@@ -2198,6 +2211,10 @@ describe('fruit trees', () => {
       const roarEvent = w.events.find((e) => e.k === 'mammothRoar' && e.id === mId && e.rainbow) as any;
       expect(roarEvent).toBeDefined();
       expect(roarEvent.dur).toBeGreaterThanOrEqual(2.5);
+
+      // Rainbow removes all cooldowns completely (0s)
+      expect(mammoth.cd).toBe(0);
+      expect(mammoth.mammothRoarCd).toBe(0);
     });
 
     it('other species charging dash normally without roar', () => {
