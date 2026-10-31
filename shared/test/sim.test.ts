@@ -553,6 +553,9 @@ describe('bonus weapons and tools', () => {
           duck: ['Vịt'],
           sheep: ['Cừu', 'Dương', 'Bạch'],
           horse: ['Ngựa', 'Bạch', 'Xích', 'Hắc', 'Boxer', 'Clover', 'Tuấn', 'Thiên'],
+          dog: ['Chó', 'Cún', 'Cậu', 'Bé', 'Gâu'],
+          elephant: ['Voi', 'Bé'],
+          monkey: ['Khỉ', 'Tề', 'Tôn', 'Vượn', 'Mỹ'],
         };
         const prefixes = validPrefixes[p.species] || [];
         const matches = prefixes.some((pre) => p.name.includes(pre));
@@ -955,21 +958,24 @@ describe('bonus weapons and tools', () => {
     expect(dog.alive).toBe(true); // Dog is swimming happily!
   });
 
-  it('bots never spawn as dog in fillBots', () => {
-    for (let run = 0; run < 10; run++) {
+  it('bots can spawn as any of the 9 species including dog, elephant and monkey', () => {
+    const spawnedSpecies = new Set<Species>();
+    for (let run = 0; run < 35; run++) {
       const w = emptyWorld();
       w.botsEnabled = true;
       for (let i = 0; i < 25; i++) {
         w.step();
       }
-      expect(w.players.size).toBeGreaterThanOrEqual(1);
       for (const p of w.players.values()) {
         if (p.bot) {
-          expect(p.species).not.toBe('dog');
-          expect(p.species).not.toBe('elephant');
+          spawnedSpecies.add(p.species);
         }
       }
     }
+    // Verify dog, elephant, and monkey are all present in bot spawns
+    expect(spawnedSpecies.has('dog')).toBe(true);
+    expect(spawnedSpecies.has('elephant')).toBe(true);
+    expect(spawnedSpecies.has('monkey')).toBe(true);
   });
 
   it('elephant spawns with 1000kg start mass', () => {

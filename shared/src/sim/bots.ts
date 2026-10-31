@@ -61,8 +61,15 @@ export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
     'Hắc Mã', 'Boxer', 'Clover', 'Tuấn Mã', 'Ngựa Hoang',
     'Thiên Mã', 'Ngựa Phi',
   ],
-  dog: [],
-  elephant: [],
+  dog: [
+    'Cậu Vàng', 'Chó Mực', 'Cún Con', 'Chó Đốm', 'Chó Cỏ',
+    'Bé Lu', 'Chó Vện', 'Gâu Gâu', 'Cún Yêu', 'Bé Corgi',
+    'Chó Shiba', 'Cún Bông',
+  ],
+  elephant: [
+    'Voi Còi', 'Voi Bự', 'Voi Con', 'Bé Voi', 'Voi Bản Đôn',
+    'Voi Khổng Lồ', 'Voi Chiến', 'Voi Rừng', 'Voi Trắng', 'Voi Xám',
+  ],
   monkey: [
     'Tề Thiên', 'Khỉ Con', 'Tôn Ngộ Không', 'Vượn Vàng', 'Khỉ Đầu Chó',
     'Mỹ Hầu Vương', 'Khỉ Nhỏ', 'Khỉ Lanh Lợi', 'Khỉ Đuôi Dài', 'Khỉ Tinh Nghịch',

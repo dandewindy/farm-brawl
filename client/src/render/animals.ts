@@ -746,18 +746,19 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   // 1. Massive Woolly Torso with Sloping Wedge Silhouette (Dáng dốc chuẩn Hình 4)
   // Front chest block (tall, bulky, broad shoulders)
   blob(g, bodyColor, 0.62, [1.08, 1.20, 1.02], 0.22, 1.45, 0);
-  // Compact, lowered rear hips (mông nhỏ lại và hạ thấp chuẩn hình 4)
-  blob(g, bodyColor, 0.34, [0.85, 0.88, 0.72], -0.44, 0.98, 0);
 
-  // Connecting torso mass: Tapered cylinder from broad chest (0.58) down to compact hips (0.35)
-  // Rotated so larger base is at front (+x, y=1.42) and small end is at rear (-x, y=1.00)
-  const torsoLen = 0.70;
-  const bodyGeo = new THREE.CylinderGeometry(0.35, 0.58, torsoLen, 16);
+  // Connecting torso mass: Tapered cylinder from broad chest (0.58) down to compact hips (0.44)
+  // Rotated so larger base is at front (+x, y=1.42) and rear end connects seamlessly into rump (-x, y=1.06)
+  const torsoLen = 0.68;
+  const bodyGeo = new THREE.CylinderGeometry(0.44, 0.58, torsoLen, 16);
   bodyGeo.rotateZ(Math.PI / 2);
   const bodyMesh = part(bodyGeo, bodyColor, -0.11, 1.21, 0, undefined, true);
-  bodyMesh.rotation.z = 0.32; // Tilts front UP and rear DOWN smoothly
+  bodyMesh.rotation.z = 0.28;
   bodyMesh.scale.set(1.0, 1.08, 0.95);
   g.add(bodyMesh);
+
+  // Seamless rounded rump block: to lên vừa vặn nối liền thân và bao phủ dính chặt 2 chân sau (z: +-0.30)!
+  blob(g, bodyColor, 0.48, [1.02, 1.05, 0.94], -0.44, 1.06, 0);
 
   // 2. High Woolly Shoulder Hump (Gù vai là điểm cao nhất trên lưng, dốc thẳng xuống mông)
   const hump = blob(g, humpColor, 0.46, [1.18, 1.15, 0.88], 0.16, 1.84, 0);
@@ -768,20 +769,29 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     const skirtF = blob(g, skirtColor, 0.35, [1.32, 0.92, 0.24], 0.12, 1.20, z);
     skirtF.rotation.z = 0.22;
     skirtF.rotation.x = z > 0 ? 0.12 : -0.12;
-    const skirtR = blob(g, skirtColor, 0.24, [0.95, 0.70, 0.18], -0.32, 0.90, z * 0.80);
-    skirtR.rotation.z = 0.28;
+    const skirtR = blob(g, skirtColor, 0.28, [1.02, 0.78, 0.20], -0.36, 0.92, z * 0.88);
+    skirtR.rotation.z = 0.25;
     skirtR.rotation.x = z > 0 ? 0.12 : -0.12;
   }
 
-  // 4. Head, Cranial Dome (Đầu liền khối duy nhất, trán vòm cao thanh thoát, KHÔNG có khối lồi không đều)
-  // Single continuous vertical capsule for the entire head & cranial crown!
-  const headGeo = new THREE.CapsuleGeometry(0.40, 0.46, 12, 18);
-  const headMesh = part(headGeo, bodyColor, 0.94, 1.62, 0);
-  headMesh.scale.set(1.02, 1.05, 0.90);
+  // 4. Head, Cranial Dome & Dark Hair Tuft (Đầu liền khối & Chỏm lông tóc màu đậm hơn giống trên lưng)
+  // Base head capsule
+  const headGeo = new THREE.CapsuleGeometry(0.38, 0.36, 12, 18);
+  const headMesh = part(headGeo, bodyColor, 0.94, 1.58, 0);
+  headMesh.scale.set(1.02, 1.0, 0.90);
   g.add(headMesh);
 
   // Smooth forehead bridge slope merging gently into trunk root
-  blob(g, bodyColor, 0.36, [1.06, 0.96, 0.84], 1.14, 1.54, 0);
+  blob(g, bodyColor, 0.35, [1.06, 0.96, 0.84], 1.14, 1.52, 0);
+
+  // Chỏm lông tóc màu đậm hơn giống trên lưng (humpColor) nổi bật trên chóp trán và đầu
+  const hairCrown = blob(g, humpColor, 0.36, [1.14, 0.78, 0.84], 0.90, 2.08, 0);
+  hairCrown.rotation.z = -0.18;
+  const hairFringe = blob(g, humpColor, 0.28, [1.18, 0.72, 0.76], 1.08, 1.94, 0);
+  hairFringe.rotation.z = -0.36;
+  for (const z of [-0.22, 0.22]) {
+    blob(g, humpColor, 0.22, [0.95, 0.65, 0.40], 0.92, 2.02, z);
+  }
 
   // 5. Small Woolly Ears (Tai nhỏ nép bên thái dương chuẩn mammoth)
   for (const z of [-0.40, 0.40]) {
