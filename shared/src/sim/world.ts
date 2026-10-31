@@ -71,6 +71,7 @@ export interface Player extends Body {
   treeShakeTreeId?: number;
   treeShakeTimer?: number;
   treeShakeDropStage?: number;
+  mammothRoarT?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
   ai: BotBrain | null;
@@ -413,6 +414,8 @@ export class World {
       p.species = this.rnd() < 0.5 ? 'chicken' : 'duck';
     } else if (p.species === 'gorilla') {
       p.species = 'monkey';
+    } else if (p.species === 'mammoth') {
+      p.species = 'elephant';
     }
     let spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
     if (this.currentRule === 'titan') {
@@ -427,7 +430,7 @@ export class World {
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
-      monkeyLeapT: 0, treeShakeT: 0,
+      monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -1023,6 +1026,12 @@ export class World {
         }
       }
 
+      if (p.mammothRoarT && p.mammothRoarT > 0) {
+        p.mammothRoarT = Math.max(0, p.mammothRoarT - DT);
+        p.vx = 0;
+        p.vz = 0;
+      }
+
       // Monkey & Gorilla Leap landing check
       if (p.monkeyLeapT && p.monkeyLeapT > 0) {
         p.monkeyLeapT = Math.max(0, p.monkeyLeapT - DT);
@@ -1184,6 +1193,32 @@ export class World {
           k: 'morph',
           id: p.id,
           species: 'monkey',
+          dur: 0,
+        });
+      }
+
+      // Elephant Evolution into Mammoth when reaching 3 tons (3000 kg)
+      if (p.alive && p.species === 'elephant' && p.mass >= 3000) {
+        p.species = 'mammoth';
+        delete p.morphT; // Permanent evolution while alive
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'mammoth',
+          dur: 0,
+        });
+      }
+
+      // Mammoth De-evolution into Elephant when dropping below 1 ton (1000 kg)
+      if (p.alive && p.species === 'mammoth' && p.mass < 1000) {
+        p.species = 'elephant';
+        delete p.morphT;
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'elephant',
           dur: 0,
         });
       }
@@ -1724,6 +1759,15 @@ export class World {
         p.cd = 0.35;
         return;
       }
+      if (p.species === 'mammoth') {
+        // Rainbow Mammoth:
+        // Húc nhẹ (holdT <= 0.15s): húc nhanh văng giống bình thường
+        // Gồng (holdT > 0.15s): choáng toàn bộ bản đồ tối đa 3s
+        if (p.holdT > 0.15) {
+          this.executeMammothRoar(p, true);
+          return;
+        }
+      }
       p.a = p.input.a;
       p.vx = Math.cos(p.a) * 62;
       p.vz = Math.sin(p.a) * 62;
@@ -1827,6 +1871,16 @@ export class World {
       return;
     }
 
+    if (p.species === 'mammoth') {
+      // Mammoth:
+      // Húc nhẹ (holdT <= 0.15s): lướt giống các con khác, gây dẹp lép và kill < 100kg trong this.hit
+      // Gồng (holdT > 0.15s): sóng âm tại chỗ, khuếch tán 1/4 bản đồ (~35m), choáng 0.5s - 1.5s, hồi chiêu 3s
+      if (p.holdT > 0.15) {
+        this.executeMammothRoar(p, false);
+        return;
+      }
+    }
+
     const d = dashParams(p.species, p.holdT, p.terrain);
     p.a = p.input.a;
     p.vx = Math.cos(p.a) * d.speed;
@@ -1837,6 +1891,67 @@ export class World {
     const baseCd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
     p.cd = baseCd + (d.plow ? CFG.PLOW_CD * (p.species === 'chicken' ? 0.65 : 1) : 0);
     p.dashHit.clear();
+  }
+
+  private executeMammothRoar(p: Player, isRainbow: boolean): void {
+    const clampedHold = Math.max(0.2, Math.min(1.2, p.holdT));
+    const ratio = (clampedHold - 0.2) / 1.0;
+    p.vx = 0;
+    p.vz = 0;
+    p.dashT = 0;
+    p.plow = false;
+    p.mammothRoarT = 1.0;
+    p.cd = 3.0; // Hồi chiêu 3s
+
+    if (isRainbow) {
+      // Siêu cầu vồng: toàn bộ bản đồ, choáng max 3s (1.0s đến 3.0s tuỳ thời gian gồng)
+      const stunDur = 1.0 + ratio * 2.0;
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id) continue;
+        other.stunT = Math.max(other.stunT, stunDur);
+        other.dashT = 0;
+        other.charging = false;
+        other.plow = false;
+        if (other.monkeyLeapT) other.monkeyLeapT = 0;
+        other.vx *= 0.2;
+        other.vz *= 0.2;
+      }
+      this.events.push({
+        k: 'mammothRoar',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        r: r2(CFG.R * 2),
+        dur: r2(stunDur),
+        rainbow: true,
+      });
+    } else {
+      // Sóng âm thường: 1/4 bản đồ tính từ tâm (bán kính 35m), choáng 0.5s đến 1.5s
+      const stunDur = 0.5 + ratio * 1.0;
+      const roarR = 35.0;
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id) continue;
+        const d = Math.hypot(other.x - p.x, other.z - p.z);
+        if (d <= roarR) {
+          other.stunT = Math.max(other.stunT, stunDur);
+          other.dashT = 0;
+          other.charging = false;
+          other.plow = false;
+          if (other.monkeyLeapT) other.monkeyLeapT = 0;
+          other.vx *= 0.2;
+          other.vz *= 0.2;
+        }
+      }
+      this.events.push({
+        k: 'mammothRoar',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        r: r2(roarR),
+        dur: r2(stunDur),
+        rainbow: false,
+      });
+    }
   }
 
   private spawnBananaCone(p: Player, count: number, giant: boolean): void {
@@ -2645,12 +2760,37 @@ export class World {
     vic.stunT = 0;
     vic.dashT = 0; vic.plow = false; vic.holdT = 0; vic.charging = false; vic.pressed = false;
     att.dashHit.add(vic.id);
-    if (att.plow) { att.vx *= 0.75; att.vz *= 0.75; }
+    if (att.plow || (att.species === 'mammoth' && vic.mass < 100)) { att.vx *= 0.8; att.vz *= 0.8; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
 
     // Elephant passive: when mass >= 1000kg, ramming instantly squashes & kills rivals under 50kg (like Farmer Till's tractor)
     if (att.species === 'elephant' && att.mass >= 1000 && vic.mass < 50) {
       vic.squishT = 2.8;
+      vic.stunT = 2.0;
+      vic.charging = false;
+      vic.dashT = 0;
+      vic.plow = false;
+      vic.lastHitBy = att.id;
+      vic.lastHitT = this.time;
+      att.lastAttackedId = vic.id;
+      att.lastAttackedT = this.time;
+      const rv = radiusOf(vic.mass);
+      this.events.push({
+        k: 'hit',
+        a: att.id,
+        v: vic.id,
+        x: r2(vic.x - nx * rv),
+        z: r2(vic.z - nz * rv),
+        s: Math.round(k),
+        loss: 0,
+      });
+      this.kill(vic, 'crush');
+      return;
+    }
+
+    // Mammoth passive: ramming instantly squashes & kills rivals under 100kg!
+    if (att.species === 'mammoth' && vic.mass < 100) {
+      vic.squishT = 3.0;
       vic.stunT = 2.0;
       vic.charging = false;
       vic.dashT = 0;
@@ -2752,8 +2892,11 @@ export class World {
     p.treeShakeTreeId = undefined;
     p.treeShakeTimer = undefined;
     p.treeShakeDropStage = undefined;
+    p.mammothRoarT = 0;
     if (p.species === 'gorilla') {
       p.species = 'monkey';
+    } else if (p.species === 'mammoth') {
+      p.species = 'elephant';
     }
     if (p.morphOrigSpecies) {
       p.species = p.morphOrigSpecies;
@@ -3064,7 +3207,8 @@ export class World {
         | (o.flyT > 0 ? FLAG.FLYING : 0)
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
         | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
-        | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0);
+        | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0)
+        | (o.mammothRoarT && o.mammothRoarT > 0 ? FLAG.MAMMOTH_ROAR : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;

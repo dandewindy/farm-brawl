@@ -2060,6 +2060,162 @@ describe('fruit trees', () => {
       expect(getEasterEggSpeciesFromName('')).toBeNull();
     });
   });
+
+  describe('mammoth mechanics', () => {
+    it('elephant evolves into mammoth at 3000kg and reverts below 1000kg', () => {
+      const w = emptyWorld();
+      const pId = w.addPlayer('Dumbo', 'elephant');
+      const p = w.players.get(pId)!;
+      expect(p.species).toBe('elephant');
+
+      // Reaching 3000kg evolves into mammoth
+      p.mass = 3000;
+      w.step();
+      expect(p.species).toBe('mammoth');
+      const morphEvent = w.events.find((e) => e.k === 'morph' && e.id === pId && e.species === 'mammoth');
+      expect(morphEvent).toBeDefined();
+
+      // Dropping below 1000kg reverts to elephant
+      p.mass = 999;
+      w.step();
+      expect(p.species).toBe('elephant');
+      const revertEvent = w.events.find((e) => e.k === 'morph' && e.id === pId && e.species === 'elephant');
+      expect(revertEvent).toBeDefined();
+    });
+
+    it('mammoth light ram (< 0.15s hold) crushes and kills animals under 100kg', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('Colossus', 'elephant');
+      const mammoth = place(w, mId, 0, 0, 3000);
+      w.step();
+      expect(mammoth.species).toBe('mammoth');
+
+      // Small animal (< 100kg)
+      const pigId = w.addPlayer('TinyPig', 'pig');
+      const pig = place(w, pigId, 2.0, 0, 80);
+
+      // Light ram (hold <= 0.15)
+      mammoth.input.a = 0;
+      mammoth.input.btn = false;
+      mammoth.holdT = 0.1;
+      mammoth.pressed = true;
+
+      w.step();
+
+      expect(pig.alive).toBe(false);
+      expect(pig.squishT).toBeGreaterThan(0);
+      const crushEvent = w.events.find((e) => e.k === 'die' && e.id === pigId && e.cause === 'crush');
+      expect(crushEvent).toBeDefined();
+
+      // Animal >= 100kg is not crushed
+      const cowId = w.addPlayer('BigCow', 'cow');
+      const cow = place(w, cowId, 2.0, 0, 150);
+      mammoth.cd = 0;
+      mammoth.input.a = 0;
+      mammoth.input.btn = false;
+      mammoth.holdT = 0.1;
+      mammoth.pressed = true;
+
+      w.step();
+
+      expect(cow.alive).toBe(true);
+      expect(cow.mass).toBeLessThan(150); // lost mass from normal hit
+    });
+
+    it('mammoth charged ability (> 0.15s hold) emits sonic roar wave stunning surrounding animals up to 1.5s with 3s cd', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('Roarer', 'elephant');
+      const mammoth = place(w, mId, 0, 0, 3000);
+      w.step();
+      expect(mammoth.species).toBe('mammoth');
+
+      // Rivals at various distances
+      const r1Id = w.addPlayer('Rival1', 'pig');
+      const rival1 = place(w, r1Id, 15, 0, 150);
+
+      const r2Id = w.addPlayer('Rival2', 'horse');
+      const rival2 = place(w, r2Id, -25, 0, 200);
+
+      const r3Id = w.addPlayer('Rival3', 'cow');
+      const rival3 = place(w, r3Id, 50, 0, 300); // Beyond 35m radius
+
+      // Full charge (1.0s hold)
+      mammoth.input.btn = false;
+      mammoth.holdT = 1.0;
+      mammoth.pressed = true;
+
+      w.step();
+
+      // Mammoth stands in place and has 3.0s cooldown
+      expect(mammoth.dashT).toBe(0);
+      expect(mammoth.cd).toBeCloseTo(3.0, 1);
+      expect(mammoth.mammothRoarT).toBeGreaterThan(0);
+
+      // Rivals within 35m are stunned (~1.3s - 1.5s)
+      expect(rival1.stunT).toBeGreaterThanOrEqual(1.2);
+      expect(rival2.stunT).toBeGreaterThanOrEqual(1.2);
+
+      // Rival beyond 35m is untouched
+      expect(rival3.stunT).toBe(0);
+
+      const roarEvent = w.events.find((e) => e.k === 'mammothRoar' && e.id === mId && !e.rainbow) as any;
+      expect(roarEvent).toBeDefined();
+      expect(roarEvent.r).toBe(35);
+      expect(roarEvent.dur).toBeGreaterThanOrEqual(1.2);
+    });
+
+    it('mammoth rainbow super mode: tap dashes as normal, charge stuns entire map up to 3.0s', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('SuperMammoth', 'elephant');
+      const mammoth = place(w, mId, 0, 0, 3000);
+      w.step();
+      expect(mammoth.species).toBe('mammoth');
+      mammoth.superT = 10;
+
+      // Tap ram (hold <= 0.15s) dashes fast like normal rainbow
+      mammoth.input.a = 0;
+      mammoth.input.btn = false;
+      mammoth.holdT = 0.1;
+      mammoth.pressed = true;
+      w.step();
+      expect(mammoth.dashT).toBeGreaterThan(0);
+      expect(mammoth.flyT).toBeGreaterThan(0);
+
+      // Reset for charged roar
+      mammoth.dashT = 0;
+      mammoth.cd = 0;
+      const farRivalId = w.addPlayer('FarRival', 'cow');
+      const farRival = place(w, farRivalId, 65, 0, 300); // At edge of map
+
+      mammoth.input.btn = false;
+      mammoth.holdT = 1.0;
+      mammoth.pressed = true;
+      w.step();
+
+      // Far rival across entire map is stunned up to 3.0s
+      expect(farRival.stunT).toBeGreaterThanOrEqual(2.5);
+
+      const roarEvent = w.events.find((e) => e.k === 'mammothRoar' && e.id === mId && e.rainbow) as any;
+      expect(roarEvent).toBeDefined();
+      expect(roarEvent.dur).toBeGreaterThanOrEqual(2.5);
+    });
+
+    it('other species charging dash normally without roar', () => {
+      const w = emptyWorld();
+      const pId = w.addPlayer('Boar', 'pig');
+      const pig = place(w, pId, 0, 0, 100);
+
+      pig.input.a = 0;
+      pig.input.btn = false;
+      pig.holdT = 1.0;
+      pig.pressed = true;
+      w.step();
+
+      expect(pig.dashT).toBeGreaterThan(0);
+      expect(pig.plow).toBe(true);
+      expect(pig.mammothRoarT).toBeFalsy();
+    });
+  });
 });
 
 

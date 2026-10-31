@@ -196,6 +196,7 @@ const SQUEAK: Record<Species, number> = {
   elephant: 180,
   monkey: 850,
   gorilla: 140,
+  mammoth: 120,
 };
 
 export function yelp(species: Species, vol = 1): void {
@@ -210,6 +211,15 @@ export function sfxGorillaRoar(vol = 1): void {
   tone('sawtooth', 140, 60, 0.55, 0.3 * vol, { delay: 0.03, attack: 0.05 });
   noise('bandpass', 350, 180, 2.5, 0.45, 0.35 * vol, { delay: 0.02 });
   tone('sine', 60, 30, 0.7, 0.6 * vol, { attack: 0.05 });
+}
+
+export function sfxMammothRoar(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('sawtooth', 180, 290, 0.45, 0.4 * vol, { attack: 0.08 });
+  tone('sawtooth', 290, 160, 0.75, 0.45 * vol, { delay: 0.35, attack: 0.06 });
+  tone('square', 145, 120, 0.9, 0.25 * vol, { delay: 0.1, attack: 0.05 });
+  tone('sine', 85, 35, 1.2, 0.65 * vol, { attack: 0.06 });
+  noise('bandpass', 450, 150, 3.0, 0.8, 0.35 * vol, { delay: 0.05 });
 }
 
 // Rising whine while a charged ram is winding up; level 0..1

@@ -70,6 +70,9 @@ export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
   gorilla: [
     'Gorilla Chúa', 'King Kong', 'Gorilla Lưng Bạc', 'Titan Gorilla', 'Đại Tinh Tinh',
   ],
+  mammoth: [
+    'Voi Ma Mút', 'Mammoth Đại Đế', 'Ma Mút Băng Hà', 'Titan Mammoth',
+  ],
 };
 
 export const SPECIES_NAMES_VI: Record<Species, string> = {
@@ -83,6 +86,7 @@ export const SPECIES_NAMES_VI: Record<Species, string> = {
   elephant: 'Voi',
   monkey: 'Khỉ',
   gorilla: 'Gorilla',
+  mammoth: 'Voi Ma Mút',
 };
 
 export const BOT_NAMES = Object.values(SPECIES_BOT_NAMES).flat();

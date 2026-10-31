@@ -4,7 +4,7 @@ import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
   cycleAudioMode, getAudioMode, type AudioMode,
@@ -1418,7 +1418,7 @@ function handleGameEvent(ev: GameEvent): void {
             yelp(vm.species, 0.4);
           }
           const FLUFF_COLORS: Record<Species, number> = {
-            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42,
+            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28,
           };
           foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
         }
@@ -1444,7 +1444,7 @@ function handleGameEvent(ev: GameEvent): void {
         yelp(vm.species, isMine ? 1 : 0.5);
       }
       const FLUFF_COLORS: Record<Species, number> = {
-        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42,
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -1972,6 +1972,22 @@ function handleGameEvent(ev: GameEvent): void {
       }
       break;
     }
+    case 'mammothRoar': {
+      const ringColor = ev.rainbow ? 0xffffff : 0x81d4fa;
+      animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r, ringColor);
+      if (ev.rainbow) {
+        animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.7, 0xffeb3b);
+        animals.spawnShockwave(ev.x, 0.16, ev.z, ev.r * 0.4, 0xff4081);
+      }
+      foodParts.burst(ev.x, 1.2, ev.z, ev.rainbow ? 0xffeb3b : 0x81d4fa, 24, 8, 8, 0.9);
+      sfxMammothRoar(ev.id === myId ? 1.0 : 0.7);
+      const me = gameState.ents.get(myId);
+      const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+      if (ev.id === myId || dist <= ev.r) {
+        shake = Math.max(shake, ev.rainbow ? 1.8 : 1.2);
+      }
+      break;
+    }
     case 'morph': {
       const targetMeta = gameState.metas.get(ev.id);
       if (targetMeta) {
@@ -2001,6 +2017,27 @@ function handleGameEvent(ev: GameEvent): void {
         } else {
           const m = gameState.metas.get(ev.id);
           hud.showToast(`🦍 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Gorilla!`);
+        }
+      } else if (ev.species === 'mammoth') {
+        const ent = gameState.ents.get(ev.id);
+        const mx = ent ? ent.x : 0;
+        const mz = ent ? ent.z : 0;
+        // Spectacular 3-stage evolution shockwave rings
+        animals.spawnShockwave(mx, 0.08, mz, 5.5, 0x8d6e63);
+        animals.spawnShockwave(mx, 0.12, mz, 4.0, 0xd7ccc8);
+        animals.spawnShockwave(mx, 0.16, mz, 2.5, 0xffd54f);
+        foodParts.burst(mx, 1.5, mz, 0x8d6e63, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffd54f, 24, 10, 10, 0.9);
+        sfxMammothRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🦣 ' + t('name_mammoth'), '✨ TIẾN HOÁ THÀNH VOI MA MÚT (MAMMOTH)! ✨');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🦣 TIẾN HOÁ MAMMOTH! 🦣', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        } else {
+          const m = gameState.metas.get(ev.id);
+          hud.showToast(`🦣 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Voi Ma Mút!`);
         }
       } else if (ev.id === myId) {
         sfxReward();

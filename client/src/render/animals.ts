@@ -37,6 +37,7 @@ interface AnimalVisual {
   waterRippleTimer?: number;
   arms?: THREE.Group[];
   tailSegments?: (THREE.Mesh | THREE.Group)[];
+  trunk?: THREE.Group;
   leapTimer?: number;
   morphTimer?: number;
   throwTimer?: number;
@@ -133,6 +134,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   elephant: 0x90a4ae,
   monkey: 0x8d5b38,
   gorilla: 0xff6d00,
+  mammoth: 0x8d6e63,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -196,6 +198,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0x242528, chest: 0x5a554e, face: 0x7a746d, crest: 0x18191b, silver: 0x787d86 }, // Silverback Alpha
     { body: 0x3e2f28, chest: 0x8a634e, face: 0x9a755e, crest: 0x2c201a, silver: 0x6e5e54 }, // Mountain Bronze
     { body: 0x1b1c1e, chest: 0x3e4046, face: 0x63666d, crest: 0x111214, silver: 0x54575f }, // Dark Obsidian
+  ],
+  mammoth: [
+    { body: 0x5a3d28, hump: 0x432815, skirt: 0x4a2e1c, tusk: 0xfcf7eb, innerEar: 0x7a4d33, toenails: 0xd4c8b8, tuft: 0x381f11 }, // Classic Warm Woolly Brown
+    { body: 0xedeae4, hump: 0xdcd8cf, skirt: 0xe2dfd8, tusk: 0xfffcf5, innerEar: 0xdec4c4, toenails: 0xe8e2d8, tuft: 0xbab4aa }, // Arctic Snow Mammoth
+    { body: 0x422616, hump: 0x2e170c, skirt: 0x361c0f, tusk: 0xfaeed2, innerEar: 0x54321d, toenails: 0xa8998a, tuft: 0x221107 }, // Dark Earth Mammoth
+    { body: 0x8c5b36, hump: 0x6e4221, skirt: 0x7a4b29, tusk: 0xfdf5e2, innerEar: 0x9e6d4c, toenails: 0xd0c0a8, tuft: 0x522f16 }, // Golden Tawny Mammoth
   ],
 };
 
@@ -721,6 +729,176 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
+function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0x5a3d28;
+  const humpColor = s.hump ?? 0x432815;
+  const skirtColor = s.skirt ?? 0x4a2e1c;
+  const tuskColor = s.tusk ?? 0xfcf7eb;
+  const innerEarColor = s.innerEar ?? 0x7a4d33;
+  const toenailsColor = s.toenails ?? 0xd4c8b8;
+  const tuftColor = s.tuft ?? 0x381f11;
+
+  // 1. Massive Woolly Torso with Sloping Back (Main shadow caster)
+  // Sloping gently downward from the large shoulder hump to the hindquarters (-0.14 rad)
+  const bodyGeo = new THREE.CapsuleGeometry(0.64, 0.82, 10, 18);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.40, 0, undefined, true);
+  bodyMesh.rotation.z = -0.14;
+  bodyMesh.scale.set(1.10, 1.15, 1.08);
+  g.add(bodyMesh);
+
+  // 2. High Woolly Shoulder Hump (Gù vai đặc trưng voi ma mút)
+  // Prominent elevated shoulder mass sloping down to the rump
+  const hump = blob(g, humpColor, 0.42, [1.15, 1.05, 0.95], 0.20, 1.82, 0);
+  hump.rotation.z = -0.18;
+
+  // 3. Shaggy Woolly Skirt along the Flanks (Lớp áo lông dài rủ hai bên sườn)
+  for (const z of [-0.44, 0.44]) {
+    // Front-mid flank woolly drape
+    const skirtF = blob(g, skirtColor, 0.35, [1.35, 0.90, 0.28], 0.12, 1.26, z);
+    skirtF.rotation.x = z > 0 ? 0.14 : -0.14;
+    // Rear flank woolly drape
+    const skirtR = blob(g, skirtColor, 0.32, [1.10, 0.85, 0.26], -0.32, 1.18, z);
+    skirtR.rotation.x = z > 0 ? 0.14 : -0.14;
+  }
+
+  // 4. Head, Cranial Dome & Forehead Fur Tuft (Đầu & Chỏm Trán Nhô Cao Đặc Trưng)
+  // Base head sphere
+  g.add(part(new THREE.SphereGeometry(0.50, 18, 14), bodyColor, 1.04, 1.74, 0));
+
+  // High Cranial Dome (Vòm đầu nhô cao)
+  blob(g, humpColor, 0.34, [0.90, 1.15, 1.05], 1.00, 2.12, 0);
+
+  // Iconic Forehead Fur Tuft / Crest (Túm lông bờm trên đỉnh trán như trong ảnh mẫu)
+  const tuftGroup = new THREE.Group();
+  tuftGroup.position.set(1.06, 2.34, 0);
+  // Layered forward-curved hair tuft
+  const crest1 = part(new THREE.CapsuleGeometry(0.12, 0.32, 8, 12), tuftColor, 0, 0, 0);
+  crest1.rotation.z = 0.45;
+  crest1.rotation.y = Math.PI / 2;
+  tuftGroup.add(crest1);
+
+  const crest2 = part(new THREE.CapsuleGeometry(0.09, 0.26, 8, 12), tuftColor, 0.08, -0.06, 0);
+  crest2.rotation.z = 0.70;
+  crest2.rotation.y = Math.PI / 2;
+  tuftGroup.add(crest2);
+
+  for (const tz of [-0.10, 0.10]) {
+    const sideTuft = part(new THREE.CapsuleGeometry(0.08, 0.22, 6, 8), tuftColor, 0.02, -0.04, tz);
+    sideTuft.rotation.z = 0.50;
+    sideTuft.rotation.x = tz > 0 ? 0.25 : -0.25;
+    tuftGroup.add(sideTuft);
+  }
+  g.add(tuftGroup);
+
+  // 5. Small Woolly Ears (Tai nhỏ giữ ấm thời kỳ băng hà)
+  for (const z of [-0.42, 0.42]) {
+    blob(g, bodyColor, 0.26, [0.72, 1.05, 0.16], 0.88, 1.82, z, [0, z > 0 ? -0.22 : 0.22, -0.12]);
+    blob(g, innerEarColor, 0.18, [0.65, 0.95, 0.12], 0.90, 1.82, z > 0 ? z - 0.02 : z + 0.02, [0, z > 0 ? -0.22 : 0.22, -0.12]);
+  }
+
+  // 6. Dynamic Animatable Trunk (Vòi voi cử động linh hoạt)
+  // Attached to cheek/mouth base, stored in g.userData.trunk so roar animation can raise it proudly!
+  const trunkGroup = new THREE.Group();
+  trunkGroup.position.set(1.28, 1.56, 0);
+
+  const trunkNodes: [number, number, number][] = [
+    [0.00, 0.00, 0.19],   // Node 0: Trunk root between tusks
+    [0.15, -0.20, 0.16],  // Node 1: Sloping down and forward
+    [0.26, -0.42, 0.135], // Node 2: Descending past chest
+    [0.32, -0.66, 0.115], // Node 3: Low curve
+    [0.44, -0.64, 0.098], // Node 4: Curving forward and up
+    [0.56, -0.48, 0.084], // Node 5: Curling upward
+    [0.54, -0.32, 0.072], // Node 6: Curled proud tip
+  ];
+
+  // Sphere joints at all nodes for smooth bending
+  for (const [nx, ny, nr] of trunkNodes) {
+    trunkGroup.add(part(new THREE.SphereGeometry(nr, 12, 10), bodyColor, nx, ny, 0));
+  }
+
+  // Tapered cylinder segments connecting consecutive nodes
+  for (let i = 0; i < trunkNodes.length - 1; i++) {
+    const [x0, y0, r0] = trunkNodes[i];
+    const [x1, y1, r1] = trunkNodes[i + 1];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    const segMesh = part(new THREE.CylinderGeometry(r1, r0, len, 12), bodyColor, (x0 + x1) / 2, (y0 + y1) / 2, 0);
+    segMesh.rotation.z = -Math.atan2(dx, dy);
+    trunkGroup.add(segMesh);
+  }
+
+  // Nostril indentations at the curled tip
+  for (const z of [-0.026, 0.026]) {
+    trunkGroup.add(part(new THREE.SphereGeometry(0.022, 6, 4), 0x241e1c, 0.51, -0.30, z));
+  }
+  g.userData.trunk = trunkGroup;
+  g.add(trunkGroup);
+
+  // 7. Majestic Mammoth Tusks (Đôi ngà voi ma mút khổng lồ uốn cong vút ngược lên)
+  // Roots start at cheeks, curve down-forward, sweep upward, and hook inwards at the tips!
+  for (const z of [-0.18, 0.18]) {
+    const sign = z > 0 ? 1 : -1;
+    // Fleshy cheek socket anchoring the tusk root
+    blob(g, bodyColor, 0.11, [1.1, 1.1, 1.1], 1.22, 1.35, z);
+
+    // Tusk curve keypoints: [x, y, zOffset, radius]
+    const tuskCurve: [number, number, number, number][] = [
+      [1.24, 1.34, z, 0.082],
+      [1.44, 1.12, z * 1.32, 0.076],
+      [1.74, 1.00, z * 1.48, 0.068],
+      [2.04, 1.26, z * 1.36, 0.055],
+      [1.96, 1.64, z * 1.06, 0.042],
+    ];
+
+    // Sphere joints connecting tusk segments
+    for (const [tx, ty, tz, tr] of tuskCurve) {
+      g.add(part(new THREE.SphereGeometry(tr, 12, 10), tuskColor, tx, ty, tz, { roughness: 0.26, metalness: 0.10 }));
+    }
+
+    // Cylinder segments connecting tusk nodes in 3D
+    for (let i = 0; i < tuskCurve.length - 1; i++) {
+      const [x0, y0, z0, r0] = tuskCurve[i];
+      const [x1, y1, z1, r1] = tuskCurve[i + 1];
+      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+      const len = Math.hypot(dx, dy, dz);
+      const seg = part(new THREE.CylinderGeometry(r1, r0, len, 12), tuskColor, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, { roughness: 0.26, metalness: 0.10 });
+      // Align cylinder orientation with 3D direction vector
+      const dir = new THREE.Vector3(dx, dy, dz).normalize();
+      seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      g.add(seg);
+    }
+
+    // Sharp curving tip cone pointing up & inward
+    const [lastX, lastY, lastZ, lastR] = tuskCurve[tuskCurve.length - 1];
+    const tipLen = 0.26;
+    const tipCone = part(new THREE.ConeGeometry(lastR, tipLen, 10), tuskColor, lastX - 0.10, lastY + 0.18, lastZ - sign * 0.06, { roughness: 0.26, metalness: 0.10 });
+    const tipDir = new THREE.Vector3(-0.45, 0.85, -sign * 0.28).normalize();
+    tipCone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tipDir);
+    g.add(tipCone);
+  }
+
+  // 8. Short Bushy Woolly Tail (Đuôi ngắn có chùm lông)
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.76, 1.36, 0);
+  tailGroup.rotation.z = -0.32;
+  const stemLen = 0.40;
+  tailGroup.add(part(new THREE.CylinderGeometry(0.034, 0.026, stemLen, 8), bodyColor, 0, -stemLen / 2, 0));
+  const tuftLen = 0.22;
+  tailGroup.add(part(new THREE.ConeGeometry(0.08, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0));
+  const tuftBall = part(new THREE.SphereGeometry(0.075, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0);
+  tuftBall.scale.set(0.9, 1.3, 0.9);
+  tailGroup.add(tuftBall);
+  g.add(tailGroup);
+
+  // 9. Expressive Eyes
+  addEyes(g, 1.32, 1.78, 0.37, 0.085);
+
+  // 10. Hefty Pillar Legs with Toenails (4 chân to như cột đình vững chắc)
+  return addLegs(g, s.legs ?? bodyColor, [[0.50, 0.35], [0.50, -0.35], [-0.50, 0.35], [-0.50, -0.35]], 1.05, 0.18, toenailsColor);
+}
+
 function buildMonkey(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const furColor = s.fur ?? 0x6e472b;
   const skinColor = s.skin ?? 0xf3cfb3;
@@ -1061,6 +1239,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   elephant: buildElephant,
   monkey: buildMonkey,
   gorilla: buildGorilla,
+  mammoth: buildMammoth,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -1151,14 +1330,15 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
-    case 'elephant': {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.045, 8, 24), mat);
-      band.position.set(0.72, 1.48, 0);
+    case 'elephant':
+    case 'mammoth': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.046, 8, 24), mat);
+      band.position.set(0.74, 1.50, 0);
       band.rotation.y = Math.PI / 2;
       band.rotation.x = 0.3;
       g.add(band);
-      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
-      medal.position.set(0.85, 1.34, 0);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 8), goldMat);
+      medal.position.set(0.88, 1.36, 0);
       g.add(medal);
       break;
     }
@@ -1200,6 +1380,7 @@ const HEAD: Record<Species, [number, number]> = {
   elephant: [0.95, 2.15],
   monkey: [0.12, 1.95],
   gorilla: [0.58, 2.15],
+  mammoth: [1.02, 2.30],
 };
 
 // Back of each species for the cape
@@ -1214,6 +1395,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   elephant: [-0.15, 1.35, 0.65, 0.65, 1.3],
   monkey: [-0.15, 1.10, 0.45, 0.45, 1.0],
   gorilla: [-0.15, 1.45, 0.65, 0.65, 1.35],
+  mammoth: [-0.15, 1.55, 0.70, 0.70, 1.45],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -1287,6 +1469,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     elephant: 0.28,
     monkey: 0.16,
     gorilla: 0.22,
+    mammoth: 0.28,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -1299,6 +1482,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     elephant: 0.08,
     monkey: 0.06,
     gorilla: 0.08,
+    mammoth: 0.10,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -1368,7 +1552,7 @@ export function buildWitchHat(species: Species): THREE.Group {
 
   const hatGroup = new THREE.Group();
   // Sit the hat snugly on the crown of each species' head
-  const yOffset = species === 'elephant' ? 0.18 : species === 'horse' ? 0.22 : species === 'cow' ? 0.18 : 0.14;
+  const yOffset = (species === 'elephant' || species === 'mammoth') ? 0.18 : species === 'horse' ? 0.22 : species === 'cow' ? 0.18 : 0.14;
   hatGroup.position.set(hx, hy + yOffset, 0);
   // Slight forward lean (toward the face) for style
   hatGroup.rotation.z = -0.12;
@@ -1602,6 +1786,7 @@ const LABEL_Y: Record<Species, number> = {
   elephant: 2.6,
   monkey: 2.2,
   gorilla: 2.6,
+  mammoth: 2.8,
 };
 
 function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -2087,6 +2272,7 @@ export class AnimalRenderer {
     const isWheel = (flags & FLAG.WHEEL) !== 0;
     const isMonkeyLeap = (flags & FLAG.MONKEY_LEAP) !== 0;
     const isTreeShake = (flags & FLAG.TREE_SHAKE) !== 0;
+    const isMammothRoar = (flags & FLAG.MAMMOTH_ROAR) !== 0;
     const lvl = (charge || 0) / 10;
 
     if (isMonkeyLeap) {
@@ -2104,7 +2290,7 @@ export class AnimalRenderer {
     setRainbow(vis, isSuper, now);
 
     // Continuous walking / dashing leg phase accumulation (elephant has slower strides; mud creates sluggish heavy stepping)
-    const legFreqMult = vis.species === 'elephant' ? 0.5 : 1.0;
+    const legFreqMult = (vis.species === 'elephant' || vis.species === 'mammoth') ? 0.5 : 1.0;
     const mudSpeedMult = isMud && !isSuper ? 0.65 : 1.0;
     vis.phase += dt * (isDashing ? 26 : 8 + Math.min(10, speed * 12)) * legFreqMult * mudSpeedMult;
     const r = radiusOf(mass);
@@ -2467,6 +2653,21 @@ export class AnimalRenderer {
       });
     }
 
+    // Mammoth dynamic trunk animation & Roar ability
+    if (vis.trunk) {
+      if (isMammothRoar) {
+        // Rearing up and raising trunk high into the sky!
+        vis.trunk.rotation.z = 0.95 + Math.sin(now * 0.02) * 0.12;
+        vis.trunk.rotation.y = Math.cos(now * 0.015) * 0.08;
+        vis.body.rotation.z = -0.18 + Math.sin(now * 0.02) * 0.05; // rear back
+      } else {
+        // Natural gentle swaying trunk while walking or idle
+        const sway = Math.sin(vis.phase) * 0.16;
+        vis.trunk.rotation.z = sway * 0.6;
+        vis.trunk.rotation.y = Math.sin(now * 0.003) * 0.06;
+      }
+    }
+
     // Under-foot dark mud patches (prominent black mud pools on ground under each foot)
     if (vis.mudSplats && vis.mudSplats.length > 0) {
       const inMud = isMud && !isSuper;
@@ -2817,6 +3018,7 @@ export class AnimalRenderer {
       skin: meta.skin,
       arms: body.userData.arms,
       tailSegments: body.userData.tail,
+      trunk: body.userData.trunk,
       label,
       labelKey: meta.name,
       regalia,

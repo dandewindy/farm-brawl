@@ -55,6 +55,7 @@ export const FLAG = {
   WHEEL: 131072,
   MONKEY_LEAP: 262144,
   TREE_SHAKE: 524288,
+  MAMMOTH_ROAR: 1048576,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
@@ -126,6 +127,7 @@ export type GameEvent =
   | { k: 'bananaHit'; id: number; x: number; z: number; giant: boolean; tier?: number }
   | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number }
   | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number; isGorilla?: boolean; inWater?: boolean }
+  | { k: 'mammothRoar'; id: number; x: number; z: number; r: number; dur: number; rainbow?: boolean }
   | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
