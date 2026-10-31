@@ -630,6 +630,36 @@ export class FoodAndParticleRenderer {
     }
   }
 
+  smokePoof(x: number, y: number, z: number, radius = 1.8, count = 40): void {
+    const whiteShades = [0xffffff, 0xfbfcfe, 0xf1f5f9, 0xe2e8f0, 0xdbe4ee];
+    const available = Math.min(count, this.maxParticles - this.particles.length);
+    for (let i = 0; i < available; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const isCore = Math.random() < 0.6;
+      // Core particles form a thick cloud around the center; outer particles burst outwards in a radial ring
+      const dist = isCore ? (Math.random() * 0.75 * radius) : ((0.65 + Math.random() * 0.85) * radius);
+      const spd = isCore ? (0.8 + Math.random() * 2.2) : (2.6 + Math.random() * 4.5);
+      const life = 0.9 + Math.random() * 0.7; // 0.9s to 1.6s
+      const colHex = whiteShades[Math.floor(Math.random() * whiteShades.length)];
+      // Smoke puff size scaled to character radius
+      const pSize = (isCore ? (1.5 + Math.random() * 1.8) : (0.9 + Math.random() * 1.2)) * Math.max(0.7, radius * 0.6);
+
+      this.particles.push({
+        x: x + Math.cos(angle) * dist,
+        y: y + (isCore ? (Math.random() - 0.25) * radius * 0.9 : Math.random() * 0.3),
+        z: z + Math.sin(angle) * dist,
+        vx: Math.cos(angle) * spd,
+        vy: 1.4 + Math.random() * 3.4, // Billows up
+        vz: Math.sin(angle) * spd,
+        life,
+        maxLife: life,
+        color: new THREE.Color(colHex),
+        size: pSize,
+        g: -0.65, // Floats and rises naturally against gravity
+      });
+    }
+  }
+
   fluff(x: number, z: number, colorHex: number, count = 8): void {
     const col = new THREE.Color(colorHex);
     for (let i = 0; i < count && this.particles.length < this.maxParticles; i++) {

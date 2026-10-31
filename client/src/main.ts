@@ -38,6 +38,7 @@ const animals = new AnimalRenderer(world.scene);
 const corpses = new CorpseRenderer(world.scene);
 const foodParts = new FoodAndParticleRenderer(world.scene);
 animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
+animals.onSmokePoof = (x, y, z, r, count) => foodParts.smokePoof(x, y, z, r, count);
 animals.onRainbowTrail = (x, y, z, a, r, isDash) => foodParts.rainbowTrail(x, y, z, a, r, isDash);
 animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
@@ -2030,16 +2031,23 @@ function handleGameEvent(ev: GameEvent): void {
       if (vis) {
         vis.morphTimer = 1.6;
       }
+      const ent = gameState.ents.get(ev.id);
+      const mx = ent ? ent.x : (vis ? vis.lastX : 0);
+      const mz = ent ? ent.z : (vis ? vis.lastZ : 0);
+      const r = ent ? radiusOf(ent.mass) : 1.8;
+
+      // Spectacular billowing white smoke cloud on every animal morph & upgrade!
+      foodParts.smokePoof(mx, 1.2, mz, Math.max(1.8, r * 1.4), 45);
+      animals.spawnShockwave(mx, 0.08, mz, Math.max(2.5, r * 1.6), 0xffffff);
+
       if (ev.species === 'gorilla') {
-        const ent = gameState.ents.get(ev.id);
-        const mx = ent ? ent.x : 0;
-        const mz = ent ? ent.z : 0;
         // Spectacular 3-stage evolution shockwave rings
         animals.spawnShockwave(mx, 0.08, mz, 5.0, 0xffd700);
         animals.spawnShockwave(mx, 0.12, mz, 3.5, 0xff6d00);
         animals.spawnShockwave(mx, 0.16, mz, 2.0, 0x4fc3f7);
         foodParts.burst(mx, 1.5, mz, 0xffd700, 36, 12, 12, 1.2);
         foodParts.burst(mx, 1.8, mz, 0xff6d00, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
@@ -2052,15 +2060,13 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showToast(`🦍 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Gorilla!`);
         }
       } else if (ev.species === 'mammoth') {
-        const ent = gameState.ents.get(ev.id);
-        const mx = ent ? ent.x : 0;
-        const mz = ent ? ent.z : 0;
         // Spectacular 3-stage evolution shockwave rings
         animals.spawnShockwave(mx, 0.08, mz, 5.5, 0x8d6e63);
         animals.spawnShockwave(mx, 0.12, mz, 4.0, 0xd7ccc8);
         animals.spawnShockwave(mx, 0.16, mz, 2.5, 0xffd54f);
         foodParts.burst(mx, 1.5, mz, 0x8d6e63, 36, 12, 12, 1.2);
         foodParts.burst(mx, 1.8, mz, 0xffd54f, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
         sfxMammothRoar(ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
@@ -2072,12 +2078,15 @@ function handleGameEvent(ev: GameEvent): void {
           const m = gameState.metas.get(ev.id);
           hud.showToast(`🦣 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Voi Ma Mút!`);
         }
-      } else if (ev.id === myId) {
-        sfxReward();
-        hud.showBanner(
-          ev.species === 'monkey' ? '🐒 ' + t('name_monkey') : '🐘 ' + t('name_elephant'),
-          ev.dur > 0 ? t('tk_banana') : t('sp_' + ev.species)
-        );
+      } else {
+        foodParts.smokePoof(mx, 1.2, mz, Math.max(1.6, r * 1.3), 40);
+        if (ev.id === myId) {
+          sfxReward();
+          hud.showBanner(
+            ev.species === 'monkey' ? '🐒 ' + t('name_monkey') : '🐘 ' + t('name_elephant'),
+            ev.dur > 0 ? t('tk_banana') : t('sp_' + ev.species)
+          );
+        }
       }
       break;
     }

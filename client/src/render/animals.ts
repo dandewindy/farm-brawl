@@ -27,6 +27,8 @@ interface AnimalVisual {
   dust: number;
   rainbow: [THREE.Mesh, THREE.Material][] | null;
   wasSuper: boolean;
+  wasWheel?: boolean;
+  wasKing?: boolean;
   trailX?: number;
   trailZ?: number;
   shockwaveTimer?: number;
@@ -2018,6 +2020,7 @@ export class AnimalRenderer {
   onPuff?: (x: number, y: number, z: number, color: number, size?: number, life?: number, vy?: number) => void;
   onRainbowTrail?: (x: number, y: number, z: number, angle: number, r: number, isDash: boolean) => void;
   onSonicWave?: (x: number, y: number, z: number, r: number) => void;
+  onSmokePoof?: (x: number, y: number, z: number, r?: number, count?: number) => void;
 
   spawnShockwave(x: number, y: number, z: number, r: number, color = 0x64d8cb): void {
     let sw = this.shockwavePool.find((s) => !s.active);
@@ -2138,13 +2141,25 @@ export class AnimalRenderer {
 
   getVisual(id: number, meta?: PlayerMeta): AnimalVisual | undefined {
     let vis = this.visuals.get(id);
+    let speciesChanged = false;
+    let oldX = 0, oldY = 0, oldZ = 0, oldR = 1.8;
     if (vis && meta && vis.species !== meta.species) {
+      speciesChanged = true;
+      oldX = vis.lastX;
+      oldY = vis.visualY || 0;
+      oldZ = vis.lastZ;
+      oldR = Math.max(1.4, (vis.root.scale.x / 1.35) || 1.8);
       this.remove(id);
       vis = undefined;
     }
     if (!vis && meta) {
       const isMe = id === this.myId;
       vis = this.buildAnimal(meta, isMe);
+      if (speciesChanged) {
+        vis.morphTimer = 1.6;
+        this.onSmokePoof?.(oldX, oldY + 0.8, oldZ, oldR, 42);
+        this.spawnShockwave(oldX, oldY + 0.08, oldZ, oldR * 1.5, 0xffffff);
+      }
       this.visuals.set(id, vis);
       this.group.add(vis.root);
     }
@@ -2308,6 +2323,34 @@ export class AnimalRenderer {
       y -= 0.08 * sc;
     }
 
+    // State change & upgrade: Super Rainbow mode
+    if (isSuper && !vis.wasSuper) {
+      this.onSmokePoof?.(x, y + 0.8, z, r * 1.4, 34);
+      this.spawnShockwave(x, y + 0.08, z, r * 1.6, 0xffffff);
+      vis.morphTimer = 0.6;
+    } else if (!isSuper && vis.wasSuper) {
+      this.onSmokePoof?.(x, y + 0.6, z, r * 1.1, 20);
+    }
+    vis.wasSuper = isSuper;
+
+    // State change & upgrade: Wheel Cart transformation
+    if (isWheel && !vis.wasWheel) {
+      this.onSmokePoof?.(x, y + 0.8, z, r * 1.5, 36);
+      this.spawnShockwave(x, y + 0.08, z, r * 1.7, 0xffffff);
+    } else if (!isWheel && vis.wasWheel) {
+      this.onSmokePoof?.(x, y + 0.8, z, r * 1.3, 28);
+      this.spawnShockwave(x, y + 0.08, z, r * 1.4, 0xffffff);
+    }
+    vis.wasWheel = isWheel;
+
+    // State change & upgrade: King coronation
+    if (isKing && !vis.wasKing) {
+      this.onSmokePoof?.(x, y + 1.0, z, r * 1.6, 36);
+      this.spawnShockwave(x, y + 0.08, z, r * 1.8, 0xffd700);
+      this.spawnShockwave(x, y + 0.12, z, r * 1.4, 0xffffff);
+    }
+    vis.wasKing = isKing;
+
     if (isWater && !isSuper) {
       vis.waterT = Math.min(3.0, (vis.waterT || 0) + dt);
     } else {
@@ -2464,17 +2507,29 @@ export class AnimalRenderer {
       baseSx *= morphScale;
       baseSy *= morphScale;
       baseSz *= morphScale;
-      // High-energy swirling golden/amber sparks rising around evolving animal
-      if (this.onPuff && Math.random() < 0.55) {
-        const pColor = Math.random() < 0.6 ? 0xffd700 : (Math.random() < 0.5 ? 0xff6d00 : 0xffee58);
+      // Billowing white smoke clouds swirling around the morphing animal!
+      if (this.onPuff && Math.random() < 0.72) {
+        const whiteCol = Math.random() < 0.65 ? 0xffffff : (Math.random() < 0.5 ? 0xf1f5f9 : 0xe2e8f0);
         this.onPuff(
-          x + (Math.random() - 0.5) * 1.8 * r,
-          0.6 + Math.random() * 2.2 * r,
-          z + (Math.random() - 0.5) * 1.8 * r,
+          x + (Math.random() - 0.5) * 1.6 * r,
+          0.3 + Math.random() * 1.8 * r,
+          z + (Math.random() - 0.5) * 1.6 * r,
+          whiteCol,
+          (1.1 + Math.random() * 0.7) * r,
+          0.75 + Math.random() * 0.45,
+          1.8 + Math.random() * 1.4
+        );
+      }
+      if (this.onPuff && Math.random() < 0.25) {
+        const pColor = Math.random() < 0.5 ? 0xffd700 : 0xffee58;
+        this.onPuff(
+          x + (Math.random() - 0.5) * 1.4 * r,
+          0.6 + Math.random() * 1.6 * r,
+          z + (Math.random() - 0.5) * 1.4 * r,
           pColor,
-          (0.7 + Math.random() * 0.4) * r,
-          0.85,
-          2.6
+          0.45 * r,
+          0.6,
+          2.4
         );
       }
     }
@@ -3039,6 +3094,8 @@ export class AnimalRenderer {
       dust: 0,
       rainbow: null,
       wasSuper: false,
+      wasWheel: false,
+      wasKing: false,
       shockwaveTimer: 0,
       rainbowTimer: 0,
       mudSplats,
