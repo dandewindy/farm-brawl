@@ -843,180 +843,154 @@ function buildMonkey(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 }
 
 function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  // Low-poly faceted sculpture gorilla matching reference images (media_1793431359334_96565256.png)
-  const furColor = s.body ?? 0x34373d;
-  const chestColor = s.chest ?? 0x78604d;
-  const faceColor = s.face ?? 0x8a705a;
-  const crestColor = s.crest ?? 0x222428;
-  const silverColor = s.silver ?? 0x686d75;
-  const eyeColor = 0x0f1012;
-  const facetOpts = { flatShading: true, roughness: 0.85 };
+  // Smooth rounded cartoon gorilla matching Farm Brawl art style (pig, monkey, cow)
+  const furColor = s.body ?? 0x2b2d32;     // Smooth dark charcoal ape fur
+  const chestColor = s.chest ?? 0x6e6862;   // Warm tan/grey chest & belly
+  const faceColor = s.face ?? 0x82776c;    // Warm tan ape face mask
+  const crestColor = s.crest ?? 0x212327;   // Dark sagittal crown
+  const silverColor = s.silver ?? 0x727882;  // Silverback saddle
+  const eyeColor = 0x141210;
 
-  // 1. Massive Low-Poly Torso (V-shape taper, tilted forward for knuckle-walking)
-  const torsoGeo = new THREE.IcosahedronGeometry(0.55, 1);
-  const torso = part(torsoGeo, furColor, 0, 1.25, 0, facetOpts, true);
-  torso.scale.set(1.15, 1.30, 1.05);
-  torso.rotation.x = 0.28; // Tilted forward into knuckles
-  g.add(torso);
+  // =========================================================================
+  // 1. Massive Upper Torso (Ngực & vai đồ sộ - to hơn mông)
+  // =========================================================================
+  // Main Upper Chest Sphere (rộng ngang Z, nhô ra trước tại x=0.18, y=1.36)
+  const chestMesh = blob(g, furColor, 0.56, [1.18, 1.02, 1.28], 0.18, 1.36, 0, undefined, true);
+  chestMesh.rotation.z = -0.16;
 
-  // 2. Trapezius / Back Hump (gives the hunched muscular alpha silhouette)
-  const humpGeo = new THREE.DodecahedronGeometry(0.42, 0);
-  const hump = part(humpGeo, furColor, -0.06, 1.58, 0, facetOpts, true);
-  hump.scale.set(1.10, 0.85, 1.22);
-  g.add(hump);
+  // Muscular Trapezius / Neck Hump behind head
+  const trapHump = blob(g, furColor, 0.44, [1.02, 0.88, 1.14], -0.02, 1.58, 0, undefined, true);
+  trapHump.rotation.z = 0.12;
 
-  // 3. Silverback Saddle on upper back / flanks
-  const saddleGeo = new THREE.BoxGeometry(0.48, 0.36, 0.88);
-  const saddle = part(saddleGeo, silverColor, -0.22, 1.30, 0, facetOpts);
-  saddle.rotation.z = -0.35;
-  g.add(saddle);
-
-  // 4. Faceted Pectoral Chest: 2 prominent muscular chest plates
+  // Pectoral Chest Plates (smooth rounded tan chest pads on front)
   for (const z of [-0.22, 0.22]) {
-    const pecGeo = new THREE.BoxGeometry(0.36, 0.32, 0.24);
-    const pec = part(pecGeo, chestColor, 0.44, 1.32, z, facetOpts);
-    pec.rotation.z = -0.35;
-    pec.rotation.y = z > 0 ? 0.20 : -0.20;
-    g.add(pec);
+    blob(g, chestColor, 0.27, [0.82, 1.06, 1.08], 0.45, 1.34, z, [0, 0, -0.32]);
   }
 
-  // 5. Faceted Abdominal Muscle Plate (Abs)
-  const absGeo = new THREE.BoxGeometry(0.28, 0.34, 0.30);
-  const abs = part(absGeo, chestColor, 0.38, 1.02, 0, facetOpts);
-  abs.rotation.z = -0.28;
-  g.add(abs);
+  // Smooth Abdominal Belly Pad
+  blob(g, chestColor, 0.24, [0.88, 1.02, 0.86], 0.36, 1.04, 0, [0, 0, -0.22]);
 
-  // 6. Rounded & Protruding Ape Head Group (curved skull, sagittal crest, brow ridge, round cheeks, protruding muzzle & jaw)
+  // =========================================================================
+  // 2. Lower Torso & Pelvis (Thân dưới / mông - nhỏ hơn ngực & vai một chút)
+  // =========================================================================
+  // Pelvis / Buttocks: nhỏ hơn ngực (bán kính 0.44 vs 0.56, hẹp hơn theo Z)
+  const pelvis = blob(g, furColor, 0.44, [1.04, 0.95, 0.96], -0.32, 1.14, 0, undefined, true);
+  pelvis.rotation.z = 0.10;
+
+  // Silverback Saddle across lower/mid back
+  blob(g, silverColor, 0.38, [0.95, 0.42, 1.08], -0.25, 1.34, 0, [0, 0, -0.28]);
+
+  // Solid hip sockets that embed the hind legs completely into the body
+  for (const z of [-0.30, 0.30]) {
+    blob(g, furColor, 0.22, [1.0, 1.0, 1.0], -0.34, 0.96, z);
+  }
+
+  // =========================================================================
+  // 3. Smooth Gorilla Head (Vòm sọ tròn, sagittal dome, gờ mày ape, mõm & mũi hơi lồi)
+  // =========================================================================
   const headGroup = new THREE.Group();
-  headGroup.position.set(0.52, 1.62, 0);
+  headGroup.position.set(0.50, 1.60, 0);
 
-  // Skull base (rounded low-poly sphere: curved, powerful, rounded ape cranial dome)
-  const skullGeo = new THREE.SphereGeometry(0.33, 14, 10);
-  const skull = part(skullGeo, furColor, 0, 0, 0, facetOpts);
-  skull.scale.set(1.05, 1.0, 0.96);
+  // Rounded Cranial Dome (Vòm đầu tròn trịa)
+  const skull = part(new THREE.SphereGeometry(0.35, 22, 16), furColor, 0, 0, 0);
+  skull.scale.set(1.06, 1.02, 0.98);
   headGroup.add(skull);
 
-  // Sagittal Crest (rounded muscular cranial ridge)
-  const crestGeo = new THREE.ConeGeometry(0.18, 0.44, 6);
-  const crest = part(crestGeo, crestColor, -0.06, 0.30, 0, facetOpts);
-  crest.scale.set(0.9, 1.0, 0.65);
-  crest.rotation.z = 0.28;
-  headGroup.add(crest);
+  // Smooth Rounded Sagittal Crest (Đỉnh đầu ape gồ cong mềm mại)
+  blob(headGroup, crestColor, 0.18, [1.25, 0.82, 0.60], -0.05, 0.28, 0, [0, 0, 0.16]);
 
-  // Heavy Arched Brow Ridge (rounded overhang above eyes)
-  const browGeo = new THREE.CylinderGeometry(0.08, 0.085, 0.46, 8);
+  // Heavy Arched Brow Ridge (Gờ mày ape vắt cong trên trán)
+  const browGeo = new THREE.CapsuleGeometry(0.07, 0.38, 8, 14);
   browGeo.rotateZ(Math.PI / 2);
-  const brow = part(browGeo, furColor, 0.22, 0.10, 0, facetOpts);
-  brow.scale.set(1.0, 1.0, 1.05);
+  const brow = part(browGeo, furColor, 0.24, 0.17, 0);
+  brow.scale.set(1.05, 0.95, 1.08);
   headGroup.add(brow);
 
-  // Deep recessed eyes
-  for (const z of [-0.10, 0.10]) {
-    const eyeSocket = part(new THREE.BoxGeometry(0.09, 0.07, 0.09), eyeColor, 0.22, 0.07, z, facetOpts);
-    headGroup.add(eyeSocket);
-    const glint = part(new THREE.BoxGeometry(0.035, 0.035, 0.035), 0xffffff, 0.26, 0.085, z > 0 ? z - 0.015 : z + 0.015);
-    headGroup.add(glint);
-  }
+  // Main Face Mask (Vùng mặt tan/da ape ôm trọn mắt và gò má giống phong cách Farm Brawl)
+  blob(headGroup, faceColor, 0.26, [0.85, 1.05, 1.02], 0.20, 0.04, 0);
 
-  // Rounded Full Cheeks (makes face rounder as requested)
+  // Rounded Cheeks (Hai má mở rộng hai bên mặt)
   for (const z of [-0.20, 0.20]) {
-    const cheekGeo = new THREE.SphereGeometry(0.15, 10, 8);
-    const cheek = part(cheekGeo, faceColor, 0.16, -0.06, z, facetOpts);
-    cheek.scale.set(1.1, 0.95, 0.85);
-    headGroup.add(cheek);
+    blob(headGroup, faceColor, 0.16, [0.95, 0.95, 0.82], 0.18, -0.04, z);
   }
 
-  // Protruding Upper Muzzle & Nose Pad ("lồi miệng ra")
-  const upperMuzzleGeo = new THREE.CapsuleGeometry(0.13, 0.16, 6, 10);
-  upperMuzzleGeo.rotateZ(Math.PI / 2);
-  const upperMuzzle = part(upperMuzzleGeo, faceColor, 0.28, -0.02, 0, facetOpts);
-  upperMuzzle.scale.set(1.15, 0.95, 1.15);
-  headGroup.add(upperMuzzle);
+  // Cute, expressive cartoon eyes sitting on the facial mask
+  addEyes(headGroup, 0.32, 0.10, 0.12, 0.065);
 
-  // Dual dark flaring gorilla nostrils
-  for (const z of [-0.05, 0.05]) {
-    const nostril = part(new THREE.BoxGeometry(0.045, 0.05, 0.045), eyeColor, 0.38, -0.01, z, facetOpts);
+  // Protruding Snout & Nose Pad (Mũi hơi lồi ra phía trước)
+  blob(headGroup, faceColor, 0.18, [1.12, 0.82, 1.02], 0.31, 0.0, 0);
+
+  // Two cute distinct dark ape nostrils
+  for (const z of [-0.052, 0.052]) {
+    const nostril = part(new THREE.SphereGeometry(0.034, 8, 6), eyeColor, 0.44, 0.005, z);
     headGroup.add(nostril);
   }
 
-  // Protruding Lower Muzzle & Mouth/Jaw (prominent ape prognathism)
-  const lowerMuzzleGeo = new THREE.CapsuleGeometry(0.12, 0.15, 6, 10);
-  lowerMuzzleGeo.rotateZ(Math.PI / 2);
-  const lowerMuzzle = part(lowerMuzzleGeo, faceColor, 0.31, -0.15, 0, facetOpts);
-  lowerMuzzle.scale.set(1.2, 0.9, 1.1);
-  lowerMuzzle.rotation.z = -0.18;
-  headGroup.add(lowerMuzzle);
+  // Lower Muzzle & Mouth/Jaw (Miệng & quai hàm hơi lồi)
+  blob(headGroup, faceColor, 0.19, [1.15, 0.86, 0.98], 0.31, -0.14, 0, [0, 0, -0.15]);
 
-  // Indented mouth slit
-  const mouth = part(new THREE.BoxGeometry(0.05, 0.025, 0.20), eyeColor, 0.40, -0.13, 0, facetOpts);
-  mouth.rotation.z = -0.16;
+  // Smooth indented mouth line
+  const mouthGeo = new THREE.CapsuleGeometry(0.018, 0.18, 4, 8);
+  mouthGeo.rotateZ(Math.PI / 2);
+  const mouth = part(mouthGeo, eyeColor, 0.43, -0.13, 0);
   headGroup.add(mouth);
 
-  // Chin under-jaw plate (anchors mouth into jaw/throat)
-  const chin = part(new THREE.BoxGeometry(0.18, 0.14, 0.24), furColor, 0.24, -0.22, 0, facetOpts);
-  chin.rotation.z = -0.25;
-  headGroup.add(chin);
+  // Chin under-throat transition
+  blob(headGroup, furColor, 0.18, [1.0, 0.85, 0.95], 0.20, -0.22, 0, [0, 0, -0.20]);
 
-  // Small rounded ape ears
-  for (const z of [-0.29, 0.29]) {
-    const earGeo = new THREE.SphereGeometry(0.08, 8, 6);
-    const ear = part(earGeo, faceColor, -0.04, 0.05, z, facetOpts);
-    ear.scale.set(0.6, 1.1, 0.8);
-    headGroup.add(ear);
+  // Rounded C-shaped ape ears
+  for (const z of [-0.30, 0.30]) {
+    blob(headGroup, furColor, 0.11, [0.55, 1.10, 1.0], -0.02, 0.05, z);
+    blob(headGroup, faceColor, 0.07, [0.50, 1.0, 0.85], -0.01, 0.05, z > 0 ? z - 0.015 : z + 0.015);
   }
 
   g.add(headGroup);
 
-  // 7. Front Knuckle-Walking Arms (Shoulder Deltoids -> Biceps -> Forearms -> Grounded Knuckle Fists)
+  // =========================================================================
+  // 4. Front Knuckle-Walking Arms (Vai tròn cơ bắp -> Cánh tay -> Nắm đấm tiếp đất)
+  // =========================================================================
   const arms: THREE.Group[] = [];
-  for (const z of [-0.56, 0.56]) {
+  for (const z of [-0.52, 0.52]) {
     const armPivot = new THREE.Group();
-    armPivot.position.set(0.32, 1.48, z);
-    armPivot.userData.origY = 1.48;
+    armPivot.position.set(0.30, 1.45, z);
+    armPivot.userData.origY = 1.45;
 
-    // Shoulder Deltoid boulder (faceted icosahedron)
-    const shoulderGeo = new THREE.IcosahedronGeometry(0.26, 0);
-    const shoulder = part(shoulderGeo, furColor, 0, 0, 0, facetOpts, true);
-    shoulder.scale.set(1.2, 1.1, 1.1);
-    armPivot.add(shoulder);
+    // Shoulder Deltoid: massive smooth sphere
+    blob(armPivot, furColor, 0.28, [1.15, 1.10, 1.12], 0, 0, 0, undefined, true);
 
-    // Upper Arm (massive faceted cylinder)
-    const upperLen = 0.48;
-    const upperArmGeo = new THREE.CylinderGeometry(0.19, 0.16, upperLen, 6);
-    const upperArm = part(upperArmGeo, furColor, 0.04, -upperLen / 2, 0, facetOpts, true);
-    upperArm.rotation.z = -0.22;
+    // Upper Arm: smooth capsule
+    const upperLen = 0.46;
+    const upperArm = part(new THREE.CapsuleGeometry(0.18, upperLen, 10, 16), furColor, 0.03, -upperLen / 2, 0, undefined, true);
+    upperArm.rotation.z = -0.20;
     upperArm.rotation.x = z > 0 ? 0.08 : -0.08;
     armPivot.add(upperArm);
 
-    // Elbow Joint Group attached at (0.08, -upperLen, 0)
+    // Elbow Joint
     const elbowJoint = new THREE.Group();
-    elbowJoint.position.set(0.08, -upperLen, 0);
-    elbowJoint.rotation.z = -0.15;
+    elbowJoint.position.set(0.07, -upperLen, 0);
+    elbowJoint.rotation.z = -0.14;
 
-    // Elbow joint cap
-    const elbowCap = part(new THREE.DodecahedronGeometry(0.16, 0), furColor, 0, 0, 0, facetOpts, true);
-    elbowJoint.add(elbowCap);
+    blob(elbowJoint, furColor, 0.16, [1, 1, 1], 0, 0, 0, undefined, true);
 
-    // Forearm (thick faceted muscle pointing down to knuckles)
-    const foreLen = 0.52;
-    const foreGeo = new THREE.CylinderGeometry(0.17, 0.15, foreLen, 6);
-    const forearm = part(foreGeo, furColor, 0.04, -foreLen / 2, 0, facetOpts, true);
+    // Forearm: thick muscular capsule
+    const foreLen = 0.50;
+    const forearm = part(new THREE.CapsuleGeometry(0.165, foreLen, 10, 16), furColor, 0.03, -foreLen / 2, 0, undefined, true);
     elbowJoint.add(forearm);
 
-    // Knuckle Fist (flat-grounded faceted box with 4 finger segments)
+    // Knuckle Fist Group
     const fistGroup = new THREE.Group();
-    fistGroup.position.set(0.06, -foreLen - 0.06, 0);
+    fistGroup.position.set(0.05, -foreLen - 0.04, 0);
 
-    // Main knuckle block
-    const fistGeo = new THREE.BoxGeometry(0.28, 0.16, 0.28);
-    const fist = part(fistGeo, faceColor, 0, 0, 0, facetOpts, true);
-    fistGroup.add(fist);
+    // Main knuckle hand block
+    const handGeo = new THREE.CapsuleGeometry(0.12, 0.16, 8, 12);
+    handGeo.rotateX(Math.PI / 2);
+    const hand = part(handGeo, faceColor, 0, 0, 0, undefined, true);
+    fistGroup.add(hand);
 
-    // 4 Finger knuckle ridges tiếp đất phẳng
+    // 4 Smooth Rounded Knuckle Fingers resting flat on ground
     for (let f = 0; f < 4; f++) {
       const fz = -0.09 + f * 0.06;
-      const finger = part(new THREE.BoxGeometry(0.14, 0.12, 0.05), faceColor, 0.12, -0.02, fz, facetOpts, true);
-      fistGroup.add(finger);
+      blob(fistGroup, faceColor, 0.065, [1.4, 0.95, 0.85], 0.10, -0.03, fz, undefined, true);
     }
 
     elbowJoint.add(fistGroup);
@@ -1027,45 +1001,52 @@ function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   }
   g.userData.arms = arms;
 
-  // 8. Hind Legs: Shorter than arms, muscular bent thighs, flat grounded feet with 4 toes
+  // =========================================================================
+  // 5. Hind Legs: 100% physically connected into pelvis (Zero Gap!)
+  // =========================================================================
   const legs: THREE.Group[] = [];
-  for (const z of [-0.36, 0.36]) {
+  for (const z of [-0.30, 0.30]) {
     const legPivot = new THREE.Group();
-    const legLen = 0.82;
-    legPivot.position.set(-0.42, legLen, z);
+    const legLen = 0.88;
+    // Positioned at y = 0.88, x = -0.32: sits completely inside pelvis bottom at y=0.96!
+    legPivot.position.set(-0.32, legLen, z);
     legPivot.userData.origY = legLen;
 
-    // Thigh: angled backwards-down from hip
-    const thighLen = 0.44;
-    const thigh = part(new THREE.CylinderGeometry(0.21, 0.17, thighLen, 6), furColor, 0, -thighLen / 2, 0, facetOpts, true);
-    thigh.rotation.z = 0.22; // Bent knee posture
+    // Hip Ball Socket (seamlessly fills joint with body)
+    blob(legPivot, furColor, 0.20, [1.08, 1.05, 1.08], 0, 0, 0, undefined, true);
+
+    // Thigh: smooth muscular capsule
+    const thighLen = 0.42;
+    const thigh = part(new THREE.CapsuleGeometry(0.19, thighLen, 10, 16), furColor, -0.02, -thighLen / 2, 0, undefined, true);
+    thigh.rotation.z = 0.20; // Bent knee posture
     legPivot.add(thigh);
 
-    // Calf: angled forward-down to foot
-    const calfLen = 0.38;
-    const calf = part(new THREE.CylinderGeometry(0.17, 0.14, calfLen, 6), furColor, 0.06, -thighLen - calfLen / 2 + 0.04, 0, facetOpts, true);
+    // Knee Ball
+    blob(legPivot, furColor, 0.165, [1.05, 1.0, 1.05], 0.04, -thighLen + 0.02, 0, undefined, true);
+
+    // Calf: smooth capsule angled forward
+    const calfLen = 0.36;
+    const calf = part(new THREE.CapsuleGeometry(0.16, calfLen, 10, 16), furColor, 0.05, -thighLen - calfLen / 2 + 0.04, 0, undefined, true);
     calf.rotation.z = -0.12;
     legPivot.add(calf);
 
-    // Foot: wide flat block grounded at y = 0
+    // Foot Group (grounded flat at -legLen)
     const footGroup = new THREE.Group();
     footGroup.position.set(0.08, -legLen + 0.08, 0);
 
-    const footGeo = new THREE.BoxGeometry(0.28, 0.14, 0.32);
-    const foot = part(footGeo, faceColor, 0, 0, 0, facetOpts, true);
-    footGroup.add(foot);
+    blob(footGroup, faceColor, 0.14, [1.35, 0.70, 1.25], 0, 0, 0, undefined, true);
 
-    // 4 Toes
+    // 4 Rounded Toes
     for (let tIdx = 0; tIdx < 4; tIdx++) {
-      const tz = -0.10 + tIdx * 0.068;
-      const toe = part(new THREE.BoxGeometry(0.12, 0.10, 0.055), faceColor, 0.13, -0.02, tz, facetOpts, true);
-      footGroup.add(toe);
+      const tz = -0.09 + tIdx * 0.06;
+      blob(footGroup, faceColor, 0.055, [1.35, 0.85, 0.85], 0.12, -0.02, tz, undefined, true);
     }
-    legPivot.add(footGroup);
 
+    legPivot.add(footGroup);
     g.add(legPivot);
     legs.push(legPivot);
   }
+
   return legs;
 }
 
