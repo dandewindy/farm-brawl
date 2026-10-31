@@ -1811,40 +1811,62 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'bananaThrow': {
-      const spd = ev.giant ? 28 : 22;
+      animals.notifyThrow(ev.id);
+      const tier = ev.tier ?? (ev.giant ? 2 : 0);
+      const spd = tier === 2 ? 28 : tier === 1 ? 25 : 22;
       if (ev.count > 1) {
         for (let i = 0; i < ev.count; i++) {
           const offsetAng = ev.a + (i - (ev.count - 1) / 2) * 0.22;
           const vx = Math.cos(offsetAng) * spd;
           const vz = Math.sin(offsetAng) * spd;
-          bananas.spawn(ev.x, ev.z, vx, vz, ev.giant);
+          bananas.spawn(ev.x, ev.z, vx, vz, ev.giant, tier);
         }
       } else {
         const vx = Math.cos(ev.a) * spd;
         const vz = Math.sin(ev.a) * spd;
-        bananas.spawn(ev.x, ev.z, vx, vz, ev.giant);
+        bananas.spawn(ev.x, ev.z, vx, vz, ev.giant, tier);
       }
-      sfxHit(1.2, ev.id === myId ? 1.0 : 0.35);
+      sfxHit(tier === 2 ? 1.8 : 1.2, ev.id === myId ? 1.0 : 0.35);
       break;
     }
     case 'bananaHit': {
-      foodParts.burst(ev.x, 1.2, ev.z, 0xffeb3b, 16, 6, 6, 0.6);
-      foodParts.burst(ev.x, 1.4, ev.z, 0xff9800, 10, 4, 4, 0.4);
+      const tier = ev.tier ?? (ev.giant ? 2 : 0);
+      const partCount = tier === 2 ? 24 : tier === 1 ? 18 : 12;
+      foodParts.burst(ev.x, 1.2, ev.z, 0xffeb3b, partCount, 6, 6, 0.6);
+      foodParts.burst(ev.x, 1.4, ev.z, 0xff9800, Math.round(partCount * 0.7), 4, 4, 0.4);
       animals.notifyHit(ev.id);
       const vm = gameState.metas.get(ev.id);
       if (vm && ev.id !== myId) {
         yelp(vm.species, 0.45);
       }
-      sfxHit(2.0, ev.id === myId ? 1.0 : 0.4);
+      sfxHit(tier === 2 ? 2.8 : tier === 1 ? 2.4 : 2.0, ev.id === myId ? 1.0 : 0.4);
       break;
     }
     case 'monkeyLand': {
-      if (ev.isGorilla) {
+      if (ev.inWater) {
+        // Water landing splash explosion
+        for (let i = 0; i < 4; i++) {
+          animals.spawnWaterRipple(ev.x, ev.z, 0.8 + i * 0.6, ev.r * (1.1 + i * 0.3), 1.2 + i * 0.2, 0xdef5ff);
+        }
+        foodParts.burst(ev.x, 0.4, ev.z, 0xdff5ff, 28, 8, 9, 0.85);
+        foodParts.burst(ev.x, 0.8, ev.z, 0x4fc3f7, 20, 6, 8, 0.75);
+        foodParts.burst(ev.x, 1.2, ev.z, 0xffffff, 16, 5, 7, 0.65);
+        sfxSplash(ev.id === myId ? 1.0 : 0.6);
+        const me = gameState.ents.get(myId);
+        const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
+        if (dist < 28) {
+          shake = Math.max(shake, 0.7 * ev.ratio * (1 - dist / 28));
+        }
+      } else if (ev.isGorilla) {
         // Gorilla ground slam: focused punchy fiery shockwaves and heavy earth dust
         animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r * 0.70, 0xff5722);
         animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.45, 0xffab00);
-        foodParts.burst(ev.x, 0.3, ev.z, 0x3e2723, 22, 8, 8, 0.75);
-        foodParts.burst(ev.x, 0.3, ev.z, 0xff6f00, 16, 6, 6, 0.6);
+        // Ground cracks on heavy slam / max gồng (ratio >= 0.75)
+        if (ev.ratio >= 0.75) {
+          animals.spawnGroundCracks(ev.x, ev.z, ev.r * 1.15);
+        }
+        foodParts.burst(ev.x, 0.3, ev.z, 0x3e2723, 24, 8, 8, 0.75);
+        foodParts.burst(ev.x, 0.3, ev.z, 0xff6f00, 18, 6, 6, 0.6);
         sfxHit(4.2, ev.id === myId ? 1.0 : 0.6);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.5);
         const me = gameState.ents.get(myId);
@@ -2577,6 +2599,7 @@ function animate(now: number): void {
   bananas.update(dt, (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy));
   animals.updateShockwaves(dt);
   animals.updateWaterRipples(dt);
+  animals.updateGroundCracks(dt);
 
   // Update animated world hazards (water ripples, pulsing coals, flames, electric fence arcs)
   const playerPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z } : undefined;

@@ -1617,18 +1617,19 @@ describe('fruit trees', () => {
   });
 
   describe('monkey mechanics', () => {
-    it('monkey tap ram near tree shakes tree and drops 1/3 fruits', () => {
+    it('monkey tap ram near tree shakes tree and drops 1/3 fruits when meeting mass requirement', () => {
       const w = new World(1234, { bots: false, food: false });
       const mId = w.addPlayer('Wukong', 'monkey');
-      // Tree at (10, 0)
+      // Tree at (10, 0), size 2 (req 1000kg)
       const tree = w.treeSims[0];
+      tree.size = 2;
       tree.x = 10;
       tree.z = 0;
       tree.big = 9;
       tree.small = 6;
-      const monkey = place(w, mId, 10 - tree.r - 1.5, 0);
+      const monkey = place(w, mId, 10 - tree.r - 1.5, 0, 1000);
 
-      // Tap ram (holdT <= 0.15)
+      // Tap ram (holdT <= 0.15) with 1000kg shakes large tree
       monkey.input.btn = false;
       monkey.holdT = 0.1;
       monkey.pressed = true;
@@ -1638,6 +1639,18 @@ describe('fruit trees', () => {
       expect(tree.small).toBe(4); // 6 - ceil(6/3) = 4
       expect(monkey.treeShakeT).toBeGreaterThan(0);
       expect(monkey.stunT).toBe(0); // Not stunned!
+
+      // When monkey has less mass than required (e.g. 50kg < 1000kg), cannot shake tree, throws banana instead
+      monkey.mass = 50;
+      monkey.treeShakeT = 0;
+      monkey.cd = 0;
+      monkey.input.btn = false;
+      monkey.holdT = 0.1;
+      monkey.pressed = true;
+      w.step();
+
+      expect(monkey.treeShakeT).toBe(0); // Did not shake
+      expect(w.bananaProjectiles.length).toBeGreaterThan(0); // Threw banana instead!
     });
 
     it('monkey tap ram away from tree throws banana projectile and deals <= 5% mass loss', () => {
@@ -1731,7 +1744,22 @@ describe('fruit trees', () => {
       for (let i = 0; i < 20; i++) w.step();
       expect(victim.squishT).toBeGreaterThan(0);
       expect(victim.mass).toBeLessThan(40);
+      expect(victim.stunT).toBeGreaterThan(0);
+      expect(victim.slowT).toBeGreaterThan(0);
       expect(gorilla.mass).toBeGreaterThan(3001); // Stole mass!
+
+      // Gorilla throwing banana pays self-mass penalty (<= 5%)
+      const massBeforeThrow = gorilla.mass;
+      gorilla.x = -30; gorilla.z = -30; // Far from tree
+      gorilla.treeShakeT = 0; gorilla.cd = 0; gorilla.dashT = 0;
+      gorilla.holdT = 0.05;
+      gorilla.pressed = true;
+      w.step();
+      expect(w.bananaProjectiles.length).toBeGreaterThan(0);
+      const latestProj = w.bananaProjectiles[w.bananaProjectiles.length - 1];
+      expect(latestProj.tier).toBe(2); // Gorilla is Tier 2
+      expect(gorilla.mass).toBeLessThan(massBeforeThrow);
+      expect(massBeforeThrow - gorilla.mass).toBeLessThanOrEqual(Math.round(massBeforeThrow * 0.05));
 
       // Gorilla tree shake: 3 seconds without stun, drops all fruits
       const tree = w.treeSims[0];

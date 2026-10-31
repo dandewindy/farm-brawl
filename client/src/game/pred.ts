@@ -149,21 +149,21 @@ export class ClientPredictor {
     const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
     if (inWater) return;
 
-    if (species === 'monkey') {
+    if (species === 'monkey' || species === 'gorilla') {
       if (isSuper) {
-        // Super rainbow monkey fires banana cone spread, does not dash
+        // Super rainbow primate fires banana cone spread, does not dash
         return;
       }
       if (held <= 0.15) {
-        // Tap throws banana projectile or shakes tree, does not dash
+        // Tap throws banana projectile or shakes tree, does not dash!
         return;
       }
       // Charged super leap
-      const minHold = 0.15;
-      const maxHold = 1.0;
-      const ratio = Math.min(1, Math.max(0, (held - minHold) / (maxHold - minHold)));
-      const leapDist = 12.0 + ratio * 20.0;
-      const leapDur = 0.45 + ratio * 0.38;
+      const isGorilla = (species === 'gorilla');
+      const clampedHold = Math.max(0.2, Math.min(1.2, held));
+      const ratio = (clampedHold - 0.2) / 1.0;
+      const leapDist = isGorilla ? (10.0 + ratio * 16.0) : (8.0 + ratio * 14.0);
+      const leapDur = 0.5 + ratio * 0.4;
       const leapSpeed = leapDist / leapDur;
       this.vx = Math.cos(aimA) * leapSpeed;
       this.vz = Math.sin(aimA) * leapSpeed;

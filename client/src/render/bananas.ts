@@ -20,9 +20,14 @@ export class BananaRenderer {
     this.scene.add(this.group);
   }
 
-  spawn(x: number, z: number, vx: number, vz: number, giant = false): void {
+  spawn(x: number, z: number, vx: number, vz: number, giant = false, tier = 0): void {
     const bGroup = new THREE.Group();
-    const sc = giant ? 2.4 : 1.0;
+    // Tier 0 (Monkey < 1000kg): sc = 1.0
+    // Tier 1 (Monkey >= 1000kg): sc = 1.55 (chuối to hơn)
+    // Tier 2 (Gorilla or Super Candy): sc = 2.35 (chuối to và uy lực hơn nữa)
+    const effectiveTier = giant ? 2 : Math.max(tier, 0);
+    const sc = effectiveTier === 2 ? 2.35 : effectiveTier === 1 ? 1.55 : 1.0;
+    const isGiant = effectiveTier === 2;
 
     // Curved golden banana body using TubeGeometry with CatmullRomCurve3
     const curve = new THREE.CatmullRomCurve3([
@@ -33,9 +38,9 @@ export class BananaRenderer {
     ]);
     const tubeGeo = new THREE.TubeGeometry(curve, 14, 0.18 * sc, 8, false);
     const bananaMat = new THREE.MeshStandardMaterial({
-      color: giant ? 0xffeb3b : 0xffd54f,
-      emissive: giant ? 0xff9800 : 0xf57f17,
-      emissiveIntensity: giant ? 0.75 : 0.35,
+      color: isGiant ? 0xffeb3b : effectiveTier === 1 ? 0xffe082 : 0xffd54f,
+      emissive: isGiant ? 0xff9800 : effectiveTier === 1 ? 0xffb300 : 0xf57f17,
+      emissiveIntensity: isGiant ? 0.8 : effectiveTier === 1 ? 0.55 : 0.35,
       roughness: 0.25,
       metalness: 0.2,
     });
@@ -57,10 +62,14 @@ export class BananaRenderer {
     tip.position.set(0.52 * sc, 0.42 * sc, 0);
     bGroup.add(tip);
 
-    if (giant) {
-      // Sparkling ring around giant banana
-      const ringGeo = new THREE.TorusGeometry(0.85 * sc, 0.04 * sc, 6, 16);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0xffea00, transparent: true, opacity: 0.8 });
+    if (isGiant || effectiveTier === 1) {
+      // Sparkling ring around giant / heavy banana
+      const ringGeo = new THREE.TorusGeometry(0.85 * sc, 0.035 * sc, 6, 16);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: isGiant ? 0xffea00 : 0xffb74d,
+        transparent: true,
+        opacity: isGiant ? 0.85 : 0.55,
+      });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = Math.PI / 2;
       bGroup.add(ring);
@@ -77,8 +86,8 @@ export class BananaRenderer {
       vx,
       vz,
       t: 0,
-      dur: giant ? 1.2 : 0.9,
-      giant,
+      dur: isGiant ? 1.2 : effectiveTier === 1 ? 1.0 : 0.85,
+      giant: isGiant,
     });
   }
 

@@ -39,6 +39,7 @@ interface AnimalVisual {
   tailSegments?: (THREE.Mesh | THREE.Group)[];
   leapTimer?: number;
   morphTimer?: number;
+  throwTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -1662,12 +1663,93 @@ interface WaterRipple {
   active: boolean;
 }
 
+interface GroundCrack {
+  group: THREE.Group;
+  matDark: THREE.MeshBasicMaterial;
+  matGlow: THREE.MeshBasicMaterial;
+  x: number;
+  z: number;
+  baseRadius: number;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
+function buildGroundCrackMesh(matDark: THREE.Material, matGlow: THREE.Material): THREE.Group {
+  const grp = new THREE.Group();
+  const darkPositions: number[] = [];
+  const glowPositions: number[] = [];
+  const branches = 12;
+
+  for (let b = 0; b < branches; b++) {
+    const baseAngle = (b / branches) * Math.PI * 2 + ((b % 2 === 0) ? 0.08 : -0.08);
+    const length = 0.75 + (b % 3 === 0 ? 0.35 : b % 2 === 0 ? 0.2 : 0.1);
+    const segs = 4;
+    let cx = 0, cz = 0;
+    let angle = baseAngle;
+
+    for (let s = 0; s < segs; s++) {
+      const segLen = length / segs;
+      angle += ((s % 2 === 0 ? 1 : -1) * 0.28) + (b % 2 === 0 ? 0.1 : -0.1);
+      const nx = cx + Math.cos(angle) * segLen;
+      const nz = cz + Math.sin(angle) * segLen;
+
+      const dx = nx - cx;
+      const dz = nz - cz;
+      const d = Math.hypot(dx, dz) || 1;
+      const px = -dz / d;
+      const pz = dx / d;
+
+      const wDark = Math.max(0.04, (1 - (s / segs)) * 0.16);
+      const wGlow = Math.max(0.02, (1 - (s / segs)) * 0.06);
+
+      darkPositions.push(
+        cx + px * wDark, 0, cz + pz * wDark,
+        nx + px * wDark * 0.7, 0, nz + pz * wDark * 0.7,
+        cx - px * wDark, 0, cz - pz * wDark,
+
+        cx - px * wDark, 0, cz - pz * wDark,
+        nx + px * wDark * 0.7, 0, nz + pz * wDark * 0.7,
+        nx - px * wDark * 0.7, 0, nz - pz * wDark * 0.7
+      );
+
+      glowPositions.push(
+        cx + px * wGlow, 0.002, cz + pz * wGlow,
+        nx + px * wGlow * 0.7, 0.002, nz + pz * wGlow * 0.7,
+        cx - px * wGlow, 0.002, cz - pz * wGlow,
+
+        cx - px * wGlow, 0.002, cz - pz * wGlow,
+        nx + px * wGlow * 0.7, 0.002, nz + pz * wGlow * 0.7,
+        nx - px * wGlow * 0.7, 0.002, nz - pz * wGlow * 0.7
+      );
+
+      cx = nx;
+      cz = nz;
+    }
+  }
+
+  const darkGeo = new THREE.BufferGeometry();
+  darkGeo.setAttribute('position', new THREE.Float32BufferAttribute(darkPositions, 3));
+  const darkMesh = new THREE.Mesh(darkGeo, matDark);
+  darkMesh.renderOrder = 4;
+  grp.add(darkMesh);
+
+  const glowGeo = new THREE.BufferGeometry();
+  glowGeo.setAttribute('position', new THREE.Float32BufferAttribute(glowPositions, 3));
+  const glowMesh = new THREE.Mesh(glowGeo, matGlow);
+  glowMesh.renderOrder = 5;
+  grp.add(glowMesh);
+
+  return grp;
+}
+
 export class AnimalRenderer {
   public myId = 0;
   private readonly visuals = new Map<number, AnimalVisual>();
   private readonly group = new THREE.Group();
   private readonly shockwavePool: ShockwaveRing[] = [];
   private readonly waterRipplePool: WaterRipple[] = [];
+  private readonly groundCrackPool: GroundCrack[] = [];
 
   constructor(private readonly scene: THREE.Scene) {
     this.scene.add(this.group);
@@ -1724,6 +1806,38 @@ export class AnimalRenderer {
         maxR: 3,
         life: 0,
         maxLife: 1.0,
+        active: false,
+      });
+    }
+
+    // Ground cracks pool for Gorilla leap slam
+    for (let i = 0; i < 16; i++) {
+      const matDark = new THREE.MeshBasicMaterial({
+        color: 0x180f08,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const matGlow = new THREE.MeshBasicMaterial({
+        color: 0xff5722,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const group = buildGroundCrackMesh(matDark, matGlow);
+      group.visible = false;
+      this.scene.add(group);
+      this.groundCrackPool.push({
+        group,
+        matDark,
+        matGlow,
+        x: 0,
+        z: 0,
+        baseRadius: 1,
+        life: 0,
+        maxLife: 2.4,
         active: false,
       });
     }
@@ -1797,6 +1911,47 @@ export class AnimalRenderer {
         // Soft gradual fade out (mờ dần các vòng sóng nước)
         wr.mat.opacity = Math.pow(1 - k, 1.8) * 0.38;
       }
+    }
+  }
+
+  spawnGroundCracks(x: number, z: number, r: number): void {
+    let gc = this.groundCrackPool.find((c) => !c.active);
+    if (!gc) gc = this.groundCrackPool[0];
+    gc.active = true;
+    gc.x = x;
+    gc.z = z;
+    gc.baseRadius = r;
+    gc.life = 0;
+    gc.maxLife = 2.4;
+    gc.matDark.opacity = 0.95;
+    gc.matGlow.opacity = 0.90;
+    gc.group.position.set(x, 0.05, z);
+    gc.group.scale.set(r * 0.35, 1, r * 0.35);
+    gc.group.visible = true;
+  }
+
+  updateGroundCracks(dt: number): void {
+    for (const gc of this.groundCrackPool) {
+      if (!gc.active) continue;
+      gc.life += dt;
+      if (gc.life >= gc.maxLife) {
+        gc.active = false;
+        gc.group.visible = false;
+      } else {
+        const k = gc.life / gc.maxLife;
+        const expandProg = Math.min(1, gc.life / 0.12);
+        const curR = gc.baseRadius * (0.35 + 0.65 * Math.sqrt(expandProg));
+        gc.group.scale.set(curR, 1, curR);
+        gc.matDark.opacity = Math.max(0, (1 - Math.pow(k, 1.3)) * 0.95);
+        gc.matGlow.opacity = Math.max(0, (1 - k * 1.5) * 0.90);
+      }
+    }
+  }
+
+  notifyThrow(id: number): void {
+    const vis = this.visuals.get(id);
+    if (vis) {
+      vis.throwTimer = 0.32;
     }
   }
 
@@ -2052,8 +2207,12 @@ export class AnimalRenderer {
     vis.root.position.set(x, bodyY, z);
     vis.root.rotation.y = -angle + (isStunned && sq <= 0.4 ? Math.sin(now / 50) * 0.5 : 0);
 
+    const isThrowing = (vis.throwTimer !== undefined && vis.throwTimer > 0);
+
     // Lean forward on dash/plow/flying, lean back on charge, struggle tilt in water, dazed sway when stunned
-    const targetRotZ = sq > 0.4
+    const targetRotZ = isThrowing
+      ? 0
+      : sq > 0.4
       ? Math.sin(now / 120) * 0.05
       : isStunned
       ? Math.sin(now / 90) * 0.15
@@ -2086,7 +2245,7 @@ export class AnimalRenderer {
       // Gentle subtle wobble as animal trudges through deep mud
       vis.root.rotation.x = Math.sin(vis.phase * 0.6) * 0.04;
       vis.root.rotation.z += Math.sin(vis.phase * 0.3) * 0.03;
-    } else if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && speed > 0.02 && sq <= 0.4) {
+    } else if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && !isThrowing && speed > 0.02 && sq <= 0.4) {
       // Gorilla walking shoulder roll
       vis.root.rotation.x = Math.sin(vis.phase * 0.9) * 0.08;
     }
@@ -2206,7 +2365,23 @@ export class AnimalRenderer {
     // Monkey and Gorilla arms dynamic animation
     if (vis.arms && vis.arms.length === 2) {
       const [armL, armR] = vis.arms;
-      if (vis.species === 'gorilla') {
+      if (vis.throwTimer && vis.throwTimer > 0) {
+        vis.throwTimer = Math.max(0, vis.throwTimer - dt);
+        const throwProg = 1 - vis.throwTimer / 0.32;
+        if (vis.species === 'gorilla') {
+          // Gorilla throws banana smoothly using right arm without body jerk
+          armR.rotation.z = -0.28 + Math.sin(throwProg * Math.PI) * (-1.35);
+          armR.rotation.x = -0.12 - Math.sin(throwProg * Math.PI) * 0.35;
+          armL.rotation.z = -0.28;
+          armL.rotation.x = 0.12;
+        } else {
+          // Monkey throws banana using right arm
+          armR.rotation.z = Math.sin(throwProg * Math.PI) * (-1.45);
+          armR.rotation.x = -0.12 - Math.sin(throwProg * Math.PI) * 0.35;
+          armL.rotation.z = 0.2;
+          armL.rotation.x = 0.12;
+        }
+      } else if (vis.species === 'gorilla') {
         if (isTreeShake) {
           // Requirement 2: Gorilla shakes tree vigorously for 3s
           const shakeVibe = Math.sin(now * 0.05) * 0.45;

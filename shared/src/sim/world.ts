@@ -84,6 +84,7 @@ export interface BananaProjectile {
   vz: number;
   life: number;
   giant: boolean;
+  tier: number;
   r: number;
 }
 
@@ -718,12 +719,9 @@ export class World {
             }
           }
         } else {
-          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0);
+          const slowMult = p.slowT > 0 ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult;
           stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
-          if (p.slowT > 0) {
-            p.vx *= 0.85;
-            p.vz *= 0.85;
-          }
         }
         if (!isLeaping) {
           const wasStunned = p.stunT >= 1.4;
@@ -1019,13 +1017,21 @@ export class World {
       if (p.monkeyLeapT && p.monkeyLeapT > 0) {
         p.monkeyLeapT = Math.max(0, p.monkeyLeapT - DT);
         if (p.monkeyLeapT <= 0) {
+          p.dashT = 0;
           const isGorilla = (p.species === 'gorilla');
           const ratio = p.monkeyLeapRatio ?? 0.5;
+          const isMaxCharge = ratio >= 0.75;
           const bodyR = radiusOf(p.mass);
           // Gorilla has massive shockwave, monkey has reduced shockwave
           const shockwaveR = isGorilla
             ? bodyR + 4.5 + ratio * 6.0
             : bodyR + 2.5 + ratio * 3.5;
+
+          // Water landing check: if landed in pond, splash water and initiate drowning
+          const inWater = (this.map.pond || []).some((b) => insideBlob(b, p.x, p.z, -0.7));
+          if (inWater) {
+            p.inWaterT = 0.05;
+          }
 
           for (const other of this.players.values()) {
             if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
@@ -1035,11 +1041,16 @@ export class World {
             if (dist <= shockwaveR) {
               const pushAng = Math.atan2(dz, dx);
               if (isGorilla) {
-                // GORILLA:
+                // Gorilla max hold leap slam: causes 0.5s stun and 1s decaying slow
+                if (isMaxCharge) {
+                  other.stunT = Math.max(other.stunT, 0.5);
+                  other.slowT = Math.max(other.slowT, 1.0);
+                }
+
                 if (other.mass <= 50) {
                   // Đạp dẹp lép toàn bộ con vật <= 50kg trong phạm vi!
                   other.squishT = 2.5;
-                  other.stunT = 1.5;
+                  other.stunT = Math.max(other.stunT, isMaxCharge ? 0.5 : 1.5);
                   other.vx = 0;
                   other.vz = 0;
                   other.dashT = 0;
@@ -1056,7 +1067,9 @@ export class World {
                   other.vz += Math.sin(pushAng) * force;
                   other.dashT = 0;
                   other.plow = false;
-                  other.stunT = Math.max(other.stunT, 0.6);
+                  if (!isMaxCharge) {
+                    other.stunT = Math.max(other.stunT, 0.6);
+                  }
                   const massLoss = Math.max(3, Math.round(other.mass * (0.05 + ratio * 0.07)));
                   other.mass = Math.max(10, other.mass - massLoss);
                   this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 2.0, Math.cos(pushAng), Math.sin(pushAng));
@@ -1102,6 +1115,7 @@ export class World {
             r: r2(shockwaveR),
             ratio: r2(ratio),
             isGorilla,
+            inWater,
           });
         }
       }
@@ -1681,7 +1695,15 @@ export class World {
           }
         }
 
-        if (nearbyTree) {
+        // Tree shaking requirements:
+        // Cây nhỏ (size 0): 100 kg
+        // Cây vừa (size 1): 500 kg
+        // Cây to (size 2): 1000 kg
+        // Gorilla (>= 3000 kg) luôn đủ điều kiện
+        const reqMass = nearbyTree ? (nearbyTree.size === 2 ? 1000 : nearbyTree.size === 1 ? 500 : 100) : 0;
+        const canShakeTree = nearbyTree && nearbyTree.big > 0 && (p.species === 'gorilla' || p.mass >= reqMass);
+
+        if (canShakeTree && nearbyTree) {
           if (p.species === 'gorilla') {
             // Gorilla Tree Shake: Rung liên tục trong 3s, rớt toàn bộ trái cây (mỗi giây rớt 1/3, giây 3 rớt sạch)
             p.treeShakeT = 3.0;
@@ -1711,7 +1733,7 @@ export class World {
             return;
           }
         } else {
-          // Throw 1 banana projectile
+          // Throw 1 banana projectile (when not near tree, tree has no ripe fruits, or not enough mass)
           p.a = p.input.a;
           this.spawnBananaCone(p, 1, false);
           p.cd = 0.5;
@@ -1762,12 +1784,22 @@ export class World {
   }
 
   private spawnBananaCone(p: Player, count: number, giant: boolean): void {
+    const isGorilla = p.species === 'gorilla';
+    const tier = giant ? 2 : isGorilla ? 2 : (p.mass >= 1000 ? 1 : 0);
     const spreadAngle = count > 1 ? (Math.PI / 3.2) : 0;
-    const speed = giant ? 26.0 : 22.0;
-    const life = giant ? 0.9 : 0.7;
+    const speed = tier === 2 ? 28.0 : tier === 1 ? 25.0 : 22.0;
+    const life = tier === 2 ? 0.95 : tier === 1 ? 0.85 : 0.75;
     const bodyR = radiusOf(p.mass);
     const startX = p.x + Math.cos(p.a) * (bodyR + 0.6);
     const startZ = p.z + Math.sin(p.a) * (bodyR + 0.6);
+    const r = tier === 2 ? 1.3 : tier === 1 ? 0.85 : 0.5;
+
+    // Gorilla khi ném chuối có trả giá bằng kg của bản thân nhưng không quá 5% kg của bản thân
+    if (isGorilla && !giant) {
+      const penalty = Math.min(Math.round(p.mass * 0.05), Math.max(3, Math.round(p.mass * 0.03)));
+      p.mass = Math.max(10, p.mass - penalty);
+      this.scatter(p.x, p.z, Math.round(penalty * 0.5), radiusOf(p.mass) + 1.5, Math.cos(p.a), Math.sin(p.a));
+    }
 
     for (let i = 0; i < count; i++) {
       const offsetRatio = count > 1 ? (i / (count - 1)) - 0.5 : 0;
@@ -1781,7 +1813,8 @@ export class World {
         vz: Math.sin(angle) * speed,
         life,
         giant,
-        r: giant ? 1.15 : 0.45,
+        tier,
+        r,
       });
     }
 
@@ -1793,6 +1826,7 @@ export class World {
       a: r2(p.a),
       count,
       giant,
+      tier,
     });
   }
 
@@ -1810,17 +1844,23 @@ export class World {
         const dist = Math.hypot(target.x - proj.x, target.z - proj.z);
         if (dist <= tr + proj.r) {
           hit = true;
-          const sizeFactor = Math.min(1.0, target.mass / 300);
-          const lossRatio = proj.giant ? 0.05 : (0.015 + 0.035 * sizeFactor);
-          const massLoss = Math.min(Math.round(target.mass * 0.05), Math.max(1, Math.round(target.mass * lossRatio)));
+          // Dù là khỉ hay gorilla mỗi lần quăng tương đương với húc nhanh làm đẩy lùi các con vật khác và mất kg giống với các con vật khác khi húc nhẹ
+          const lossRatio = proj.tier === 2 ? 0.05 : proj.tier === 1 ? 0.04 : 0.03;
+          const minLoss = proj.tier === 2 ? 4 : proj.tier === 1 ? 2 : 1;
+          const massLoss = Math.min(Math.round(target.mass * 0.05), Math.max(minLoss, Math.round(target.mass * lossRatio)));
 
           target.mass = Math.max(10, target.mass - massLoss);
           this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
 
           const hitAngle = Math.atan2(proj.vz, proj.vx);
-          const knockback = proj.giant ? 28.0 : 7.5;
+          const knockback = proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
           target.vx += Math.cos(hitAngle) * knockback;
           target.vz += Math.sin(hitAngle) * knockback;
+          target.dashT = 0;
+          target.plow = false;
+          target.charging = false;
+          target.lastHitBy = proj.ownerId;
+          target.lastHitT = this.time;
 
           this.events.push({
             k: 'bananaHit',
@@ -1828,6 +1868,16 @@ export class World {
             x: r2(target.x),
             z: r2(target.z),
             giant: proj.giant,
+            tier: proj.tier,
+          });
+          this.events.push({
+            k: 'hit',
+            a: proj.ownerId,
+            v: target.id,
+            x: r2(target.x),
+            z: r2(target.z),
+            s: Math.round(knockback),
+            loss: massLoss,
           });
           break;
         }
