@@ -735,45 +735,66 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
-function addMammothEyes(headGroup: THREE.Group, bodyColor: number): void {
+function addMammothEyes(headGroup: THREE.Group): void {
   const whiteMat = animalMat(0xffffff, { roughness: 0.35 });
   const pupilMat = animalMat(0x161210, { roughness: 0.3 });
   const hlMat = animalMat(0xffffff, { roughness: 0.15 });
 
   for (const side of [-1, 1]) {
-    // Tọa độ chuẩn khớp với sọ đầu to 30% của voi ma mút
-    const x = 0.28;
-    const y = 0.14;
-    const z = side * 0.38;
-    const r = 0.085;
+    // Tọa độ chuẩn khớp với sọ đầu to 30%, phẳng ôm sọ tự nhiên (không lồi)
+    const x = 0.26;
+    const y = 0.10;
+    const z = side * 0.34;
+    const r = 0.068;
 
-    // Bệ mí mắt bo viền bảo vệ
-    const socket = new THREE.Mesh(
-      new THREE.SphereGeometry(r * 1.15, 12, 8),
-      animalMat(bodyColor, { roughness: 0.9 })
-    );
-    socket.position.set(x - 0.015, y, z * 0.96);
-    socket.scale.set(0.9, 1.15, 0.9);
-    headGroup.add(socket);
-
-    // Tròng trắng mắt
+    // Tròng trắng mắt hơi dẹt nhẹ ôm theo hộp sọ, không bị lồi
     const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), whiteMat);
-    eyeWhite.scale.set(0.85, 1.05, 1.05);
+    eyeWhite.scale.set(0.68, 1.0, 0.88);
     eyeWhite.position.set(x, y, z);
-    eyeWhite.rotation.y = side * 0.36;
+    eyeWhite.rotation.y = side * 0.32;
     headGroup.add(eyeWhite);
 
     // Con ngươi đen
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.62, 12, 8), pupilMat);
-    pupil.scale.set(0.48, 1, 1);
-    pupil.position.set(x + 0.038, y, z + side * 0.032);
-    pupil.rotation.y = side * 0.36;
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.60, 12, 8), pupilMat);
+    pupil.scale.set(0.40, 1, 1);
+    pupil.position.set(x + 0.026, y, z + side * 0.016);
+    pupil.rotation.y = side * 0.32;
     headGroup.add(pupil);
 
     // Điểm sáng lấp lánh
-    const hl = new THREE.Mesh(new THREE.SphereGeometry(r * 0.24, 8, 6), hlMat);
-    hl.position.set(x + 0.058, y + 0.026, z + side * 0.040);
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(r * 0.22, 8, 6), hlMat);
+    hl.position.set(x + 0.040, y + 0.018, z + side * 0.022);
     headGroup.add(hl);
+  }
+}
+
+function addMammothEars(
+  headGroup: THREE.Group,
+  bodyColor: number,
+  innerEarColor: number,
+  furOpts: Partial<THREE.MeshStandardMaterialParameters>
+): void {
+  for (const side of [-1, 1]) {
+    const z = side * 0.38;
+    const earGroup = new THREE.Group();
+    earGroup.position.set(-0.06, 0.08, z);
+    earGroup.rotation.y = side * -0.38;
+    earGroup.rotation.z = -0.16;
+    earGroup.rotation.x = side * 0.12;
+
+    // Vành tai ngoài
+    const earGeo = new THREE.CylinderGeometry(0.14, 0.18, 0.045, 12);
+    earGeo.scale(0.85, 0.24, 1.25);
+    const earMesh = part(earGeo, bodyColor, 0, 0, 0, furOpts);
+    earGroup.add(earMesh);
+
+    // Lòng tai trong
+    const innerGeo = new THREE.CylinderGeometry(0.09, 0.13, 0.035, 10);
+    innerGeo.scale(0.80, 0.20, 1.15);
+    const innerMesh = part(innerGeo, innerEarColor, 0, 0.012, 0, furOpts);
+    earGroup.add(innerMesh);
+
+    headGroup.add(earGroup);
   }
 }
 
@@ -896,14 +917,11 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const hairBack = furBlob(headGroup, humpColor, 0.24, [1.10, 0.44, 0.68], -0.10, 0.48, 0);
   hairBack.rotation.z = 0.20;
 
-  // Small Woolly Ears (Tai nhỏ nép sát 2 bên thái dương)
-  for (const z of [-0.27, 0.27]) {
-    furBlob(headGroup, bodyColor, 0.16, [0.65, 0.88, 0.12], -0.07, 0.08, z, [0, z > 0 ? -0.28 : 0.28, -0.12]);
-    furBlob(headGroup, innerEarColor, 0.11, [0.55, 0.78, 0.08], -0.05, 0.08, z > 0 ? z - 0.015 : z + 0.015, [0, z > 0 ? -0.28 : 0.28, -0.12]);
-  }
+  // Small Woolly Ears (Tai nhỏ nép 2 bên sọ rõ ràng, không bị chìm)
+  addMammothEars(headGroup, bodyColor, innerEarColor, furOpts);
 
-  // 🌟 Expressive Cute Eyes (Tỉ lệ chuẩn theo đầu to 30%, hiện rõ không bị chìm)
-  addMammothEyes(headGroup, bodyColor);
+  // 🌟 Expressive Cute Eyes (Tỉ lệ chuẩn theo đầu to 30%, phẳng ôm sọ tự nhiên không lồi)
+  addMammothEyes(headGroup);
 
   // Smooth Animatable Trunk (Vòi voi gắn trong headGroup)
   const trunkGroup = new THREE.Group();
@@ -990,17 +1008,17 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   g.add(headGroup);
 
   // =========================================================================
-  // 6. Tail (Đuôi ngắn có chỏm lông)
+  // 6. Tail (Đuôi dài buông tự nhiên ra sau mông, chùm lông to rõ)
   // =========================================================================
   const tailGroup = new THREE.Group();
-  tailGroup.position.set(-0.62, 1.08, 0);
-  tailGroup.rotation.z = -0.42;
-  const stemLen = 0.30;
+  tailGroup.position.set(-0.66, 1.18, 0);
+  tailGroup.rotation.z = -0.15; // buông thẳng tự nhiên xuống phía sau mông
+  const stemLen = 0.48; // dài hơn (từ 0.30 lên 0.48)
   tailGroup.add(part(new THREE.CylinderGeometry(0.026, 0.018, stemLen, 8), bodyColor, 0, -stemLen / 2, 0, furOpts));
-  const tuftLen = 0.16;
-  tailGroup.add(part(new THREE.ConeGeometry(0.060, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0, furOpts));
-  const tuftBall = part(new THREE.SphereGeometry(0.055, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0, furOpts);
-  tuftBall.scale.set(0.9, 1.3, 0.9);
+  const tuftLen = 0.22; // chùm lông đuôi to rõ
+  tailGroup.add(part(new THREE.ConeGeometry(0.065, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0, furOpts));
+  const tuftBall = part(new THREE.SphereGeometry(0.060, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0, furOpts);
+  tuftBall.scale.set(0.95, 1.35, 0.95);
   tailGroup.add(tuftBall);
   g.add(tailGroup);
 
@@ -2586,7 +2604,7 @@ export class AnimalRenderer {
       : isWater && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.sin(now / 120) * 0.15
       : isCharging
-      ? (vis.species === 'mammoth' ? 0.16 + lvl * 0.20 : 0.15 + lvl * 0.15)
+      ? (vis.species === 'mammoth' ? 0 : 0.15 + lvl * 0.15)
       : 0;
 
     vis.root.rotation.z += (targetRotZ - vis.root.rotation.z) * Math.min(1, 16 * dt);
@@ -2603,8 +2621,8 @@ export class AnimalRenderer {
       vis.root.rotation.x = Math.sin(vis.phase * 0.9) * 0.08;
     }
 
-    // Charge trembling wind-up
-    if (isCharging) {
+    // Charge trembling wind-up (không rung lắc toàn thân đối với voi mammoth)
+    if (isCharging && vis.species !== 'mammoth') {
       vis.root.position.x += (Math.random() - 0.5) * 0.12 * lvl * r;
       vis.root.position.z += (Math.random() - 0.5) * 0.12 * lvl * r;
     }
@@ -2837,26 +2855,25 @@ export class AnimalRenderer {
     // Mammoth dynamic head, trunk, and roar animation
     if (vis.species === 'mammoth') {
       if (isMammothRoar) {
-        // Mighty roar blast: rearing up, raising head & trunk high into the sky!
-        const roarPulse = Math.sin(now * 0.025);
-        vis.body.rotation.z = 0.22 + roarPulse * 0.05; // rear body up!
+        // Mighty roar blast: giữ tư thế uy nghi đưa cao đầu và vòi lên trời
+        vis.body.rotation.z = 0;
         if (vis.head) {
-          vis.head.rotation.z = 0.28 + roarPulse * 0.06; // head raised high!
+          vis.head.rotation.z = 0.32; // đầu ngẩng cao
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 0.95 + roarPulse * 0.12; // trunk raised and curled high!
-          vis.trunk.rotation.y = Math.cos(now * 0.02) * 0.08;
+          vis.trunk.rotation.z = 1.05; // vòi uốn cao vút
+          vis.trunk.rotation.y = 0;
         }
       } else if (isCharging) {
-        // Nén gồng: tensing power, body crouches while head and trunk rear high up!
-        const chargeVibe = Math.sin(now * 0.04) * 0.03 * lvl;
-        vis.body.rotation.z = (0.10 + chargeVibe) * lvl;
+        // Nén gồng: đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.rotation.z = 0;
         if (vis.head) {
-          vis.head.rotation.z = (0.18 + lvl * 0.16) + chargeVibe; // head lifts up!
+          vis.head.rotation.z = 0.30 * t; // nâng đầu lên 1 lần mượt mà
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 0.48 + lvl * 0.58 + Math.sin(now * 0.03) * 0.08; // trunk lifts high!
-          vis.trunk.rotation.y = Math.sin(now * 0.015) * 0.05;
+          vis.trunk.rotation.z = 0.90 * t; // nâng vòi lên cao mượt mà
+          vis.trunk.rotation.y = 0;
         }
       } else {
         // Natural gentle swaying trunk while walking or idle
