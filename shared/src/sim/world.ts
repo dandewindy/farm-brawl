@@ -1153,10 +1153,13 @@ export class World {
               } else {
                 // MONKEY:
                 // KHÔNG làm dẹp lép! Chỉ hất văng mọi con vật ra xa (khoảng cách tỉ lệ với độ gồng)
-                // Cầu vồng hất văng cực xa!
-                const force = isRainbowLanding
+                // Cầu vồng hất văng cực xa! (Giảm 1/2 uy lực đối với Gorilla và Voi Mammoth)
+                let force = isRainbowLanding
                   ? (32.0 + ratio * 48.0)
                   : (14.0 + ratio * 20.0);
+                if (isRainbowLanding && (other.species === 'gorilla' || other.species === 'mammoth')) {
+                  force *= 0.5;
+                }
                 other.vx += Math.cos(pushAng) * force;
                 other.vz += Math.sin(pushAng) * force;
                 other.dashT = 0;
@@ -2231,7 +2234,10 @@ export class World {
           target.mass = Math.max(10, target.mass - massLoss);
           this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
 
-          const knockback = proj.giant ? 44.0 : proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
+          let knockback = proj.giant ? 44.0 : proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
+          if (proj.giant && (target.species === 'gorilla' || target.species === 'mammoth')) {
+            knockback *= 0.5;
+          }
           target.vx += Math.cos(hitAngle) * knockback;
           target.vz += Math.sin(hitAngle) * knockback;
           target.dashT = 0;
@@ -2835,6 +2841,10 @@ export class World {
     // Super Rainbow Dash: violent massive knockback launching victim across arena into fence (doubled power)
     if (att.superT > 0) {
       k = Math.max(k * 4.4, 150);
+      // Giảm 1/2 uy lực bị húc văng bởi cầu vồng đối với Voi mammoth và Gorilla
+      if (vic.species === 'gorilla' || vic.species === 'mammoth') {
+        k *= 0.5;
+      }
     }
 
     vic.vx = nx * k + vic.vx * 0.15;

@@ -2346,23 +2346,54 @@ describe('fruit trees', () => {
       expect(smallPig.vx).toBeLessThan(0);
     });
 
-    it('allows rainbow-empowered ram to bypass Gorilla and Mammoth immunity', () => {
-      const w = emptyWorld();
-      const mId = w.addPlayer('BigMammoth', 'mammoth');
-      const mammoth = place(w, mId, 0, 0, 3000);
+    it('allows rainbow-empowered ram to bypass Gorilla and Mammoth immunity with 1/2 knockback force', () => {
+      // 1. Hit a normal elephant
+      const w1 = emptyWorld();
+      const eId = w1.addPlayer('NormalElephant', 'elephant');
+      const elephant = place(w1, eId, 0, 0, 3000);
+      const pId1 = w1.addPlayer('RainbowPig1', 'pig');
+      const smallPig1 = place(w1, pId1, -5, 0, 100);
+      smallPig1.superT = 10;
+      smallPig1.dashT = 0.5;
+      smallPig1.vx = 30;
+      smallPig1.vz = 0;
+      w1.step();
+      const normalKnockback = elephant.vx;
+      expect(normalKnockback).toBeGreaterThan(50);
 
-      const pId = w.addPlayer('RainbowPig', 'pig');
-      const smallPig = place(w, pId, -5, 0, 100);
-      smallPig.superT = 10; // Rainbow powered!
-      smallPig.dashT = 0.5;
-      smallPig.vx = 30;
-      smallPig.vz = 0;
+      // 2. Hit a Mammoth of the exact same mass
+      const w2 = emptyWorld();
+      const mId = w2.addPlayer('BigMammoth', 'elephant');
+      const mammoth = place(w2, mId, 0, 0, 3000);
+      mammoth.species = 'mammoth';
+      const pId2 = w2.addPlayer('RainbowPig2', 'pig');
+      const smallPig2 = place(w2, pId2, -5, 0, 100);
+      smallPig2.superT = 10;
+      smallPig2.dashT = 0.5;
+      smallPig2.vx = 30;
+      smallPig2.vz = 0;
+      w2.step();
+      const mammothKnockback = mammoth.vx;
 
-      w.step();
+      // 3. Hit a Gorilla of the exact same mass
+      const w3 = emptyWorld();
+      const gId = w3.addPlayer('BigGorilla', 'monkey');
+      const gorilla = place(w3, gId, 0, 0, 3000);
+      gorilla.species = 'gorilla';
+      const pId3 = w3.addPlayer('RainbowPig3', 'pig');
+      const smallPig3 = place(w3, pId3, -5, 0, 100);
+      smallPig3.superT = 10;
+      smallPig3.dashT = 0.5;
+      smallPig3.vx = 30;
+      smallPig3.vz = 0;
+      w3.step();
+      const gorillaKnockback = gorilla.vx;
 
-      // Rainbow ram bypasses immunity: Mammoth is launched with knockback
-      expect(mammoth.vx).toBeGreaterThan(5);
+      // Mammoth and Gorilla knockback must be exactly 1/2 of normal rainbow knockback!
+      expect(mammothKnockback).toBeCloseTo(normalKnockback * 0.5, 1);
+      expect(gorillaKnockback).toBeCloseTo(normalKnockback * 0.5, 1);
       expect(mammoth.mass).toBeLessThan(3000);
+      expect(gorilla.mass).toBeLessThan(3000);
     });
 
     it('ensures cart/wheel crush squishes Mammoth and caps loss at 100 kg per hit with debounce', () => {
