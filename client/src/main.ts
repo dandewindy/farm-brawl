@@ -1778,7 +1778,7 @@ function handleGameEvent(ev: GameEvent): void {
         } else if (ev.kind === 'banana') {
           hud.showBanner(`🍌 ${t('banana_head')}`, t('tk_banana'));
         } else if (ev.kind === 'speed') {
-          mySpeedEndTime = performance.now() + 10_000;
+          mySpeedEndTime = performance.now() + 20_000;
           hud.showBanner(`⚡ ${t('speed_head')}`, t('tk_speed'));
         } else if (ev.kind === 'shield') {
           hud.showBanner(`🛡️ ${t('shield_head')}`, t('tk_shield'));

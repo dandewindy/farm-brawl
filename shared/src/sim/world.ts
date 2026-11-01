@@ -1342,7 +1342,7 @@ export class World {
             p.morphT = 30;
             this.events.push({ k: 'morph', id: p.id, species: targetSpecies, dur: 30 });
           } else if (t.kind === 'speed') {
-            p.speedT = 10;
+            p.speedT = 20;
           } else if (t.kind === 'shield') {
             p.shieldT = 10;
             p.stunT = 0;

@@ -1,4 +1,4 @@
-import { CFG } from '@shared/constants';
+import { CFG, radiusOf } from '@shared/constants';
 import type { MapData } from '@shared/map';
 import type { ToolWire } from '@shared/protocol';
 import type { Ent } from '../game/state';
@@ -202,7 +202,7 @@ export class MinimapRenderer {
       const ez = center + e.z * scale;
       const isNap = e.id === napoleonId && napoleonId > 0;
       ctx.beginPath();
-      ctx.arc(ex, ez, isNap ? 4.5 : Math.max(2.5, Math.sqrt(e.mass) * 0.45), 0, Math.PI * 2);
+      ctx.arc(ex, ez, isNap ? 4.5 : Math.max(2.5, radiusOf(e.mass) * 1.05), 0, Math.PI * 2);
       ctx.fillStyle = isNap ? '#e8b641' : '#f2ead7';
       ctx.fill();
     }

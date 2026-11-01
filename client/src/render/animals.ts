@@ -296,16 +296,16 @@ function addEyes(g: THREE.Group, x: number, y: number, sep: number, s: number): 
 }
 
 // Helper: add legs with hooves casting shadows
-function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: number, rad: number, hoofColor?: number): THREE.Group[] {
+function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: number, rad: number, hoofColor?: number, opts?: Partial<THREE.MeshStandardMaterialParameters>): THREE.Group[] {
   const arr: THREE.Group[] = [];
   for (const [x, z] of pts) {
     const pivot = new THREE.Group();
     pivot.position.set(x, len, z);
     pivot.userData.origY = len;
-    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0, undefined, true);
+    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0, opts, true);
     pivot.add(legMesh);
     if (hoofColor !== undefined) {
-      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0, undefined, true);
+      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0, opts, true);
       pivot.add(hoof);
     }
     g.add(pivot);
@@ -1038,8 +1038,8 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   // 7. Sturdy Pillar Legs:
   // Chân trước cao (1.14), Chân sau thấp hơn (0.90) tạo dáng đứng dốc uy nghi
   // =========================================================================
-  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.42, 0.34], [0.42, -0.34]], 1.14, 0.18, toenailsColor);
-  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.38, 0.28], [-0.38, -0.28]], 0.90, 0.165, toenailsColor);
+  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.42, 0.34], [0.42, -0.34]], 1.14, 0.18, toenailsColor, furOpts);
+  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.38, 0.28], [-0.38, -0.28]], 0.90, 0.165, toenailsColor, furOpts);
   return [...frontLegs, ...rearLegs];
 }
 
@@ -2610,7 +2610,7 @@ export class AnimalRenderer {
       : isPlowing
       ? -0.4
       : isDashing
-      ? -0.25
+      ? (vis.species === 'mammoth' ? -0.06 : -0.25)
       : isDrowning
       ? Math.sin(now / 180) * 0.3
       : isWater && vis.species === 'duck'
@@ -2618,7 +2618,7 @@ export class AnimalRenderer {
       : isWater && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.sin(now / 120) * 0.15
       : isCharging
-      ? (vis.species === 'mammoth' ? 0 : 0.15 + lvl * 0.15)
+      ? (vis.species === 'mammoth' ? 0.06 * lvl : 0.15 + lvl * 0.15)
       : 0;
 
     vis.root.rotation.z += (targetRotZ - vis.root.rotation.z) * Math.min(1, 16 * dt);
@@ -2891,24 +2891,24 @@ export class AnimalRenderer {
     // Mammoth dynamic head, trunk, and roar animation
     if (vis.species === 'mammoth') {
       if (isMammothRoar) {
-        // Mighty roar blast: giữ tư thế uy nghi đưa cao đầu và vòi lên trời
-        vis.body.rotation.z = 0;
+        // Mighty roar blast: giữ tư thế uy nghi nâng ngực, đưa cao đầu và vòi lên trời
+        vis.body.rotation.z = 0.16;
         if (vis.head) {
-          vis.head.rotation.z = 0.32; // đầu ngẩng cao
+          vis.head.rotation.z = 0.38; // đầu ngẩng cao uy phong
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 1.05; // vòi uốn cao vút
+          vis.trunk.rotation.z = 1.18; // vòi uốn cong vút lên trời
           vis.trunk.rotation.y = 0;
         }
       } else if (isCharging) {
-        // Nén gồng: đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng
+        // Nén gồng: nén cơ thể và đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng
         const t = Math.min(1, Math.max(0, lvl));
-        vis.body.rotation.z = 0;
+        vis.body.rotation.z = 0.08 * t; // nâng ngực hơi ngửa đón lực nén
         if (vis.head) {
-          vis.head.rotation.z = 0.30 * t; // nâng đầu lên 1 lần mượt mà
+          vis.head.rotation.z = 0.36 * t; // nâng đầu lên cao mượt mà không chúi
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 0.90 * t; // nâng vòi lên cao mượt mà
+          vis.trunk.rotation.z = 1.05 * t; // nâng vòi lên cao mượt mà
           vis.trunk.rotation.y = 0;
         }
       } else {

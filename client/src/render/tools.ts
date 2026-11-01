@@ -92,35 +92,173 @@ function buildSparklingEgg(g: THREE.Group, c: EggColors): void {
   }
 }
 
+function createBananaGeometry(): { geo: THREE.BufferGeometry; p0: THREE.Vector3; pLast: THREE.Vector3 } {
+  const nSlices = 32;
+  const nRadial = 20;
+
+  // Pure smooth parabolic crescent curve (no inflection points, zero twists)
+  const points: THREE.Vector3[] = [];
+  const tangents: THREE.Vector3[] = [];
+  const normals: THREE.Vector3[] = [];
+  const binormals: THREE.Vector3[] = [];
+
+  for (let i = 0; i <= nSlices; i++) {
+    const t = i / nSlices;
+    // x goes from -0.52 to 0.48
+    const x = -0.52 + 1.00 * t;
+    // y is a graceful smiling crescent
+    const u = 2 * t - 1; // -1 to 1
+    const y = 0.32 - 0.38 * (1 - u * u);
+    points.push(new THREE.Vector3(x, y, 0));
+
+    // Tangent derivative: dx/dt = 1.0, dy/dt = 0.38 * 2 * u * 2 = 1.52 * u
+    const tx = 1.00;
+    const ty = 1.52 * u;
+    const len = Math.hypot(tx, ty);
+    const tan = new THREE.Vector3(tx / len, ty / len, 0);
+    tangents.push(tan);
+
+    // Stable 2D normal in XY plane perpendicular to tangent: (-ty, tx, 0)
+    normals.push(new THREE.Vector3(-tan.y, tan.x, 0));
+    // Binormal is strictly (0, 0, 1)
+    binormals.push(new THREE.Vector3(0, 0, 1));
+  }
+
+  function getRadius(t: number): number {
+    // Continuous, organic smooth swell
+    const baseTaper = (1.0 - t) * 0.068 + t * 0.038;
+    const swell = Math.sin(t * Math.PI) * 0.21;
+    return baseTaper + swell;
+  }
+
+  const positions: number[] = [];
+  const vertNormals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  // Stem cap center vertex (index 0)
+  positions.push(points[0].x, points[0].y, points[0].z);
+  vertNormals.push(-tangents[0].x, -tangents[0].y, 0);
+  uvs.push(0.5, 0.5);
+
+  // Rings of vertices
+  for (let i = 0; i <= nSlices; i++) {
+    const t = i / nSlices;
+    const p = points[i];
+    const N = normals[i];
+    const B = binormals[i];
+    const r = getRadius(t);
+
+    for (let j = 0; j <= nRadial; j++) {
+      const phi = (j / nRadial) * Math.PI * 2;
+      // Banana 5-sided facet (natural peel geometry)
+      const facetFactor = 1.0 + 0.05 * Math.cos(phi * 5);
+      const rad = r * facetFactor;
+
+      const cx = Math.cos(phi);
+      const cy = Math.sin(phi);
+
+      const vx = p.x + (N.x * cx + B.x * cy) * rad;
+      const vy = p.y + (N.y * cx + B.y * cy) * rad;
+      const vz = p.z + (N.z * cx + B.z * cy) * rad;
+      positions.push(vx, vy, vz);
+
+      const nx = N.x * cx + B.x * cy;
+      const ny = N.y * cx + B.y * cy;
+      const nz = N.z * cx + B.z * cy;
+      vertNormals.push(nx, ny, nz);
+
+      uvs.push(j / nRadial, t);
+    }
+  }
+
+  // Blossom tip cap center vertex
+  const lastP = points[nSlices];
+  const tipIdx = positions.length / 3;
+  positions.push(lastP.x, lastP.y, lastP.z);
+  vertNormals.push(tangents[nSlices].x, tangents[nSlices].y, 0);
+  uvs.push(0.5, 0.5);
+
+  // Faces: Stem cap
+  for (let j = 0; j < nRadial; j++) {
+    const v1 = 1 + j;
+    const v2 = 1 + (j + 1);
+    indices.push(0, v2, v1);
+  }
+
+  // Faces: Tube body
+  const stride = nRadial + 1;
+  for (let i = 0; i < nSlices; i++) {
+    for (let j = 0; j < nRadial; j++) {
+      const a = 1 + i * stride + j;
+      const b = 1 + (i + 1) * stride + j;
+      const c = 1 + (i + 1) * stride + (j + 1);
+      const d = 1 + i * stride + (j + 1);
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  // Faces: Blossom tip cap
+  const lastRingStart = 1 + nSlices * stride;
+  for (let j = 0; j < nRadial; j++) {
+    const v1 = lastRingStart + j;
+    const v2 = lastRingStart + (j + 1);
+    indices.push(tipIdx, v1, v2);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(vertNormals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return { geo, p0: points[0], pLast: lastP };
+}
+
 function buildSparklingBanana(g: THREE.Group): void {
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.45, 0.35, 0),
-    new THREE.Vector3(-0.15, 0.08, 0),
-    new THREE.Vector3(0.20, 0.12, 0),
-    new THREE.Vector3(0.50, 0.40, 0),
-  ]);
-  const tubeGeo = new THREE.TubeGeometry(curve, 18, 0.22, 10, false);
-  const bananaMesh = mesh(tubeGeo, 0xffeb3b, 0, 1.45, 0, {
-    metalness: 0.65,
-    roughness: 0.2,
-    emissive: 0xffc107,
-    emissiveIntensity: 0.6,
+  const { geo: bananaGeo, p0, pLast } = createBananaGeometry();
+  const bananaMesh = mesh(bananaGeo, 0xffd500, 0, 1.45, 0, {
+    metalness: 0.08,
+    roughness: 0.35,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.22,
   });
   g.add(bananaMesh);
 
-  // Green stem at top tip
-  const stem = mesh(new THREE.CylinderGeometry(0.065, 0.085, 0.28, 8), 0x43a047, -0.48, 1.88, 0);
-  stem.rotation.z = 0.5;
+  // Curved green stem seamlessly attached at p0 + (0, 1.45, 0)
+  const stemBaseX = p0.x;
+  const stemBaseY = p0.y + 1.45;
+  const stemCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(stemBaseX, stemBaseY, 0),
+    new THREE.Vector3(stemBaseX - 0.08, stemBaseY + 0.12, 0),
+    new THREE.Vector3(stemBaseX - 0.13, stemBaseY + 0.22, 0),
+  ]);
+  const stemGeo = new THREE.TubeGeometry(stemCurve, 10, 0.055, 8, false);
+  const stem = mesh(stemGeo, 0x43a047, 0, 0, 0, {
+    metalness: 0.0,
+    roughness: 0.65,
+  });
   g.add(stem);
 
-  // Dark tip at bottom
-  const tip = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0x3e2723, 0.52, 1.87, 0);
+  // Brownish stem cut tip
+  const stemCap = mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.035, 8), 0x4e342e, stemBaseX - 0.13, stemBaseY + 0.23, 0, {
+    roughness: 0.85,
+  });
+  stemCap.rotation.z = -0.45;
+  g.add(stemCap);
+
+  // Small natural dark blossom tip at pLast + (0, 1.45, 0)
+  const tip = mesh(new THREE.SphereGeometry(0.040, 8, 6), 0x2e1c0c, pLast.x + 0.015, pLast.y + 1.45 + 0.01, 0, {
+    roughness: 0.9,
+    metalness: 0.0,
+  });
   g.add(tip);
 
   // Orbiting Golden Halo Ring
-  const halo = mesh(new THREE.TorusGeometry(1.05, 0.045, 8, 32), 0xffd700, 0, 1.55, 0, {
+  const halo = mesh(new THREE.TorusGeometry(0.95, 0.04, 8, 32), 0xffd700, 0, 1.55, 0, {
     metalness: 0.85,
-    roughness: 0.15,
+    roughness: 0.2,
     emissive: 0xffb300,
     emissiveIntensity: 0.65,
   });
@@ -131,7 +269,7 @@ function buildSparklingBanana(g: THREE.Group): void {
   // 6 orbiting sparkling diamond stars
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    const sparkle = mesh(new THREE.OctahedronGeometry(0.12, 0), 0xffffff, Math.cos(a) * 0.95, 1.55 + Math.sin(a * 3) * 0.25, Math.sin(a) * 0.95, {
+    const sparkle = mesh(new THREE.OctahedronGeometry(0.11, 0), 0xffffff, Math.cos(a) * 0.92, 1.55 + Math.sin(a * 3) * 0.22, Math.sin(a) * 0.92, {
       metalness: 0.8,
       roughness: 0.15,
       emissive: 0xffea00,

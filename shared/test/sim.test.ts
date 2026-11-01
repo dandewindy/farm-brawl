@@ -2512,7 +2512,7 @@ describe('fruit trees', () => {
       expect(growthAbove).toBeLessThan(growthBelow * 0.45);
     });
 
-    it('speed item increases speed by 300% decaying over last 5s', () => {
+    it('speed item increases speed by 300% for 20s decaying over last 5s', () => {
       const w = emptyWorld();
       const id1 = w.addPlayer('runner1', 'pig', false);
       const p1 = place(w, id1, 0, 0, 50);
@@ -2521,12 +2521,12 @@ describe('fruit trees', () => {
       const id2 = w.addPlayer('runner2', 'pig', false);
       const p2 = place(w, id2, 0, 5, 50);
       p2.input = { a: 0, mv: true, btn: false };
-      p2.speedT = 10; // active 300% speed boost
+      p2.speedT = 20; // active 300% speed boost for 20s
 
       w.step();
       w.flush();
 
-      // At t=10s, p2 moves at 300% (3x) the distance of normal p1
+      // At t=20s, p2 moves at 300% (3x) the distance of normal p1
       const distNormal = p1.x;
       const distBoosted = p2.x;
       expect(distBoosted).toBeGreaterThan(distNormal * 2.7);
