@@ -2346,6 +2346,66 @@ describe('fruit trees', () => {
       expect(smallPig.vx).toBeLessThan(0);
     });
 
+    it('allows rainbow-empowered ram to bypass Gorilla and Mammoth immunity', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('BigMammoth', 'mammoth');
+      const mammoth = place(w, mId, 0, 0, 3000);
+
+      const pId = w.addPlayer('RainbowPig', 'pig');
+      const smallPig = place(w, pId, -5, 0, 100);
+      smallPig.superT = 10; // Rainbow powered!
+      smallPig.dashT = 0.5;
+      smallPig.vx = 30;
+      smallPig.vz = 0;
+
+      w.step();
+
+      // Rainbow ram bypasses immunity: Mammoth is launched with knockback
+      expect(mammoth.vx).toBeGreaterThan(5);
+      expect(mammoth.mass).toBeLessThan(3000);
+    });
+
+    it('ensures cart/wheel crush squishes Mammoth and caps loss at 100 kg per hit with debounce', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('BigMammoth', 'mammoth');
+      const mammoth = place(w, mId, 0, 0, 3000);
+
+      const cId = w.addPlayer('CartDriver', 'pig');
+      const cart = place(w, cId, -2, 0, 200);
+      cart.wheelT = 10;
+      cart.vx = 20;
+      cart.vz = 0;
+
+      // First roll-over hit
+      const massBefore = mammoth.mass;
+      w.step();
+
+      expect(mammoth.squishT).toBeGreaterThan(0);
+      expect(mammoth.stunT).toBeGreaterThan(0);
+      const hitEv = (w as any).events.find((e: any) => e.k === 'hit');
+      expect(hitEv).toBeDefined();
+      expect(hitEv.loss).toBe(100);
+      // Actual mass loss should be capped around 100kg (accounting for a tiny fraction of tick hunger decay)
+      expect(massBefore - mammoth.mass).toBeLessThanOrEqual(101);
+      expect(massBefore - mammoth.mass).toBeGreaterThan(0);
+
+      // Immediate next frame within debounce window (0.35s) cannot re-drain
+      cart.x = mammoth.x - 0.5;
+      (w as any).events = [];
+      w.step();
+      const debouncedHit = (w as any).events.find((e: any) => e.k === 'hit');
+      expect(debouncedHit).toBeUndefined();
+
+      // After debounce time (e.g. 0.4s), continuous rolling over can hit again
+      (w as any).time += 0.4;
+      cart.x = mammoth.x - 0.5;
+      (w as any).events = [];
+      w.step();
+      const secondHit = (w as any).events.find((e: any) => e.k === 'hit');
+      expect(secondHit).toBeDefined();
+      expect(secondHit.loss).toBe(100);
+    });
+
     it('ensures food, tools, and scattered items never spawn inside hay bales or trees', () => {
       for (let seed = 100; seed < 120; seed++) {
         const w = new World(seed);

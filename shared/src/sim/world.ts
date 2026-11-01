@@ -1069,6 +1069,10 @@ export class World {
             const dz = other.z - p.z;
             const dist = Math.hypot(dx, dz);
             if (dist <= shockwaveR) {
+              // Gorilla & Mammoth immunity: immune to shockwaves from leapers < 1 ton without rainbow!
+              if ((other.species === 'gorilla' || other.species === 'mammoth') && p.mass < 1000 && !isRainbowLanding) {
+                continue;
+              }
               const pushAng = Math.atan2(dz, dx);
               if (isGorilla) {
                 if (other.mass <= 50) {
@@ -2283,8 +2287,13 @@ export class World {
         const nx = dx / d, nz = dz / d;
         const ma = a.mass * TRAITS[a.species].weight, mb = b.mass * TRAITS[b.species].weight;
 
-        // separate, the lighter one moves more
-        const overlap = minD - Math.min(d, minD), wa = mb / (ma + mb);
+        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals
+        const aImmune = (a.species === 'gorilla' || a.species === 'mammoth') && b.mass < 1000;
+        const bImmune = (b.species === 'gorilla' || b.species === 'mammoth') && a.mass < 1000;
+        let wa = mb / (ma + mb);
+        if (aImmune) wa = 0;
+        else if (bImmune) wa = 1;
+        const overlap = minD - Math.min(d, minD);
         a.x -= nx * overlap * wa; a.z -= nz * overlap * wa;
         b.x += nx * overlap * (1 - wa); b.z += nz * overlap * (1 - wa);
 
@@ -2320,8 +2329,12 @@ export class World {
           const closing = va + vb;
           if (closing > 0) {
             const jImp = (1.2 * closing) / (1 / ma + 1 / mb);
-            a.vx -= (jImp / ma) * nx; a.vz -= (jImp / ma) * nz;
-            b.vx += (jImp / mb) * nx; b.vz += (jImp / mb) * nz;
+            if (!aImmune) {
+              a.vx -= (jImp / ma) * nx; a.vz -= (jImp / ma) * nz;
+            }
+            if (!bImmune) {
+              b.vx += (jImp / mb) * nx; b.vz += (jImp / mb) * nz;
+            }
           }
         }
       }
@@ -2329,6 +2342,9 @@ export class World {
   }
 
   private wheelCrush(attacker: Player, victim: Player, nx: number, nz: number): void {
+    if (victim.lastHitBy === attacker.id && (this.time - victim.lastHitT) < 0.35) {
+      return;
+    }
     victim.squishT = 3.0; // Flattened squished animation
     victim.stunT = 1.2;
     victim.lastHitBy = attacker.id;
@@ -2342,7 +2358,8 @@ export class World {
     if (victim.mass < 80) {
       this.kill(victim, 'crush');
     } else {
-      const lostMass = Math.min(victim.mass - 20, Math.max(50, Math.round(victim.mass * 0.4)));
+      const rawLoss = Math.round(victim.mass * 0.4);
+      const lostMass = Math.min(100, Math.min(victim.mass - 20, Math.max(20, rawLoss)));
       victim.mass = Math.max(20, victim.mass - lostMass);
       attacker.mass += Math.round(lostMass * 0.5);
       this.scatter(victim.x, victim.z, Math.round(lostMass * 0.5), 1.2);
@@ -2762,8 +2779,8 @@ export class World {
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
-    // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton
-    if ((vic.species === 'gorilla' || vic.species === 'mammoth') && att.mass < 1000) {
+    // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
+    if ((vic.species === 'gorilla' || vic.species === 'mammoth') && att.mass < 1000 && !(att.superT > 0)) {
       att.vx = -nx * 18;
       att.vz = -nz * 18;
       att.dashT = 0;
