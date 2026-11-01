@@ -57,8 +57,8 @@ export const CFG = {
 
   FOOD_TARGET: 260,
   FOOD_SPAWN_PER_TICK: 4,
-  /** total special items/tools maintained on map (increased as new items are added) */
-  TOOL_TARGET: 12,
+  /** total special items/tools maintained on map (20 items for optimal map density) */
+  TOOL_TARGET: 20,
   /** above this, mass slowly melts so giants don't stay forever */
   DECAY_START: 120,
   DECAY_RATE: 0.001,

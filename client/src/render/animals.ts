@@ -1009,16 +1009,16 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   g.add(headGroup);
 
   // =========================================================================
-  // 6. Tail (Đuôi dài buông tự nhiên ra sau mông, chùm lông to rõ)
+  // 6. Tail (Đuôi tăng độ dài và độ lớn lên 50%, buông tự nhiên ra sau mông)
   // =========================================================================
   const tailGroup = new THREE.Group();
   tailGroup.position.set(-0.66, 1.18, 0);
   tailGroup.rotation.z = -0.15; // buông thẳng tự nhiên xuống phía sau mông
-  const stemLen = 0.48; // dài hơn (từ 0.30 lên 0.48)
-  tailGroup.add(part(new THREE.CylinderGeometry(0.026, 0.018, stemLen, 8), bodyColor, 0, -stemLen / 2, 0, furOpts));
-  const tuftLen = 0.22; // chùm lông đuôi to rõ
-  tailGroup.add(part(new THREE.ConeGeometry(0.065, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0, furOpts));
-  const tuftBall = part(new THREE.SphereGeometry(0.060, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0, furOpts);
+  const stemLen = 0.72; // tăng độ dài 50% (từ 0.48 lên 0.72)
+  tailGroup.add(part(new THREE.CylinderGeometry(0.039, 0.027, stemLen, 8), bodyColor, 0, -stemLen / 2, 0, furOpts));
+  const tuftLen = 0.33; // tăng độ dài chùm lông 50% (từ 0.22 lên 0.33)
+  tailGroup.add(part(new THREE.ConeGeometry(0.098, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0, furOpts));
+  const tuftBall = part(new THREE.SphereGeometry(0.090, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0, furOpts);
   tuftBall.scale.set(0.95, 1.35, 0.95);
   tailGroup.add(tuftBall);
   g.add(tailGroup);

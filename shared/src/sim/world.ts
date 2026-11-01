@@ -733,7 +733,7 @@ export class World {
           }
         } else {
           const isShielded = p.shieldT > 0;
-          const speedBoost = p.speedT > 0 ? (1.0 + (p.speedT / 10.0) * 1.0) : 1.0;
+          const speedBoost = p.speedT > 5 ? 3.0 : (p.speedT > 0 ? (1.0 + (p.speedT / 5.0) * 2.0) : 1.0);
           const slowMult = (p.slowT > 0 && !isShielded) ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
           const effectiveTerrain = isShielded ? 0 : p.terrain;
           const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost;
@@ -951,10 +951,15 @@ export class World {
     this.eat(alive);
     this.updateBananaProjectiles(DT);
 
-    // Tool & Super Candy spawning (special items spawn 2x faster, maintain TOOL_TARGET tools)
+    // Tool & Super Candy spawning (maintain TOOL_TARGET tools with balanced replenishment)
     this.toolSpawnTimer -= DT;
     if (this.toolSpawnTimer <= 0) {
-      this.toolSpawnTimer = 6 + this.rnd() * 4;
+      const deficit = CFG.TOOL_TARGET - this.tools.size;
+      if (deficit >= 5) {
+        this.toolSpawnTimer = 3.0 + this.rnd() * 2.0; // quick replenishment when many tools are taken
+      } else {
+        this.toolSpawnTimer = 5.0 + this.rnd() * 3.0; // steady 5..8s cadence, balanced density
+      }
       if (this.tools.size < CFG.TOOL_TARGET) {
         this.spawnTool();
       }
@@ -1622,9 +1627,9 @@ export class World {
         const cosA = Math.cos(-this.tillTruck.angle);
         const sinA = Math.sin(-this.tillTruck.angle);
 
-        // Check ram collision with every alive player: INSTANT ELIMINATION!
+        // Check ram collision with every alive player: INSTANT ELIMINATION (or damage only for shielded)!
         for (const p of alive) {
-          if (!p.alive || p.shieldT > 0) continue;
+          if (!p.alive) continue;
           const dx = p.x - this.tillTruck.x;
           const dz = p.z - this.tillTruck.z;
           const rx = dx * cosA - dz * sinA;
@@ -1632,6 +1637,15 @@ export class World {
           const pr = radiusOf(p.mass);
           // Collision box matching giant 2.4x model: front cutter blades (7.0) to rear cab/tires (-4.2)
           if (rx >= -4.2 - pr && rx <= 7.0 + pr && Math.abs(rz) <= 3.3 + pr) {
+            if (p.shieldT > 0) {
+              if (p.lastHitBy === -999 && (this.time - p.lastHitT) < 0.5) continue;
+              p.lastHitBy = -999;
+              p.lastHitT = this.time;
+              const loss = Math.min(p.mass - 10, Math.max(10, Math.round(p.mass * 0.25)));
+              p.mass = Math.max(10, p.mass - loss);
+              this.scatter(p.x, p.z, loss, pr + 1.0);
+              continue;
+            }
             p.squishT = 2.8; // Squished flat pancake!
             p.stunT = 2.0;   // Stunned
             p.charging = false;
@@ -2373,12 +2387,34 @@ export class World {
     if (victim.lastHitBy === attacker.id && (this.time - victim.lastHitT) < 0.35) {
       return;
     }
-    victim.squishT = 3.0; // Flattened squished animation
-    victim.stunT = 1.2;
     victim.lastHitBy = attacker.id;
     victim.lastHitT = this.time;
     attacker.lastAttackedId = victim.id;
     attacker.lastAttackedT = this.time;
+
+    // Shielded: Takes damage only, NO squish, NO stun, NO knockback, NO kill!
+    if (victim.shieldT > 0) {
+      const rawLoss = Math.round(victim.mass * 0.4);
+      const lostMass = Math.min(100, Math.min(victim.mass - 10, Math.max(10, rawLoss)));
+      victim.mass = Math.max(10, victim.mass - lostMass);
+      attacker.mass += Math.round(lostMass * 0.5);
+      this.scatter(victim.x, victim.z, Math.round(lostMass * 0.5), 1.2);
+      this.events.push({
+        k: 'hit',
+        a: attacker.id,
+        v: victim.id,
+        x: r2(victim.x),
+        z: r2(victim.z),
+        s: 14,
+        loss: Math.round(lostMass),
+      });
+      attacker.vx *= 0.5;
+      attacker.vz *= 0.5;
+      return;
+    }
+
+    victim.squishT = 3.0; // Flattened squished animation
+    victim.stunT = 1.2;
     const launchSpeed = 34;
     victim.vx = nx * launchSpeed;
     victim.vz = nz * launchSpeed;
@@ -2807,14 +2843,68 @@ export class World {
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
-    // Shield immunity: completely immune to hits, damage, knockback & stun; attacker bounces off
+    // Shield immunity: immune to stun, knockback, flinch, squish & crowd control; takes damage (sát thương) only!
     if (vic.shieldT > 0) {
-      att.vx = -nx * 16;
-      att.vz = -nz * 16;
+      att.dashHit.add(vic.id);
       att.dashT = 0;
       att.plow = false;
-      att.dashHit.add(vic.id);
-      this.events.push({ k: 'hit', a: att.id, v: vic.id, x: r2(vic.x), z: r2(vic.z), s: 12, loss: 0 });
+      att.vx = -nx * 14;
+      att.vz = -nz * 14;
+
+      const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
+      let loss = 0;
+      if (att.hasDynamite) {
+        att.hasDynamite = false;
+        const boomX = r2((att.x + vic.x) / 2);
+        const boomZ = r2((att.z + vic.z) / 2);
+        this.events.push({ k: 'boom', id: att.id, x: boomX, z: boomZ });
+        loss = Math.min(vic.mass - 10, Math.max(20, Math.round(vic.mass * 0.25)));
+        vic.mass = Math.max(10, vic.mass - loss);
+        this.scatter(boomX, boomZ, loss, radiusOf(vic.mass) + 2.0, nx, nz);
+      } else if (att.pitchforkT > 0 && (att.pitchforkHits ?? 3) > 0) {
+        const hitsLeft = att.pitchforkHits ?? 3;
+        const pct = hitsLeft === 3 ? 0.30 : hitsLeft === 2 ? 0.20 : 0.10;
+        loss = Math.min(vic.mass - CFG.MIN_MASS, Math.max(2, Math.round(vic.mass * pct)));
+        att.pitchforkHits = hitsLeft - 1;
+        if (att.pitchforkHits <= 0) {
+          att.pitchforkT = 0;
+          att.pitchforkHits = 0;
+        }
+        const steal = Math.round(loss * 0.5);
+        if (steal > 0) {
+          att.mass += steal;
+          att.best = Math.max(att.best, att.mass);
+        }
+        vic.mass -= loss;
+        this.scatter(vic.x, vic.z, loss, radiusOf(vic.mass) + 0.8, nx, nz);
+      } else {
+        const superMult = att.superT > 0 ? 2.0 : 1.0;
+        loss = Math.min(vic.mass - CFG.MIN_MASS, Math.max(1, vic.mass * CFG.HIT_LOSS * att.power * superMult * clamp(ma / mv, 0.5, 1.5)));
+        vic.mass -= loss;
+        this.scatter(vic.x, vic.z, loss, radiusOf(vic.mass) + 0.8, nx, nz);
+      }
+
+      vic.lastHitBy = att.id;
+      vic.lastHitT = this.time;
+      att.lastAttackedId = vic.id;
+      att.lastAttackedT = this.time;
+
+      // ZERO knockback on vic (vic.vx & vic.vz completely untouched!)
+      // ZERO stun, ZERO squish, ZERO flinch / interruption
+      vic.stunT = 0;
+      vic.squishT = 0;
+      vic.slowT = 0;
+
+      const rv = radiusOf(vic.mass);
+      this.events.push({
+        k: 'hit',
+        a: att.id,
+        v: vic.id,
+        x: r2(vic.x - nx * rv),
+        z: r2(vic.z - nz * rv),
+        s: 12,
+        loss: Math.round(loss * 10) / 10,
+      });
       return;
     }
 
@@ -3288,13 +3378,22 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star', 'banana', 'banana', 'speed', 'speed', 'shield', 'shield'];
+    const kinds: ToolKind[] = [
+      'pitchfork', 'pitchfork',
+      'dynamite', 'dynamite',
+      'song', 'song',
+      'wheel', 'wheel',
+      'star', 'star', 'star',
+      'banana', 'banana', 'banana',
+      'speed', 'speed', 'speed',
+      'shield', 'shield', 'shield',
+    ];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
 
-    for (let tries = 0; tries < 40; tries++) {
+    for (let tries = 0; tries < 50; tries++) {
       const a = this.rnd() * Math.PI * 2;
-      const d = 10 + Math.sqrt(this.rnd()) * (CFG.R - 25);
+      const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 22);
       const x = Math.cos(a) * d;
       const z = Math.sin(a) * d;
       if (terrainAt(this.map, x, z) === 1) continue;
@@ -3304,6 +3403,16 @@ export class World {
       if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.8)) continue;
       if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.8)) continue;
       if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < (fr || 2.5) + 2.8)) continue;
+      // Requirement 4: Distribute items evenly, avoid clustering right next to existing tools
+      const minToolDist = tries < 25 ? 8.5 : 5.0;
+      let tooClose = false;
+      for (const t of this.tools.values()) {
+        if (Math.hypot(x - t.x, z - t.z) < minToolDist) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
       bx = x; bz = z;
       break;
     }

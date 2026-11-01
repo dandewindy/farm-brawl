@@ -87,6 +87,7 @@ let lastSentTime = 0;
 let prevPredX = 0;
 let prevPredZ = 0;
 let hasPrevPred = false;
+let mySpeedEndTime = 0;
 
 interface OptimisticEatEntry {
   foodId: number;
@@ -1761,6 +1762,7 @@ function handleGameEvent(ev: GameEvent): void {
         } else if (ev.kind === 'banana') {
           hud.showBanner(`🍌 ${t('banana_head')}`, t('tk_banana'));
         } else if (ev.kind === 'speed') {
+          mySpeedEndTime = performance.now() + 10_000;
           hud.showBanner(`⚡ ${t('speed_head')}`, t('tk_speed'));
         } else if (ev.kind === 'shield') {
           hud.showBanner(`🛡️ ${t('shield_head')}`, t('tk_shield'));
@@ -2523,7 +2525,15 @@ function animate(now: number): void {
         prevPredZ = predictor.z;
         hasPrevPred = true;
       }
-      const speedBoost = (stepFlags & FLAG.SPEED_BOOST) !== 0 ? 1.5 : 1.0;
+      let speedBoost = 1.0;
+      if ((stepFlags & FLAG.SPEED_BOOST) !== 0) {
+        if (mySpeedEndTime <= now) mySpeedEndTime = now + 10_000;
+        const rem = (mySpeedEndTime - now) / 1000;
+        if (rem > 5) speedBoost = 3.0;
+        else if (rem > 0) speedBoost = 1.0 + (rem / 5.0) * 2.0;
+      } else {
+        mySpeedEndTime = 0;
+      }
       const tillSpeedMult = (gameState.truck !== undefined ? 1.5 : 1.0) * (myMeta.species === 'monkey' && (stepFlags & FLAG.SUPER) !== 0 ? 1.30 : 1.0) * speedBoost;
       predictor.step(
         dt,

@@ -566,8 +566,11 @@ describe('bonus weapons and tools', () => {
           dog: ['Chó', 'Cún', 'Cậu', 'Bé', 'Gâu'],
           elephant: ['Voi', 'Bé'],
           monkey: ['Khỉ', 'Tề', 'Tôn', 'Vượn', 'Mỹ'],
+          gorilla: ['Gorilla', 'King', 'Titan', 'Đại', 'Tinh'],
+          mammoth: ['Voi', 'Mammoth', 'Ma', 'Titan', 'Bé'],
         };
-        const prefixes = validPrefixes[p.species] || [];
+        const checkSpecies = p.morphOrigSpecies || p.species;
+        const prefixes = validPrefixes[checkSpecies] || [];
         const matches = prefixes.some((pre) => p.name.includes(pre));
         expect(matches).toBe(true);
       }
@@ -2498,7 +2501,7 @@ describe('fruit trees', () => {
       expect(growthAbove).toBeLessThan(growthBelow * 0.45);
     });
 
-    it('speed item increases speed by 200% decaying over 10s', () => {
+    it('speed item increases speed by 300% decaying over last 5s', () => {
       const w = emptyWorld();
       const id1 = w.addPlayer('runner1', 'pig', false);
       const p1 = place(w, id1, 0, 0, 50);
@@ -2507,25 +2510,38 @@ describe('fruit trees', () => {
       const id2 = w.addPlayer('runner2', 'pig', false);
       const p2 = place(w, id2, 0, 5, 50);
       p2.input = { a: 0, mv: true, btn: false };
-      p2.speedT = 10; // active 200% speed boost
+      p2.speedT = 10; // active 300% speed boost
 
       w.step();
       w.flush();
 
-      // At t=10s, p2 moves at 200% (2x) the distance of normal p1
+      // At t=10s, p2 moves at 300% (3x) the distance of normal p1
       const distNormal = p1.x;
       const distBoosted = p2.x;
-      expect(distBoosted).toBeGreaterThan(distNormal * 1.8);
+      expect(distBoosted).toBeGreaterThan(distNormal * 2.7);
 
-      // Decays over time
-      expect(p2.speedT).toBeLessThan(10);
-      expect(p2.speedT).toBeGreaterThan(9.9);
+      // Decays over last 5s: at 2.5s remaining, boost is 2.0x
+      const id3 = w.addPlayer('runner3', 'pig', false);
+      const p3 = place(w, id3, 0, 10, 50);
+      p3.input = { a: 0, mv: true, btn: false };
+      p3.speedT = 2.5;
+
+      const id4 = w.addPlayer('runner4', 'pig', false);
+      const p4 = place(w, id4, 0, 15, 50);
+      p4.input = { a: 0, mv: true, btn: false };
+      p4.speedT = 0;
+
+      w.step();
+      w.flush();
+
+      expect(p3.x).toBeGreaterThan(p4.x * 1.8);
+      expect(p3.x).toBeLessThan(p4.x * 2.2);
     });
 
-    it('shield item provides total immunity to hazards, water, and combat hits', () => {
+    it('shield item provides immunity to stun, knockback, squish while taking damage', () => {
       const w = emptyWorld();
       const id1 = w.addPlayer('shielded', 'pig', false);
-      const p1 = place(w, id1, 0, 0, 50);
+      const p1 = place(w, id1, 0, 0, 100);
       p1.shieldT = 10;
 
       // 1. Water immunity: inWaterT remains 0
@@ -2542,7 +2558,7 @@ describe('fruit trees', () => {
       expect(p1.alive).toBe(true);
       w.map.fire.length = 0;
 
-      // 3. Combat immunity: when hit, shielded player takes 0 loss & 0 knockback
+      // 3. Combat: shielded player takes damage (sát thương) but 0 knockback, 0 stun, 0 squish
       const id2 = w.addPlayer('attacker', 'elephant', false);
       const p2 = place(w, id2, -3, 0, 2000);
       p2.vx = 40;
@@ -2555,14 +2571,16 @@ describe('fruit trees', () => {
       w.flush();
 
       expect(p1.alive).toBe(true);
-      expect(p1.mass).toBe(prevMass);
-      expect(Math.abs(p1.x - prevX)).toBeLessThan(1.0); // No massive knockback
+      expect(p1.mass).toBeLessThan(prevMass); // Takes damage / mass loss
+      expect(p1.stunT).toBe(0); // Immune to stun
+      expect(p1.squishT).toBe(0); // Immune to squish
+      expect(Math.abs(p1.x - prevX)).toBeLessThan(1.0); // No knockback!
     });
 
-    it('maintains increased TOOL_TARGET of 12 tools across map lifecycle', () => {
+    it('maintains increased TOOL_TARGET of 20 tools across map lifecycle', () => {
       const w = new World(42, { bots: false, food: false });
       expect(w.tools.size).toBe(CFG.TOOL_TARGET);
-      expect(CFG.TOOL_TARGET).toBe(12);
+      expect(CFG.TOOL_TARGET).toBe(20);
 
       w.renewGame(100);
       expect(w.tools.size).toBe(CFG.TOOL_TARGET);
