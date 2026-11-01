@@ -68,8 +68,13 @@ export const CFG = {
 } as const;
 export type Cfg = typeof CFG;
 
-/** body radius from mass (kg) */
-export const radiusOf = (m: number): number => 1 + Math.sqrt(m) * 0.09;
+/** body radius from mass (kg) with diminishing scaling above 3000kg */
+export const radiusOf = (m: number): number => {
+  if (m <= 3000) return 1 + Math.sqrt(m) * 0.09;
+  const r3000 = 1 + Math.sqrt(3000) * 0.09;
+  const extra = Math.sqrt(m) - Math.sqrt(3000);
+  return r3000 + extra * 0.09 * 0.40; // 60% slower growth above 3000kg
+};
 
 export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey', 'gorilla', 'mammoth'] as const;
 export type Species = (typeof SPECIES)[number];

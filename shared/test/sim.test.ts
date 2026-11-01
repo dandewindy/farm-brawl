@@ -2471,6 +2471,22 @@ describe('fruit trees', () => {
         }
       }
     });
+
+    it('tapers size growth rate for animals exceeding 3000kg', () => {
+      const r2999 = radiusOf(2999);
+      const r3000 = radiusOf(3000);
+      const r3001 = radiusOf(3001);
+      // Strictly increasing and continuous at 3000kg
+      expect(r3000).toBeGreaterThan(r2999);
+      expect(r3001).toBeGreaterThan(r3000);
+      expect(Math.abs(r3000 - (1 + Math.sqrt(3000) * 0.09))).toBeLessThan(1e-9);
+
+      // Delta for 1000kg below 3000kg vs 1000kg above 3000kg
+      const growthBelow = radiusOf(3000) - radiusOf(2000);
+      const growthAbove = radiusOf(4000) - radiusOf(3000);
+      // Growth rate above 3000kg should be significantly dampened (40% slope)
+      expect(growthAbove).toBeLessThan(growthBelow * 0.45);
+    });
   });
 });
 
