@@ -117,7 +117,8 @@ const revivingHearts: RevivingHeartObj[] = [];
 function spawnGiantRevivingHeart(x: number, z: number, mass: number, dur: number): void {
   const group = new THREE.Group();
   const baseR = radiusOf(mass);
-  const heartScale = Math.max(0.7, baseR * 1.5);
+  // Kích thước Icon trái tim 3D khi đang hồi sinh tỉ lệ chính xác theo kích thước con vật lúc chết
+  const heartScale = baseR * 1.0;
 
   const geo = createHeartGeometry(0.38);
   geo.scale(heartScale, heartScale, heartScale);
@@ -192,7 +193,8 @@ function updateRevivingHearts(dt: number, now: number): void {
     h.timer += dt;
 
     const baseR = radiusOf(h.mass);
-    const floatY = Math.max(0.8, baseR * 1.0) + Math.sin(now * 0.004) * 0.18;
+    const heartScale = baseR * 1.0;
+    const floatY = Math.max(0.75, baseR * 1.05) + Math.sin(now * 0.004) * (0.12 * baseR);
     h.group.position.y = floatY;
     h.group.rotation.y = now * 0.0015;
 
@@ -202,8 +204,6 @@ function updateRevivingHearts(dt: number, now: number): void {
     h.bodyMesh.scale.set(beat, beat, beat);
 
     h.halo.rotation.z = now * 0.0025;
-
-    const heartScale = Math.max(0.7, baseR * 1.5);
     for (let j = 0; j < h.sparkles.length; j++) {
       const sp = h.sparkles[j];
       const a = (j / 8) * Math.PI * 2 + now * 0.0025;
