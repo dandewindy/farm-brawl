@@ -471,11 +471,18 @@ export class FoodAndParticleRenderer {
 
       const idx = counts[k]++;
       const baseKg = FOOD_KG[k] || 1;
+      // 🌟 Tăng kích thước item đặc biệt (kẹo cầu vồng) lên 1.5 lần, các đồ ăn nhỏ lên 1.2 lần
+      const scaleMult = k === 6
+        ? 1.5 // Item đặc biệt: Kẹo cầu vồng siêu thú
+        : (k >= 0 && k <= 5)
+        ? 1.2 // Đồ ăn nhỏ: bắp, táo, bắp vàng, cà rốt, bí đỏ, củ cải
+        : 1.0; // Đồ ăn lớn/khổng lồ: dưa hấu, hoa khổng lồ, bí ma thuật giữ nguyên
+
       // Apple (k === 1) uses cube-root volume scaling so 100kg giant apple exactly equals watermelon (sz ~2.91),
       // 20..50kg medium apple (sz ~1.70..2.31), 5..10kg small apple (sz ~1.07..1.35), 2.5kg base apple (sz ~0.85)
-      const sz = k === 1
+      const sz = (k === 1
         ? 0.85 * Math.cbrt((f.v || baseKg) / baseKg)
-        : Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)));
+        : Math.min(1.6, Math.max(0.7, Math.sqrt((f.v || baseKg) / baseKg)))) * scaleMult;
       const grow = (f.born ? Math.max(0, Math.min(1, (now - f.born) / 350)) : 1) * this.transitionScale;
       const seed = f.id * 1.37;
       const ySink = - (1 - this.transitionScale) * 2.5;

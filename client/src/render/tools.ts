@@ -157,6 +157,8 @@ export class ToolRenderer {
 
   private buildTool(kind: ToolKind): THREE.Group {
     const g = new THREE.Group();
+    // 🌟 Tăng kích thước item đặc biệt lên 1.5 lần
+    g.scale.set(1.5, 1.5, 1.5);
     if (kind === 'banana') {
       buildSparklingBanana(g);
       const glow = new THREE.Mesh(
