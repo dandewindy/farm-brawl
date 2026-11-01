@@ -136,6 +136,7 @@ export type GameEvent =
   | { k: 'heartRevive'; id: number; x: number; z: number; mass: number; dur: number }
   | { k: 'heartRevived'; id: number; x: number; z: number; mass: number }
   | { k: 'heartCollect'; id: number; name: string }
+  | { k: 'dolphinDeliver'; x: number; z: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
 /** [id, stage: 0..3, big, small, flowers] */

@@ -2729,27 +2729,38 @@ describe('fruit trees', () => {
       expect(spawnedSong).toBe(true);
     });
 
-    it('spawns dolphin heart at center of largest pond every 30s', () => {
+    it('spawns dolphin heart at center of largest pond only when dolphin delivers, and does not spawn if already present', () => {
       const w = new World(1234, { bots: false, food: false });
       w.food.clear();
       w.tools.clear();
       const pond = w.getLargestPond()!;
       expect(pond).toBeDefined();
 
-      // Step 30 seconds
-      for (let i = 0; i < 30 * 60; i++) {
+      // Step 30 seconds: dolphinDeliver event should be pushed
+      for (let i = 0; i < 30 * 20; i++) {
+        w.step();
+      }
+      const snapDeliver = w.snapshotFor(1);
+      const deliverEv = snapDeliver.ev.find((e) => e.k === 'dolphinDeliver');
+      expect(deliverEv).toBeDefined();
+
+      // Step another 2.5s: dolphin finishes surfacing at center and places heart item
+      for (let i = 0; i < Math.ceil(2.5 * 20); i++) {
         w.step();
       }
 
-      // Heart tool should have spawned near center of largest pond
-      let foundHeart = false;
-      for (const t of w.tools.values()) {
-        if (t.kind === 'heart') {
-          foundHeart = true;
-          expect(Math.hypot(t.x - pond[0], t.z - pond[1])).toBeLessThan(0.1);
-        }
+      // Heart tool should now exist near center of largest pond
+      const hearts = [...w.tools.values()].filter((t) => t.kind === 'heart');
+      expect(hearts.length).toBe(1);
+      expect(Math.hypot(hearts[0].x - pond[0], hearts[0].z - pond[1])).toBeLessThan(0.1);
+
+      // Requirement: Nếu đã có Trái tim ở trước đó thì cá heo sẽ chỉ bơi vòng quanh và thỉnh thoảng hiện lên thôi.
+      // Step another 60s while heart is still uncollected: NO duplicate heart spawns!
+      for (let i = 0; i < 60 * 20; i++) {
+        w.step();
       }
-      expect(foundHeart).toBe(true);
+      const heartsAfter60s = [...w.tools.values()].filter((t) => t.kind === 'heart');
+      expect(heartsAfter60s.length).toBe(1);
     });
 
     it('player picking up heart item gains hasHeart flag and revives in 3s with exact mass', () => {

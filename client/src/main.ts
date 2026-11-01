@@ -1992,12 +1992,17 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'heartCollect': {
+      dolphin.onHeartCollected();
       if (ev.id === myId) {
         sfxReward();
         hud.showBanner(`💖 ${t('heart_head')}`, t('tk_heart'));
       } else {
         hud.showToast(t('heart_other', { name: ev.name }), 2500);
       }
+      break;
+    }
+    case 'dolphinDeliver': {
+      dolphin.startHeartDelivery(ev.x, ev.z);
       break;
     }
     case 'heartRevive': {

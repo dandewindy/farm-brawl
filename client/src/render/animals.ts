@@ -2796,47 +2796,9 @@ export class AnimalRenderer {
       vis.heartAura.visible = false;
     }
 
-    // Dynamic aerodynamic wind whirlwind visual when SPEED_BOOST flag is active
+    // Aerodynamic speed boost indicator
     const isSpeedBoost = (flags & FLAG.SPEED_BOOST) !== 0;
-    if (isSpeedBoost) {
-      if (!vis.windWhirlMesh) {
-        const wGroup = new THREE.Group();
-        const mat1 = new THREE.MeshBasicMaterial({
-          color: 0x80deea,
-          transparent: true,
-          opacity: 0.65,
-          wireframe: false,
-        });
-        const mat2 = new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          transparent: true,
-          opacity: 0.45,
-          wireframe: false,
-        });
-        const r1 = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.035, 6, 24), mat1);
-        r1.rotation.x = Math.PI / 2.2;
-        r1.rotation.y = 0.2;
-        wGroup.add(r1);
-
-        const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.03, 6, 24), mat2);
-        r2.rotation.x = Math.PI / 1.8;
-        r2.rotation.z = -0.3;
-        r2.position.y = 0.35;
-        wGroup.add(r2);
-
-        const r3 = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.025, 6, 24), mat1);
-        r3.rotation.x = Math.PI / 2.05;
-        r3.position.y = -0.3;
-        wGroup.add(r3);
-
-        vis.windWhirlMesh = wGroup;
-        vis.root.add(vis.windWhirlMesh);
-      }
-      vis.windWhirlMesh.visible = true;
-      vis.windWhirlMesh.position.y = 0.55;
-      vis.windWhirlMesh.rotation.y = now * 0.012;
-      vis.windWhirlMesh.scale.setScalar(1.0 + 0.08 * Math.sin(now * 0.008));
-    } else if (vis.windWhirlMesh) {
+    if (vis.windWhirlMesh) {
       vis.windWhirlMesh.visible = false;
     }
 
@@ -3209,7 +3171,6 @@ export class AnimalRenderer {
     const isTraitor = (flags & FLAG.TRAITOR) !== 0;
 
     let iconPrefix = '';
-    if (flags & FLAG.HEART) iconPrefix += '💖 ';
     if (flags & FLAG.SPEED_BOOST) iconPrefix += '⚡ ';
     if (flags & FLAG.IMMUNITY) iconPrefix += '🛡️ ';
     if (flags & FLAG.WHEEL) iconPrefix += '🛞 ';

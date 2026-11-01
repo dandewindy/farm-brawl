@@ -230,6 +230,8 @@ export class World {
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
   private dolphinHeartTimer = 30;
+  private dolphinDelivering = false;
+  private dolphinDeliveryTimer = 0;
   private mapShiftTimer = 300;
   private rnd: () => number;
   private events: GameEvent[] = [];
@@ -1016,11 +1018,44 @@ export class World {
       }
     }
 
-    // Dolphin Heart Spawner: Every 30s the dolphin surfaces in the largest pond and places the heart item
-    this.dolphinHeartTimer -= DT;
-    if (this.dolphinHeartTimer <= 0) {
+    // Dolphin Heart Spawner:
+    // Trái tim chỉ xuất hiện giữa hồ khi Cá heo đưa vào giữa.
+    // Nếu đã có Trái tim ở trước đó thì cá heo sẽ chỉ bơi vòng quanh và thỉnh thoảng hiện lên thôi. Còn nếu chưa có thì cứ tiếp tục.
+    const hasHeartTool = [...this.tools.values()].some((t) => t.kind === 'heart');
+    if (!hasHeartTool) {
+      if (this.dolphinDelivering) {
+        this.dolphinDeliveryTimer -= DT;
+        if (this.dolphinDeliveryTimer <= 0) {
+          this.dolphinDelivering = false;
+          this.dolphinHeartTimer = 30;
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
+          this.spawnDolphinHeart();
+        }
+      } else {
+        this.dolphinHeartTimer -= DT;
+        if (this.dolphinHeartTimer <= 0) {
+          const pond = this.getLargestPond();
+          if (pond) {
+            this.dolphinDelivering = true;
+            this.dolphinDeliveryTimer = 2.0; // 2s for dolphin to swim into center and surface
+            this.events.push({
+              k: 'dolphinDeliver',
+              x: r2(pond[0]),
+              z: r2(pond[1]),
+            });
+          } else {
+            this.dolphinHeartTimer = 30;
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
+          }
+        }
+      }
+    } else {
       this.dolphinHeartTimer = 30;
-      this.spawnDolphinHeart();
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
+      this.dolphinDelivering = false;
     }
 
     // Requirement 4: Items despawn after 3 minutes (180s) without being picked up, and respawn at a new position
@@ -3870,11 +3905,15 @@ export class World {
     this.food.clear();
     this.tools.clear();
     this.dolphinHeartTimer = 30;
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
     this.matchClock = this.mode === 'friend' ? this.matchDuration : 300;
     this.mapShiftTimer = 300;
     this.dolphinHeartTimer = 30;
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
     this.teamScores = [0, 0];
     this.matchEnded = false;
     this.matchEndTimer = 0;
@@ -3925,6 +3964,8 @@ export class World {
     this.food.clear();
     this.tools.clear();
     this.dolphinHeartTimer = 30;
+    this.dolphinDelivering = false;
+    this.dolphinDeliveryTimer = 0;
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
 
