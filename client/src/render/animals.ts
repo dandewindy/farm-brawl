@@ -3,6 +3,7 @@ import { CFG, radiusOf, type Species } from '@shared/constants';
 import { FLAG, type PlayerMeta } from '@shared/protocol';
 import { t } from '../i18n';
 import { getArenaTheme, type ArenaTheme } from '../theme';
+import { createHeartGeometry } from './tools';
 
 interface AnimalVisual {
   root: THREE.Group;
@@ -42,6 +43,7 @@ interface AnimalVisual {
   trunk?: THREE.Group;
   head?: THREE.Group;
   shieldAura?: THREE.Mesh;
+  heartAura?: THREE.Group;
   leapTimer?: number;
   leapDur?: number;
   leapHeight?: number;
@@ -2738,6 +2740,59 @@ export class AnimalRenderer {
       vis.shieldAura.visible = false;
     }
 
+    // Floating sparkling heart aura when FLAG.HEART is active
+    const hasHeart = (flags & FLAG.HEART) !== 0;
+    if (hasHeart) {
+      if (!vis.heartAura) {
+        const hGroup = new THREE.Group();
+        const heartGeo = createHeartGeometry(0.22);
+        heartGeo.scale(0.5, 0.5, 0.5);
+        const heartMat = new THREE.MeshStandardMaterial({
+          color: 0xff1744,
+          emissive: 0xff4081,
+          emissiveIntensity: 0.85,
+          metalness: 0.2,
+          roughness: 0.25,
+        });
+        const heartMesh = new THREE.Mesh(heartGeo, heartMat);
+        heartMesh.name = 'visHeartMesh';
+        hGroup.add(heartMesh);
+
+        const halo = new THREE.Mesh(
+          new THREE.TorusGeometry(0.38, 0.02, 8, 24),
+          new THREE.MeshStandardMaterial({
+            color: 0xff80ab,
+            emissive: 0xff4081,
+            emissiveIntensity: 0.8,
+          })
+        );
+        halo.rotation.x = Math.PI / 3;
+        halo.name = 'visHeartHalo';
+        hGroup.add(halo);
+
+        vis.heartAura = hGroup;
+        vis.root.add(vis.heartAura);
+      }
+      vis.heartAura.visible = true;
+      const headH = 1.35 * sc;
+      vis.heartAura.position.set(0, headH + 0.35 + Math.sin(now * 0.004) * 0.08, 0);
+      const heartMesh = vis.heartAura.getObjectByName('visHeartMesh') as THREE.Mesh | undefined;
+      if (heartMesh && heartMesh.material instanceof THREE.MeshStandardMaterial) {
+        const colRed = new THREE.Color(0xff1744);
+        const colPink = new THREE.Color(0xff4081);
+        const cycle = (Math.sin(now * 0.003) + 1) * 0.5;
+        const curCol = new THREE.Color().lerpColors(colRed, colPink, cycle);
+        heartMesh.material.color.copy(curCol);
+        heartMesh.material.emissive.copy(curCol);
+        const beat = 0.5 * (1.0 + 0.15 * Math.pow(Math.max(0, Math.sin(now * 0.006)), 3));
+        heartMesh.scale.set(beat, beat, beat);
+      }
+      const halo = vis.heartAura.getObjectByName('visHeartHalo') as THREE.Mesh | undefined;
+      if (halo) halo.rotation.z = now * 0.002;
+    } else if (vis.heartAura) {
+      vis.heartAura.visible = false;
+    }
+
     // Dynamic leg swinging with amplitude 0.7
     const gorillaCycle = Math.sin(vis.phase * 0.9);
     vis.legs.forEach((leg, idx) => {
@@ -3097,6 +3152,7 @@ export class AnimalRenderer {
     const isTraitor = (flags & FLAG.TRAITOR) !== 0;
 
     let iconPrefix = '';
+    if (flags & FLAG.HEART) iconPrefix += '💖 ';
     if (flags & FLAG.SPEED_BOOST) iconPrefix += '⚡ ';
     if (flags & FLAG.IMMUNITY) iconPrefix += '🛡️ ';
     if (flags & FLAG.WHEEL) iconPrefix += '🛞 ';

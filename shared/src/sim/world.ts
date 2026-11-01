@@ -5,7 +5,7 @@ import {
   CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf, pickRandomSpecies,
   type FoodKind, type Species,
 } from '../constants';
-import { generateMap, type MapData, type TreeData, type TreeSize } from '../map';
+import { generateMap, type Blob, type MapData, type TreeData, type TreeSize } from '../map';
 import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
@@ -77,6 +77,12 @@ export interface Player extends Body {
   mammothRoarCd?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
+  hasHeart?: boolean;
+  heartReviving?: boolean;
+  heartReviveTimer?: number;
+  heartReviveMass?: number;
+  heartDeathX?: number;
+  heartDeathZ?: number;
   ai: BotBrain | null;
 }
 
@@ -223,6 +229,7 @@ export class World {
   minions = new Map<number, Minion>();
   private toolSpawnTimer = 3;
   private superCandyTimer = 25;
+  private dolphinHeartTimer = 30;
   private mapShiftTimer = 300;
   private rnd: () => number;
   private events: GameEvent[] = [];
@@ -313,7 +320,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, lastAttackedId: 0, lastAttackedT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: 0, squishT: 0, wheelT: 0, hasHeart: false, heartReviving: false, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -435,6 +442,7 @@ export class World {
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
+      hasHeart: false, heartReviving: false, heartReviveTimer: undefined,
       monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
     });
     delete p.morphOrigSpecies;
@@ -677,9 +685,31 @@ export class World {
       tree.step(DT);
     }
 
+    // Update Heart Reviving players
+    for (const p of this.players.values()) {
+      if (p.heartReviving) {
+        p.heartReviveTimer = (p.heartReviveTimer ?? 3.0) - DT;
+        if (p.heartReviveTimer <= 0) {
+          p.heartReviving = false;
+          p.alive = true;
+          p.mass = p.heartReviveMass ?? p.mass;
+          const [safeX, safeZ] = this.findSafeReviveSpot(p.heartDeathX ?? p.x, p.heartDeathZ ?? p.z);
+          p.x = safeX;
+          p.z = safeZ;
+          p.vx = 0;
+          p.vz = 0;
+          p.shieldT = 3.0; // 3s immunity protection on revive!
+          p.inWaterT = 0;
+          p.stunT = 0;
+          p.slowT = 0;
+          p.squishT = 0;
+        }
+      }
+    }
+
     for (const p of this.players.values()) {
       if (!p.alive) {
-        if (p.bot && (p.respawnT -= DT) <= 0) this.spawn(p);
+        if (!p.heartReviving && p.bot && (p.respawnT -= DT) <= 0) this.spawn(p);
         continue;
       }
       if (p.ai && p.bot) thinkBot(this, p, DT);
@@ -977,6 +1007,13 @@ export class World {
       if (!hasSuper) {
         this.spawnSuperCandy();
       }
+    }
+
+    // Dolphin Heart Spawner: Every 30s the dolphin surfaces in the largest pond and places the heart item
+    this.dolphinHeartTimer -= DT;
+    if (this.dolphinHeartTimer <= 0) {
+      this.dolphinHeartTimer = 30;
+      this.spawnDolphinHeart();
     }
 
     // Requirement 4: Items despawn after 3 minutes (180s) without being picked up, and respawn at a new position
@@ -1374,6 +1411,9 @@ export class World {
             p.slowT = 0;
             p.squishT = 0;
             p.inWaterT = 0;
+          } else if (t.kind === 'heart') {
+            p.hasHeart = true;
+            this.events.push({ k: 'heartCollect', id: p.id, name: p.name });
           }
           break;
         }
@@ -3162,6 +3202,106 @@ export class World {
   }
 
   private kill(p: Player, cause: DeathCause): void {
+    if (p.hasHeart) {
+      p.hasHeart = false;
+      p.heartReviving = true;
+      p.heartReviveTimer = 3.0;
+      p.heartReviveMass = p.mass;
+      p.heartDeathX = p.x;
+      p.heartDeathZ = p.z;
+      p.alive = false;
+      p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
+      p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
+      p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
+      p.monkeyLeapT = 0; p.treeShakeT = 0;
+      p.treeShakeTreeId = undefined;
+      p.treeShakeTimer = undefined;
+      p.treeShakeDropStage = undefined;
+      p.mammothRoarT = 0;
+      if (p.species === 'gorilla') {
+        p.species = 'monkey';
+      } else if (p.species === 'mammoth') {
+        p.species = 'elephant';
+      }
+      if (p.morphOrigSpecies) {
+        p.species = p.morphOrigSpecies;
+        delete p.morphOrigSpecies;
+        delete p.morphT;
+      }
+      for (const [mid, m] of this.minions) {
+        if (m.ownerId === p.id) this.minions.delete(mid);
+      }
+
+      const wasKing = (p.id === this.napoleonId && this.napoleonId > 0);
+      const credited = p.lastHitBy && this.time - p.lastHitT < CFG.CREDIT_TIME ? this.players.get(p.lastHitBy) : undefined;
+      const killer = credited && credited.alive && credited !== p ? credited : undefined;
+      if (killer) {
+        const spoils = Math.round(p.mass * CFG.KILL_SPOILS);
+        killer.mass += spoils;
+        killer.kills++;
+        killer.totalKills = (killer.totalKills || 0) + 1;
+        killer.streak++;
+        if (killer.team !== undefined && p.team !== undefined && killer.team !== p.team) {
+          if (wasKing) {
+            this.teamScores[killer.team] += 5;
+            killer.score = (killer.score || 0) + 300;
+          } else {
+            this.teamScores[killer.team] += 1;
+            killer.score = (killer.score || 0) + 100;
+          }
+        } else {
+          killer.score = (killer.score || 0) + (wasKing ? 300 : 100);
+        }
+      }
+
+      if (wasKing) {
+        const prevKing = this.players.get(p.id);
+        const dur = Math.round(this.napoleonReign);
+        if (dur >= 5 && prevKing) {
+          this.hof.push([prevKing.name, prevKing.species, dur]);
+          this.hof.sort((a, b) => b[2] - a[2]);
+          this.hof = this.hof.slice(0, 3);
+        }
+
+        if (killer) {
+          this.napoleonId = killer.id;
+          this.napoleonReign = 0;
+          this.clearRule();
+          this.podiumCaptor = killer.id;
+          this.podiumProgress = 1.0;
+          this.podiumPhaseTimer = 30;
+          this.podiumWarned5s = false;
+          this.summonKingGuards(killer);
+          if (killer.team !== undefined) {
+            this.teamScores[killer.team] += 5;
+          }
+          killer.score = (killer.score || 0) + 250;
+          this.events.push({ k: 'napoleon', id: killer.id, usurped: true });
+          this.startKingChoice();
+        } else {
+          this.napoleonId = 0;
+          this.napoleonReign = 0;
+          this.clearRule();
+          this.kingChoice = null;
+          this.podiumProgress = 0;
+          this.podiumCaptor = 0;
+          this.podiumPhaseTimer = 30;
+          this.podiumWarned5s = false;
+          this.events.push({ k: 'napoleon', id: 0 });
+        }
+      }
+
+      this.events.push({
+        k: 'heartRevive',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        mass: Math.round(p.mass),
+        dur: 3.0,
+      });
+      return;
+    }
+
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
@@ -3545,6 +3685,48 @@ export class World {
     this.events.push({ k: 'superFood', x: r2(bx), z: r2(bz) });
   }
 
+  public getLargestPond(): Blob | null {
+    if (!this.map.pond || this.map.pond.length === 0) return null;
+    return this.map.pond.reduce((max, p) => (p[2] > max[2] ? p : max), this.map.pond[0]);
+  }
+
+  private spawnDolphinHeart(): void {
+    const pond = this.getLargestPond();
+    if (!pond) return;
+    const cx = pond[0];
+    const cz = pond[1];
+    // Don't spawn duplicate heart if uncollected heart already exists near center
+    for (const t of this.tools.values()) {
+      if (t.kind === 'heart' && Math.hypot(t.x - cx, t.z - cz) < 3.0) {
+        return;
+      }
+    }
+    const id = this.nextTool++;
+    this.tools.set(id, { id, kind: 'heart', x: r2(cx), z: r2(cz), age: 0 });
+  }
+
+  private findSafeReviveSpot(origX: number, origZ: number): [number, number] {
+    const radii = [4, 7, 10, 14, 18, 22, 26];
+    const angles = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 5 * Math.PI / 4, 3 * Math.PI / 2, 7 * Math.PI / 4];
+    for (const r of radii) {
+      const aOffset = this.rnd() * Math.PI * 2;
+      for (const a of angles) {
+        const x = origX + Math.cos(a + aOffset) * r;
+        const z = origZ + Math.sin(a + aOffset) * r;
+        if (Math.hypot(x, z) > CFG.R - 4) continue;
+        if (terrainAt(this.map, x, z) !== 0) continue;
+        if (this.map.pond?.some((b) => insideBlob(b, x, z, 1.2))) continue;
+        if (this.map.fire?.some(([fx, fz, fr]) => Math.hypot(x - fx, z - fz) < (fr || 2.5) + 3.0)) continue;
+        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 3.0)) continue;
+        if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 2.0)) continue;
+        if (this.map.hay?.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 2.0)) continue;
+        if (Math.hypot(x - this.map.podium[0], z - this.map.podium[1]) < CFG.PODIUM_R + 3.0) continue;
+        return [r2(x), r2(z)];
+      }
+    }
+    return [0, 0];
+  }
+
   // ------------------------------------------------------------------ output
 
   init(): ServerMsg {
@@ -3575,6 +3757,7 @@ export class World {
         | (o.squishT > 0 ? FLAG.SQUISHED : 0)
         | (o.speedT > 0 ? FLAG.SPEED_BOOST : 0)
         | (o.shieldT > 0 ? FLAG.IMMUNITY : 0)
+        | (o.hasHeart ? FLAG.HEART : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
         | (o.flyT > 0 ? FLAG.FLYING : 0)
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
@@ -3682,10 +3865,12 @@ export class World {
     this.initTrees();
     this.food.clear();
     this.tools.clear();
+    this.dolphinHeartTimer = 30;
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
     this.matchClock = this.mode === 'friend' ? this.matchDuration : 300;
     this.mapShiftTimer = 300;
+    this.dolphinHeartTimer = 30;
     this.teamScores = [0, 0];
     this.matchEnded = false;
     this.matchEndTimer = 0;
@@ -3735,6 +3920,7 @@ export class World {
     this.initTrees();
     this.food.clear();
     this.tools.clear();
+    this.dolphinHeartTimer = 30;
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
 

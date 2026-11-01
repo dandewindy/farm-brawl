@@ -52,6 +52,7 @@ export const FLAG = {
   SQUISHED: 2048,
   SPEED_BOOST: 4096,
   IMMUNITY: 8192,
+  HEART: 16384,
   SUPER: 32768,
   FLYING: 65536,
   WHEEL: 131072,
@@ -62,7 +63,7 @@ export const FLAG = {
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
 
-export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star' | 'banana' | 'speed' | 'shield';
+export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star' | 'banana' | 'speed' | 'shield' | 'heart';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
 
 /** [id, ownerId, x, z, angle, mass, species, skin] */
@@ -132,6 +133,8 @@ export type GameEvent =
   | { k: 'mammothRoar'; id: number; x: number; z: number; r: number; dur: number; rainbow?: boolean }
   | { k: 'sundaySummon'; dur: number }
   | { k: 'morph'; id: number; species: Species; dur: number }
+  | { k: 'heartRevive'; id: number; x: number; z: number; mass: number; dur: number }
+  | { k: 'heartCollect'; id: number; name: string }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
 /** [id, stage: 0..3, big, small, flowers] */

@@ -2689,6 +2689,87 @@ describe('fruit trees', () => {
       }
       expect(spawnedSong).toBe(true);
     });
+
+    it('spawns dolphin heart at center of largest pond every 30s', () => {
+      const w = new World(1234, { bots: false, food: false });
+      w.food.clear();
+      w.tools.clear();
+      const pond = w.getLargestPond()!;
+      expect(pond).toBeDefined();
+
+      // Step 30 seconds
+      for (let i = 0; i < 30 * 60; i++) {
+        w.step();
+      }
+
+      // Heart tool should have spawned near center of largest pond
+      let foundHeart = false;
+      for (const t of w.tools.values()) {
+        if (t.kind === 'heart') {
+          foundHeart = true;
+          expect(Math.hypot(t.x - pond[0], t.z - pond[1])).toBeLessThan(0.1);
+        }
+      }
+      expect(foundHeart).toBe(true);
+    });
+
+    it('player picking up heart item gains hasHeart flag and revives in 3s with exact mass', () => {
+      const w = emptyWorld();
+      w.tools.clear();
+      const id = w.addPlayer('BlessedPlayer', 'sheep', false);
+      place(w, id, 10, 10, 245);
+      const p = w.players.get(id)!;
+      expect(p.hasHeart).toBe(false);
+
+      // Spawn heart right at player position
+      const heartId = (w as any).nextTool++;
+      w.tools.set(heartId, { id: heartId, kind: 'heart', x: 10, z: 10, age: 0 });
+
+      w.step();
+
+      // Heart should be picked up
+      expect(w.tools.has(heartId)).toBe(false);
+      expect(p.hasHeart).toBe(true);
+
+      const snap = w.snapshotFor(id);
+      const wire = snap.p.find(([pid]) => pid === id)!;
+      expect((wire[5] & FLAG.HEART) !== 0).toBe(true);
+
+      // Now kill the player with hazards / attack
+      const preDeathMass = p.mass;
+      expect(Math.round(preDeathMass)).toBe(245);
+
+      (w as any).kill(p, 'fire');
+      const snapAfterKill = w.snapshotFor(id);
+      const reviveEv = snapAfterKill.ev.find((e) => e.k === 'heartRevive') as any;
+      expect(reviveEv).toBeDefined();
+      expect(reviveEv.mass).toBe(Math.round(preDeathMass));
+      expect(reviveEv.dur).toBe(3.0);
+
+      // Player should be heartReviving and alive = false temporarily
+      expect(p.heartReviving).toBe(true);
+      expect(p.alive).toBe(false);
+      expect(p.hasHeart).toBe(false);
+
+      // Fast forward 2.8 seconds: still reviving (DT = 0.05s)
+      for (let i = 0; i < Math.floor(2.8 / DT); i++) {
+        w.step();
+      }
+      expect(p.heartReviving).toBe(true);
+      expect(p.alive).toBe(false);
+
+      // Step past 3.0 seconds: resurrected!
+      for (let i = 0; i < Math.ceil(0.3 / DT); i++) {
+        w.step();
+      }
+      expect(p.heartReviving).toBe(false);
+      expect(p.alive).toBe(true);
+      // Requirement: Kích thước sau khi hồi sinh đúng bằng lúc trước khi chết!
+      expect(Math.round(p.mass)).toBe(Math.round(preDeathMass));
+      expect(p.heartReviveMass).toBe(preDeathMass);
+      // Revives with 3s immunity shield
+      expect(p.shieldT).toBeGreaterThan(0);
+    });
   });
 });
 

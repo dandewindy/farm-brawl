@@ -369,6 +369,81 @@ function buildAegisShield(g: THREE.Group): void {
   g.add(orbitRing);
 }
 
+export function createHeartShape(): THREE.Shape {
+  const shape = new THREE.Shape();
+  // Classic plump rounded 3D heart
+  shape.moveTo(0, 0.35);
+  shape.bezierCurveTo(0, 0.65, 0.35, 0.95, 0.65, 0.95);
+  shape.bezierCurveTo(1.05, 0.95, 1.05, 0.45, 1.05, 0.45);
+  shape.bezierCurveTo(1.05, 0.05, 0.65, -0.4, 0, -0.85);
+  shape.bezierCurveTo(-0.65, -0.4, -1.05, 0.05, -1.05, 0.45);
+  shape.bezierCurveTo(-1.05, 0.45, -1.05, 0.95, -0.65, 0.95);
+  shape.bezierCurveTo(-0.35, 0.95, 0, 0.65, 0, 0.35);
+  return shape;
+}
+
+export function createHeartGeometry(depth = 0.38): THREE.BufferGeometry {
+  const shape = createHeartShape();
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 5,
+    steps: 2,
+    bevelSize: 0.14,
+    bevelThickness: 0.14,
+  };
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geo.center();
+  return geo;
+}
+
+export function buildSparklingHeart(g: THREE.Group): void {
+  const heartGeo = createHeartGeometry(0.38);
+  const heartMat = new THREE.MeshStandardMaterial({
+    color: 0xff1744,
+    emissive: 0xd50000,
+    emissiveIntensity: 0.65,
+    metalness: 0.2,
+    roughness: 0.25,
+  });
+  const heartMesh = new THREE.Mesh(heartGeo, heartMat);
+  heartMesh.name = 'heartBodyMesh';
+  heartMesh.position.set(0, 1.5, 0);
+  g.add(heartMesh);
+
+  // Orbiting Golden-Pink Halo Ring
+  const haloMat = new THREE.MeshStandardMaterial({
+    color: 0xff80ab,
+    metalness: 0.85,
+    roughness: 0.15,
+    emissive: 0xff4081,
+    emissiveIntensity: 0.8,
+  });
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.04, 8, 36), haloMat);
+  halo.name = 'heartHaloRing';
+  halo.position.set(0, 1.5, 0);
+  halo.rotation.x = Math.PI / 3;
+  halo.rotation.y = Math.PI / 6;
+  g.add(halo);
+
+  // 6 orbiting sparkling diamond stars
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const sparkleMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.9,
+      roughness: 0.1,
+      emissive: 0xff80ab,
+      emissiveIntensity: 1.2,
+    });
+    const sparkle = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), sparkleMat);
+    sparkle.name = `heartSparkle_${i}`;
+    sparkle.position.set(Math.cos(a) * 1.15, 1.5 + Math.sin(a * 2) * 0.3, Math.sin(a) * 1.15);
+    sparkle.rotation.z = Math.PI / 4;
+    g.add(sparkle);
+  }
+}
+
 export class ToolRenderer {
   private readonly toolObjs = new Map<number, ToolObject>();
   private readonly group = new THREE.Group();
@@ -427,6 +502,24 @@ export class ToolRenderer {
         new THREE.RingGeometry(1.1, 1.5, 24),
         new THREE.MeshBasicMaterial({
           color: 0x00e676,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = 0.08;
+      g.add(glow);
+      return g;
+    }
+
+    if (kind === 'heart') {
+      buildSparklingHeart(g);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.5, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0xff4081,
           transparent: true,
           opacity: 0.85,
           depthWrite: false,
@@ -693,9 +786,39 @@ export class ToolRenderer {
   }
 
   update(now: number): void {
+    const colRed = new THREE.Color(0xff1744);
+    const colPink = new THREE.Color(0xff4081);
+    const cycle = (Math.sin(now * 0.003) + 1) * 0.5;
+    const currentHeartColor = new THREE.Color().lerpColors(colRed, colPink, cycle);
+    const heartbeatScale = 1.0 + 0.12 * Math.pow(Math.max(0, Math.sin(now * 0.006)), 3);
+
     for (const o of this.toolObjs.values()) {
       o.group.rotation.y = now / 600 + o.seed;
       o.group.position.y = 0.3 + Math.sin(now / 300 + o.seed) * 0.25;
+
+      if (o.kind === 'heart') {
+        const body = o.group.getObjectByName('heartBodyMesh') as THREE.Mesh | undefined;
+        if (body && body.material instanceof THREE.MeshStandardMaterial) {
+          body.material.color.copy(currentHeartColor);
+          body.material.emissive.copy(currentHeartColor);
+          body.material.emissiveIntensity = 0.5 + 0.35 * Math.sin(now * 0.006);
+          body.scale.set(heartbeatScale, heartbeatScale, heartbeatScale);
+        }
+        const halo = o.group.getObjectByName('heartHaloRing') as THREE.Mesh | undefined;
+        if (halo) {
+          halo.rotation.z = now * 0.002;
+        }
+        for (let i = 0; i < 6; i++) {
+          const sp = o.group.getObjectByName(`heartSparkle_${i}`) as THREE.Mesh | undefined;
+          if (sp) {
+            const a = (i / 6) * Math.PI * 2 + now * 0.002;
+            sp.position.x = Math.cos(a) * 1.15;
+            sp.position.z = Math.sin(a) * 1.15;
+            sp.position.y = 1.5 + Math.sin(a * 2 + now * 0.004) * 0.3;
+            sp.rotation.y = a;
+          }
+        }
+      }
     }
   }
 

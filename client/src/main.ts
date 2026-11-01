@@ -21,7 +21,8 @@ import { CorpseRenderer } from './render/corpses';
 import { FoodAndParticleRenderer } from './render/food';
 import { MinimapRenderer } from './render/minimap';
 import { MinionRenderer } from './render/minions';
-import { ToolRenderer } from './render/tools';
+import { ToolRenderer, createHeartGeometry } from './render/tools';
+import { DolphinRenderer } from './render/dolphin';
 import { WorldRenderer } from './render/world';
 import { BananaRenderer } from './render/bananas';
 import { HudManager } from './ui/hud';
@@ -44,6 +45,9 @@ animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
 const tools = new ToolRenderer(world.scene);
 const minions = new MinionRenderer(world.scene);
 const bananas = new BananaRenderer(world.scene);
+const dolphin = new DolphinRenderer(world.scene, (x, y, z, count) => {
+  foodParts.burst(x, y, z, 0xbfe3ff, count || 16, 5, 4);
+});
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -88,6 +92,149 @@ let prevPredX = 0;
 let prevPredZ = 0;
 let hasPrevPred = false;
 let mySpeedEndTime = 0;
+
+interface RevivingHeartObj {
+  group: THREE.Group;
+  bodyMesh: THREE.Mesh;
+  halo: THREE.Mesh;
+  sparkles: THREE.Mesh[];
+  x: number;
+  z: number;
+  mass: number;
+  timer: number;
+  dur: number;
+}
+const revivingHearts: RevivingHeartObj[] = [];
+
+function spawnGiantRevivingHeart(x: number, z: number, mass: number, dur: number): void {
+  const group = new THREE.Group();
+  const baseR = radiusOf(mass);
+  const heartScale = Math.max(0.7, baseR * 1.5);
+
+  const geo = createHeartGeometry(0.38);
+  geo.scale(heartScale, heartScale, heartScale);
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xff1744,
+    emissive: 0xd50000,
+    emissiveIntensity: 0.8,
+    metalness: 0.2,
+    roughness: 0.25,
+  });
+  const bodyMesh = new THREE.Mesh(geo, mat);
+  bodyMesh.position.set(0, 0, 0);
+  group.add(bodyMesh);
+
+  const haloMat = new THREE.MeshStandardMaterial({
+    color: 0xff80ab,
+    metalness: 0.85,
+    roughness: 0.15,
+    emissive: 0xff4081,
+    emissiveIntensity: 0.8,
+  });
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(heartScale * 1.25, heartScale * 0.045, 8, 36), haloMat);
+  halo.rotation.x = Math.PI / 3;
+  group.add(halo);
+
+  const sparkles: THREE.Mesh[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const sparkleMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.9,
+      roughness: 0.1,
+      emissive: 0xff80ab,
+      emissiveIntensity: 1.2,
+    });
+    const sp = new THREE.Mesh(new THREE.OctahedronGeometry(heartScale * 0.14, 0), sparkleMat);
+    sp.position.set(Math.cos(a) * heartScale * 1.25, Math.sin(a * 2) * heartScale * 0.3, Math.sin(a) * heartScale * 1.25);
+    group.add(sp);
+    sparkles.push(sp);
+  }
+
+  const floatY = Math.max(0.8, baseR * 1.0);
+  group.position.set(x, floatY, z);
+  world.scene.add(group);
+
+  revivingHearts.push({
+    group,
+    bodyMesh,
+    halo,
+    sparkles,
+    x,
+    z,
+    mass,
+    timer: 0,
+    dur,
+  });
+
+  foodParts.burst(x, floatY, z, 0xff4081, 28, 8, 7, 0.9);
+  foodParts.burst(x, floatY, z, 0xffd700, 16, 6, 6, 0.7);
+}
+
+function updateRevivingHearts(dt: number, now: number): void {
+  const colRed = new THREE.Color(0xff1744);
+  const colPink = new THREE.Color(0xff4081);
+  const cycle = (Math.sin(now * 0.004) + 1) * 0.5;
+  const curColor = new THREE.Color().lerpColors(colRed, colPink, cycle);
+  const beat = 1.0 + 0.18 * Math.pow(Math.max(0, Math.sin(now * 0.007)), 3);
+
+  for (let i = revivingHearts.length - 1; i >= 0; i--) {
+    const h = revivingHearts[i];
+    h.timer += dt;
+
+    const baseR = radiusOf(h.mass);
+    const floatY = Math.max(0.8, baseR * 1.0) + Math.sin(now * 0.004) * 0.18;
+    h.group.position.y = floatY;
+    h.group.rotation.y = now * 0.0015;
+
+    h.bodyMesh.material.color.copy(curColor);
+    h.bodyMesh.material.emissive.copy(curColor);
+    h.bodyMesh.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(now * 0.007);
+    h.bodyMesh.scale.set(beat, beat, beat);
+
+    h.halo.rotation.z = now * 0.0025;
+
+    const heartScale = Math.max(0.7, baseR * 1.5);
+    for (let j = 0; j < h.sparkles.length; j++) {
+      const sp = h.sparkles[j];
+      const a = (j / 8) * Math.PI * 2 + now * 0.0025;
+      sp.position.x = Math.cos(a) * heartScale * 1.25;
+      sp.position.z = Math.sin(a) * heartScale * 1.25;
+      sp.position.y = Math.sin(a * 2 + now * 0.005) * heartScale * 0.35;
+      sp.rotation.y = a;
+    }
+
+    if (Math.random() < 0.25) {
+      foodParts.puff(
+        h.x + (Math.random() - 0.5) * heartScale,
+        floatY + (Math.random() - 0.5) * heartScale * 0.5,
+        h.z + (Math.random() - 0.5) * heartScale,
+        Math.random() < 0.5 ? 0xff4081 : 0xff80ab,
+        0.5,
+        0.8,
+        1.2
+      );
+    }
+
+    if (h.timer >= h.dur) {
+      foodParts.burst(h.x, floatY, h.z, 0xff4081, 35, 12, 10, 1.2);
+      foodParts.burst(h.x, floatY, h.z, 0xffd700, 25, 10, 8, 1.0);
+      foodParts.fluff(h.x, h.z, 0xff80ab, 12);
+      sfxReward();
+
+      world.scene.remove(h.group);
+      h.group.traverse((c) => {
+        if (c instanceof THREE.Mesh) {
+          c.geometry.dispose();
+          if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+          else c.material.dispose();
+        }
+      });
+      revivingHearts.splice(i, 1);
+    }
+  }
+}
 
 interface OptimisticEatEntry {
   foodId: number;
@@ -1221,6 +1368,7 @@ const gameState = new GameState({
       world.buildMap(map);
       corpses.setMap(map);
       minions.setMap(map);
+      dolphin.setMap(map);
       if (!gameState.alive) {
         animals.clear();
       }
@@ -1767,7 +1915,7 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'tool': {
       const isMine = ev.id === myId;
-      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : ev.kind === 'banana' ? 0xffeb3b : ev.kind === 'speed' ? 0x00e5ff : ev.kind === 'shield' ? 0x00e676 : 0xe8b641;
+      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : ev.kind === 'banana' ? 0xffeb3b : ev.kind === 'speed' ? 0x00e5ff : ev.kind === 'shield' ? 0x00e676 : ev.kind === 'heart' ? 0xff4081 : 0xe8b641;
       foodParts.burst(ev.x, 1, ev.z, toolColor, 18, 6, 6, 0.8);
       if (isMine) {
         sfxReward();
@@ -1782,6 +1930,8 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner(`⚡ ${t('speed_head')}`, t('tk_speed'));
         } else if (ev.kind === 'shield') {
           hud.showBanner(`🛡️ ${t('shield_head')}`, t('tk_shield'));
+        } else if (ev.kind === 'heart') {
+          hud.showBanner(`💖 ${t('heart_head')}`, t('tk_heart'));
         } else {
           hud.showToast(t(`tk_${ev.kind}`));
         }
@@ -1798,7 +1948,43 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showToast(t('speed_other', { name: pName }));
         } else if (ev.kind === 'shield') {
           hud.showToast(t('shield_other', { name: pName }));
+        } else if (ev.kind === 'heart') {
+          hud.showToast(t('heart_other', { name: pName }));
         }
+      }
+      break;
+    }
+    case 'heartCollect': {
+      if (ev.id === myId) {
+        sfxReward();
+        hud.showBanner(`💖 ${t('heart_head')}`, t('tk_heart'));
+      } else {
+        hud.showToast(t('heart_other', { name: ev.name }), 2500);
+      }
+      break;
+    }
+    case 'heartRevive': {
+      animals.remove(ev.id);
+      spawnGiantRevivingHeart(ev.x, ev.z, ev.mass, ev.dur);
+
+      const isMine = ev.id === myId;
+      if (isMine) {
+        if (deathScreenTimer !== null) {
+          clearTimeout(deathScreenTimer);
+          deathScreenTimer = null;
+        }
+        isDeadAwaitingScreen = false;
+        deathCamTarget = { x: ev.x, z: ev.z };
+        hud.showBanner(`💖 ${t('heart_head')}`, t('heartRevivingBanner', { s: '3' }));
+
+        window.setTimeout(() => {
+          if (deathCamTarget) deathCamTarget = null;
+          hud.showToast(t('heartRevivedToast'), 3500);
+        }, ev.dur * 1000);
+      } else {
+        const victim = gameState.metas.get(ev.id);
+        const name = victim ? victim.name : 'Ai đó';
+        hud.showToast(`💖 ${name} đã biến thành Trái Tim và đang hồi sinh...`, 2500);
       }
       break;
     }
@@ -1894,6 +2080,7 @@ function handleGameEvent(ev: GameEvent): void {
         world.transitionToMap(ev.map, () => {
           corpses.setMap(ev.map);
           minions.setMap(ev.map);
+          dolphin.setMap(ev.map);
           tools.clear();
         });
         hud.showMapShiftDone();
@@ -1901,6 +2088,7 @@ function handleGameEvent(ev: GameEvent): void {
         world.buildMap(ev.map);
         corpses.setMap(ev.map);
         minions.setMap(ev.map);
+        dolphin.setMap(ev.map);
         animals.clear();
         tools.clear();
         bananas.clear();
@@ -2860,6 +3048,12 @@ function animate(now: number): void {
 
   // Update floating bonus tools on the farm
   tools.update(now);
+
+  // Update dolphin swimming in largest pond
+  dolphin.update(dt, now);
+
+  // Update giant reviving hearts
+  updateRevivingHearts(dt, now);
 
   // Update mini clone minions
   minions.sync(Array.from(gameState.minions.values()));

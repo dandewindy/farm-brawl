@@ -188,6 +188,14 @@ export class MinimapRenderer {
           ctx.strokeStyle = '#ffd700';
           ctx.lineWidth = 1;
           ctx.stroke();
+        } else if (kind === 'heart') {
+          ctx.beginPath();
+          ctx.arc(tx, tz, 4.2, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff1744';
+          ctx.fill();
+          ctx.strokeStyle = '#ff80ab';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
         } else {
           ctx.fillStyle = '#e8b641';
           ctx.fillRect(tx - 3, tz - 3, 6, 6);
