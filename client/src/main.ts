@@ -46,9 +46,15 @@ animals.onWindTrail = (x, y, z, a, r, speed) => foodParts.windTrail(x, y, z, a, 
 const tools = new ToolRenderer(world.scene);
 const minions = new MinionRenderer(world.scene);
 const bananas = new BananaRenderer(world.scene);
-const dolphin = new DolphinRenderer(world.scene, (x, y, z, count) => {
-  foodParts.burst(x, y, z, 0xbfe3ff, count || 16, 5, 4);
-});
+const dolphin = new DolphinRenderer(
+  world.scene,
+  (x, y, z, count) => {
+    foodParts.burst(x, y, z, 0xbfe3ff, count || 16, 5, 4);
+  },
+  (x, y, z, angle, r) => {
+    foodParts.waterWake(x, y, z, angle, r);
+  }
+);
 const minimap = new MinimapRenderer(minimapCanvas);
 const input = new InputManager();
 
@@ -76,6 +82,7 @@ let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
 let deathScreenTimer: number | null = null;
 let isDeadAwaitingScreen = false;
+let isHeartReviving = false;
 let awaitingJoinAck = false;
 let missingMeTicks = 0;
 let localStunTimer = 0;
@@ -421,6 +428,7 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     connectToRoom('pub-1');
   }
   if (transport) {
+    isHeartReviving = false;
     transport.inGame = true;
     const team = mode === 'team' ? hud.selectedTeam : undefined;
     const matchDuration = mode === 'friend' ? hud.getMatchDuration() : undefined;
@@ -493,6 +501,7 @@ hud.onExitLobby = () => {
   predictor.on = false;
   gameState.alive = false;
   isDeadAwaitingScreen = false;
+  isHeartReviving = false;
   if (deathScreenTimer !== null) {
     clearTimeout(deathScreenTimer);
     deathScreenTimer = null;
@@ -1499,11 +1508,37 @@ const gameState = new GameState({
           hud.showToast(t('superEnd'));
         }
         wasSuper = isSuper;
+
+        if (isHeartReviving) {
+          isHeartReviving = false;
+          missingMeTicks = 0;
+          isDeadAwaitingScreen = false;
+          deathCamTarget = null;
+          if (deathScreenTimer !== null) {
+            clearTimeout(deathScreenTimer);
+            deathScreenTimer = null;
+          }
+          hud.hideDeath();
+          gameState.alive = true;
+          hud.isPlayerAlive = true;
+          if (transport) transport.inGame = true;
+          predictor.on = true;
+          hud.showToast(t('heartRevivedToast'), 3500);
+        }
       }
     }
     if (!seenMe) {
       predictor.on = false;
-      if (transport && transport.inGame && gameState.alive && gameState.myId > 0 && !isDeadAwaitingScreen && !hud.isDeathScreenVisible() && !hud.isLobbyVisible()) {
+      if (
+        transport &&
+        transport.inGame &&
+        gameState.alive &&
+        gameState.myId > 0 &&
+        !isDeadAwaitingScreen &&
+        !isHeartReviving &&
+        !hud.isDeathScreenVisible() &&
+        !hud.isLobbyVisible()
+      ) {
         missingMeTicks++;
         if (missingMeTicks >= 40) {
           missingMeTicks = 0;
@@ -1755,6 +1790,7 @@ function handleGameEvent(ev: GameEvent): void {
       }
 
       if (ev.id === myId) {
+        if (isHeartReviving) return;
         localStunTimer = 0;
         wasStunnedLastFrame = false;
         predictor.on = false;
@@ -1970,22 +2006,43 @@ function handleGameEvent(ev: GameEvent): void {
 
       const isMine = ev.id === myId;
       if (isMine) {
+        isHeartReviving = true;
+        missingMeTicks = 0;
+        isDeadAwaitingScreen = false;
         if (deathScreenTimer !== null) {
           clearTimeout(deathScreenTimer);
           deathScreenTimer = null;
         }
-        isDeadAwaitingScreen = false;
+        hud.hideDeath();
+        if (transport) transport.inGame = true;
         deathCamTarget = { x: ev.x, z: ev.z };
         hud.showBanner(`💖 ${t('heart_head')}`, t('heartRevivingBanner', { s: '3' }));
-
-        window.setTimeout(() => {
-          if (deathCamTarget) deathCamTarget = null;
-          hud.showToast(t('heartRevivedToast'), 3500);
-        }, ev.dur * 1000);
       } else {
         const victim = gameState.metas.get(ev.id);
         const name = victim ? victim.name : 'Ai đó';
         hud.showToast(`💖 ${name} đã biến thành Trái Tim và đang hồi sinh...`, 2500);
+      }
+      break;
+    }
+    case 'heartRevived': {
+      if (ev.id === myId) {
+        isHeartReviving = false;
+        missingMeTicks = 0;
+        isDeadAwaitingScreen = false;
+        deathCamTarget = null;
+        if (deathScreenTimer !== null) {
+          clearTimeout(deathScreenTimer);
+          deathScreenTimer = null;
+        }
+        hud.hideDeath();
+        gameState.alive = true;
+        hud.isPlayerAlive = true;
+        if (transport) transport.inGame = true;
+        predictor.on = true;
+        world.camTarget.x = ev.x;
+        world.camTarget.z = ev.z;
+        hud.showToast(t('heartRevivedToast'), 3500);
+        sfxReward();
       }
       break;
     }
@@ -2562,7 +2619,7 @@ setInterval(() => {
   }
 
   // 2. Ở màn hình chết (Death Screen): nếu ngồi ngắm màn hình chết quá 90s không bấm chơi lại
-  if (!gameState.alive && (deathCamTarget || isDeadAwaitingScreen || !document.getElementById('death')?.hidden)) {
+  if (!gameState.alive && !isHeartReviving && (deathCamTarget || isDeadAwaitingScreen || !document.getElementById('death')?.hidden)) {
     if (idleMs >= 90_000) {
       hud.onExitLobby?.();
       enterAfkSleep();

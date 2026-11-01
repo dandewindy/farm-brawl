@@ -134,6 +134,7 @@ export type GameEvent =
   | { k: 'sundaySummon'; dur: number }
   | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'heartRevive'; id: number; x: number; z: number; mass: number; dur: number }
+  | { k: 'heartRevived'; id: number; x: number; z: number; mass: number }
   | { k: 'heartCollect'; id: number; name: string }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 

@@ -703,6 +703,13 @@ export class World {
           p.stunT = 0;
           p.slowT = 0;
           p.squishT = 0;
+          this.events.push({
+            k: 'heartRevived',
+            id: p.id,
+            x: r2(p.x),
+            z: r2(p.z),
+            mass: Math.round(p.mass),
+          });
         }
       }
     }
@@ -3213,6 +3220,7 @@ export class World {
       p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
       p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
       p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
+      p.inWaterT = 0; p.slowT = 0; p.squishT = 0;
       p.monkeyLeapT = 0; p.treeShakeT = 0;
       p.treeShakeTreeId = undefined;
       p.treeShakeTimer = undefined;

@@ -1730,6 +1730,15 @@ export class HudManager {
     return !this.startScreen.hidden;
   }
 
+  hideDeath(): void {
+    if (this.deathCountdownTimer) {
+      clearInterval(this.deathCountdownTimer);
+      this.deathCountdownTimer = null;
+    }
+    if (this.deathCountdownEl) this.deathCountdownEl.hidden = true;
+    this.deathScreen.hidden = true;
+  }
+
   showInGame(): void {
     this.startScreen.hidden = true;
     this.deathScreen.hidden = true;

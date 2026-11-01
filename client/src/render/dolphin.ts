@@ -2,11 +2,22 @@ import * as THREE from 'three';
 import type { MapData, Blob } from '@shared/map';
 import { createHeartGeometry } from './tools';
 
+interface WakeRipple {
+  mesh: THREE.Mesh;
+  active: boolean;
+  life: number;
+  maxLife: number;
+  startR: number;
+  endR: number;
+  maxOpacity: number;
+}
+
 export class DolphinRenderer {
   private readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
   private readonly tail = new THREE.Group();
   private readonly headHeart = new THREE.Group();
+  private readonly ripplePool: WakeRipple[] = [];
 
   private pondCenter = new THREE.Vector2(0, 0);
   private pondRadius = 15;
@@ -14,19 +25,27 @@ export class DolphinRenderer {
 
   private state: 'swim' | 'jump' | 'surface_center' = 'swim';
   private swimAngle = 0;
-  private swimSpeed = 3.8; // m/s
+  private swimSpeed = 4.2; // m/s
   private jumpTimer = 0;
-  private jumpDur = 1.8; // seconds
-  private jumpStartY = 0;
-  private nextJumpTimer = 10 + Math.random() * 5;
+  private jumpDur = 2.0; // seconds
+  private nextJumpTimer = 8 + Math.random() * 6;
   private heartCycleTimer = 30; // 30s interval
   private surfaceHoldTimer = 0;
+  private wakeTimer = 0;
+  private centerRippleTimer = 0;
 
   private onSplash?: (x: number, y: number, z: number, count?: number) => void;
+  private onWake?: (x: number, y: number, z: number, angle: number, r: number) => void;
 
-  constructor(scene: THREE.Scene, onSplash?: (x: number, y: number, z: number, count?: number) => void) {
+  constructor(
+    scene: THREE.Scene,
+    onSplash?: (x: number, y: number, z: number, count?: number) => void,
+    onWake?: (x: number, y: number, z: number, angle: number, r: number) => void
+  ) {
     this.onSplash = onSplash;
+    this.onWake = onWake;
     this.buildDolphin();
+    this.buildRipplePool(scene);
     this.root.visible = false;
     scene.add(this.root);
   }
@@ -45,12 +64,56 @@ export class DolphinRenderer {
     this.root.visible = true;
     this.swimAngle = Math.random() * Math.PI * 2;
     this.state = 'swim';
-    this.nextJumpTimer = 8 + Math.random() * 6;
+    this.nextJumpTimer = 7 + Math.random() * 6;
     this.heartCycleTimer = 30;
   }
 
+  private buildRipplePool(scene: THREE.Scene): void {
+    const geo = new THREE.RingGeometry(0.85, 1.0, 32);
+    for (let i = 0; i < 14; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x80deea,
+        transparent: true,
+        opacity: 0.65,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.03;
+      mesh.visible = false;
+      scene.add(mesh);
+      this.ripplePool.push({
+        mesh,
+        active: false,
+        life: 0,
+        maxLife: 1.2,
+        startR: 0.4,
+        endR: 2.5,
+        maxOpacity: 0.65,
+      });
+    }
+  }
+
+  private spawnRipple(x: number, z: number, startR = 0.4, endR = 2.6, maxLife = 1.2, maxOpacity = 0.65): void {
+    let r = this.ripplePool.find((item) => !item.active);
+    if (!r) r = this.ripplePool[0];
+    r.active = true;
+    r.life = 0;
+    r.maxLife = maxLife;
+    r.startR = startR;
+    r.endR = endR;
+    r.maxOpacity = maxOpacity;
+    r.mesh.position.set(x, 0.03, z);
+    r.mesh.scale.setScalar(startR);
+    if (r.mesh.material instanceof THREE.MeshBasicMaterial) {
+      r.mesh.material.opacity = maxOpacity;
+    }
+    r.mesh.visible = true;
+  }
+
   private buildDolphin(): void {
-    // 30kg Dolphin: length ~1.5m, width ~0.42m, height ~0.4m
+    // 100kg Dolphin: length ~2.25m, width ~0.63m, height ~0.60m (1.5x linear scaling of 30kg)
     const skinMat = new THREE.MeshStandardMaterial({
       color: 0x0288d1, // Oceanic cerulean blue
       roughness: 0.28,
@@ -95,7 +158,7 @@ export class DolphinRenderer {
     beak.position.set(0, -0.03, 0.52);
     this.body.add(beak);
 
-    // Friendly smile line (small dark wedge)
+    // Friendly smile line
     const smile = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.015, 0.16), darkMat);
     smile.position.set(0, -0.06, 0.48);
     this.body.add(smile);
@@ -150,7 +213,7 @@ export class DolphinRenderer {
       this.body.add(flipper);
     }
 
-    // Tail Stalk (Peduncle) & Flukes (Tail Fin) - hinged for flapping
+    // Tail Stalk & Flukes
     this.tail.position.set(0, 0, -0.38);
 
     const tailStalkGeo = new THREE.ConeGeometry(0.14, 0.46, 12);
@@ -165,7 +228,7 @@ export class DolphinRenderer {
     flukeShape.moveTo(0, -0.06);
     flukeShape.bezierCurveTo(0.18, 0.08, 0.32, 0.12, 0.38, 0.04);
     flukeShape.bezierCurveTo(0.28, -0.04, 0.14, -0.12, 0.04, -0.14);
-    flukeShape.lineTo(0, -0.11); // center notch
+    flukeShape.lineTo(0, -0.11);
     flukeShape.lineTo(-0.04, -0.14);
     flukeShape.bezierCurveTo(-0.14, -0.12, -0.28, -0.04, -0.38, 0.04);
     flukeShape.bezierCurveTo(-0.32, 0.12, -0.18, 0.08, 0, -0.06);
@@ -184,15 +247,18 @@ export class DolphinRenderer {
     this.tail.add(fluke);
 
     this.body.add(this.tail);
+
+    // Sized to 100kg! (1.5x in all linear dimensions)
+    this.body.scale.set(1.5, 1.5, 1.5);
     this.root.add(this.body);
 
     // Head crown socket for heart item (surfacing at 30s)
-    const heartGeo = createHeartGeometry(0.24);
-    heartGeo.scale(0.48, 0.48, 0.48);
+    const heartGeo = createHeartGeometry(0.26);
+    heartGeo.scale(0.55, 0.55, 0.55);
     const heartMat = new THREE.MeshStandardMaterial({
       color: 0xff1744,
       emissive: 0xff4081,
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.95,
       metalness: 0.2,
       roughness: 0.2,
     });
@@ -202,35 +268,53 @@ export class DolphinRenderer {
 
     // Mini halo ring
     const halo = new THREE.Mesh(
-      new THREE.TorusGeometry(0.36, 0.018, 8, 24),
+      new THREE.TorusGeometry(0.40, 0.022, 8, 24),
       new THREE.MeshStandardMaterial({
         color: 0xff80ab,
         emissive: 0xff4081,
-        emissiveIntensity: 0.8,
+        emissiveIntensity: 0.85,
       })
     );
     halo.rotation.x = Math.PI / 3;
     this.headHeart.add(halo);
 
-    this.headHeart.position.set(0, 0.28, 0.25);
+    this.headHeart.position.set(0, 0.32, 0.28);
     this.headHeart.visible = false;
     this.body.add(this.headHeart);
   }
 
   update(dt: number, now: number): void {
+    // Update active water ripple rings
+    for (const r of this.ripplePool) {
+      if (!r.active) continue;
+      r.life += dt;
+      if (r.life >= r.maxLife) {
+        r.active = false;
+        r.mesh.visible = false;
+        continue;
+      }
+      const progress = r.life / r.maxLife;
+      const curR = r.startR + (r.endR - r.startR) * Math.sin(progress * Math.PI * 0.5);
+      r.mesh.scale.setScalar(curR);
+      if (r.mesh.material instanceof THREE.MeshBasicMaterial) {
+        r.mesh.material.opacity = r.maxOpacity * (1 - progress);
+      }
+    }
+
     if (!this.hasPond) return;
 
     // Swimming radius inside the largest pond
-    const swimR = Math.max(4.0, this.pondRadius * 0.6);
+    const swimR = Math.max(4.5, this.pondRadius * 0.62);
     const waterLevel = 0.0;
 
     // Countdown to 30s heart surfacing
     this.heartCycleTimer -= dt;
     if (this.heartCycleTimer <= 0 && this.state !== 'surface_center') {
       this.state = 'surface_center';
-      this.surfaceHoldTimer = 6.0;
+      this.surfaceHoldTimer = 6.5;
       this.heartCycleTimer = 30;
       this.headHeart.visible = true;
+      this.centerRippleTimer = 0;
     }
 
     if (this.state === 'swim') {
@@ -239,60 +323,75 @@ export class DolphinRenderer {
       const targetX = this.pondCenter.x + Math.cos(this.swimAngle) * swimR;
       const targetZ = this.pondCenter.y + Math.sin(this.swimAngle) * swimR;
 
-      // Dolphin swims just at or slightly below surface
-      const targetY = waterLevel - 0.12 + Math.sin(now * 0.0035) * 0.08;
+      // Graceful undulating motion (lượn lờ sóng nước)
+      const targetY = waterLevel - 0.10 + Math.sin(now * 0.003) * 0.18;
       this.root.position.set(targetX, targetY, targetZ);
 
       // Facing tangent along the swimming circle
       const forwardAngle = this.swimAngle + Math.PI / 2;
       this.root.rotation.y = -forwardAngle + Math.PI / 2;
 
+      // Sinusoidal pitch: dipping nose slightly down and up as it undulates
+      this.body.rotation.x = -Math.cos(now * 0.003) * 0.20;
       // Inward banking roll while turning
-      this.body.rotation.z = 0.18;
-      this.body.rotation.x = Math.sin(now * 0.004) * 0.08;
+      this.body.rotation.z = 0.22;
 
       // Tail flapping vertically
-      this.tail.rotation.x = Math.sin(now * 0.007) * 0.28;
+      this.tail.rotation.x = Math.sin(now * 0.008) * 0.35;
+
+      // Water ripples & trailing wake foam
+      this.wakeTimer += dt;
+      if (this.wakeTimer >= 0.16) {
+        this.wakeTimer = 0;
+        this.spawnRipple(targetX, targetZ, 0.5, 2.8, 1.4, 0.60);
+        this.onWake?.(targetX, 0.02, targetZ, forwardAngle, 1.4);
+      }
 
       // Random jump countdown
       this.nextJumpTimer -= dt;
       if (this.nextJumpTimer <= 0) {
         this.state = 'jump';
         this.jumpTimer = 0;
-        this.jumpStartY = this.root.position.y;
-        this.nextJumpTimer = 12 + Math.random() * 8;
-        // Splash takeoff
-        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 14);
+        this.nextJumpTimer = 9 + Math.random() * 8;
+        // Big launch splash & ripple shockwave!
+        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 20);
+        this.spawnRipple(this.root.position.x, this.root.position.z, 0.8, 3.8, 1.6, 0.85);
       }
     } else if (this.state === 'jump') {
       this.jumpTimer += dt;
       const t = Math.min(1.0, this.jumpTimer / this.jumpDur);
 
       // Continue circling forward along arc during jump
-      this.swimAngle += (this.swimSpeed * 1.2 / swimR) * dt;
+      this.swimAngle += (this.swimSpeed * 1.15 / swimR) * dt;
       const targetX = this.pondCenter.x + Math.cos(this.swimAngle) * swimR;
       const targetZ = this.pondCenter.y + Math.sin(this.swimAngle) * swimR;
 
-      // High parabolic leap out of the water up to 2.2m!
-      const jumpPeak = 2.2;
+      // High parabolic leap out of the water up to 2.8m!
+      const jumpPeak = 2.8;
       const targetY = waterLevel + 4 * jumpPeak * t * (1 - t);
       this.root.position.set(targetX, targetY, targetZ);
 
       const forwardAngle = this.swimAngle + Math.PI / 2;
       this.root.rotation.y = -forwardAngle + Math.PI / 2;
 
-      // Pitch rotates gracefully: up -> apex flat -> dive plunge
-      const pitch = (0.5 - t) * 1.5; // +0.75 -> -0.75 rad
+      // Pitch: Leap up nose-first (-1.05 rad), crest flat (0 rad at t=0.45), dive plunge head-first ("chúi xuống nước" at +1.25 rad)!
+      const pitch = (t - 0.45) * 2.3;
       this.body.rotation.x = pitch;
-      this.body.rotation.z = 0.05;
+      this.body.rotation.z = 0.06;
 
-      // Tail flap during jump
-      this.tail.rotation.x = Math.sin(now * 0.012) * 0.35;
+      // Tail flap during leap
+      this.tail.rotation.x = Math.sin(now * 0.014) * 0.40;
+
+      // Droplets while flying
+      if (Math.random() < 0.4) {
+        this.onSplash?.(targetX, targetY, targetZ, 2);
+      }
 
       if (t >= 1.0) {
         this.state = 'swim';
-        // Water re-entry splash plunge!
-        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 22);
+        // Massive re-entry splash plunge ("chúi xuống nước")!
+        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 32);
+        this.spawnRipple(this.root.position.x, this.root.position.z, 1.0, 4.2, 1.8, 0.90);
       }
     } else if (this.state === 'surface_center') {
       // Swims to pond center and surfaces proudly presenting the heart
@@ -303,16 +402,23 @@ export class DolphinRenderer {
       this.root.position.x += (targetX - this.root.position.x) * 2.5 * dt;
       this.root.position.z += (targetZ - this.root.position.z) * 2.5 * dt;
 
-      // Head rises high out of water with heart
-      const targetY = waterLevel + 0.38 + Math.sin(now * 0.003) * 0.05;
+      // Head rises proudly out of water with heart
+      const targetY = waterLevel + 0.36 + Math.sin(now * 0.0025) * 0.06;
       this.root.position.y += (targetY - this.root.position.y) * 3.0 * dt;
 
-      // Upright proud posture
-      this.body.rotation.x = 0.42; // nose pointing up
-      this.body.rotation.z = Math.sin(now * 0.002) * 0.08;
-      this.tail.rotation.x = Math.sin(now * 0.005) * 0.15;
+      // Upright proud posture: nose pointing UP out of the water!
+      this.body.rotation.x = -0.68;
+      this.body.rotation.z = Math.sin(now * 0.002) * 0.06;
+      this.tail.rotation.x = Math.sin(now * 0.005) * 0.16;
 
-      // Animate heart on head (color shift & thumping beat)
+      // Concentric water ripples expanding from center
+      this.centerRippleTimer += dt;
+      if (this.centerRippleTimer >= 0.75) {
+        this.centerRippleTimer = 0;
+        this.spawnRipple(this.root.position.x, this.root.position.z, 0.6, 3.2, 1.8, 0.75);
+      }
+
+      // Animate heart on head (color shift red-pink & thumping heartbeat)
       const heartMesh = this.headHeart.getObjectByName('dolphinHeadHeartMesh') as THREE.Mesh | undefined;
       if (heartMesh && heartMesh.material instanceof THREE.MeshStandardMaterial) {
         const colRed = new THREE.Color(0xff1744);
@@ -321,7 +427,7 @@ export class DolphinRenderer {
         const col = new THREE.Color().lerpColors(colRed, colPink, cycle);
         heartMesh.material.color.copy(col);
         heartMesh.material.emissive.copy(col);
-        const beat = 0.65 * (1.0 + 0.15 * Math.pow(Math.max(0, Math.sin(now * 0.006)), 3));
+        const beat = 0.75 * (1.0 + 0.18 * Math.pow(Math.max(0, Math.sin(now * 0.006)), 3));
         heartMesh.scale.set(beat, beat, beat);
       }
 
@@ -329,7 +435,8 @@ export class DolphinRenderer {
       if (this.surfaceHoldTimer <= 0) {
         this.state = 'swim';
         this.headHeart.visible = false;
-        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 16);
+        this.onSplash?.(this.root.position.x, 0.1, this.root.position.z, 22);
+        this.spawnRipple(this.root.position.x, this.root.position.z, 0.8, 3.5, 1.6, 0.8);
       }
     }
   }
@@ -338,6 +445,14 @@ export class DolphinRenderer {
     if (this.root.parent) {
       this.root.parent.remove(this.root);
     }
+    for (const r of this.ripplePool) {
+      if (r.mesh.parent) r.mesh.parent.remove(r.mesh);
+      r.mesh.geometry.dispose();
+      if (Array.isArray(r.mesh.material)) r.mesh.material.forEach((m) => m.dispose());
+      else r.mesh.material.dispose();
+    }
+    this.ripplePool.length = 0;
+
     this.root.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose();

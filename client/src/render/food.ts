@@ -787,6 +787,38 @@ export class FoodAndParticleRenderer {
     }
   }
 
+  waterWake(x: number, y: number, z: number, angle: number, r = 1.0): void {
+    const px = -Math.sin(angle);
+    const pz = Math.cos(angle);
+    const backX = -Math.cos(angle);
+    const backZ = -Math.sin(angle);
+    const wakeCols = [
+      new THREE.Color(0xffffff),
+      new THREE.Color(0xe0f7fa),
+      new THREE.Color(0xb2ebf2),
+      new THREE.Color(0x80deea),
+      new THREE.Color(0x4fc3f7),
+    ];
+    for (let i = 0; i < 3 && this.particles.length < this.maxParticles; i++) {
+      const side = (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.7) * r;
+      const col = wakeCols[Math.floor(Math.random() * wakeCols.length)];
+      const backDist = (0.4 + Math.random() * 1.0) * r;
+      this.particles.push({
+        x: x + backX * backDist + px * side,
+        y: y + 0.02 + Math.random() * 0.04,
+        z: z + backZ * backDist + pz * side,
+        vx: px * side * 0.7 + backX * 0.4,
+        vy: 0.06 + Math.random() * 0.12,
+        vz: pz * side * 0.7 + backZ * 0.4,
+        life: 0.45 + Math.random() * 0.35,
+        maxLife: 0.8,
+        color: col,
+        size: (0.32 + Math.random() * 0.28) * r,
+        g: 0.03,
+      });
+    }
+  }
+
   updateParticles(dt: number): void {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];

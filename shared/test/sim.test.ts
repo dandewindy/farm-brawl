@@ -2803,6 +2803,11 @@ describe('fruit trees', () => {
       }
       expect(p.heartReviving).toBe(false);
       expect(p.alive).toBe(true);
+      const snapRevived = w.snapshotFor(id);
+      const revivedEv = snapRevived.ev.find((e) => e.k === 'heartRevived') as any;
+      expect(revivedEv).toBeDefined();
+      expect(revivedEv.id).toBe(id);
+      expect(revivedEv.mass).toBe(Math.round(preDeathMass));
       // Requirement: Kích thước sau khi hồi sinh đúng bằng lúc trước khi chết!
       expect(Math.round(p.mass)).toBe(Math.round(preDeathMass));
       expect(p.heartReviveMass).toBe(preDeathMass);
