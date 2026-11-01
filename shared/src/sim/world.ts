@@ -54,6 +54,8 @@ export interface Player extends Body {
   slowT: number;
   superT: number;
   flyT: number;
+  speedT: number;
+  shieldT: number;
   lastEatT: number;
   squishT: number;
   wheelT: number;
@@ -278,7 +280,7 @@ export class World {
     if (this.foodEnabled) {
       for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
     }
-    for (let i = 0; i < 7; i++) this.spawnTool();
+    for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
     this.flush();
   }
 
@@ -310,7 +312,7 @@ export class World {
       x: 0, z: 0, vx: 0, vz: 0, a: 0, mass: startMass, dashT: 0, stunT: 0, charging: false,
       input: { a: 0, mv: false, btn: false }, btnLatch: false, releaseLatch: false, releaseAimA: 0, pressed: false, holdT: 0, cd: 0, plow: false, power: 1,
       terrain: 0, dashHit: new Set(), lastHitBy: 0, lastHitT: -99, lastAttackedId: 0, lastAttackedT: -99, kills: 0, totalKills: 0, score: 0, streak: 0, bornT: 0, best: 0,
-      respawnT: 0, inWaterT: 0, pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
+      respawnT: 0, inWaterT: 0, pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: 0, squishT: 0, wheelT: 0, team, ai: bot ? newBrain(this.rnd) : null,
     };
     this.players.set(id, p);
     this.spawn(p);
@@ -430,7 +432,7 @@ export class World {
       lastAttackedId: 0, lastAttackedT: -99,
       kills: p.kills || 0, totalKills: p.totalKills || 0, score: p.score || 0, streak: 0, bornT: this.time,
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
-      pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
+      pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
       monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
     });
     delete p.morphOrigSpecies;
@@ -730,14 +732,17 @@ export class World {
             }
           }
         } else {
-          const slowMult = p.slowT > 0 ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
-          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult;
-          stepMove(p, p.input, h, p.species, p.terrain, tillSpeedMult);
+          const isShielded = p.shieldT > 0;
+          const speedBoost = p.speedT > 0 ? (1.0 + (p.speedT / 10.0) * 1.0) : 1.0;
+          const slowMult = (p.slowT > 0 && !isShielded) ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
+          const effectiveTerrain = isShielded ? 0 : p.terrain;
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost;
+          stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult);
         }
         if (!isLeaping) {
           const wasStunned = p.stunT >= 1.4;
           const hayHit = collideHay(p, this.map.hay);
-          if (hayHit && !wasStunned) {
+          if (hayHit && !wasStunned && !(p.shieldT > 0)) {
             p.plow = false;
             p.charging = false;
             p.holdT = 0;
@@ -880,7 +885,7 @@ export class World {
 
       // 1. Electric fence
       if (outsideFence(p)) {
-        if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.flyT > 0) {
+        if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.flyT > 0 || p.shieldT > 0) {
           const d = Math.hypot(p.x, p.z), lim = CFG.R - radiusOf(p.mass) * 0.3 - 1;
           if (d > 0) {
             p.x = (p.x / d) * lim;
@@ -896,8 +901,9 @@ export class World {
         }
       }
 
-      // Monkey leaping over terrain hazards (well, fire, water, etc.)
-      if (p.monkeyLeapT && p.monkeyLeapT > 0) {
+      // Monkey leaping or Shield immunity over terrain hazards (well, fire, water, etc.)
+      if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.shieldT > 0) {
+        p.inWaterT = 0;
         continue;
       }
 
@@ -945,11 +951,11 @@ export class World {
     this.eat(alive);
     this.updateBananaProjectiles(DT);
 
-    // Tool & Super Candy spawning (special items spawn 2x faster, max 8 tools)
+    // Tool & Super Candy spawning (special items spawn 2x faster, maintain TOOL_TARGET tools)
     this.toolSpawnTimer -= DT;
     if (this.toolSpawnTimer <= 0) {
       this.toolSpawnTimer = 6 + this.rnd() * 4;
-      if (this.tools.size < 8) {
+      if (this.tools.size < CFG.TOOL_TARGET) {
         this.spawnTool();
       }
     }
@@ -1003,6 +1009,14 @@ export class World {
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
       if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
+      if (p.speedT > 0) p.speedT = Math.max(0, p.speedT - DT);
+      if (p.shieldT > 0) {
+        p.shieldT = Math.max(0, p.shieldT - DT);
+        p.stunT = 0;
+        p.slowT = 0;
+        p.squishT = 0;
+        p.inWaterT = 0;
+      }
       if (p.treeShakeT && p.treeShakeT > 0) {
         p.treeShakeT = Math.max(0, p.treeShakeT - DT);
         // Gorilla continuous tree shaking progression (drops 1/3 every second, drops all at 3s)
@@ -1320,6 +1334,14 @@ export class World {
             p.species = targetSpecies;
             p.morphT = 30;
             this.events.push({ k: 'morph', id: p.id, species: targetSpecies, dur: 30 });
+          } else if (t.kind === 'speed') {
+            p.speedT = 10;
+          } else if (t.kind === 'shield') {
+            p.shieldT = 10;
+            p.stunT = 0;
+            p.slowT = 0;
+            p.squishT = 0;
+            p.inWaterT = 0;
           }
           break;
         }
@@ -1602,7 +1624,7 @@ export class World {
 
         // Check ram collision with every alive player: INSTANT ELIMINATION!
         for (const p of alive) {
-          if (!p.alive) continue;
+          if (!p.alive || p.shieldT > 0) continue;
           const dx = p.x - this.tillTruck.x;
           const dz = p.z - this.tillTruck.z;
           const rx = dx * cosA - dz * sinA;
@@ -1979,7 +2001,7 @@ export class World {
       // Siêu cầu vồng: toàn bộ bản đồ, choáng max 3s (1.0s đến 3.0s tuỳ thời gian gồng)
       const stunDur = 1.0 + ratio * 2.0;
       for (const other of this.players.values()) {
-        if (!other.alive || other.id === p.id) continue;
+        if (!other.alive || other.id === p.id || other.shieldT > 0) continue;
         other.stunT = Math.max(other.stunT, stunDur);
         other.dashT = 0;
         other.charging = false;
@@ -2002,7 +2024,7 @@ export class World {
       const stunDur = 0.5 + ratio * 1.0;
       const roarR = 35.0;
       for (const other of this.players.values()) {
-        if (!other.alive || other.id === p.id) continue;
+        if (!other.alive || other.id === p.id || other.shieldT > 0) continue;
         const d = Math.hypot(other.x - p.x, other.z - p.z);
         if (d <= roarR) {
           other.stunT = Math.max(other.stunT, stunDur);
@@ -2089,8 +2111,8 @@ export class World {
           hit = true;
           const att = this.players.get(proj.ownerId);
 
-          // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton
-          if ((target.species === 'gorilla' || target.species === 'mammoth') && (!att || att.mass < 1000)) {
+          // Shield immunity & Gorilla/Mammoth passive immunity: immune to stun, flinch, knockback, and loss
+          if (target.shieldT > 0 || ((target.species === 'gorilla' || target.species === 'mammoth') && (!att || att.mass < 1000))) {
             this.events.push({
               k: 'bananaHit',
               id: target.id,
@@ -2293,9 +2315,9 @@ export class World {
         const nx = dx / d, nz = dz / d;
         const ma = a.mass * TRAITS[a.species].weight, mb = b.mass * TRAITS[b.species].weight;
 
-        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals
-        const aImmune = (a.species === 'gorilla' || a.species === 'mammoth') && b.mass < 1000;
-        const bImmune = (b.species === 'gorilla' || b.species === 'mammoth') && a.mass < 1000;
+        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals; Shield is unyielding against all
+        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth') && b.mass < 1000) || a.shieldT > 0;
+        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth') && a.mass < 1000) || b.shieldT > 0;
         let wa = mb / (ma + mb);
         if (aImmune) wa = 0;
         else if (bImmune) wa = 1;
@@ -2785,6 +2807,17 @@ export class World {
   }
 
   private hit(att: Player, vic: Player, nx: number, nz: number, speed: number): void {
+    // Shield immunity: completely immune to hits, damage, knockback & stun; attacker bounces off
+    if (vic.shieldT > 0) {
+      att.vx = -nx * 16;
+      att.vz = -nz * 16;
+      att.dashT = 0;
+      att.plow = false;
+      att.dashHit.add(vic.id);
+      this.events.push({ k: 'hit', a: att.id, v: vic.id, x: r2(vic.x), z: r2(vic.z), s: 12, loss: 0 });
+      return;
+    }
+
     // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
     if ((vic.species === 'gorilla' || vic.species === 'mammoth') && att.mass < 1000 && !(att.superT > 0)) {
       att.vx = -nx * 18;
@@ -2978,7 +3011,7 @@ export class World {
   private kill(p: Player, cause: DeathCause): void {
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
-    p.superT = 0; p.flyT = 0; p.wheelT = 0;
+    p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
     p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
     p.monkeyLeapT = 0; p.treeShakeT = 0;
     p.treeShakeTreeId = undefined;
@@ -3255,7 +3288,7 @@ export class World {
   }
 
   private spawnTool(): void {
-    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star', 'banana', 'banana'];
+    const kinds: ToolKind[] = ['pitchfork', 'dynamite', 'dynamite', 'song', 'wheel', 'star', 'star', 'star', 'banana', 'banana', 'speed', 'speed', 'shield', 'shield'];
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
 
@@ -3327,6 +3360,8 @@ export class World {
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)
         | (traitorId > 0 && o.id === traitorId ? FLAG.TRAITOR : 0)
         | (o.squishT > 0 ? FLAG.SQUISHED : 0)
+        | (o.speedT > 0 ? FLAG.SPEED_BOOST : 0)
+        | (o.shieldT > 0 ? FLAG.IMMUNITY : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
         | (o.flyT > 0 ? FLAG.FLYING : 0)
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
@@ -3435,7 +3470,7 @@ export class World {
     this.food.clear();
     this.tools.clear();
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
-    for (let i = 0; i < 6; i++) this.spawnTool();
+    for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
     this.matchClock = this.mode === 'friend' ? this.matchDuration : 300;
     this.mapShiftTimer = 300;
     this.teamScores = [0, 0];
@@ -3488,7 +3523,7 @@ export class World {
     this.food.clear();
     this.tools.clear();
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();
-    for (let i = 0; i < 6; i++) this.spawnTool();
+    for (let i = 0; i < CFG.TOOL_TARGET; i++) this.spawnTool();
 
     // Nudge alive players safely if they overlap with newly spawned trees or hay
     for (const p of this.players.values()) {

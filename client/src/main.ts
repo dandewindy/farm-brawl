@@ -1750,7 +1750,7 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'tool': {
       const isMine = ev.id === myId;
-      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : ev.kind === 'banana' ? 0xffeb3b : 0xe8b641;
+      const toolColor = ev.kind === 'wheel' ? 0xd48834 : ev.kind === 'star' ? 0xffea00 : ev.kind === 'banana' ? 0xffeb3b : ev.kind === 'speed' ? 0x00e5ff : ev.kind === 'shield' ? 0x00e676 : 0xe8b641;
       foodParts.burst(ev.x, 1, ev.z, toolColor, 18, 6, 6, 0.8);
       if (isMine) {
         sfxReward();
@@ -1760,6 +1760,10 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner(`⭐ ${t('star_head')}`, t('tk_star'));
         } else if (ev.kind === 'banana') {
           hud.showBanner(`🍌 ${t('banana_head')}`, t('tk_banana'));
+        } else if (ev.kind === 'speed') {
+          hud.showBanner(`⚡ ${t('speed_head')}`, t('tk_speed'));
+        } else if (ev.kind === 'shield') {
+          hud.showBanner(`🛡️ ${t('shield_head')}`, t('tk_shield'));
         } else {
           hud.showToast(t(`tk_${ev.kind}`));
         }
@@ -1772,6 +1776,10 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showToast(t('star_other', { name: pName }));
         } else if (ev.kind === 'banana') {
           hud.showToast(t('banana_other', { name: pName }));
+        } else if (ev.kind === 'speed') {
+          hud.showToast(t('speed_other', { name: pName }));
+        } else if (ev.kind === 'shield') {
+          hud.showToast(t('shield_other', { name: pName }));
         }
       }
       break;
@@ -2515,7 +2523,8 @@ function animate(now: number): void {
         prevPredZ = predictor.z;
         hasPrevPred = true;
       }
-      const tillSpeedMult = (gameState.truck !== undefined ? 1.5 : 1.0) * (myMeta.species === 'monkey' && (stepFlags & FLAG.SUPER) !== 0 ? 1.30 : 1.0);
+      const speedBoost = (stepFlags & FLAG.SPEED_BOOST) !== 0 ? 1.5 : 1.0;
+      const tillSpeedMult = (gameState.truck !== undefined ? 1.5 : 1.0) * (myMeta.species === 'monkey' && (stepFlags & FLAG.SUPER) !== 0 ? 1.30 : 1.0) * speedBoost;
       predictor.step(
         dt,
         now,

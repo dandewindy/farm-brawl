@@ -674,7 +674,7 @@ describe('bonus weapons and tools', () => {
 
     expect(w.map.seed).toBe(999);
     expect(w.food.size).toBe(CFG.FOOD_TARGET);
-    expect(w.tools.size).toBe(6);
+    expect(w.tools.size).toBe(CFG.TOOL_TARGET);
     expect(w.matchClock).toBe(300);
     expect(w.teamScores).toEqual([0, 0]);
   });
@@ -2496,6 +2496,79 @@ describe('fruit trees', () => {
       const growthAbove = radiusOf(4000) - radiusOf(3000);
       // Growth rate above 3000kg should be significantly dampened (40% slope)
       expect(growthAbove).toBeLessThan(growthBelow * 0.45);
+    });
+
+    it('speed item increases speed by 200% decaying over 10s', () => {
+      const w = emptyWorld();
+      const id1 = w.addPlayer('runner1', 'pig', false);
+      const p1 = place(w, id1, 0, 0, 50);
+      p1.input = { a: 0, mv: true, btn: false };
+
+      const id2 = w.addPlayer('runner2', 'pig', false);
+      const p2 = place(w, id2, 0, 5, 50);
+      p2.input = { a: 0, mv: true, btn: false };
+      p2.speedT = 10; // active 200% speed boost
+
+      w.step();
+      w.flush();
+
+      // At t=10s, p2 moves at 200% (2x) the distance of normal p1
+      const distNormal = p1.x;
+      const distBoosted = p2.x;
+      expect(distBoosted).toBeGreaterThan(distNormal * 1.8);
+
+      // Decays over time
+      expect(p2.speedT).toBeLessThan(10);
+      expect(p2.speedT).toBeGreaterThan(9.9);
+    });
+
+    it('shield item provides total immunity to hazards, water, and combat hits', () => {
+      const w = emptyWorld();
+      const id1 = w.addPlayer('shielded', 'pig', false);
+      const p1 = place(w, id1, 0, 0, 50);
+      p1.shieldT = 10;
+
+      // 1. Water immunity: inWaterT remains 0
+      p1.terrain = 1;
+      w.step();
+      w.flush();
+      expect(p1.inWaterT).toBe(0);
+      expect(p1.alive).toBe(true);
+
+      // 2. Fire pit immunity
+      w.map.fire = [[0, 0, 5]];
+      w.step();
+      w.flush();
+      expect(p1.alive).toBe(true);
+      w.map.fire.length = 0;
+
+      // 3. Combat immunity: when hit, shielded player takes 0 loss & 0 knockback
+      const id2 = w.addPlayer('attacker', 'elephant', false);
+      const p2 = place(w, id2, -3, 0, 2000);
+      p2.vx = 40;
+      p2.dashT = 0.5;
+      p2.power = 1.5;
+      const prevX = p1.x;
+      const prevMass = p1.mass;
+
+      w.step();
+      w.flush();
+
+      expect(p1.alive).toBe(true);
+      expect(p1.mass).toBe(prevMass);
+      expect(Math.abs(p1.x - prevX)).toBeLessThan(1.0); // No massive knockback
+    });
+
+    it('maintains increased TOOL_TARGET of 12 tools across map lifecycle', () => {
+      const w = new World(42, { bots: false, food: false });
+      expect(w.tools.size).toBe(CFG.TOOL_TARGET);
+      expect(CFG.TOOL_TARGET).toBe(12);
+
+      w.renewGame(100);
+      expect(w.tools.size).toBe(CFG.TOOL_TARGET);
+
+      w.shiftMap(200);
+      expect(w.tools.size).toBe(CFG.TOOL_TARGET);
     });
   });
 });

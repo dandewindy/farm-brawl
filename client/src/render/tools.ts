@@ -143,6 +143,94 @@ function buildSparklingBanana(g: THREE.Group): void {
   }
 }
 
+function buildSpeedBoots(g: THREE.Group): void {
+  // Winged boot of Hermes / Lightning Speed Boots
+  const bootShaft = mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.8, 12), 0x00e5ff, 0, 1.6, 0, {
+    metalness: 0.6,
+    roughness: 0.2,
+    emissive: 0x00b0ff,
+    emissiveIntensity: 0.4,
+  });
+  g.add(bootShaft);
+
+  const bootToe = mesh(new THREE.SphereGeometry(0.32, 12, 10), 0x00e5ff, 0.26, 1.25, 0, {
+    metalness: 0.6,
+    roughness: 0.2,
+    emissive: 0x00b0ff,
+    emissiveIntensity: 0.4,
+  });
+  bootToe.scale.set(1.4, 0.7, 0.9);
+  g.add(bootToe);
+
+  const bootSole = mesh(new THREE.BoxGeometry(0.9, 0.12, 0.55), 0xffd700, 0.1, 1.15, 0, {
+    metalness: 0.8,
+    roughness: 0.25,
+  });
+  g.add(bootSole);
+
+  for (const side of [-1, 1]) {
+    for (let f = 0; f < 3; f++) {
+      const wing = mesh(new THREE.ConeGeometry(0.12, 0.55 - f * 0.08, 6), 0xffea00, -0.18 - f * 0.14, 1.6 + f * 0.18, side * 0.32, {
+        metalness: 0.8,
+        roughness: 0.2,
+        emissive: 0xffd700,
+        emissiveIntensity: 0.6,
+      });
+      wing.rotation.z = Math.PI / 2 + 0.35 - f * 0.2;
+      wing.rotation.x = side * 0.25;
+      g.add(wing);
+    }
+  }
+
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const spark = mesh(new THREE.OctahedronGeometry(0.1, 0), 0xffffff, Math.cos(a) * 0.85, 1.5 + Math.sin(a * 2) * 0.2, Math.sin(a) * 0.85, {
+      emissive: 0x00e5ff,
+      emissiveIntensity: 1.2,
+    });
+    g.add(spark);
+  }
+}
+
+function buildAegisShield(g: THREE.Group): void {
+  // Hexagonal Golden Aegis Shield with Emerald Core
+  const shieldRim = mesh(new THREE.CylinderGeometry(0.85, 0.92, 0.14, 6), 0xffd700, 0, 1.5, 0, {
+    metalness: 0.85,
+    roughness: 0.2,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.35,
+  });
+  shieldRim.rotation.x = Math.PI / 2;
+  g.add(shieldRim);
+
+  const shieldCore = mesh(new THREE.CylinderGeometry(0.65, 0.72, 0.18, 6), 0x00e676, 0, 1.5, 0, {
+    metalness: 0.4,
+    roughness: 0.2,
+    emissive: 0x00c853,
+    emissiveIntensity: 0.6,
+  });
+  shieldCore.rotation.x = Math.PI / 2;
+  g.add(shieldCore);
+
+  const gem = mesh(new THREE.OctahedronGeometry(0.28, 0), 0xffffff, 0, 1.5, 0.14, {
+    metalness: 0.9,
+    roughness: 0.1,
+    emissive: 0x69f0ae,
+    emissiveIntensity: 1.0,
+  });
+  gem.scale.set(1.0, 1.2, 0.8);
+  g.add(gem);
+
+  const orbitRing = mesh(new THREE.TorusGeometry(1.08, 0.04, 8, 30), 0x69f0ae, 0, 1.5, 0, {
+    metalness: 0.7,
+    roughness: 0.15,
+    emissive: 0x00e676,
+    emissiveIntensity: 0.8,
+  });
+  orbitRing.rotation.x = Math.PI / 2.6;
+  g.add(orbitRing);
+}
+
 export class ToolRenderer {
   private readonly toolObjs = new Map<number, ToolObject>();
   private readonly group = new THREE.Group();
@@ -165,6 +253,42 @@ export class ToolRenderer {
         new THREE.RingGeometry(1.1, 1.5, 24),
         new THREE.MeshBasicMaterial({
           color: 0xffd700,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = 0.08;
+      g.add(glow);
+      return g;
+    }
+
+    if (kind === 'speed') {
+      buildSpeedBoots(g);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.5, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0x00e5ff,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        })
+      );
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = 0.08;
+      g.add(glow);
+      return g;
+    }
+
+    if (kind === 'shield') {
+      buildAegisShield(g);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.5, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0x00e676,
           transparent: true,
           opacity: 0.85,
           depthWrite: false,

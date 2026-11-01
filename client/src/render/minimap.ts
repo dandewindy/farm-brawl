@@ -172,6 +172,22 @@ export class MinimapRenderer {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1;
           ctx.stroke();
+        } else if (kind === 'speed') {
+          ctx.beginPath();
+          ctx.arc(tx, tz, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#00e5ff';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else if (kind === 'shield') {
+          ctx.beginPath();
+          ctx.arc(tx, tz, 3.8, 0, Math.PI * 2);
+          ctx.fillStyle = '#00e676';
+          ctx.fill();
+          ctx.strokeStyle = '#ffd700';
+          ctx.lineWidth = 1;
+          ctx.stroke();
         } else {
           ctx.fillStyle = '#e8b641';
           ctx.fillRect(tx - 3, tz - 3, 6, 6);

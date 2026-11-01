@@ -50,6 +50,8 @@ export const FLAG = {
   DYNAMITE: 512,
   TRAITOR: 1024,
   SQUISHED: 2048,
+  SPEED_BOOST: 4096,
+  IMMUNITY: 8192,
   SUPER: 32768,
   FLYING: 65536,
   WHEEL: 131072,
@@ -60,7 +62,7 @@ export const FLAG = {
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';
 
-export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star' | 'banana';
+export type ToolKind = 'pitchfork' | 'dynamite' | 'song' | 'wheel' | 'star' | 'banana' | 'speed' | 'shield';
 export type ToolWire = [id: number, kind: ToolKind, x: number, z: number];
 
 /** [id, ownerId, x, z, angle, mass, species, skin] */
