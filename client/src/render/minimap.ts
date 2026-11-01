@@ -195,31 +195,41 @@ export class MinimapRenderer {
       }
     }
 
-    // Other Animals
+    // Other Animals (scaled to match item visibility, proportional with dampened ceiling for giants)
     for (const e of ents.values()) {
       if (e.id === myId) continue;
       const ex = center + e.x * scale;
       const ez = center + e.z * scale;
       const isNap = e.id === napoleonId && napoleonId > 0;
-      const dotR = isNap ? 3.8 : Math.max(1.8, 1.2 + (radiusOf(e.mass) - 1) * 0.42);
+      const rNorm = Math.max(0, radiusOf(e.mass) - 1);
+      const dotR = Math.min(6.8, 3.8 + Math.sqrt(rNorm) * 1.25);
+      const finalR = isNap ? Math.min(7.2, dotR + 0.8) : dotR;
+
       ctx.beginPath();
-      ctx.arc(ex, ez, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = isNap ? '#e8b641' : '#f2ead7';
+      ctx.arc(ex, ez, finalR, 0, Math.PI * 2);
+      ctx.fillStyle = isNap ? '#ffd700' : '#f5f0e1';
       ctx.fill();
+      ctx.lineWidth = isNap ? 1.5 : 1;
+      ctx.strokeStyle = isNap ? '#ffffff' : 'rgba(25, 20, 18, 0.7)';
+      ctx.stroke();
     }
 
-    // My Animal (bright red with white ring)
+    // My Animal (bright red with crisp white ring, scales proportionally)
     const me = ents.get(myId);
     const mxCoord = myPos ? myPos.x : (me ? me.x : null);
     const mzCoord = myPos ? myPos.z : (me ? me.z : null);
     if (mxCoord !== null && mzCoord !== null) {
       const mx = center + mxCoord * scale;
       const mz = center + mzCoord * scale;
+      const myMass = me ? me.mass : 50;
+      const myRNorm = Math.max(0, radiusOf(myMass) - 1);
+      const myDotR = Math.min(7.2, 4.4 + Math.sqrt(myRNorm) * 1.2);
+
       ctx.beginPath();
-      ctx.arc(mx, mz, 4.2, 0, Math.PI * 2);
+      ctx.arc(mx, mz, myDotR, 0, Math.PI * 2);
       ctx.fillStyle = '#ff3b30';
       ctx.fill();
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.8;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     }
