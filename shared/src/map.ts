@@ -41,7 +41,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
       const a = between(0, Math.PI * 2);
       const d = Math.sqrt(rnd()) * Math.max(1, R - margin - r);
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 2.0)) {
+      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 3.0)) {
         taken.push([x, z, r]);
         return [x, z];
       }
@@ -56,7 +56,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
     const scale = i === 0 ? 2 : 4;
     const baseR = between(3.6, 4.2);
     const r = baseR * scale;
-    const p = place(r * 1.15, 6);
+    const p = place(r * 1.15, 8);
     if (p) pond.push([p[0], p[1], r, between(0, 100)]);
   }
 
@@ -67,7 +67,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
     const scale = i === 0 ? 2 : i === 1 ? 3 : (rnd() < 0.5 ? 2 : 3);
     const baseR = between(4.2, 5.0);
     const r = baseR * scale;
-    const p = place(r * 1.3, 6);
+    const p = place(r * 1.3, 8);
     if (p) mud.push([p[0], p[1], r, between(0, 100)]);
   }
 
@@ -77,7 +77,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   const nHay = 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < nHay; i++) {
     const r = between(1.3, 2);
-    const p = place(r, 6);
+    const p = place(r, 8);
     if (p) hay.push([p[0], p[1], r]);
   }
 
@@ -85,7 +85,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   const nWell = 3;
   for (let i = 0; i < nWell; i++) {
     const r = between(1.6, 2.2);
-    const p = place(r, 6);
+    const p = place(r, 8);
     if (p) well.push([p[0], p[1], r]);
   }
 
@@ -93,7 +93,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
   const nFire = 3;
   for (let i = 0; i < nFire; i++) {
     const r = between(1.8, 2.4);
-    const p = place(r, 6);
+    const p = place(r, 8);
     if (p) fire.push([p[0], p[1], r]);
   }
 
@@ -122,10 +122,10 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
     let placed = false;
     for (let tryIdx = 0; tryIdx < 40; tryIdx++) {
       const a = baseAngle + between(-0.35, 0.35) + (tryIdx > 15 ? between(-1.0, 1.0) : 0);
-      const d = between(52, 61);
+      const d = between(R - 26, R - 13);
       const x = Math.cos(a) * d;
       const z = Math.sin(a) * d;
-      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 2.5)) {
+      if (taken.every(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) > tr + r + 3.0)) {
         taken.push([x, z, r + 2.0]);
         trees.push({
           id: i + 1,
@@ -142,7 +142,7 @@ export function generateMap(seed: number, R: number = CFG.R): MapData {
       }
     }
     if (!placed) {
-      const p = place(r + 1.2, 8);
+      const p = place(r + 1.2, 10);
       if (p) {
         trees.push({
           id: i + 1,

@@ -7,8 +7,8 @@ import { FLAG } from '../src/protocol';
 import { World, TreeSimState, type Player } from '../src/sim/world';
 
 /** a world with no bots and no food, so tests control everything */
-function emptyWorld(): World {
-  const w = new World(1234, { bots: false, food: false });
+function emptyWorld(seed = 1234): World {
+  const w = new World(seed, { bots: false, food: false });
   w.food.clear();
   // keep hazards out of the way of the test arena
   w.map.hay.length = 0;
@@ -37,10 +37,20 @@ describe('map', () => {
   });
 
   it('keeps everything inside the fence', () => {
-    for (let s = 0; s < 20; s++) {
+    for (let s = 0; s < 50; s++) {
       const m = generateMap(s);
       for (const [x, z, r] of [...m.pond, ...m.mud]) expect(Math.hypot(x, z) + r * 1.3).toBeLessThan(CFG.R);
       for (const [x, z, r] of m.hay) expect(Math.hypot(x, z) + r).toBeLessThan(CFG.R);
+      if (m.well) {
+        for (const [x, z, r] of m.well) expect(Math.hypot(x, z) + r).toBeLessThan(CFG.R);
+      }
+      if (m.fire) {
+        for (const [x, z, r] of m.fire) expect(Math.hypot(x, z) + r).toBeLessThan(CFG.R);
+      }
+      for (const t of m.trees) {
+        expect(Math.hypot(t.x, t.z) + t.r).toBeLessThan(CFG.R);
+        expect(Math.hypot(t.x, t.z)).toBeGreaterThan(65);
+      }
     }
   });
 
@@ -791,10 +801,10 @@ describe('bonus weapons and tools', () => {
     expect(w.tillTruck.exiting).toBe(true);
 
     // Fast-forward until truck reaches outer forest
-    for (let i = 0; i < 100 && w.tillTruck.active; i++) {
+    for (let i = 0; i < 150 && w.tillTruck.active; i++) {
       w.step();
     }
-    // Vanished in the forest outside R = 70
+    // Vanished in the forest outside R = 105
     expect(w.tillTruck.active).toBe(false);
     expect(w.currentRule).toBe('');
   });
@@ -961,7 +971,7 @@ describe('bonus weapons and tools', () => {
   it('bots can spawn as any of the 9 species including dog, elephant and monkey', () => {
     const spawnedSpecies = new Set<Species>();
     for (let run = 0; run < 35; run++) {
-      const w = emptyWorld();
+      const w = emptyWorld(1234 + run * 37);
       w.botsEnabled = true;
       for (let i = 0; i < 25; i++) {
         w.step();

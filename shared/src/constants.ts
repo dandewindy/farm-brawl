@@ -8,8 +8,8 @@ export const DT = 1 / TICK_RATE;
 export const SUBSTEPS = 2;
 
 export const CFG = {
-  /** radius of the electric fence */
-  R: 70,
+  /** radius of the electric fence (expanded 50% from 70m to 105m) */
+  R: 105,
   PODIUM_R: 7,
   START_MASS: 20,
   MIN_MASS: 10,

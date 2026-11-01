@@ -1513,10 +1513,10 @@ export class World {
       if (!this.tillTruck.active) {
         this.tillTruck.timer -= DT;
         if (this.tillTruck.timer <= 0) {
-          // Spawn tractor at perimeter R = 54 facing inward
+          // Spawn tractor at perimeter facing inward
           const enterA = this.rnd() * Math.PI * 2;
-          const sx = Math.cos(enterA) * 54;
-          const sz = Math.sin(enterA) * 54;
+          const sx = Math.cos(enterA) * (CFG.R - 22);
+          const sz = Math.sin(enterA) * (CFG.R - 22);
           const aimA = enterA + Math.PI;
           const speed = 19;
           this.tillTruck.active = true;
@@ -1621,8 +1621,8 @@ export class World {
           }
         }
 
-        // Disappear deep in the surrounding forest outside the fence (CFG.R = 70)
-        if (this.tillTruck.exiting && distFromCenter > 74) {
+        // Disappear deep in the surrounding forest outside the fence (CFG.R + 5)
+        if (this.tillTruck.exiting && distFromCenter > CFG.R + 5) {
           this.tillTruck.active = false;
           this.tillTruck.exiting = false;
           this.clearRule();
@@ -1644,7 +1644,7 @@ export class World {
         this.tillTruck.x += this.tillTruck.vx * DT;
         this.tillTruck.z += this.tillTruck.vz * DT;
 
-        if (Math.hypot(this.tillTruck.x, this.tillTruck.z) > 74) {
+        if (Math.hypot(this.tillTruck.x, this.tillTruck.z) > CFG.R + 5) {
           this.tillTruck.active = false;
           this.tillTruck.exiting = false;
         }
@@ -3216,7 +3216,7 @@ export class World {
     } else {
       let placed = false;
       for (let i = 0; i < 30; i++) {
-        const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 3);
+        const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 4.5);
         const cx = Math.cos(a) * d, cz = Math.sin(a) * d;
         if (this.isBlockedByObstacle(cx, cz, 1.4)) continue;
         x = cx; z = cz;
@@ -3261,7 +3261,7 @@ export class World {
 
     for (let tries = 0; tries < 40; tries++) {
       const a = this.rnd() * Math.PI * 2;
-      const d = 8 + Math.sqrt(this.rnd()) * (CFG.R - 20);
+      const d = 10 + Math.sqrt(this.rnd()) * (CFG.R - 25);
       const x = Math.cos(a) * d;
       const z = Math.sin(a) * d;
       if (terrainAt(this.map, x, z) === 1) continue;
@@ -3282,7 +3282,7 @@ export class World {
     let bx = 0, bz = 0;
     for (let tries = 0; tries < 40; tries++) {
       const a = this.rnd() * Math.PI * 2;
-      const d = 4 + Math.sqrt(this.rnd()) * (CFG.R - 12);
+      const d = 6 + Math.sqrt(this.rnd()) * (CFG.R - 18);
       const x = Math.cos(a) * d;
       const z = Math.sin(a) * d;
       if (terrainAt(this.map, x, z) === 1) continue;
