@@ -734,6 +734,101 @@ function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[]
   return addLegs(g, s.legs ?? s.body, [[0.46, 0.32], [0.46, -0.32], [-0.46, 0.32], [-0.46, -0.32]], 1.05, 0.16, s.toenails ?? 0xd0c8be);
 }
 
+function buildLoftedMammothTorso(color: number, humpColor: number): THREE.Group {
+  const group = new THREE.Group();
+
+  // Slices along X axis: [x, cy, ryTop, ryBot, rz]
+  // Flowing downward from high shoulder hump (x=0.20, top=2.16) down to low rump (x=-0.40, top=1.52)
+  const slices: [number, number, number, number, number][] = [
+    [-0.58, 1.06, 0.26, 0.20, 0.28], // rear end cap / tail root
+    [-0.40, 1.12, 0.44, 0.30, 0.42], // low compact rump & pelvis (seamlessly covering rear legs z: +-0.26)
+    [-0.18, 1.26, 0.58, 0.38, 0.48], // sloping mid-back
+    [ 0.02, 1.40, 0.68, 0.46, 0.54], // upper back rising towards hump
+    [ 0.20, 1.48, 0.70, 0.52, 0.56], // peak shoulder hump (highest point of spine!)
+    [ 0.42, 1.44, 0.62, 0.54, 0.52], // muscular chest & front shoulders
+    [ 0.64, 1.46, 0.50, 0.46, 0.44], // powerful neck collar blending into head
+    [ 0.78, 1.48, 0.40, 0.36, 0.36], // neck juncture seamlessly meeting head
+  ];
+
+  const nRadial = 24;
+  const nSlices = slices.length;
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  const uvs: number[] = [];
+
+  // 1. Rear end-cap vertex (seals the rear completely into a smooth rounded rump)
+  const rearCapIdx = 0;
+  vertices.push(-0.64, 1.06, 0);
+  uvs.push(0, 0.5);
+
+  // 2. Body slice vertices
+  for (let i = 0; i < nSlices; i++) {
+    const [x, cy, ryTop, ryBot, rz] = slices[i];
+    for (let j = 0; j <= nRadial; j++) {
+      const theta = (j / nRadial) * Math.PI * 2;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+      const ry = sinT >= 0 ? ryTop : ryBot;
+      const py = cy + sinT * ry;
+      const pz = cosT * rz;
+      vertices.push(x, py, pz);
+      uvs.push((i + 1) / (nSlices + 1), j / nRadial);
+    }
+  }
+
+  // 3. Front neck-cap vertex (seals the front into the head)
+  const frontCapIdx = 1 + nSlices * (nRadial + 1);
+  vertices.push(0.82, 1.48, 0);
+  uvs.push(1, 0.5);
+
+  // Triangulate rear end-cap
+  for (let j = 0; j < nRadial; j++) {
+    const ringV1 = 1 + j;
+    const ringV2 = 1 + j + 1;
+    indices.push(rearCapIdx, ringV2, ringV1);
+  }
+
+  // Triangulate body quads
+  for (let i = 0; i < nSlices - 1; i++) {
+    const baseA = 1 + i * (nRadial + 1);
+    const baseB = 1 + (i + 1) * (nRadial + 1);
+    for (let j = 0; j < nRadial; j++) {
+      const a = baseA + j;
+      const b = baseB + j;
+      const c = baseB + j + 1;
+      const d = baseA + j + 1;
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  // Triangulate front neck-cap
+  const lastRingBase = 1 + (nSlices - 1) * (nRadial + 1);
+  for (let j = 0; j < nRadial; j++) {
+    const ringV1 = lastRingBase + j;
+    const ringV2 = lastRingBase + j + 1;
+    indices.push(frontCapIdx, ringV1, ringV2);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const mat = animalMat(color);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+
+  // Natural woolly mantle draped organically across the shoulder hump
+  const mantle = blob(group, humpColor, 0.44, [1.14, 0.62, 0.84], 0.20, 1.90, 0);
+  mantle.rotation.z = 0.06;
+
+  return group;
+}
+
 function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const bodyColor = s.body ?? 0x5a3d28;
   const humpColor = s.hump ?? 0x432815;
@@ -743,75 +838,66 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const toenailsColor = s.toenails ?? 0xd4c8b8;
   const tuftColor = s.tuft ?? 0x381f11;
 
-  // 1. Massive Woolly Torso with Sloping Wedge Silhouette (Dáng dốc chuẩn Hình 4)
-  // Front chest block (tall, bulky, broad shoulders)
-  blob(g, bodyColor, 0.62, [1.08, 1.20, 1.02], 0.22, 1.45, 0);
+  // 1. One Unified, Continuous, Seamless Mammoth Torso with iconic sloping wedge!
+  g.add(buildLoftedMammothTorso(bodyColor, humpColor));
 
-  // Connecting torso mass: Tapered cylinder from broad chest (0.58) down to compact hips (0.44)
-  // Rotated so larger base is at front (+x, y=1.42) and rear end connects seamlessly into rump (-x, y=1.06)
-  const torsoLen = 0.68;
-  const bodyGeo = new THREE.CylinderGeometry(0.44, 0.58, torsoLen, 16);
-  bodyGeo.rotateZ(Math.PI / 2);
-  const bodyMesh = part(bodyGeo, bodyColor, -0.11, 1.21, 0, undefined, true);
-  bodyMesh.rotation.z = 0.28;
-  bodyMesh.scale.set(1.0, 1.08, 0.95);
-  g.add(bodyMesh);
-
-  // Seamless rounded rump block: to lên vừa vặn nối liền thân và bao phủ dính chặt 2 chân sau (z: +-0.30)!
-  blob(g, bodyColor, 0.48, [1.02, 1.05, 0.94], -0.44, 1.06, 0);
-
-  // 2. High Woolly Shoulder Hump (Gù vai là điểm cao nhất trên lưng, dốc thẳng xuống mông)
-  const hump = blob(g, humpColor, 0.46, [1.18, 1.15, 0.88], 0.16, 1.84, 0);
-  hump.rotation.z = 0.15;
-
-  // 3. Shaggy Woolly Skirt along the Flanks (Lông rủ dốc chéo theo sườn)
-  for (const z of [-0.40, 0.40]) {
-    const skirtF = blob(g, skirtColor, 0.35, [1.32, 0.92, 0.24], 0.12, 1.20, z);
-    skirtF.rotation.z = 0.22;
-    skirtF.rotation.x = z > 0 ? 0.12 : -0.12;
-    const skirtR = blob(g, skirtColor, 0.28, [1.02, 0.78, 0.20], -0.36, 0.92, z * 0.88);
-    skirtR.rotation.z = 0.25;
-    skirtR.rotation.x = z > 0 ? 0.12 : -0.12;
+  // Flank skirts: soft woolly tufts sloping along ribs
+  for (const z of [-0.42, 0.42]) {
+    const skirtF = blob(g, skirtColor, 0.30, [1.25, 0.78, 0.18], 0.16, 1.16, z);
+    skirtF.rotation.z = 0.20;
+    skirtF.rotation.x = z > 0 ? 0.14 : -0.14;
+    const skirtR = blob(g, skirtColor, 0.24, [1.02, 0.68, 0.16], -0.26, 0.98, z * 0.88);
+    skirtR.rotation.z = 0.22;
+    skirtR.rotation.x = z > 0 ? 0.14 : -0.14;
   }
 
-  // 4. Head, Cranial Dome & Dark Hair Tuft (Đầu liền khối & Chỏm lông tóc màu đậm hơn giống trên lưng)
-  // Base head capsule
-  const headGeo = new THREE.CapsuleGeometry(0.38, 0.36, 12, 18);
-  const headMesh = part(headGeo, bodyColor, 0.94, 1.58, 0);
-  headMesh.scale.set(1.02, 1.0, 0.90);
-  g.add(headMesh);
+  // 2. Sculpted Head & Cranial Dome (liền khối với cổ, biểu cảm dễ thương chuẩn Hình 1 & 2)
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0.82, 1.54, 0);
 
-  // Smooth forehead bridge slope merging gently into trunk root
-  blob(g, bodyColor, 0.35, [1.06, 0.96, 0.84], 1.14, 1.52, 0);
+  // Skull (rounded head sphere merging with neck collar)
+  blob(headGroup, bodyColor, 0.40, [1.06, 1.04, 0.92], 0, 0.06, 0);
 
-  // Chỏm lông tóc màu đậm hơn giống trên lưng (humpColor) nổi bật trên chóp trán và đầu
-  const hairCrown = blob(g, humpColor, 0.36, [1.14, 0.78, 0.84], 0.90, 2.08, 0);
-  hairCrown.rotation.z = -0.18;
-  const hairFringe = blob(g, humpColor, 0.28, [1.18, 0.72, 0.76], 1.08, 1.94, 0);
-  hairFringe.rotation.z = -0.36;
+  // Forehead brow sloping gently into trunk
+  blob(headGroup, bodyColor, 0.30, [1.04, 0.88, 0.82], 0.22, -0.04, 0);
+
+  // Cheeks (housing tusk sockets)
   for (const z of [-0.22, 0.22]) {
-    blob(g, humpColor, 0.22, [0.95, 0.65, 0.40], 0.92, 2.02, z);
+    blob(headGroup, bodyColor, 0.17, [1.0, 1.0, 1.0], 0.20, -0.18, z);
   }
 
-  // 5. Small Woolly Ears (Tai nhỏ nép bên thái dương chuẩn mammoth)
-  for (const z of [-0.40, 0.40]) {
-    blob(g, bodyColor, 0.24, [0.70, 1.00, 0.15], 0.76, 1.70, z, [0, z > 0 ? -0.22 : 0.22, -0.12]);
-    blob(g, innerEarColor, 0.16, [0.60, 0.90, 0.10], 0.78, 1.70, z > 0 ? z - 0.02 : z + 0.02, [0, z > 0 ? -0.22 : 0.22, -0.12]);
+  // Stylish swept-back woolly hair quiff / bangs on crown (Hình 1 - tóc chải sóng bồng bềnh, KHÔNG lồi cục dị dạng)
+  const hairMain = blob(headGroup, humpColor, 0.22, [1.20, 0.75, 0.65], 0.04, 0.36, 0);
+  hairMain.rotation.z = 0.24;
+  const hairFore = blob(headGroup, humpColor, 0.16, [1.10, 0.65, 0.55], 0.18, 0.28, 0);
+  hairFore.rotation.z = 0.12;
+  for (const z of [-0.15, 0.15]) {
+    const hairSide = blob(headGroup, humpColor, 0.15, [1.05, 0.65, 0.45], 0.02, 0.32, z);
+    hairSide.rotation.z = 0.20;
+    hairSide.rotation.y = z > 0 ? 0.12 : -0.12;
   }
 
-  // 6. Dynamic Animatable Trunk (Vòi dài hơn, uốn cong chạm gần chân rồi vút lên chuẩn hình 4)
+  g.add(headGroup);
+
+  // 3. Small Woolly Ears (Nép sát bên thái dương, đúng chuẩn voi ma mút)
+  for (const z of [-0.36, 0.36]) {
+    blob(g, bodyColor, 0.20, [0.65, 0.90, 0.14], 0.74, 1.66, z, [0, z > 0 ? -0.22 : 0.22, -0.10]);
+    blob(g, innerEarColor, 0.14, [0.55, 0.80, 0.09], 0.76, 1.66, z > 0 ? z - 0.02 : z + 0.02, [0, z > 0 ? -0.22 : 0.22, -0.10]);
+  }
+
+  // 4. Smooth Animatable Trunk
   const trunkGroup = new THREE.Group();
-  trunkGroup.position.set(1.22, 1.48, 0);
+  trunkGroup.position.set(1.12, 1.44, 0);
 
   const trunkNodes: [number, number, number][] = [
-    [0.00, 0.00, 0.21],
-    [0.12, -0.22, 0.185],
-    [0.22, -0.46, 0.16],
-    [0.30, -0.72, 0.14],
-    [0.38, -0.98, 0.12],
-    [0.48, -1.16, 0.105],
-    [0.62, -1.12, 0.09],
-    [0.68, -0.94, 0.078],
+    [0.00,  0.00, 0.18],
+    [0.10, -0.20, 0.16],
+    [0.20, -0.42, 0.14],
+    [0.28, -0.66, 0.12],
+    [0.36, -0.88, 0.105],
+    [0.45, -1.04, 0.092],
+    [0.56, -1.00, 0.080],
+    [0.62, -0.84, 0.070],
   ];
 
   for (const [nx, ny, nr] of trunkNodes) {
@@ -829,74 +915,90 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     trunkGroup.add(segMesh);
   }
 
-  // Nostril indentations
-  for (const z of [-0.026, 0.026]) {
-    trunkGroup.add(part(new THREE.SphereGeometry(0.022, 6, 4), 0x241e1c, 0.64, -0.92, z));
+  // Nostrils
+  for (const z of [-0.022, 0.022]) {
+    trunkGroup.add(part(new THREE.SphereGeometry(0.018, 6, 4), 0x241e1c, 0.58, -0.82, z));
   }
   g.userData.trunk = trunkGroup;
   g.add(trunkGroup);
 
-  // 7. Majestic Mammoth Tusks (Ngà voi to uốn lượn hình chữ C vút lên)
+  // 5. Majestic Seamless Sweeping Tusks (Uốn cong C mượt mà từ má vút lên)
   for (const z of [-0.22, 0.22]) {
-    const sign = z > 0 ? 1 : -1;
-    // Fleshy cheek socket
-    blob(g, bodyColor, 0.13, [1.1, 1.1, 1.1], 1.16, 1.24, z);
-
-    // Smooth organic sweeping curve
-    const tuskPoints: [number, number, number, number][] = [
-      [1.18, 1.22, z * 1.00, 0.100],
-      [1.34, 1.04, z * 1.20, 0.092],
-      [1.52, 0.88, z * 1.40, 0.084],
-      [1.74, 0.80, z * 1.50, 0.075],
-      [1.96, 0.88, z * 1.48, 0.066],
-      [2.14, 1.10, z * 1.34, 0.054],
-      [2.14, 1.40, z * 1.12, 0.044],
-      [2.00, 1.70, z * 0.86, 0.034],
+    const tuskPoints = [
+      new THREE.Vector3(1.04, 1.28, z * 0.95),
+      new THREE.Vector3(1.24, 1.06, z * 1.30),
+      new THREE.Vector3(1.50, 0.84, z * 1.50),
+      new THREE.Vector3(1.78, 0.90, z * 1.48),
+      new THREE.Vector3(2.00, 1.16, z * 1.30),
+      new THREE.Vector3(2.04, 1.48, z * 1.02),
+      new THREE.Vector3(1.90, 1.76, z * 0.72),
     ];
 
-    for (const [tx, ty, tz, tr] of tuskPoints) {
-      g.add(part(new THREE.SphereGeometry(tr, 12, 10), tuskColor, tx, ty, tz, { roughness: 0.24, metalness: 0.08 }));
-    }
+    const curve = new THREE.CatmullRomCurve3(tuskPoints);
+    const tubularSegments = 24;
+    const radialSegments = 10;
+    const baseRadius = 0.092;
+    const tuskGeo = new THREE.TubeGeometry(curve, tubularSegments, baseRadius, radialSegments, false);
 
-    for (let i = 0; i < tuskPoints.length - 1; i++) {
-      const [x0, y0, z0, r0] = tuskPoints[i];
-      const [x1, y1, z1, r1] = tuskPoints[i + 1];
-      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-      const len = Math.hypot(dx, dy, dz);
-      const seg = part(new THREE.CylinderGeometry(r1, r0, len, 12), tuskColor, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, { roughness: 0.24, metalness: 0.08 });
-      const dir = new THREE.Vector3(dx, dy, dz).normalize();
-      seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      g.add(seg);
+    // Taper the tube from base (thick) to sharp pointed tip
+    const posAttr = tuskGeo.attributes.position;
+    for (let i = 0; i <= tubularSegments; i++) {
+      const t = i / tubularSegments;
+      const scale = 1.0 - 0.76 * t;
+      const center = curve.getPoint(t);
+      for (let j = 0; j <= radialSegments; j++) {
+        const idx = i * (radialSegments + 1) + j;
+        const px = posAttr.getX(idx);
+        const py = posAttr.getY(idx);
+        const pz = posAttr.getZ(idx);
+        posAttr.setXYZ(
+          idx,
+          center.x + (px - center.x) * scale,
+          center.y + (py - center.y) * scale,
+          center.z + (pz - center.z) * scale
+        );
+      }
     }
+    tuskGeo.computeVertexNormals();
 
-    // Sharp curving tip cone pointing up & inward
-    const [lastX, lastY, lastZ, lastR] = tuskPoints[tuskPoints.length - 1];
-    const tipLen = 0.24;
-    const tipCone = part(new THREE.ConeGeometry(lastR, tipLen, 12), tuskColor, lastX - 0.07, lastY + 0.14, lastZ - sign * 0.07, { roughness: 0.24, metalness: 0.08 });
-    const tipDir = new THREE.Vector3(-0.42, 0.82, -sign * 0.38).normalize();
+    const tuskMat = animalMat(tuskColor, { roughness: 0.22, metalness: 0.06 });
+    const tuskMesh = new THREE.Mesh(tuskGeo, tuskMat);
+    tuskMesh.castShadow = true;
+    g.add(tuskMesh);
+
+    // Sharp needle tip cone pointing inward
+    const tipPt = tuskPoints[tuskPoints.length - 1];
+    const tipPrev = tuskPoints[tuskPoints.length - 2];
+    const tipDir = new THREE.Vector3().subVectors(tipPt, tipPrev).normalize();
+    const tipCone = part(new THREE.ConeGeometry(0.022, 0.15, 10), tuskColor, tipPt.x + tipDir.x * 0.07, tipPt.y + tipDir.y * 0.07, tipPt.z + tipDir.z * 0.07, { roughness: 0.22, metalness: 0.06 });
     tipCone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tipDir);
     g.add(tipCone);
   }
 
-  // 8. Short Bushy Woolly Tail
+  // 6. Tail
   const tailGroup = new THREE.Group();
-  tailGroup.position.set(-0.62, 1.02, 0);
-  tailGroup.rotation.z = -0.42;
-  const stemLen = 0.36;
-  tailGroup.add(part(new THREE.CylinderGeometry(0.032, 0.024, stemLen, 8), bodyColor, 0, -stemLen / 2, 0));
-  const tuftLen = 0.20;
-  tailGroup.add(part(new THREE.ConeGeometry(0.075, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0));
-  const tuftBall = part(new THREE.SphereGeometry(0.070, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0);
+  tailGroup.position.set(-0.62, 1.04, 0);
+  tailGroup.rotation.z = -0.45;
+  const stemLen = 0.32;
+  tailGroup.add(part(new THREE.CylinderGeometry(0.028, 0.020, stemLen, 8), bodyColor, 0, -stemLen / 2, 0));
+  const tuftLen = 0.18;
+  tailGroup.add(part(new THREE.ConeGeometry(0.065, tuftLen, 8), tuftColor, 0, -stemLen - tuftLen * 0.4, 0));
+  const tuftBall = part(new THREE.SphereGeometry(0.060, 8, 6), tuftColor, 0, -stemLen - tuftLen * 0.8, 0);
   tuftBall.scale.set(0.9, 1.3, 0.9);
   tailGroup.add(tuftBall);
   g.add(tailGroup);
 
-  // 9. Expressive Eyes (Cute dark eyes on temple)
-  addEyes(g, 1.24, 1.68, 0.36, 0.082);
+  // 7. Expressive Eyes
+  addEyes(g, 1.10, 1.60, 0.32, 0.075);
 
-  // 10. Pillar Legs: 2 chân trước cao vững chãi (1.12), 2 chân sau ngắn hơn (0.86) hạ thấp trọng tâm mông chuẩn hình 4!
-  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.46, 0.36], [0.46, -0.36]], 1.12, 0.19, toenailsColor);
-  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.44, 0.30], [-0.44, -0.30]], 0.86, 0.17, toenailsColor);
+  // 8. Sturdy Pillar Legs:
+  // Front legs tall (1.14) under heavy shoulders; Rear legs shorter (0.88) lowering rear posture
+  // Thigh caps cover hip joints completely so there are never any seams or gaps!
+  for (const z of [-0.26, 0.26]) {
+    blob(g, bodyColor, 0.22, [1.02, 1.05, 0.95], -0.38, 1.06, z);
+  }
+  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.44, 0.34], [0.44, -0.34]], 1.14, 0.18, toenailsColor);
+  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.38, 0.26], [-0.38, -0.26]], 0.88, 0.165, toenailsColor);
   return [...frontLegs, ...rearLegs];
 }
 

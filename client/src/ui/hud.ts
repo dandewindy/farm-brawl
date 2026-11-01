@@ -82,6 +82,8 @@ export class HudManager {
   private readonly floatsEl: HTMLElement;
   private readonly toastsEl: HTMLElement;
   private readonly bannerEl: HTMLElement;
+  private readonly mapCountdownBadgeEl: HTMLElement | null;
+  private mapCountdownTimer: number | null = null;
   private bannerTimer = 0;
 
   private readonly startScreen: HTMLElement;
@@ -275,6 +277,7 @@ export class HudManager {
     this.floatsEl = document.getElementById('floats')!;
     this.toastsEl = document.getElementById('toasts')!;
     this.bannerEl = document.getElementById('banner')!;
+    this.mapCountdownBadgeEl = document.getElementById('mapCountdownBadge');
 
     this.startScreen = document.getElementById('start')!;
     this.deathScreen = document.getElementById('death')!;
@@ -2287,6 +2290,43 @@ export class HudManager {
     this.centerAlertTimer = setTimeout(() => {
       this.hideCenterAlert();
     }, durationMs);
+  }
+
+  showMapCountdown(sec: number): void {
+    if (!this.mapCountdownBadgeEl) return;
+    if (this.mapCountdownTimer) {
+      clearTimeout(this.mapCountdownTimer);
+      this.mapCountdownTimer = null;
+    }
+    this.mapCountdownBadgeEl.classList.remove('done');
+    this.mapCountdownBadgeEl.hidden = false;
+    this.mapCountdownBadgeEl.textContent = `🗺️ ${t('mapShiftCountdownShort', { s: sec })}`;
+    this.mapCountdownBadgeEl.style.animation = 'none';
+    void this.mapCountdownBadgeEl.offsetWidth;
+    this.mapCountdownBadgeEl.style.animation = '';
+    this.mapCountdownTimer = window.setTimeout(() => {
+      if (this.mapCountdownBadgeEl) this.mapCountdownBadgeEl.hidden = true;
+    }, 1500);
+  }
+
+  showMapShiftDone(): void {
+    if (!this.mapCountdownBadgeEl) return;
+    if (this.mapCountdownTimer) {
+      clearTimeout(this.mapCountdownTimer);
+      this.mapCountdownTimer = null;
+    }
+    this.mapCountdownBadgeEl.classList.add('done');
+    this.mapCountdownBadgeEl.hidden = false;
+    this.mapCountdownBadgeEl.textContent = `✨ ${t('mapShiftedShort')}`;
+    this.mapCountdownBadgeEl.style.animation = 'none';
+    void this.mapCountdownBadgeEl.offsetWidth;
+    this.mapCountdownBadgeEl.style.animation = '';
+    this.mapCountdownTimer = window.setTimeout(() => {
+      if (this.mapCountdownBadgeEl) {
+        this.mapCountdownBadgeEl.hidden = true;
+        this.mapCountdownBadgeEl.classList.remove('done');
+      }
+    }, 1800);
   }
 
   showRuleBanner(ruleId: string): void {

@@ -2345,6 +2345,41 @@ describe('fruit trees', () => {
       expect(smallPig.stunT).toBeGreaterThan(0);
       expect(smallPig.vx).toBeLessThan(0);
     });
+
+    it('ensures food, tools, and scattered items never spawn inside hay bales or trees', () => {
+      for (let seed = 100; seed < 120; seed++) {
+        const w = new World(seed);
+        
+        // Check initial spawns
+        for (const f of w.food.values()) {
+          expect(w.isBlockedByObstacle(f.x, f.z, 0.4)).toBe(false);
+        }
+        for (const t of w.tools.values()) {
+          expect(w.isBlockedByObstacle(t.x, t.z, 0.4)).toBe(false);
+        }
+
+        // Test scatter around hay and trees
+        if (w.map.hay.length > 0) {
+          const [hx, hz, hr] = w.map.hay[0];
+          (w as any).scatter(hx, hz, 50, hr, 1, 0);
+          for (const f of w.food.values()) {
+            expect(w.isBlockedByObstacle(f.x, f.z, 0.4)).toBe(false);
+          }
+        }
+
+        // Test renewGame
+        w.renewGame(seed + 999);
+        for (const f of w.food.values()) {
+          expect(w.isBlockedByObstacle(f.x, f.z, 0.4)).toBe(false);
+        }
+
+        // Test shiftMap
+        w.shiftMap(seed + 1999);
+        for (const f of w.food.values()) {
+          expect(w.isBlockedByObstacle(f.x, f.z, 0.4)).toBe(false);
+        }
+      }
+    });
   });
 });
 

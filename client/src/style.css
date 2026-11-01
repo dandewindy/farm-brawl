@@ -1354,6 +1354,47 @@ body.ipad #lb {
 #toasts { position: fixed; left: 50%; top: 175px; transform: translateX(-50%); z-index: 8; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
 #toasts div { padding: 6px 14px; background: rgba(31, 26, 23, .85); border-radius: 10px; font-weight: 700; font-size: 14px; animation: fadeIn .2s, fadeOut .4s 2.2s forwards; }
 
+/* Prominent Map Shift Countdown Highlight Banner */
+#mapCountdownBadge {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1020;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 28px;
+  background: linear-gradient(135deg, rgba(255, 140, 0, 0.96), rgba(220, 38, 38, 0.98));
+  border: 3px solid #ffd700;
+  border-radius: 999px;
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.65), 0 0 24px rgba(255, 215, 0, 0.85);
+  color: #fff;
+  font-family: var(--f-display);
+  font-size: clamp(22px, 3.2vw, 32px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85), 0 0 14px rgba(255, 215, 0, 0.7);
+  pointer-events: none;
+  user-select: none;
+  animation: cdPopPulse 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#mapCountdownBadge.done {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.96), rgba(5, 150, 105, 0.98));
+  border-color: #6ee7b7;
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.65), 0 0 24px rgba(110, 231, 183, 0.85);
+}
+#mapCountdownBadge[hidden] {
+  display: none !important;
+}
+@keyframes cdPopPulse {
+  0% { transform: translateX(-50%) scale(1.35); }
+  50% { transform: translateX(-50%) scale(0.95); }
+  100% { transform: translateX(-50%) scale(1.0); }
+}
+
 /* Center Alert Notice Modal */
 .center-alert {
   position: fixed;
@@ -2189,6 +2230,13 @@ body:not(.ipad):not(.is-pc) #banner,
 body.mobile-phone #banner {
   top: 38px !important;
   padding: 4px 14px 6px !important;
+}
+body:not(.ipad):not(.is-pc) #mapCountdownBadge,
+body.mobile-phone #mapCountdownBadge {
+  top: 42px !important;
+  padding: 6px 18px !important;
+  font-size: 18px !important;
+  border-width: 2px !important;
 }
 body:not(.ipad):not(.is-pc) #banner .head,
 body.mobile-phone #banner .head {

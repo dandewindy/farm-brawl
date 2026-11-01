@@ -1737,8 +1737,9 @@ export class World {
       for (let i = 0; i < totalDropped; i++) {
         const ang = this.rnd() * Math.PI * 2;
         const dist = tree.r + 1.2 + this.rnd() * 3.5;
-        const fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
-        const fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+        let fx = clamp(tree.x + Math.cos(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+        let fz = clamp(tree.z + Math.sin(ang) * dist, -(CFG.R - 2), CFG.R - 2);
+        [fx, fz] = this.pushOutsideObstacles(fx, fz, 1.4);
         const fruitWeight = tree.size === 2
           ? 100
           : tree.size === 1
@@ -3125,6 +3126,57 @@ export class World {
     this.foodAdded.push([f.id, r2(x), r2(z), k, Math.round(v * 10) / 10]);
   }
 
+  /** Checks if (x, z) is blocked by hay bales, tree trunks, or wells with reachability safety margin */
+  isBlockedByObstacle(x: number, z: number, margin = 1.4): boolean {
+    if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + margin)) return true;
+    if (this.treeSims.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + margin)) return true;
+    if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + margin + 0.4)) return true;
+    return false;
+  }
+
+  /** Pushes (x, z) safely radially outside any overlapping tree, hay bale, or well rim */
+  pushOutsideObstacles(x: number, z: number, margin = 1.4): [number, number] {
+    let curX = x, curZ = z;
+    // Push out of trees
+    for (const t of this.treeSims) {
+      const dist = Math.hypot(curX - t.x, curZ - t.z);
+      const safeR = t.r + margin;
+      if (dist < safeR) {
+        const ang = dist > 0.01 ? Math.atan2(curZ - t.z, curX - t.x) : Math.random() * Math.PI * 2;
+        curX = t.x + Math.cos(ang) * safeR;
+        curZ = t.z + Math.sin(ang) * safeR;
+      }
+    }
+    // Push out of hay bales
+    for (const [hx, hz, hr] of this.map.hay) {
+      const dist = Math.hypot(curX - hx, curZ - hz);
+      const safeR = hr + margin;
+      if (dist < safeR) {
+        const ang = dist > 0.01 ? Math.atan2(curZ - hz, curX - hx) : Math.random() * Math.PI * 2;
+        curX = hx + Math.cos(ang) * safeR;
+        curZ = hz + Math.sin(ang) * safeR;
+      }
+    }
+    // Push out of wells
+    for (const [wx, wz, wr] of (this.map.well || [])) {
+      const dist = Math.hypot(curX - wx, curZ - wz);
+      const safeR = wr + margin + 0.4;
+      if (dist < safeR) {
+        const ang = dist > 0.01 ? Math.atan2(curZ - wz, curX - wx) : Math.random() * Math.PI * 2;
+        curX = wx + Math.cos(ang) * safeR;
+        curZ = wz + Math.sin(ang) * safeR;
+      }
+    }
+    // Keep within fence
+    const d = Math.hypot(curX, curZ);
+    const maxR = CFG.R - 2.0;
+    if (d > maxR) {
+      curX = (curX / d) * maxR;
+      curZ = (curZ / d) * maxR;
+    }
+    return [curX, curZ];
+  }
+
   private spawnFood(): void {
     let x = 0, z = 0;
     // Requirement 1: 8% chance to place food directly on campfire as a tempting trap for greedy players
@@ -3135,13 +3187,17 @@ export class World {
       x = fx + Math.cos(a) * d;
       z = fz + Math.sin(a) * d;
     } else {
-      for (let i = 0; i < 16; i++) {
+      let placed = false;
+      for (let i = 0; i < 30; i++) {
         const a = this.rnd() * Math.PI * 2, d = Math.sqrt(this.rnd()) * (CFG.R - 3);
-        x = Math.cos(a) * d; z = Math.sin(a) * d;
-        if (this.map.hay.some(([hx, hz, hr]) => Math.hypot(x - hx, z - hz) < hr + 0.6)) continue;
-        if (this.map.well?.some(([wx, wz, wr]) => Math.hypot(x - wx, z - wz) < wr + 1.8)) continue;
-        // Food is allowed on fire as a trap for greedy players
+        const cx = Math.cos(a) * d, cz = Math.sin(a) * d;
+        if (this.isBlockedByObstacle(cx, cz, 1.4)) continue;
+        x = cx; z = cz;
+        placed = true;
         break;
+      }
+      if (!placed) {
+        [x, z] = this.pushOutsideObstacles(x, z, 1.4);
       }
     }
     let roll = this.rnd() * (FOOD_WEIGHT as readonly number[]).reduce((s, w) => s + w, 0);
@@ -3164,31 +3220,8 @@ export class World {
       const d = rad + this.rnd() * 3;
       let fx = x + Math.cos(a) * d, fz = z + Math.sin(a) * d;
 
-      // Avoid stone wells: push radially outside well rim so food never floats over the pit
-      for (const [wx, wz, wr] of (this.map.well || [])) {
-        const dist = Math.hypot(fx - wx, fz - wz);
-        const safeR = wr + 1.8;
-        if (dist < safeR) {
-          const ang = dist > 0.01 ? Math.atan2(fz - wz, fx - wx) : a;
-          fx = wx + Math.cos(ang) * safeR;
-          fz = wz + Math.sin(ang) * safeR;
-        }
-      }
-
-      // Keep within fence
-      const fd = Math.hypot(fx, fz), lim = CFG.R - 2;
-      if (fd > lim) { fx = (fx / fd) * lim; fz = (fz / fd) * lim; }
-
-      // Extra check: ensure safe from wells even after fence clamp
-      for (const [wx, wz, wr] of (this.map.well || [])) {
-        const dist = Math.hypot(fx - wx, fz - wz);
-        const safeR = wr + 1.5;
-        if (dist < safeR) {
-          const ang = dist > 0.01 ? Math.atan2(fz - wz, fx - wx) : a;
-          fx = wx + Math.cos(ang) * safeR;
-          fz = wz + Math.sin(ang) * safeR;
-        }
-      }
+      // Push safely outside trees, hay bales, and stone wells so food is never unreachable
+      [fx, fz] = this.pushOutsideObstacles(fx, fz, 1.4);
 
       this.addFood(fx, fz, k, v);
     }
@@ -3371,6 +3404,7 @@ export class World {
     const seed = newSeed ?? ((Math.random() * 2 ** 31) | 0);
     this.rnd = mulberry32(seed ^ 0x9e3779b9);
     this.map = generateMap(seed);
+    this.initTrees();
     this.food.clear();
     this.tools.clear();
     for (let i = 0; i < CFG.FOOD_TARGET; i++) this.spawnFood();

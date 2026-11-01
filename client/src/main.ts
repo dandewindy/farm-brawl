@@ -1858,7 +1858,7 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'mapWarn': {
-      hud.showToast(t('mapShiftCountdown', { s: ev.left }), 1200);
+      hud.showMapCountdown(ev.left);
       sfxHit(0.5, 0.4);
       break;
     }
@@ -1870,7 +1870,7 @@ function handleGameEvent(ev: GameEvent): void {
           minions.setMap(ev.map);
           tools.clear();
         });
-        hud.showToast(t('mapShifted'), 3000);
+        hud.showMapShiftDone();
       } else {
         world.buildMap(ev.map);
         corpses.setMap(ev.map);
