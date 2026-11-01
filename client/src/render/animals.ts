@@ -794,20 +794,22 @@ function addMammothEars(
     const z = side * 0.38;
     const earGroup = new THREE.Group();
     earGroup.position.set(-0.06, 0.08, z);
-    earGroup.rotation.y = side * -0.38;
-    earGroup.rotation.z = -0.16;
-    earGroup.rotation.x = side * 0.12;
+    earGroup.rotation.y = side * 0.22;
+    earGroup.rotation.z = -0.15;
+    earGroup.rotation.x = side * 0.08;
 
-    // Vành tai ngoài
+    // Vành tai ngoài - NẰM DỌC THEO THÂN ĐẦU (trục X-Y dọc, không nằm ngang)
     const earGeo = new THREE.CylinderGeometry(0.14, 0.18, 0.045, 12);
-    earGeo.scale(0.85, 0.24, 1.25);
+    earGeo.rotateX(Math.PI / 2);
+    earGeo.scale(0.85, 1.25, 0.24);
     const earMesh = part(earGeo, bodyColor, 0, 0, 0, furOpts);
     earGroup.add(earMesh);
 
     // Lòng tai trong
     const innerGeo = new THREE.CylinderGeometry(0.09, 0.13, 0.035, 10);
-    innerGeo.scale(0.80, 0.20, 1.15);
-    const innerMesh = part(innerGeo, innerEarColor, 0, 0.012, 0, furOpts);
+    innerGeo.rotateX(Math.PI / 2);
+    innerGeo.scale(0.80, 1.15, 0.20);
+    const innerMesh = part(innerGeo, innerEarColor, 0, 0, side * 0.012, furOpts);
     earGroup.add(innerMesh);
 
     headGroup.add(earGroup);
@@ -1944,7 +1946,7 @@ const LABEL_Y: Record<Species, number> = {
   mammoth: 2.8,
 };
 
-function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
+export function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const font = `700 40px ${LABEL_FONT}`;

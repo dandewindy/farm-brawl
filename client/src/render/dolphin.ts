@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { MapData, Blob } from '@shared/map';
 import { createHeartGeometry } from './tools';
+import { createLabel } from './animals';
+import { t } from '../i18n';
 
 interface WakeRipple {
   mesh: THREE.Mesh;
@@ -13,11 +15,14 @@ interface WakeRipple {
 }
 
 export class DolphinRenderer {
+  private readonly scene: THREE.Scene;
   private readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
   private readonly tail = new THREE.Group();
   private readonly headHeart = new THREE.Group();
   private readonly ripplePool: WakeRipple[] = [];
+  private label: THREE.Sprite | null = null;
+  private labelText = '';
 
   private pondCenter = new THREE.Vector2(0, 0);
   private pondRadius = 15;
@@ -42,6 +47,7 @@ export class DolphinRenderer {
     onSplash?: (x: number, y: number, z: number, count?: number) => void,
     onWake?: (x: number, y: number, z: number, angle: number, r: number) => void
   ) {
+    this.scene = scene;
     this.onSplash = onSplash;
     this.onWake = onWake;
     this.buildDolphin();
@@ -54,6 +60,7 @@ export class DolphinRenderer {
     if (!map.pond || map.pond.length === 0) {
       this.hasPond = false;
       this.root.visible = false;
+      if (this.label) this.label.visible = false;
       return;
     }
     // Find largest pond by radius
@@ -62,10 +69,33 @@ export class DolphinRenderer {
     this.pondRadius = largestPond[2];
     this.hasPond = true;
     this.root.visible = true;
+    if (this.label) this.label.visible = true;
     this.swimAngle = Math.random() * Math.PI * 2;
     this.state = 'swim';
     this.nextJumpTimer = 7 + Math.random() * 6;
     this.heartCycleTimer = 30;
+  }
+
+  private updateLabel(x: number, y: number, z: number): void {
+    const curName = t('dolphin_name');
+    if (this.labelText !== curName || !this.label) {
+      if (this.label) {
+        this.scene.remove(this.label);
+        this.label.material.map?.dispose();
+        this.label.material.dispose();
+      }
+      this.label = createLabel(curName, false, false, false);
+      this.scene.add(this.label);
+      this.labelText = curName;
+    }
+    this.label.visible = this.hasPond && this.root.visible;
+    if (this.label.visible) {
+      // Float gracefully above water and dolphin body
+      const targetY = Math.max(1.8, y + 1.6);
+      this.label.position.set(x, targetY, z);
+      const lh = 0.85;
+      this.label.scale.set(lh * this.label.userData.aspect, lh, 1);
+    }
   }
 
   private buildRipplePool(scene: THREE.Scene): void {
@@ -314,7 +344,10 @@ export class DolphinRenderer {
       }
     }
 
-    if (!this.hasPond) return;
+    if (!this.hasPond) {
+      if (this.label) this.label.visible = false;
+      return;
+    }
 
     // Swimming radius inside the largest pond
     const swimR = Math.max(5.0, this.pondRadius * 0.65);
@@ -442,9 +475,17 @@ export class DolphinRenderer {
         this.spawnRipple(this.root.position.x, this.root.position.z, 1.0, 4.8, 1.8, 0.85);
       }
     }
+
+    this.updateLabel(this.root.position.x, this.root.position.y, this.root.position.z);
   }
 
   destroy(): void {
+    if (this.label) {
+      this.scene.remove(this.label);
+      this.label.material.map?.dispose();
+      this.label.material.dispose();
+      this.label = null;
+    }
     if (this.root.parent) {
       this.root.parent.remove(this.root);
     }
