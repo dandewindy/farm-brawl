@@ -205,10 +205,10 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0x1b1c1e, chest: 0x3e4046, face: 0x63666d, crest: 0x111214, silver: 0x54575f }, // Dark Obsidian
   ],
   mammoth: [
-    { body: 0x5a3d28, hump: 0x432815, skirt: 0x4a2e1c, tusk: 0xfcf7eb, innerEar: 0x7a4d33, toenails: 0xd4c8b8, tuft: 0x381f11 }, // Classic Warm Woolly Brown
-    { body: 0xedeae4, hump: 0xdcd8cf, skirt: 0xe2dfd8, tusk: 0xfffcf5, innerEar: 0xdec4c4, toenails: 0xe8e2d8, tuft: 0xbab4aa }, // Arctic Snow Mammoth
-    { body: 0x422616, hump: 0x2e170c, skirt: 0x361c0f, tusk: 0xfaeed2, innerEar: 0x54321d, toenails: 0xa8998a, tuft: 0x221107 }, // Dark Earth Mammoth
-    { body: 0x8c5b36, hump: 0x6e4221, skirt: 0x7a4b29, tusk: 0xfdf5e2, innerEar: 0x9e6d4c, toenails: 0xd0c0a8, tuft: 0x522f16 }, // Golden Tawny Mammoth
+    { body: 0x5a3d28, hump: 0x381f11, skirt: 0x442614, tusk: 0xfcf7eb, innerEar: 0x7a4d33, toenails: 0xd4c8b8, tuft: 0x30180d }, // Classic Warm Woolly Brown
+    { body: 0xedeae4, hump: 0xc4c0b6, skirt: 0xd8d4cb, tusk: 0xfffcf5, innerEar: 0xdec4c4, toenails: 0xe8e2d8, tuft: 0xbab4aa }, // Arctic Snow Mammoth
+    { body: 0x422616, hump: 0x24140a, skirt: 0x321a0c, tusk: 0xfaeed2, innerEar: 0x54321d, toenails: 0xa8998a, tuft: 0x1a0d06 }, // Dark Earth Mammoth
+    { body: 0x8c5b36, hump: 0x5c3214, skirt: 0x724220, tusk: 0xfdf5e2, innerEar: 0x9e6d4c, toenails: 0xd0c0a8, tuft: 0x48260e }, // Golden Tawny Mammoth
   ],
 };
 
@@ -284,16 +284,16 @@ function addEyes(g: THREE.Group, x: number, y: number, sep: number, s: number): 
 }
 
 // Helper: add legs with hooves casting shadows
-function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: number, rad: number, hoofColor?: number): THREE.Group[] {
+function addLegs(g: THREE.Group, color: number, pts: [number, number][], len: number, rad: number, hoofColor?: number, opts?: Partial<THREE.MeshStandardMaterialParameters>): THREE.Group[] {
   const arr: THREE.Group[] = [];
   for (const [x, z] of pts) {
     const pivot = new THREE.Group();
     pivot.position.set(x, len, z);
     pivot.userData.origY = len;
-    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0, undefined, true);
+    const legMesh = part(new THREE.CapsuleGeometry(rad, Math.max(0.01, len - rad * 2), 4, 10), color, 0, -len / 2, 0, opts, true);
     pivot.add(legMesh);
     if (hoofColor !== undefined) {
-      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0, undefined, true);
+      const hoof = part(new THREE.CylinderGeometry(rad * 1.06, rad * 1.12, rad * 1.1, 12), hoofColor, 0, -len + rad * 0.55, 0, opts, true);
       pivot.add(hoof);
     }
     g.add(pivot);
@@ -807,8 +807,8 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const toenailsColor = s.toenails ?? 0xd4c8b8;
   const tuftColor = s.tuft ?? 0x381f11;
 
-  // Ultra-matte, non-specular woolly fur material (khử bóng, tạo chất liệu lông chân thực)
-  const furOpts: Partial<THREE.MeshStandardMaterialParameters> = { roughness: 0.96, metalness: 0.0 };
+  // Ultra-matte, non-specular woolly fur material (khử bóng triệt để, tạo chất liệu lông chân thực)
+  const furOpts: Partial<THREE.MeshStandardMaterialParameters> = { roughness: 1.0, metalness: 0.0 };
 
   // Helper for textured matte fur geometry
   const furBlob = (
@@ -855,41 +855,60 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     furBlob(g, bodyColor, 0.30, [1.02, 1.04, 0.96], -0.40, 1.06, z);
   }
 
-  // Shaggy Woolly Flank Skirts (Vạt lông dài rủ dọc 2 bên sườn, che khuyết điểm gầm bụng)
+  // Shaggy Woolly Flank Skirts (Vạt lông dài rủ dọc 2 bên sườn & hông tạo cảm giác lông dày dặn)
   for (const z of [-0.44, 0.44]) {
-    const skirtF = furBlob(g, skirtColor, 0.32, [1.20, 0.72, 0.18], 0.18, 1.12, z);
+    const skirtF = furBlob(g, skirtColor, 0.34, [1.25, 0.76, 0.22], 0.18, 1.10, z);
     skirtF.rotation.z = 0.16;
-    skirtF.rotation.x = z > 0 ? 0.12 : -0.12;
-    const skirtR = furBlob(g, skirtColor, 0.26, [1.08, 0.65, 0.16], -0.22, 0.98, z * 0.92);
+    skirtF.rotation.x = z > 0 ? 0.14 : -0.14;
+    const skirtR = furBlob(g, skirtColor, 0.28, [1.12, 0.70, 0.20], -0.22, 0.96, z * 0.92);
     skirtR.rotation.z = 0.18;
-    skirtR.rotation.x = z > 0 ? 0.12 : -0.12;
+    skirtR.rotation.x = z > 0 ? 0.14 : -0.14;
+
+    // Múi lông rủ giữa sườn
+    const skirtMid = furBlob(g, skirtColor, 0.30, [1.18, 0.72, 0.20], -0.02, 1.02, z * 0.96);
+    skirtMid.rotation.z = 0.15;
+    skirtMid.rotation.x = z > 0 ? 0.14 : -0.14;
   }
 
   // =========================================================================
-  // Majestic Woolly Back Mane (Lông lưng giống phần đầu, màu đậm hơn thân, to hơn phần đầu)
+  // Majestic Woolly Back Mane (Lông lưng giống phần đầu, màu đậm hơn thân, TO HƠN PHẦN ĐẦU)
   // =========================================================================
-  // Main Summit Crest (Đỉnh bờm chính trên gù vai - to và bồng bềnh hơn đầu)
-  const maneApex = furBlob(g, humpColor, 0.46, [1.28, 0.62, 0.94], 0.20, 2.06, 0);
-  maneApex.rotation.z = -0.06;
+  // 1. Khối nền bờm lưng đồ sộ (To và dày dặn hơn hộp sọ đầu)
+  const maneBaseApex = furBlob(g, humpColor, 0.58, [1.32, 0.90, 1.18], 0.18, 1.76, 0);
+  maneBaseApex.rotation.z = -0.06;
 
-  // Front flow towards neck/head (Vuốt mượt về trước cổ)
-  const maneFront = furBlob(g, humpColor, 0.40, [1.16, 0.58, 0.88], 0.46, 1.94, 0);
-  maneFront.rotation.z = -0.10;
+  const maneBaseFront = furBlob(g, humpColor, 0.50, [1.20, 0.86, 1.12], 0.46, 1.68, 0);
+  maneBaseFront.rotation.z = -0.10;
 
-  // Mid-spine flow down the slope (Trải dài dọc theo sống lưng dốc xuống mông)
-  const maneSlope = furBlob(g, humpColor, 0.44, [1.22, 0.60, 0.90], -0.10, 1.80, 0);
-  maneSlope.rotation.z = 0.12;
+  const maneBaseSlope = furBlob(g, humpColor, 0.52, [1.24, 0.84, 1.14], -0.14, 1.54, 0);
+  maneBaseSlope.rotation.z = 0.12;
 
-  // Rear crest taper (Đuôi bờm lưng vuốt nhỏ dần về mông)
-  const maneRear = furBlob(g, humpColor, 0.36, [1.10, 0.52, 0.82], -0.34, 1.50, 0);
-  maneRear.rotation.z = 0.16;
+  const maneBaseRear = furBlob(g, humpColor, 0.42, [1.15, 0.76, 1.02], -0.40, 1.32, 0);
+  maneBaseRear.rotation.z = 0.16;
 
-  // Lateral woolly fluffs (Hai bên bờm tạo độ dày dặn khối 3D)
-  for (const z of [-0.28, 0.28]) {
-    const maneSide = furBlob(g, humpColor, 0.35, [1.14, 0.55, 0.72], 0.14, 1.96, z);
-    maneSide.rotation.z = -0.04;
-    maneSide.rotation.x = z > 0 ? 0.15 : -0.15;
+  // 2. Hai bên vai bờm lông bồng bềnh
+  for (const z of [-0.36, 0.36]) {
+    const maneSideF = furBlob(g, humpColor, 0.44, [1.18, 0.78, 0.85], 0.16, 1.68, z);
+    maneSideF.rotation.z = -0.05;
+    maneSideF.rotation.x = z > 0 ? 0.22 : -0.22;
+
+    const maneSideR = furBlob(g, humpColor, 0.40, [1.14, 0.72, 0.82], -0.16, 1.50, z * 0.95);
+    maneSideR.rotation.z = 0.10;
+    maneSideR.rotation.x = z > 0 ? 0.20 : -0.20;
   }
+
+  // 3. Các múi bờm vuốt ngược bồng bềnh trên đỉnh lưng (GIỐNG VỚI PHẦN ĐẦU nhưng TO HƠN ĐẦU)
+  const maneCrestApex = furBlob(g, humpColor, 0.44, [1.26, 0.56, 0.92], 0.16, 2.15, 0);
+  maneCrestApex.rotation.z = 0.16;
+
+  const maneCrestFront = furBlob(g, humpColor, 0.36, [1.15, 0.50, 0.82], 0.42, 2.02, 0);
+  maneCrestFront.rotation.z = 0.12;
+
+  const maneCrestSlope = furBlob(g, humpColor, 0.40, [1.20, 0.54, 0.88], -0.12, 1.90, 0);
+  maneCrestSlope.rotation.z = 0.18;
+
+  const maneCrestRear = furBlob(g, humpColor, 0.32, [1.10, 0.46, 0.78], -0.36, 1.64, 0);
+  maneCrestRear.rotation.z = 0.22;
 
   // =========================================================================
   // 2. Sculpted Head (+30% Scale, Unified with Eyes, Ears, Tusks & Trunk)
@@ -1026,8 +1045,8 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   // 7. Sturdy Pillar Legs:
   // Chân trước cao (1.14), Chân sau thấp hơn (0.90) tạo dáng đứng dốc uy nghi
   // =========================================================================
-  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.42, 0.34], [0.42, -0.34]], 1.14, 0.18, toenailsColor);
-  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.38, 0.28], [-0.38, -0.28]], 0.90, 0.165, toenailsColor);
+  const frontLegs = addLegs(g, s.legs ?? bodyColor, [[0.42, 0.34], [0.42, -0.34]], 1.14, 0.18, toenailsColor, furOpts);
+  const rearLegs = addLegs(g, s.legs ?? bodyColor, [[-0.38, 0.28], [-0.38, -0.28]], 0.90, 0.165, toenailsColor, furOpts);
   return [...frontLegs, ...rearLegs];
 }
 
@@ -2858,21 +2877,21 @@ export class AnimalRenderer {
         // Mighty roar blast: giữ tư thế uy nghi đưa cao đầu và vòi lên trời
         vis.body.rotation.z = 0;
         if (vis.head) {
-          vis.head.rotation.z = 0.32; // đầu ngẩng cao
+          vis.head.rotation.z = 0.35; // đầu ngẩng cao
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 1.05; // vòi uốn cao vút
+          vis.trunk.rotation.z = 1.15; // vòi uốn cao vút
           vis.trunk.rotation.y = 0;
         }
       } else if (isCharging) {
-        // Nén gồng: đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng
+        // Nén gồng: đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không chúi đầu xuống đất, không khựng
         const t = Math.min(1, Math.max(0, lvl));
         vis.body.rotation.z = 0;
         if (vis.head) {
-          vis.head.rotation.z = 0.30 * t; // nâng đầu lên 1 lần mượt mà
+          vis.head.rotation.z = 0.32 * t; // nâng đầu lên cao êm ái
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 0.90 * t; // nâng vòi lên cao mượt mà
+          vis.trunk.rotation.z = 1.05 * t; // nâng vòi lên cao vút
           vis.trunk.rotation.y = 0;
         }
       } else {
