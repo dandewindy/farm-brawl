@@ -1715,8 +1715,24 @@ function handleGameEvent(ev: GameEvent): void {
       const kingMeta = gameState.metas.get(gameState.napoleonId);
       hud.updateBoard(ev.id, gameState.reign, kingMeta?.name, gameState.napoleonId === gameState.myId);
       if (ev.id === 'sunday') {
-        animals.triggerSundaySummon(1.5);
+        if (gameState.myId !== gameState.napoleonId) {
+          predictor.setStun(1.5);
+          localStunTimer = 1.5;
+          predictor.vx = 0;
+          predictor.vz = 0;
+        }
+        animals.triggerSundaySummon(1.5, gameState.napoleonId);
       }
+      break;
+    }
+    case 'sundaySummon': {
+      if (gameState.myId !== gameState.napoleonId) {
+        predictor.setStun(ev.dur);
+        localStunTimer = ev.dur;
+        predictor.vx = 0;
+        predictor.vz = 0;
+      }
+      animals.triggerSundaySummon(ev.dur, gameState.napoleonId);
       break;
     }
     case 'flowerBloom': {

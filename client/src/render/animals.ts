@@ -57,13 +57,18 @@ interface AnimalVisual {
   };
   cartWheels: THREE.Mesh[];
   summonRingTimer?: number;
+  summonTotalDur?: number;
   summonGroup: THREE.Group;
   summonOuter: THREE.Mesh;
   summonInner: THREE.Mesh;
   summonBeam: THREE.Mesh;
+  summonRisingRing: THREE.Mesh;
+  summonRisingRingOuter: THREE.Mesh;
   summonOuterMat: THREE.MeshBasicMaterial;
   summonInnerMat: THREE.MeshBasicMaterial;
   summonBeamMat: THREE.MeshBasicMaterial;
+  summonRisingMat: THREE.MeshBasicMaterial;
+  summonRisingOuterMat: THREE.MeshBasicMaterial;
 }
 
 function computePodiumRampY(x: number, z: number, podX: number, podZ: number): number {
@@ -128,6 +133,12 @@ const summonInnerGeo = new THREE.RingGeometry(0.65, 0.90, 24);
 summonInnerGeo.rotateX(-Math.PI / 2);
 
 const summonBeamGeo = new THREE.CylinderGeometry(1.35, 1.35, 3.8, 20, 1, true);
+
+const summonRisingRingGeo = new THREE.TorusGeometry(1.35, 0.08, 12, 36);
+summonRisingRingGeo.rotateX(Math.PI / 2);
+
+const summonRisingRingOuterGeo = new THREE.TorusGeometry(1.48, 0.035, 8, 36);
+summonRisingRingOuterGeo.rotateX(Math.PI / 2);
 
 const SPECIES_RING_COLOR: Record<Species, number> = {
   chicken: 0xffb74d,
@@ -2385,9 +2396,11 @@ export class AnimalRenderer {
     }
   }
 
-  triggerSundaySummon(duration = 1.5): void {
-    for (const vis of this.visuals.values()) {
+  triggerSundaySummon(duration = 1.5, kingId?: number): void {
+    for (const [id, vis] of this.visuals) {
+      if (kingId !== undefined && id === kingId) continue;
       vis.summonRingTimer = duration;
+      vis.summonTotalDur = duration;
       vis.summonGroup.visible = true;
     }
   }
@@ -3147,27 +3160,51 @@ export class AnimalRenderer {
       : (SPECIES_RING_COLOR[vis.species] ?? 0xff9800);
     vis.collarMat.color.setHex(isKing ? 0xffc928 : collarColor);
 
-    // Requirement 4: Sunday Meeting Summoning Ring animation (1.5s)
+    // Sunday Meeting Summoning Ring animation: Rising ring of light from feet up to head (1.5s)
     if (vis.summonRingTimer !== undefined && vis.summonRingTimer > 0) {
       vis.summonRingTimer = Math.max(0, vis.summonRingTimer - dt);
-      const prog = vis.summonRingTimer / 1.5; // 1 down to 0
-      if (prog <= 0) {
+      const totalDur = vis.summonTotalDur || 1.5;
+      const elapsed = totalDur - vis.summonRingTimer;
+      const prog = Math.min(1.0, Math.max(0.0, elapsed / totalDur)); // 0.0 (feet) -> 1.0 (head)
+      if (vis.summonRingTimer <= 0) {
         vis.summonGroup.visible = false;
       } else {
         vis.summonGroup.visible = true;
         vis.summonGroup.position.set(x, smoothBaseY, z);
-        const baseSc = r * (1.1 + (1 - prog) * 0.35);
-        vis.summonGroup.scale.set(baseSc, 1, baseSc);
+        const baseRadius = Math.max(0.8, r * 1.05);
+        vis.summonGroup.scale.set(baseRadius, 1, baseRadius);
 
-        // Rotation of magic rings
+        const animalHeight = Math.max(1.5, r * 2.2);
+
+        // 1. Rising ring of light: travels from feet (y = 0.05) up to head (y = animalHeight)
+        const ringY = 0.05 + prog * animalHeight;
+        vis.summonRisingRing.position.y = ringY;
+        vis.summonRisingRingOuter.position.y = ringY;
+
+        // Ring expands slightly and pulses with energy as it rises
+        const ringExpand = 1.0 + Math.sin(prog * Math.PI) * 0.18;
+        vis.summonRisingRing.scale.set(ringExpand, ringExpand, 1.0);
+        vis.summonRisingRingOuter.scale.set(ringExpand, ringExpand, 1.0);
+
+        vis.summonRisingRing.rotation.z = now * 0.006;
+        vis.summonRisingRingOuter.rotation.z = -now * 0.009;
+
+        // 2. Ascending light beam / energy pillar rising from feet up to the ring
+        const beamH = Math.max(0.01, ringY);
+        vis.summonBeam.scale.set(1.0, beamH / 3.8, 1.0);
+        vis.summonBeam.position.y = beamH / 2;
+
+        // 3. Ground magic rings spin at the feet
         vis.summonOuter.rotation.z = now * 0.003;
-        vis.summonInner.rotation.z = -now * 0.005;
+        vis.summonInner.rotation.z = -now * 0.006;
 
-        // Pulsing glowing opacity
-        const pulse = 0.7 + 0.3 * Math.sin(now * 0.012);
-        vis.summonOuterMat.opacity = Math.min(1, prog * 1.2) * pulse * 0.95;
-        vis.summonInnerMat.opacity = Math.min(1, prog * 1.2) * (1.3 - pulse) * 0.9;
-        vis.summonBeamMat.opacity = Math.min(1, prog * 1.4) * pulse * 0.45;
+        // Opacity and pulsing glow
+        const pulse = 0.75 + 0.25 * Math.sin(now * 0.015);
+        vis.summonRisingMat.opacity = Math.min(1.0, (0.4 + prog * 0.6) * pulse);
+        vis.summonRisingOuterMat.opacity = Math.min(1.0, (0.5 + prog * 0.5) * pulse * 0.9);
+        vis.summonBeamMat.opacity = Math.min(0.55, (0.15 + prog * 0.4) * pulse);
+        vis.summonOuterMat.opacity = (1.0 - prog * 0.3) * pulse * 0.9;
+        vis.summonInnerMat.opacity = (1.0 - prog * 0.3) * (1.2 - pulse) * 0.85;
       }
     } else {
       vis.summonGroup.visible = false;
@@ -3257,6 +3294,28 @@ export class AnimalRenderer {
     summonBeam.position.y = 1.9;
     summonGroup.add(summonBeam);
 
+    const summonRisingMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const summonRisingRing = new THREE.Mesh(summonRisingRingGeo, summonRisingMat);
+    summonRisingRing.position.y = 0.1;
+    summonGroup.add(summonRisingRing);
+
+    const summonRisingOuterMat = new THREE.MeshBasicMaterial({
+      color: 0xffd600,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const summonRisingRingOuter = new THREE.Mesh(summonRisingRingOuterGeo, summonRisingOuterMat);
+    summonRisingRingOuter.position.y = 0.1;
+    summonGroup.add(summonRisingRingOuter);
+
     this.scene.add(summonGroup);
 
     return {
@@ -3300,9 +3359,13 @@ export class AnimalRenderer {
       summonOuter,
       summonInner,
       summonBeam,
+      summonRisingRing,
+      summonRisingRingOuter,
       summonOuterMat,
       summonInnerMat,
       summonBeamMat,
+      summonRisingMat,
+      summonRisingOuterMat,
     };
   }
 }

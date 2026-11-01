@@ -248,6 +248,7 @@ export class World {
   napoleonReign = 0;
   currentRule = '';
   ruleTimer = 0;
+  sundayTeleportTimer = 0;
   kingChoice: { options: string[]; expireT: number } | null = null;
   hof: [string, Species, number][] = [];
   tillTruck = {
@@ -345,6 +346,7 @@ export class World {
     }
     this.currentRule = '';
     this.ruleTimer = 0;
+    this.sundayTeleportTimer = 0;
   }
 
   removePlayer(id: number): void {
@@ -1464,7 +1466,7 @@ export class World {
     }
 
     // Sunday meeting rule: pull non-king animals gently towards podium
-    if (this.currentRule === 'sunday' && this.napoleonId > 0) {
+    if (this.currentRule === 'sunday' && this.napoleonId > 0 && this.sundayTeleportTimer <= 0) {
       for (const p of alive) {
         if (p.id !== this.napoleonId) {
           const dx = podX - p.x, dz = podZ - p.z;
@@ -1474,6 +1476,38 @@ export class World {
             p.vz += (dz / dist) * 3.5 * DT;
           }
         }
+      }
+    }
+
+    // Sunday meeting rule: 1.5s freeze countdown with rising light ring, then teleport to podium
+    if (this.sundayTeleportTimer > 0) {
+      this.sundayTeleportTimer -= DT;
+      for (const p of alive) {
+        if (p.id !== this.napoleonId) {
+          p.vx = 0;
+          p.vz = 0;
+          p.dashT = 0;
+          p.charging = false;
+        }
+      }
+      if (this.sundayTeleportTimer <= 0) {
+        this.sundayTeleportTimer = 0;
+        const [podX, podZ] = this.map.podium;
+        const others = [...this.players.values()].filter((p) => p.alive && p.id !== this.napoleonId);
+        const total = others.length;
+        for (let i = 0; i < total; i++) {
+          const p = others[i];
+          const ang = (i / Math.max(1, total)) * Math.PI * 2;
+          const dist = 1.8 + (i % 3) * 1.5;
+          p.x = podX + Math.cos(ang) * dist;
+          p.z = podZ + Math.sin(ang) * dist;
+          p.vx = 0;
+          p.vz = 0;
+          p.dashT = 0;
+          p.charging = false;
+          p.stunT = 0; // unfreeze on arrival!
+        }
+        this.events.push({ k: 'podBlast', x: podX, z: podZ });
       }
     }
 
@@ -2766,22 +2800,20 @@ export class World {
         }
       }
     } else if (ruleId === 'sunday') {
-      // 5. Họp ngày chủ nhật: summon & teleport all animals to podium except King
-      const [podX, podZ] = this.map.podium;
-      const others = [...this.players.values()].filter((p) => p.alive && p.id !== this.napoleonId);
-      const total = others.length;
-      for (let i = 0; i < total; i++) {
-        const p = others[i];
-        const ang = (i / Math.max(1, total)) * Math.PI * 2;
-        const dist = 1.8 + (i % 3) * 1.5;
-        p.x = podX + Math.cos(ang) * dist;
-        p.z = podZ + Math.sin(ang) * dist;
-        p.vx = 0;
-        p.vz = 0;
-        p.dashT = 0;
-        p.charging = false;
+      // 5. Họp ngày chủ nhật: Tất cả con vật bị đứng yên 1.5s, xuất hiện vòng sáng teleport dưới chân lên đầu, rồi dịch chuyển về bục
+      this.sundayTeleportTimer = 1.5;
+      this.podiumShield = false;
+      for (const p of this.players.values()) {
+        if (p.alive && p.id !== this.napoleonId) {
+          p.stunT = Math.max(p.stunT, 1.5);
+          p.vx = 0;
+          p.vz = 0;
+          p.dashT = 0;
+          p.charging = false;
+          p.plow = false;
+        }
       }
-      this.events.push({ k: 'podBlast', x: podX, z: podZ });
+      this.events.push({ k: 'sundaySummon', dur: 1.5 });
     } else if (ruleId === 'squealer') {
       const king = this.players.get(this.napoleonId);
       if (king && king.alive) {

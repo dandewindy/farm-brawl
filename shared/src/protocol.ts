@@ -130,6 +130,7 @@ export type GameEvent =
   | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number; rainbow?: boolean }
   | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number; isGorilla?: boolean; inWater?: boolean; rainbow?: boolean }
   | { k: 'mammothRoar'; id: number; x: number; z: number; r: number; dur: number; rainbow?: boolean }
+  | { k: 'sundaySummon'; dur: number }
   | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 

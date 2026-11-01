@@ -1167,11 +1167,22 @@ describe('bonus weapons and tools', () => {
     const [podX, podZ] = w.map.podium;
     w.applyRule('sunday');
 
-    // Non-kings should now be positioned on/around the podium
+    // Immediately after rule is picked: non-kings are frozen in place for 1.5s (stunT = 1.5)
+    expect(sub1.stunT).toBe(1.5);
+    expect(sub2.stunT).toBe(1.5);
+    expect(sub1.x).toBe(45);
+    expect(sub2.x).toBe(-45);
+
+    // After 1.5s (46 ticks of 0.0333s = ~1.53s), teleport takes place
+    run(w, 46);
+
+    // Non-kings should now be positioned on/around the podium and unfrozen
     const dist1 = Math.hypot(sub1.x - podX, sub1.z - podZ);
     const dist2 = Math.hypot(sub2.x - podX, sub2.z - podZ);
     expect(dist1).toBeLessThan(7);
     expect(dist2).toBeLessThan(7);
+    expect(sub1.stunT).toBe(0);
+    expect(sub2.stunT).toBe(0);
 
     // King position is NOT teleported
     expect(king.x).toBe(0);
