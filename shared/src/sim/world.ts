@@ -1298,8 +1298,8 @@ export class World {
             for (const m of this.minions.values()) {
               if (m.ownerId === p.id && m.alive) count++;
             }
-            // Requirement 3: Max 6 normally, 8 at 1000kg (1 ton), 10 at 3000kg (3 tons)
-            const maxMinions = p.mass >= 3000 ? 10 : (p.mass >= 1000 ? 8 : 6);
+            // Requirement 3: Max 6 normally, 8 at 1000kg (1 ton), 10 at 3000kg (3 tons) or King
+            const maxMinions = p.id === this.napoleonId ? 10 : (p.mass >= 3000 ? 10 : (p.mass >= 1000 ? 8 : 6));
             const spawnCount = Math.min(2, Math.max(0, maxMinions - count));
             for (let i = 0; i < spawnCount; i++) {
               const mid = this.nextMinionId++;
@@ -1404,6 +1404,7 @@ export class World {
             this.napoleonReign = 0;
             this.podiumPhaseTimer = 30;
             this.podiumWarned5s = false;
+            this.summonKingGuards(c);
             // King capture bonus
             if (c.team !== undefined) {
               this.teamScores[c.team] += 5; // +5 points for team when becoming King
@@ -3209,6 +3210,7 @@ export class World {
         this.podiumProgress = 1.0;
         this.podiumPhaseTimer = 30;
         this.podiumWarned5s = false;
+        this.summonKingGuards(killer);
         if (killer.team !== undefined) {
           this.teamScores[killer.team] += 5; // +5 points for team for crown usurpation
         }
@@ -3409,17 +3411,57 @@ export class World {
     }
   }
 
+  public summonKingGuards(king: Player): void {
+    // Clear any previous minions of other owners so only the current King commands the royal guard
+    for (const [mid, m] of this.minions) {
+      if (m.ownerId !== king.id) this.minions.delete(mid);
+    }
+    let currentMinions = 0;
+    for (const m of this.minions.values()) {
+      if (m.ownerId === king.id && m.alive) currentMinions++;
+    }
+    const needed = Math.max(0, 10 - currentMinions);
+    const bodyR = radiusOf(king.mass);
+    for (let i = 0; i < needed; i++) {
+      const mid = this.nextMinionId++;
+      const orbitAng = (i / 10) * Math.PI * 2;
+      const spawnDist = bodyR + 2.0;
+      const mx = king.x + Math.cos(orbitAng) * spawnDist;
+      const mz = king.z + Math.sin(orbitAng) * spawnDist;
+      this.minions.set(mid, {
+        id: mid,
+        ownerId: king.id,
+        x: r2(mx),
+        z: r2(mz),
+        vx: 0,
+        vz: 0,
+        a: king.a,
+        mass: 50,
+        species: king.species,
+        skin: king.skin,
+        targetId: 0,
+        alive: true,
+        cd: 0,
+        orbitAngle: orbitAng,
+      });
+    }
+  }
+
   private spawnTool(): void {
+    const hasKing = this.napoleonId > 0 && !!this.players.get(this.napoleonId)?.alive;
     const kinds: ToolKind[] = [
       'pitchfork', 'pitchfork',
       'dynamite', 'dynamite',
-      'song', 'song',
       'wheel', 'wheel',
       'star', 'star', 'star',
       'banana', 'banana', 'banana',
       'speed', 'speed', 'speed',
       'shield', 'shield', 'shield',
     ];
+    // Requirement: Hát vang Tổng tấn công giảm 1 nửa tỉ lệ và CHỈ xuất hiện khi có Vua
+    if (hasKing) {
+      kinds.push('song');
+    }
     const kind = kinds[Math.floor(this.rnd() * kinds.length)];
     let bx = 0, bz = 0;
 

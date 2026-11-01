@@ -3052,17 +3052,28 @@ export class AnimalRenderer {
       vis.cartWheels.forEach((w) => {
         w.rotation.z -= dt * 26;
       });
-      if (this.onPuff && Math.random() < 0.4) {
+      if (this.onPuff && Math.random() < 0.45) {
         const theme = getArenaTheme();
-        const puffColor = theme === 'halloween' ? 0xba68c8 : (theme === 'women_day' ? 0xff80ab : 0x3e2723);
+        const puffColor = theme === 'halloween' ? 0xba68c8 : (theme === 'women_day' ? 0xff80ab : 0x4a4542);
+        // Local coordinates of the exhaust chimney pipe on the cart model
+        const lx = theme === 'halloween' ? -0.45 : (theme === 'women_day' ? -0.50 : 0.40);
+        const ly = theme === 'halloween' ? 1.65 : (theme === 'women_day' ? 1.25 : 1.62);
+        const lz = theme === 'halloween' ? 0.35 : (theme === 'women_day' ? 0.35 : 0.38);
+
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        const stackX = x + sc * (lx * cosA - lz * sinA) + (Math.random() - 0.5) * 0.08 * sc;
+        const stackY = bodyY + sc * ly;
+        const stackZ = z + sc * (lx * sinA + lz * cosA) + (Math.random() - 0.5) * 0.08 * sc;
+
         this.onPuff(
-          x - Math.cos(angle) * r * 0.95 + (Math.random() - 0.5) * 0.3 * r,
-          sc * 1.4,
-          z - Math.sin(angle) * r * 0.95 + (Math.random() - 0.5) * 0.3 * r,
+          stackX,
+          stackY,
+          stackZ,
           puffColor,
-          0.65 * r,
-          0.6,
-          2.0
+          0.45 * sc,
+          0.75,
+          1.8
         );
       }
     } else {

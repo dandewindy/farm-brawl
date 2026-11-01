@@ -2109,7 +2109,7 @@ function handleGameEvent(ev: GameEvent): void {
         if (ev.id === myId) {
           sfxReward();
           hud.showBanner(
-            ev.species === 'monkey' ? '🐒 ' + t('name_monkey') : '🐘 ' + t('name_elephant'),
+            ev.species === 'monkey' ? '🐒 Biến hình thành Khỉ!' : '🐘 Biến hình thành Voi!',
             ev.dur > 0 ? t('tk_banana') : t('sp_' + ev.species)
           );
         }

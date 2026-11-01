@@ -2599,6 +2599,73 @@ describe('fruit trees', () => {
       w.shiftMap(200);
       expect(w.tools.size).toBe(CFG.TOOL_TARGET);
     });
+
+    it('coronation immediately summons 10 mini defender animals for the King', () => {
+      const w = emptyWorld();
+      w.podiumShield = false;
+      const id1 = w.addPlayer('KingCandidate', 'pig', false);
+      const p1 = place(w, id1, w.map.podium[0], w.map.podium[1], 100);
+
+      // Trigger King coronation
+      w.podiumProgress = 0.99;
+      w.podiumCaptor = p1.id;
+      w.step();
+      w.flush();
+
+      expect(w.napoleonId).toBe(p1.id);
+      let kingMinions = 0;
+      for (const m of w.minions.values()) {
+        if (m.ownerId === p1.id) kingMinions++;
+      }
+      expect(kingMinions).toBe(10);
+
+      // When King is usurped by killer, new King gets 10 minions
+      const id2 = w.addPlayer('Usurper', 'elephant', false);
+      const p2 = place(w, id2, 0, 0, 1000);
+      p1.lastHitBy = p2.id;
+      p1.lastHitT = w.time;
+      (w as any).kill(p1, 'ram');
+      w.flush();
+
+      expect(w.napoleonId).toBe(p2.id);
+      let usurperMinions = 0;
+      for (const m of w.minions.values()) {
+        if (m.ownerId === p2.id) usurperMinions++;
+        if (m.ownerId === p1.id) {
+          expect(m.ownerId).not.toBe(p1.id);
+        }
+      }
+      expect(usurperMinions).toBe(10);
+    });
+
+    it('song item only spawns when a King exists and is alive', () => {
+      const w = emptyWorld();
+      w.tools.clear();
+      expect(w.napoleonId).toBe(0);
+
+      // With no King, spawning tools should NEVER produce 'song'
+      for (let i = 0; i < 60; i++) {
+        (w as any).spawnTool();
+      }
+      for (const t of w.tools.values()) {
+        expect(t.kind).not.toBe('song');
+      }
+
+      // Crown a king
+      const id1 = w.addPlayer('ActiveKing', 'pig', false);
+      w.napoleonId = id1;
+      w.tools.clear();
+
+      // With King active, 'song' can now spawn
+      let spawnedSong = false;
+      for (let i = 0; i < 80; i++) {
+        (w as any).spawnTool();
+      }
+      for (const t of w.tools.values()) {
+        if (t.kind === 'song') spawnedSong = true;
+      }
+      expect(spawnedSong).toBe(true);
+    });
   });
 });
 

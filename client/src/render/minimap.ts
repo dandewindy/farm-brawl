@@ -201,8 +201,9 @@ export class MinimapRenderer {
       const ex = center + e.x * scale;
       const ez = center + e.z * scale;
       const isNap = e.id === napoleonId && napoleonId > 0;
+      const dotR = isNap ? 3.8 : Math.max(1.8, 1.2 + (radiusOf(e.mass) - 1) * 0.42);
       ctx.beginPath();
-      ctx.arc(ex, ez, isNap ? 4.5 : Math.max(2.5, radiusOf(e.mass) * 1.05), 0, Math.PI * 2);
+      ctx.arc(ex, ez, dotR, 0, Math.PI * 2);
       ctx.fillStyle = isNap ? '#e8b641' : '#f2ead7';
       ctx.fill();
     }
@@ -215,10 +216,10 @@ export class MinimapRenderer {
       const mx = center + mxCoord * scale;
       const mz = center + mzCoord * scale;
       ctx.beginPath();
-      ctx.arc(mx, mz, 5.5, 0, Math.PI * 2);
+      ctx.arc(mx, mz, 4.2, 0, Math.PI * 2);
       ctx.fillStyle = '#ff3b30';
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     }
