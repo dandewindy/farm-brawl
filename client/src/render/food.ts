@@ -752,6 +752,41 @@ export class FoodAndParticleRenderer {
     }
   }
 
+  windTrail(x: number, y: number, z: number, angle: number, r: number, _speed: number): void {
+    const px = -Math.sin(angle);
+    const pz = Math.cos(angle);
+    const tx = x - Math.cos(angle) * r * 0.95;
+    const tz = z - Math.sin(angle) * r * 0.95;
+    const windCols = [
+      new THREE.Color(0xffffff),
+      new THREE.Color(0xe0f7fa),
+      new THREE.Color(0xb2ebf2),
+      new THREE.Color(0x80deea),
+      new THREE.Color(0x00e5ff),
+    ];
+
+    // Trailing aerodynamic wind streaks & gusts
+    const count = 4;
+    for (let i = 0; i < count && this.particles.length < this.maxParticles; i++) {
+      const lateralOff = (Math.random() - 0.5) * 1.5 * r;
+      const col = windCols[Math.floor(Math.random() * windCols.length)];
+      const backSpeed = 5.0 + Math.random() * 7.0;
+      this.particles.push({
+        x: tx + px * lateralOff,
+        y: y + (Math.random() - 0.5) * 0.35 * r,
+        z: tz + pz * lateralOff,
+        vx: -Math.cos(angle) * backSpeed + px * (Math.random() - 0.5) * 2.0,
+        vy: 0.15 + Math.random() * 0.35,
+        vz: -Math.sin(angle) * backSpeed + pz * (Math.random() - 0.5) * 2.0,
+        life: 0.28 + Math.random() * 0.14,
+        maxLife: 0.42,
+        color: col,
+        size: (0.45 + Math.random() * 0.4) * r,
+        g: -0.15, // gently billows upward like breezy swirling wind
+      });
+    }
+  }
+
   updateParticles(dt: number): void {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];

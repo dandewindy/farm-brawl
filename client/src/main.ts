@@ -42,6 +42,7 @@ animals.onPuff = (x, y, z, c, s, l, vy) => foodParts.puff(x, y, z, c, s, l, vy);
 animals.onSmokePoof = (x, y, z, r, count) => foodParts.smokePoof(x, y, z, r, count);
 animals.onRainbowTrail = (x, y, z, a, r, isDash) => foodParts.rainbowTrail(x, y, z, a, r, isDash);
 animals.onSonicWave = (x, y, z, r) => foodParts.sonicWave(x, y, z, r);
+animals.onWindTrail = (x, y, z, a, r, speed) => foodParts.windTrail(x, y, z, a, r, speed);
 const tools = new ToolRenderer(world.scene);
 const minions = new MinionRenderer(world.scene);
 const bananas = new BananaRenderer(world.scene);

@@ -3582,10 +3582,6 @@ export class World {
   }
 
   public summonKingGuards(king: Player): void {
-    // Clear any previous minions of other owners so only the current King commands the royal guard
-    for (const [mid, m] of this.minions) {
-      if (m.ownerId !== king.id) this.minions.delete(mid);
-    }
     let currentMinions = 0;
     for (const m of this.minions.values()) {
       if (m.ownerId === king.id && m.alive) currentMinions++;

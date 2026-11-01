@@ -2661,6 +2661,45 @@ describe('fruit trees', () => {
       expect(usurperMinions).toBe(10);
     });
 
+    it('coronation does NOT delete minions of other living animals', () => {
+      const w = emptyWorld();
+      w.podiumShield = false;
+      const otherId = w.addPlayer('OtherPlayer', 'sheep', false);
+      place(w, otherId, 20, 20, 200);
+
+      // Other player has 4 minions
+      for (let i = 0; i < 4; i++) {
+        const mid = (w as any).nextMinionId++;
+        w.minions.set(mid, {
+          id: mid,
+          ownerId: otherId,
+          x: 20,
+          z: 20,
+          vx: 0,
+          vz: 0,
+          a: 0,
+          mass: 50,
+          species: 'sheep',
+          skin: 0,
+          targetId: 0,
+          alive: true,
+          cd: 0,
+          orbitAngle: 0,
+        });
+      }
+      expect([...w.minions.values()].filter((m) => m.ownerId === otherId).length).toBe(4);
+
+      // Now a new player becomes King
+      const kingId = w.addPlayer('NewKing', 'pig', false);
+      const king = place(w, kingId, w.map.podium[0], w.map.podium[1], 100);
+      w.summonKingGuards(king);
+
+      // King should have 10 minions
+      expect([...w.minions.values()].filter((m) => m.ownerId === kingId).length).toBe(10);
+      // Other player should STILL have their 4 minions intact!
+      expect([...w.minions.values()].filter((m) => m.ownerId === otherId).length).toBe(4);
+    });
+
     it('song item only spawns when a King exists and is alive', () => {
       const w = emptyWorld();
       w.tools.clear();
