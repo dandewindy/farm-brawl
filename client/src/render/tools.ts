@@ -248,9 +248,9 @@ function buildSparklingBanana(g: THREE.Group): void {
   stemCap.rotation.z = -0.45;
   g.add(stemCap);
 
-  // Small natural dark blossom tip at pLast + (0, 1.45, 0)
-  const tip = mesh(new THREE.SphereGeometry(0.040, 8, 6), 0x2e1c0c, pLast.x + 0.015, pLast.y + 1.45 + 0.01, 0, {
-    roughness: 0.9,
+  // Natural subtle dark blossom tip neatly capping the blossom end (pLast + (0, 1.45, 0))
+  const tip = mesh(new THREE.SphereGeometry(0.020, 8, 6), 0x4a3424, pLast.x + 0.008, pLast.y + 1.45 + 0.006, 0, {
+    roughness: 0.95,
     metalness: 0.0,
   });
   g.add(tip);

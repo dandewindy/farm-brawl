@@ -820,7 +820,7 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const tuftColor = s.tuft ?? 0x381f11;
 
   // Ultra-matte, non-specular woolly fur material (khử bóng, tạo chất liệu lông chân thực)
-  const furOpts: Partial<THREE.MeshStandardMaterialParameters> = { roughness: 0.96, metalness: 0.0 };
+  const furOpts: Partial<THREE.MeshStandardMaterialParameters> = { roughness: 1.0, metalness: 0.0 };
 
   // Helper for textured matte fur geometry
   const furBlob = (
@@ -867,48 +867,55 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     furBlob(g, bodyColor, 0.30, [1.02, 1.04, 0.96], -0.40, 1.06, z);
   }
 
-  // Shaggy Woolly Flank Skirts (Vạt lông dài rủ dọc 2 bên sườn, che khuyết điểm gầm bụng)
+  // Shaggy Woolly Flank Skirts & Textured Fur Layers (Tạo cảm giác lông rủ tự nhiên, khử hoàn toàn cảm giác bóng)
   for (const z of [-0.44, 0.44]) {
-    const skirtF = furBlob(g, skirtColor, 0.32, [1.20, 0.72, 0.18], 0.18, 1.12, z);
+    const skirtF = furBlob(g, skirtColor, 0.32, [1.20, 0.72, 0.22], 0.18, 1.12, z);
     skirtF.rotation.z = 0.16;
     skirtF.rotation.x = z > 0 ? 0.12 : -0.12;
-    const skirtR = furBlob(g, skirtColor, 0.26, [1.08, 0.65, 0.16], -0.22, 0.98, z * 0.92);
+    const skirtR = furBlob(g, skirtColor, 0.26, [1.08, 0.65, 0.20], -0.22, 0.98, z * 0.92);
     skirtR.rotation.z = 0.18;
     skirtR.rotation.x = z > 0 ? 0.12 : -0.12;
+    // Layered flank fur tufts (Cụm lông phủ sườn tạo độ gợn sóng bề mặt lông)
+    const flankTuft = furBlob(g, bodyColor, 0.28, [1.15, 0.65, 0.24], 0.02, 1.28, z);
+    flankTuft.rotation.z = 0.08;
+    flankTuft.rotation.x = z > 0 ? 0.10 : -0.10;
   }
 
   // =========================================================================
   // Majestic Woolly Back Mane (Lông lưng giống phần đầu, màu đậm hơn thân, to hơn phần đầu)
   // =========================================================================
   // Main Summit Crest (Đỉnh bờm chính trên gù vai - to và bồng bềnh hơn đầu)
-  const maneApex = furBlob(g, humpColor, 0.46, [1.28, 0.62, 0.94], 0.20, 2.06, 0);
+  const maneApex = furBlob(g, humpColor, 0.60, [1.32, 0.72, 1.10], 0.18, 2.12, 0);
   maneApex.rotation.z = -0.06;
 
-  // Front flow towards neck/head (Vuốt mượt về trước cổ)
-  const maneFront = furBlob(g, humpColor, 0.40, [1.16, 0.58, 0.88], 0.46, 1.94, 0);
+  // Front flow towards neck/head (Vuốt mượt về trước cổ nối liền sọ đầu)
+  const maneFront = furBlob(g, humpColor, 0.52, [1.20, 0.64, 1.00], 0.46, 1.98, 0);
   maneFront.rotation.z = -0.10;
 
   // Mid-spine flow down the slope (Trải dài dọc theo sống lưng dốc xuống mông)
-  const maneSlope = furBlob(g, humpColor, 0.44, [1.22, 0.60, 0.90], -0.10, 1.80, 0);
+  const maneSlope = furBlob(g, humpColor, 0.54, [1.24, 0.66, 1.02], -0.12, 1.84, 0);
   maneSlope.rotation.z = 0.12;
 
-  // Rear crest taper (Đuôi bờm lưng vuốt nhỏ dần về mông)
-  const maneRear = furBlob(g, humpColor, 0.36, [1.10, 0.52, 0.82], -0.34, 1.50, 0);
+  // Rear crest taper (Đuôi bờm lưng vuốt dần về phía mông)
+  const maneRear = furBlob(g, humpColor, 0.46, [1.16, 0.56, 0.92], -0.40, 1.54, 0);
   maneRear.rotation.z = 0.16;
 
-  // Lateral woolly fluffs (Hai bên bờm tạo độ dày dặn khối 3D)
-  for (const z of [-0.28, 0.28]) {
-    const maneSide = furBlob(g, humpColor, 0.35, [1.14, 0.55, 0.72], 0.14, 1.96, z);
-    maneSide.rotation.z = -0.04;
-    maneSide.rotation.x = z > 0 ? 0.15 : -0.15;
+  // Swept Woolly Tufts / Flank Locks (Các lọn lông vuốt ngược đặc trưng giống phần đầu quiff nhưng đồ sộ hơn)
+  for (const z of [-0.32, 0.32]) {
+    const maneSideF = furBlob(g, humpColor, 0.44, [1.22, 0.60, 0.80], 0.14, 2.02, z);
+    maneSideF.rotation.z = -0.04;
+    maneSideF.rotation.x = z > 0 ? 0.16 : -0.16;
+    const maneSideR = furBlob(g, humpColor, 0.40, [1.16, 0.56, 0.76], -0.16, 1.82, z);
+    maneSideR.rotation.z = 0.08;
+    maneSideR.rotation.x = z > 0 ? 0.16 : -0.16;
   }
 
   // =========================================================================
   // 2. Sculpted Head (+30% Scale, Unified with Eyes, Ears, Tusks & Trunk)
   // =========================================================================
   const headGroup = new THREE.Group();
-  headGroup.position.set(0.84, 1.56, 0);
-  headGroup.scale.set(1.30, 1.30, 1.30); // Đầu to lên 30% so với trước
+  headGroup.position.set(0.80, 1.54, 0);
+  headGroup.scale.set(1.69, 1.69, 1.69); // Đầu to lên 30% so với phiên bản hiện tại (1.30 * 1.30 = 1.69)
 
   // Skull (Hộp sọ vòm cao chuẩn voi ma mút, nhẵn nhụi, liền khối với cổ)
   furBlob(headGroup, bodyColor, 0.44, [1.05, 1.12, 0.95], 0, 0.05, 0);
@@ -2608,9 +2615,9 @@ export class AnimalRenderer {
       : isFlying
       ? -0.5
       : isPlowing
-      ? -0.4
+      ? (vis.species === 'mammoth' ? 0 : -0.4)
       : isDashing
-      ? (vis.species === 'mammoth' ? -0.06 : -0.25)
+      ? (vis.species === 'mammoth' ? 0 : -0.25)
       : isDrowning
       ? Math.sin(now / 180) * 0.3
       : isWater && vis.species === 'duck'
@@ -2618,7 +2625,7 @@ export class AnimalRenderer {
       : isWater && vis.species !== 'duck' && vis.species !== 'dog'
       ? Math.sin(now / 120) * 0.15
       : isCharging
-      ? (vis.species === 'mammoth' ? 0.06 * lvl : 0.15 + lvl * 0.15)
+      ? (vis.species === 'mammoth' ? 0 : 0.15 + lvl * 0.15)
       : 0;
 
     vis.root.rotation.z += (targetRotZ - vis.root.rotation.z) * Math.min(1, 16 * dt);
@@ -2892,23 +2899,23 @@ export class AnimalRenderer {
     if (vis.species === 'mammoth') {
       if (isMammothRoar) {
         // Mighty roar blast: giữ tư thế uy nghi nâng ngực, đưa cao đầu và vòi lên trời
-        vis.body.rotation.z = 0.16;
+        vis.body.rotation.z = 0.18;
         if (vis.head) {
-          vis.head.rotation.z = 0.38; // đầu ngẩng cao uy phong
+          vis.head.rotation.z = 0.50; // đầu ngẩng cao uy phong
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 1.18; // vòi uốn cong vút lên trời
+          vis.trunk.rotation.z = 1.45; // vòi uốn cong vút lên trời
           vis.trunk.rotation.y = 0;
         }
       } else if (isCharging) {
-        // Nén gồng: nén cơ thể và đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng
+        // Nén gồng: nén cơ thể và đưa cao đầu và vòi lên 1 lần êm ái theo mức gồng (lvl: 0 -> 1), không giật/khựng, không chúi đầu xuống đất
         const t = Math.min(1, Math.max(0, lvl));
-        vis.body.rotation.z = 0.08 * t; // nâng ngực hơi ngửa đón lực nén
+        vis.body.rotation.z = 0.12 * t; // nâng ngực hơi ngửa đón lực nén
         if (vis.head) {
-          vis.head.rotation.z = 0.36 * t; // nâng đầu lên cao mượt mà không chúi
+          vis.head.rotation.z = 0.45 * t; // nâng đầu lên cao mượt mà không chúi
         }
         if (vis.trunk) {
-          vis.trunk.rotation.z = 1.05 * t; // nâng vòi lên cao mượt mà
+          vis.trunk.rotation.z = 1.35 * t; // nâng vòi lên cao mượt mà
           vis.trunk.rotation.y = 0;
         }
       } else {

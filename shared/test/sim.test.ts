@@ -2510,6 +2510,10 @@ describe('fruit trees', () => {
       const growthAbove = radiusOf(4000) - radiusOf(3000);
       // Growth rate above 3000kg should be significantly dampened (40% slope)
       expect(growthAbove).toBeLessThan(growthBelow * 0.45);
+
+      // Progressively diminishing rate above 3000kg:
+      const growthNext = radiusOf(5000) - radiusOf(4000);
+      expect(growthNext).toBeLessThan(growthAbove);
     });
 
     it('speed item increases speed by 300% for 20s decaying over last 5s', () => {
@@ -2586,6 +2590,25 @@ describe('fruit trees', () => {
       expect(p1.stunT).toBe(0); // Immune to stun
       expect(p1.squishT).toBe(0); // Immune to squish
       expect(Math.abs(p1.x - prevX)).toBeLessThan(1.0); // No knockback!
+
+      // 4. Gorilla leap shockwave landing immunity: takes damage only, 0 squish, 0 stun, 0 knockback
+      const id3 = w.addPlayer('gorillaLeaper', 'gorilla', false);
+      const p3 = place(w, id3, p1.x + 1, p1.z, 3500);
+      p3.monkeyLeapT = 0.05; // about to land next tick
+      p3.holdT = 1.0;
+      p1.vx = 2.0; // moving forward
+      const prevVx = p1.vx;
+      const prevMass3 = p1.mass;
+
+      w.step();
+      w.flush();
+
+      expect(p1.alive).toBe(true);
+      expect(p1.mass).toBeLessThan(prevMass3); // takes damage
+      expect(p1.squishT).toBe(0); // NO squish
+      expect(p1.stunT).toBe(0); // NO stun
+      expect(p1.vx).toBeLessThanOrEqual(prevVx); // Normal friction only, ZERO knockback!
+      expect(p1.vx).toBeGreaterThan(0);
     });
 
     it('maintains increased TOOL_TARGET of 20 tools across map lifecycle', () => {

@@ -1095,6 +1095,31 @@ export class World {
                 continue;
               }
               const pushAng = Math.atan2(dz, dx);
+
+              // Shield Immunity: 100% immune to stun, squish, slow, knockback, flinch and kill; takes damage only!
+              if (other.shieldT > 0) {
+                const lossFraction = isGorilla
+                  ? (isRainbowLanding ? (0.20 + ratio * 0.10) : 0.15)
+                  : (isRainbowLanding ? (0.04 + ratio * 0.06) : (0.02 + ratio * 0.03));
+                const massLoss = Math.max(isGorilla ? 10 : 1, Math.round(other.mass * lossFraction));
+                other.mass = Math.max(10, other.mass - massLoss);
+                this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 1.5, Math.cos(pushAng), Math.sin(pushAng));
+                other.lastHitBy = p.id;
+                other.lastHitT = this.time;
+                p.lastAttackedId = other.id;
+                p.lastAttackedT = this.time;
+                this.events.push({
+                  k: 'hit',
+                  a: p.id,
+                  v: other.id,
+                  x: r2(other.x),
+                  z: r2(other.z),
+                  s: isGorilla ? 14 : 10,
+                  loss: massLoss,
+                });
+                continue;
+              }
+
               if (isGorilla) {
                 if (other.mass <= 50) {
                   // Đạp dẹp lép và LẬP TỨC KẾT LIỄU con vật <= 50kg!
@@ -2577,10 +2602,15 @@ export class World {
           const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
           if (dist < hitDist && m.cd <= 0) {
             m.cd = 0.8;
-            if (target.species === 'gorilla' || target.species === 'mammoth') {
-              // Gorilla and Mammoth are immune to minions: minion bounces off, no stun, no knockback, no loss
+            if (target.species === 'gorilla' || target.species === 'mammoth' || target.shieldT > 0) {
+              // Gorilla, Mammoth and Shielded targets: immune to minion stun and knockback (target moves freely!)
               m.vx = -Math.cos(aimA) * 12;
               m.vz = -Math.sin(aimA) * 12;
+              const loss = target.shieldT > 0 ? Math.min(target.mass - 10, 8) : 0;
+              if (loss > 0) {
+                target.mass -= loss;
+                owner.mass += loss;
+              }
               this.events.push({
                 k: 'hit',
                 a: owner.id,
@@ -2588,7 +2618,7 @@ export class World {
                 x: r2(target.x),
                 z: r2(target.z),
                 s: 10,
-                loss: 0,
+                loss: Math.round(loss),
                 minion: true,
               });
             } else {
