@@ -949,6 +949,46 @@ function buildMammothHead(bodyColor: number, humpColor: number, furOpts: Partial
   return headGroup;
 }
 
+function addMammothEyes(headGroup: THREE.Group, bodyColor: number): void {
+  const whiteMat = animalMat(0xffffff, { roughness: 0.25 });
+  const pupilMat = animalMat(0x111012, { roughness: 0.2 });
+  const hlMat = animalMat(0xffffff, { roughness: 0.1 });
+
+  for (const side of [-1, 1]) {
+    const x = 0.30;
+    const y = 0.22;
+    const z = side * 0.35;
+
+    // Fleshy eyelid socket framing the eye so it never clips or sinks into fur
+    const socket = new THREE.Mesh(
+      new THREE.SphereGeometry(0.10, 12, 8),
+      animalMat(bodyColor, { roughness: 0.9 })
+    );
+    socket.position.set(x - 0.015, y, z * 0.96);
+    socket.scale.set(0.9, 1.15, 0.9);
+    headGroup.add(socket);
+
+    // Bright clear eye white
+    const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.082, 14, 10), whiteMat);
+    eyeWhite.scale.set(0.85, 1.05, 1.05);
+    eyeWhite.position.set(x, y, z);
+    eyeWhite.rotation.y = side * 0.38;
+    headGroup.add(eyeWhite);
+
+    // Prominent dark pupil looking alert and forward-sideways
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.054, 12, 8), pupilMat);
+    pupil.scale.set(0.48, 1, 1);
+    pupil.position.set(x + 0.038, y, z + side * 0.032);
+    pupil.rotation.y = side * 0.38;
+    headGroup.add(pupil);
+
+    // Specular glint
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), hlMat);
+    hl.position.set(x + 0.056, y + 0.024, z + side * 0.040);
+    headGroup.add(hl);
+  }
+}
+
 function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const bodyColor = s.body ?? 0x5a3d28;
   const humpColor = s.hump ?? 0x432815;
@@ -988,8 +1028,8 @@ function buildMammoth(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     headGroup.add(earGroup);
   }
 
-  // Expressive eyes placed on forehead brow
-  addEyes(headGroup, 0.28, 0.14, 0.30, 0.068);
+  // Expressive eyes placed prominently on forehead brow (never clipped or submerged)
+  addMammothEyes(headGroup, bodyColor);
 
   // 3. Trunk (Smooth continuous tapering curve hanging from face, curling forward at tip)
   const trunkGroup = new THREE.Group();
