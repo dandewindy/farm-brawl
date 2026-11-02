@@ -19,7 +19,7 @@ describe('KidsPlayManager', () => {
       enabled: false,
       timeLimitEnabled: true,
       timeLimitMinutes: 20,
-      livesLimitEnabled: false,
+      livesLimitEnabled: true,
       livesLimit: 5,
       pinHash: '',
     };

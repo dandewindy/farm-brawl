@@ -29,6 +29,7 @@ export class KidsUiController {
   private livesChips: HTMLElement[] = [];
   private customLivesInput!: HTMLInputElement | null;
   private pinInput!: HTMLInputElement | null;
+  private clearPinBtn!: HTMLElement | null;
   private pinStatusDesc!: HTMLElement | null;
   private formError!: HTMLElement | null;
   private saveBtn!: HTMLElement | null;
@@ -88,6 +89,7 @@ export class KidsUiController {
     this.customLivesInput = document.getElementById('kidsCustomLives') as HTMLInputElement | null;
 
     this.pinInput = document.getElementById('kidsPinInput') as HTMLInputElement | null;
+    this.clearPinBtn = document.getElementById('kidsClearPinBtn');
     this.pinStatusDesc = document.getElementById('kidsPinStatusDesc');
     this.formError = document.getElementById('kidsFormError');
     this.saveBtn = document.getElementById('kidsSaveBtn');
@@ -114,6 +116,7 @@ export class KidsUiController {
       document.getElementById('pcKidsModeBtn'),
       document.getElementById('sbmKidsMode'),
       document.getElementById('drawerKidsBtn'),
+      this.hudWidgetEl,
     ];
 
     openBtns.forEach((btn) => {
@@ -123,9 +126,27 @@ export class KidsUiController {
       });
     });
 
-    // Modal Close
-    document.getElementById('kidsCloseBtn')?.addEventListener('click', () => {
+    // Modal Close via X button - ALWAYS auto-save on close!
+    document.getElementById('kidsCloseBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.saveFormState(false);
       this.closeSettingsModal();
+    });
+
+    // Close via Backdrop click
+    this.modalEl?.addEventListener('click', (e) => {
+      if (e.target === this.modalEl) {
+        this.saveFormState(false);
+        this.closeSettingsModal();
+      }
+    });
+
+    // Close via Escape key
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.modalEl && !this.modalEl.hidden) {
+        this.saveFormState(false);
+        this.closeSettingsModal();
+      }
     });
 
     // PIN Digits Auto-tabbing
@@ -151,6 +172,7 @@ export class KidsUiController {
         const m = parseInt(chip.dataset.minutes || '20', 10);
         this.selectedMinutes = m;
         if (this.customMinutesInput) this.customMinutesInput.value = '';
+        this.saveFormState(false);
       });
     });
 
@@ -158,17 +180,15 @@ export class KidsUiController {
       const val = parseInt(this.customMinutesInput?.value || '0', 10);
       if (val > 0) {
         this.timeChips.forEach((c) => c.classList.remove('on'));
-        this.selectedMinutes = val;
+        this.selectedMinutes = Math.min(180, val);
+        this.saveFormState(false);
       }
     });
 
     // Time Enabled Checkbox
     this.timeEnabledCheck?.addEventListener('change', () => {
-      const on = this.timeEnabledCheck?.checked ?? true;
-      if (this.timeOptionsBox) {
-        this.timeOptionsBox.style.opacity = on ? '1' : '0.4';
-        this.timeOptionsBox.style.pointerEvents = on ? 'auto' : 'none';
-      }
+      this.updateSectionsVisibility();
+      this.saveFormState(false);
     });
 
     // Lives Chips
@@ -179,6 +199,7 @@ export class KidsUiController {
         const l = parseInt(chip.dataset.lives || '5', 10);
         this.selectedLives = l;
         if (this.customLivesInput) this.customLivesInput.value = '';
+        this.saveFormState(false);
       });
     });
 
@@ -186,27 +207,39 @@ export class KidsUiController {
       const val = parseInt(this.customLivesInput?.value || '0', 10);
       if (val > 0) {
         this.livesChips.forEach((c) => c.classList.remove('on'));
-        this.selectedLives = val;
+        this.selectedLives = Math.min(50, val);
+        this.saveFormState(false);
       }
     });
 
     // Lives Enabled Checkbox
     this.livesEnabledCheck?.addEventListener('change', () => {
-      const on = this.livesEnabledCheck?.checked ?? false;
-      if (this.livesOptionsBox) {
-        this.livesOptionsBox.style.opacity = on ? '1' : '0.4';
-        this.livesOptionsBox.style.pointerEvents = on ? 'auto' : 'none';
-      }
+      this.updateSectionsVisibility();
+      this.saveFormState(false);
     });
 
     // Master Toggle
     this.masterToggle?.addEventListener('change', () => {
-      const on = this.masterToggle?.checked ?? false;
-      const sections = document.getElementById('kidsConfigSections');
-      if (sections) {
-        sections.style.opacity = on ? '1' : '0.45';
-        sections.style.pointerEvents = on ? 'auto' : 'none';
+      this.updateSectionsVisibility();
+      this.saveFormState(false);
+    });
+
+    // PIN input changes
+    this.pinInput?.addEventListener('input', () => {
+      const val = this.pinInput?.value?.trim() || '';
+      if (val.length === 4) {
+        this.saveFormState(false);
+        this.updatePinSection();
       }
+    });
+
+    // Clear PIN button
+    this.clearPinBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.mgr.clearPin();
+      if (this.pinInput) this.pinInput.value = '';
+      this.updatePinSection();
+      this.showFeedbackToast('🔑 Đã xóa mã PIN phụ huynh!');
     });
 
     // Save Button
@@ -217,6 +250,7 @@ export class KidsUiController {
     // Disable Button
     this.disableBtn?.addEventListener('click', () => {
       this.mgr.disableKidsMode(this.getCurrentPin());
+      this.showFeedbackToast('👶 Đã tắt chế độ Giờ chơi của bé.');
       this.closeSettingsModal();
     });
 
@@ -260,6 +294,39 @@ export class KidsUiController {
         this.hideLockOverlay();
       }
     });
+  }
+
+  private updateSectionsVisibility(): void {
+    const isMaster = this.masterToggle?.checked ?? false;
+    const sections = document.getElementById('kidsConfigSections');
+    if (sections) {
+      sections.style.opacity = isMaster ? '1' : '0.45';
+      sections.style.pointerEvents = isMaster ? 'auto' : 'none';
+    }
+
+    const isTime = this.timeEnabledCheck?.checked ?? true;
+    if (this.timeOptionsBox) {
+      this.timeOptionsBox.style.opacity = isMaster && isTime ? '1' : '0.4';
+      this.timeOptionsBox.style.pointerEvents = isMaster && isTime ? 'auto' : 'none';
+    }
+
+    const isLives = this.livesEnabledCheck?.checked ?? true;
+    if (this.livesOptionsBox) {
+      this.livesOptionsBox.style.opacity = isMaster && isLives ? '1' : '0.4';
+      this.livesOptionsBox.style.pointerEvents = isMaster && isLives ? 'auto' : 'none';
+    }
+  }
+
+  private updatePinSection(): void {
+    const hasPin = this.mgr.hasPin();
+    if (this.pinStatusDesc) {
+      this.pinStatusDesc.textContent = hasPin
+        ? 'Đã cài mã PIN. Nhập 4 số mới nếu muốn đổi, hoặc bấm ✕ để xóa PIN.'
+        : 'Chưa cài mã PIN (Tùy chọn). Nhập 4 số nếu muốn khóa cài đặt.';
+    }
+    if (this.clearPinBtn) {
+      this.clearPinBtn.hidden = !hasPin;
+    }
   }
 
   private openSettingsModal(): void {
@@ -325,8 +392,8 @@ export class KidsUiController {
         chip.classList.remove('on');
       }
     });
-    if (!matchedTimeChip && this.customMinutesInput) {
-      this.customMinutesInput.value = String(cfg.timeLimitMinutes);
+    if (this.customMinutesInput) {
+      this.customMinutesInput.value = matchedTimeChip ? '' : String(cfg.timeLimitMinutes);
     }
 
     // Select lives chip or custom
@@ -340,24 +407,13 @@ export class KidsUiController {
         chip.classList.remove('on');
       }
     });
-    if (!matchedLivesChip && this.customLivesInput) {
-      this.customLivesInput.value = String(cfg.livesLimit);
+    if (this.customLivesInput) {
+      this.customLivesInput.value = matchedLivesChip ? '' : String(cfg.livesLimit);
     }
 
-    if (this.timeOptionsBox) {
-      this.timeOptionsBox.style.opacity = cfg.timeLimitEnabled ? '1' : '0.4';
-      this.timeOptionsBox.style.pointerEvents = cfg.timeLimitEnabled ? 'auto' : 'none';
-    }
-    if (this.livesOptionsBox) {
-      this.livesOptionsBox.style.opacity = cfg.livesLimitEnabled ? '1' : '0.4';
-      this.livesOptionsBox.style.pointerEvents = cfg.livesLimitEnabled ? 'auto' : 'none';
-    }
+    this.updateSectionsVisibility();
+    this.updatePinSection();
 
-    if (this.pinStatusDesc) {
-      this.pinStatusDesc.textContent = this.mgr.hasPin()
-        ? 'Đã cài mã PIN. Nhập 4 số mới nếu muốn đổi PIN.'
-        : 'Chưa cài mã PIN. Hãy nhập 4 số để bảo vệ cài đặt.';
-    }
     if (this.pinInput) this.pinInput.value = '';
     if (this.disableBtn) this.disableBtn.hidden = !cfg.enabled;
   }
@@ -366,30 +422,86 @@ export class KidsUiController {
     return this.pinDigits.map((d) => d.value).join('') || this.pinInput?.value || '';
   }
 
-  private handleSaveSettings(): void {
+  private saveFormState(forceReset = false): boolean {
     const isMaster = this.masterToggle?.checked ?? false;
     const isTime = this.timeEnabledCheck?.checked ?? true;
-    const isLives = this.livesEnabledCheck?.checked ?? false;
+    const isLives = this.livesEnabledCheck?.checked ?? true;
 
-    if (isMaster && !isTime && !isLives) {
-      if (this.formError) {
-        this.formError.textContent = 'Vui lòng chọn ít nhất giới hạn thời gian hoặc giới hạn số mạng!';
-        this.formError.hidden = false;
-      }
-      return;
+    // Custom or selected minutes
+    let minutes = this.selectedMinutes;
+    const customMin = parseInt(this.customMinutesInput?.value || '0', 10);
+    if (customMin > 0) {
+      minutes = Math.max(1, Math.min(180, customMin));
+      this.selectedMinutes = minutes;
+    }
+
+    // Custom or selected lives
+    let lives = this.selectedLives;
+    const customLiv = parseInt(this.customLivesInput?.value || '0', 10);
+    if (customLiv > 0) {
+      lives = Math.max(1, Math.min(50, customLiv));
+      this.selectedLives = lives;
     }
 
     const pinVal = this.pinInput?.value?.trim() || '';
-    if (isMaster && !this.mgr.hasPin() && pinVal.length !== 4) {
+    if (pinVal.length > 0 && pinVal.length < 4) {
       if (this.formError) {
         this.formError.textContent = t('kids_pin_required');
         this.formError.hidden = false;
       }
-      return;
+      return false;
     }
 
-    this.mgr.updateLimits(isMaster, isTime, this.selectedMinutes, isLives, this.selectedLives, pinVal.length === 4 ? pinVal : undefined);
-    this.closeSettingsModal();
+    if (this.formError) this.formError.hidden = true;
+
+    this.mgr.updateLimits(
+      isMaster,
+      isTime,
+      minutes,
+      isLives,
+      lives,
+      pinVal.length === 4 ? pinVal : undefined,
+      forceReset
+    );
+
+    return true;
+  }
+
+  private handleSaveSettings(): void {
+    if (this.masterToggle) {
+      this.masterToggle.checked = true;
+    }
+
+    // If both limits are turned off, turn both on by default
+    if (this.timeEnabledCheck && this.livesEnabledCheck) {
+      if (!this.timeEnabledCheck.checked && !this.livesEnabledCheck.checked) {
+        this.timeEnabledCheck.checked = true;
+        this.livesEnabledCheck.checked = true;
+      }
+    }
+
+    const ok = this.saveFormState(true);
+    if (ok) {
+      this.showFeedbackToast(t('kids_saved_toast') || '👶 Đã lưu & kích hoạt Giờ chơi cho bé! ✨');
+      this.closeSettingsModal();
+    }
+  }
+
+  private showFeedbackToast(msg: string): void {
+    let toast = document.getElementById('kidsToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'kidsToast';
+      toast.className = 'kids-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.remove('fade-out');
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast?.classList.remove('show');
+      toast?.classList.add('fade-out');
+    }, 2800);
   }
 
   private handleLockPinSubmit(): void {
@@ -450,6 +562,7 @@ export class KidsUiController {
     const btns = [
       document.getElementById('kidsModeBtn'),
       document.getElementById('startKidsModeBtn'),
+      document.getElementById('pcKidsModeBtn'),
     ];
     btns.forEach((b) => b?.classList.toggle('active', config.enabled));
 

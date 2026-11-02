@@ -4573,7 +4573,12 @@ body.spectating #lbList li:hover {
   z-index: 100;
   pointer-events: auto;
   user-select: none;
+  cursor: pointer;
   transition: all 0.2s ease;
+}
+.hud-kids-badge:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 6px 16px rgba(251, 192, 45, 0.4);
 }
 .hud-kids-badge .kids-badge-icon {
   font-size: 18px;
@@ -4730,6 +4735,21 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+/* Small Switch for sub-options */
+.switch-sm {
+  width: 42px;
+  height: 24px;
+}
+.switch-sm .slider:before {
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2.5px;
+}
+.switch-sm input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
 /* Sections */
 .kids-sections {
   display: flex;
@@ -4737,32 +4757,27 @@ input:checked + .slider:before {
   gap: 12px;
 }
 .kids-section-card {
-  background: rgba(30, 24, 18, 0.6);
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  background: rgba(30, 24, 18, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: opacity 0.2s ease;
 }
 .kids-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.kids-checkbox-label {
+.kids-section-title {
+  color: #ffca28;
+  font-weight: 800;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 14px;
-  color: #fff9c4;
-}
-.kids-section-title {
-  color: #fbc02d;
-  font-weight: 700;
-  font-size: 14px;
+  gap: 6px;
 }
 
 /* Chips and custom input */
@@ -4772,8 +4787,8 @@ input:checked + .slider:before {
   gap: 8px;
 }
 .kids-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1.5px solid rgba(251, 192, 45, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(251, 192, 45, 0.4);
   border-radius: 10px;
   color: #fff;
   font-size: 13px;
@@ -4783,37 +4798,72 @@ input:checked + .slider:before {
   transition: all 0.15s ease;
 }
 .kids-chip:hover {
-  background: rgba(251, 192, 45, 0.2);
+  background: rgba(251, 192, 45, 0.25);
   border-color: #fbc02d;
 }
 .kids-chip.on {
   background: #fbc02d;
   color: #1a140f;
   border-color: #fbc02d;
-  box-shadow: 0 2px 8px rgba(251, 192, 45, 0.4);
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(251, 192, 45, 0.5);
 }
 .kids-custom-input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 13px;
-  color: #c7baa7;
-  margin-top: 4px;
+  color: #f5eedc;
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.kids-custom-label {
+  font-weight: 700;
+  color: #e0d5c1;
+}
+.kids-input-unit-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .kids-input-num {
-  width: 75px;
-  background: rgba(15, 12, 10, 0.8);
-  border: 1.5px solid #6d5d4d;
+  width: 80px;
+  background: rgba(30, 22, 16, 0.95);
+  border: 2px solid #fbc02d;
   border-radius: 8px;
   color: #fff;
-  padding: 4px 8px;
-  font-size: 14px;
-  font-weight: 700;
+  padding: 5px 8px;
+  font-size: 16px;
+  font-weight: 800;
   text-align: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.kids-input-num::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  font-weight: 600;
 }
 .kids-input-num:focus {
-  border-color: #fbc02d;
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(251, 192, 45, 0.6);
   outline: none;
+}
+.kids-input-lives {
+  border-color: #ff4081;
+  color: #ff80ab;
+}
+.kids-input-lives:focus {
+  border-color: #ff4081;
+  box-shadow: 0 0 10px rgba(255, 64, 129, 0.6);
+}
+.kids-unit {
+  font-weight: 700;
+  color: #ffe082;
+  font-size: 13px;
 }
 
 /* PIN section */
@@ -4823,26 +4873,83 @@ input:checked + .slider:before {
   justify-content: space-between;
   gap: 12px;
 }
+.kids-pin-text-wrap {
+  flex: 1;
+}
 .kids-pin-desc {
   font-size: 12px;
-  color: #9e8e7a;
+  color: #b0a394;
+  line-height: 1.4;
+}
+.kids-pin-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .kids-input-pin {
-  width: 90px;
-  background: rgba(15, 12, 10, 0.8);
+  width: 110px;
+  background: rgba(30, 22, 16, 0.95);
   border: 1.5px solid #ffb300;
   border-radius: 8px;
   color: #ffeb3b;
   font-size: 16px;
   font-weight: 800;
-  letter-spacing: 4px;
+  letter-spacing: 2px;
   text-align: center;
   padding: 6px 8px;
+}
+.kids-input-pin::placeholder {
+  letter-spacing: normal;
+  font-size: 11px;
+  color: #9e8e7a;
 }
 .kids-input-pin:focus {
   border-color: #ffd54f;
   box-shadow: 0 0 8px rgba(255, 213, 79, 0.4);
   outline: none;
+}
+.kids-btn-clear-pin {
+  background: rgba(239, 83, 80, 0.2);
+  border: 1px solid #ef5350;
+  color: #ff8a80;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.kids-btn-clear-pin:hover {
+  background: #ef5350;
+  color: #fff;
+}
+
+/* Toast for Kids Mode */
+.kids-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: linear-gradient(135deg, #1e2815 0%, #111a0c 100%);
+  border: 2px solid #81c784;
+  color: #f1f8e9;
+  padding: 10px 22px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 99999999;
+}
+.kids-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.kids-toast.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
 }
 
 /* Actions */
@@ -5058,12 +5165,56 @@ input:checked + .slider:before {
     font-size: 15px;
   }
   .kids-card {
-    padding: 16px 18px;
+    width: min(96vw, 440px);
+    padding: 14px 14px;
+    max-height: 88vh;
+    border-radius: 20px;
+  }
+  .kids-header {
+    padding-bottom: 8px;
+    gap: 10px;
+  }
+  .kids-header-icon {
+    font-size: 28px;
+  }
+  .kids-title {
+    font-size: 16px;
+  }
+  .kids-chip {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .kids-custom-input-row {
+    padding: 6px 10px;
+  }
+  .kids-input-num {
+    width: 70px;
+    font-size: 16px;
+  }
+  .kids-input-pin {
+    width: 95px;
+    font-size: 16px;
   }
   .kids-lock-card {
-    padding: 22px 16px;
+    padding: 20px 14px;
   }
   .kids-lock-head {
-    font-size: 19px;
+    font-size: 18px;
+  }
+}
+
+@media (max-height: 520px) {
+  /* Landscape phone */
+  .kids-card {
+    max-height: 94vh;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .kids-sections {
+    gap: 8px;
+  }
+  .kids-section-card {
+    padding: 8px 10px;
+    gap: 6px;
   }
 }

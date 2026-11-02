@@ -41,7 +41,7 @@ export class KidsPlayManager {
     enabled: false,
     timeLimitEnabled: true,
     timeLimitMinutes: 20,
-    livesLimitEnabled: false,
+    livesLimitEnabled: true,
     livesLimit: 5,
     pinHash: '',
   };
@@ -145,8 +145,10 @@ export class KidsPlayManager {
     timeLimitMinutes: number,
     livesLimitEnabled: boolean,
     livesLimit: number,
-    newPin?: string
+    newPin?: string,
+    forceResetSession = false
   ): void {
+    const wasEnabled = this.config.enabled;
     this.config.enabled = enabled;
     this.config.timeLimitEnabled = timeLimitEnabled;
     this.config.timeLimitMinutes = Math.max(1, Math.min(180, timeLimitMinutes));
@@ -158,7 +160,26 @@ export class KidsPlayManager {
     }
 
     this.saveConfig();
-    this.resetSession();
+
+    if ((!wasEnabled && enabled) || forceResetSession) {
+      this.resetSession();
+    } else if (enabled) {
+      // Đang bật: đảm bảo thời gian và mạng còn lại không vượt quá trần cấu hình
+      this.state.timeRemainingSec = Math.min(this.state.timeRemainingSec, this.config.timeLimitMinutes * 60);
+      this.state.livesRemaining = Math.min(this.state.livesRemaining, this.config.livesLimit);
+      this.saveState();
+      this.notify();
+    } else {
+      this.state.isLocked = false;
+      this.state.lockReason = null;
+      this.saveState();
+      this.notify();
+    }
+  }
+
+  public clearPin(): void {
+    this.config.pinHash = '';
+    this.saveConfig();
   }
 
   public resetSession(): void {

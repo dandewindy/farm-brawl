@@ -705,7 +705,7 @@
       <div class="kids-header">
         <div class="kids-header-icon">👶</div>
         <div class="kids-header-text">
-          <h2 class="kids-title" data-i18n="kids_mode_modal_head">QUẢN LÝ GIỜ CHƠI CHO BÉ 👶</h2>
+          <h2 class="kids-title" data-i18n="kids_mode_modal_head">QUẢN LÝ GIỜ CHƠI CHO BÉ</h2>
           <p class="kids-sub" data-i18n="kids_mode_sub">Bảo vệ mắt & cân bằng thời gian chơi lành mạnh</p>
         </div>
         <button id="kidsCloseBtn" type="button" class="kids-close-btn" title="Đóng">✕</button>
@@ -743,23 +743,27 @@
           <!-- 1. Playtime Limit Section -->
           <div class="kids-section-card">
             <div class="kids-section-head">
-              <label class="kids-checkbox-label">
+              <span class="kids-section-title">⏱️ <span data-i18n="kids_time_limit">Giới hạn thời gian chơi</span></span>
+              <label class="switch switch-sm" title="Bật/Tắt giới hạn thời gian">
                 <input type="checkbox" id="kidsTimeEnabled" checked>
-                <span class="kids-section-title" data-i18n="kids_time_limit">Giới hạn thời gian chơi</span>
+                <span class="slider round"></span>
               </label>
             </div>
             <div id="kidsTimeOptions" class="kids-options-box">
               <div class="kids-chips" id="kidsTimeChips">
-                <button type="button" class="kids-chip on" data-minutes="10">10p</button>
+                <button type="button" class="kids-chip" data-minutes="10">10p</button>
                 <button type="button" class="kids-chip" data-minutes="15">15p</button>
-                <button type="button" class="kids-chip" data-minutes="20">20p</button>
+                <button type="button" class="kids-chip on" data-minutes="20">20p</button>
                 <button type="button" class="kids-chip" data-minutes="30">30p</button>
                 <button type="button" class="kids-chip" data-minutes="45">45p</button>
+                <button type="button" class="kids-chip" data-minutes="60">60p</button>
               </div>
               <div class="kids-custom-input-row">
-                <span>Hoặc tự nhập:</span>
-                <input type="number" id="kidsCustomMinutes" min="1" max="180" placeholder="Số phút" class="kids-input-num">
-                <span>phút</span>
+                <span class="kids-custom-label">Hoặc nhập số phút:</span>
+                <div class="kids-input-unit-wrap">
+                  <input type="number" id="kidsCustomMinutes" min="1" max="180" placeholder="Số phút" class="kids-input-num">
+                  <span class="kids-unit">phút</span>
+                </div>
               </div>
             </div>
           </div>
@@ -767,22 +771,26 @@
           <!-- 2. Lives Limit Section -->
           <div class="kids-section-card">
             <div class="kids-section-head">
-              <label class="kids-checkbox-label">
-                <input type="checkbox" id="kidsLivesEnabled">
-                <span class="kids-section-title" data-i18n="kids_lives_limit">Giới hạn số mạng chơi (số lần hồi sinh)</span>
+              <span class="kids-section-title">❤️ <span data-i18n="kids_lives_limit">Giới hạn số mạng chơi</span></span>
+              <label class="switch switch-sm" title="Bật/Tắt giới hạn số mạng">
+                <input type="checkbox" id="kidsLivesEnabled" checked>
+                <span class="slider round"></span>
               </label>
             </div>
-            <div id="kidsLivesOptions" class="kids-options-box" style="opacity: 0.5; pointer-events: none;">
+            <div id="kidsLivesOptions" class="kids-options-box">
               <div class="kids-chips" id="kidsLivesChips">
-                <button type="button" class="kids-chip on" data-lives="3">3 ❤️</button>
-                <button type="button" class="kids-chip" data-lives="5">5 ❤️</button>
+                <button type="button" class="kids-chip" data-lives="3">3 ❤️</button>
+                <button type="button" class="kids-chip on" data-lives="5">5 ❤️</button>
                 <button type="button" class="kids-chip" data-lives="10">10 ❤️</button>
                 <button type="button" class="kids-chip" data-lives="15">15 ❤️</button>
+                <button type="button" class="kids-chip" data-lives="20">20 ❤️</button>
               </div>
               <div class="kids-custom-input-row">
-                <span>Hoặc tự nhập:</span>
-                <input type="number" id="kidsCustomLives" min="1" max="50" placeholder="Số mạng" class="kids-input-num">
-                <span>mạng</span>
+                <span class="kids-custom-label">Hoặc nhập số mạng:</span>
+                <div class="kids-input-unit-wrap">
+                  <input type="number" id="kidsCustomLives" min="1" max="50" placeholder="Số mạng" class="kids-input-num kids-input-lives">
+                  <span class="kids-unit">mạng</span>
+                </div>
               </div>
             </div>
           </div>
@@ -790,11 +798,16 @@
           <!-- 3. Parent PIN Section -->
           <div class="kids-section-card">
             <div class="kids-section-head">
-              <span class="kids-section-title" data-i18n="kids_pin_label">Mã PIN phụ huynh (4 số)</span>
+              <span class="kids-section-title">🔑 <span data-i18n="kids_pin_label">Mã PIN phụ huynh (Tùy chọn)</span></span>
             </div>
             <div class="kids-pin-setting-row">
-              <span class="kids-pin-desc" id="kidsPinStatusDesc">Bảo vệ cài đặt để trẻ không tự ý thay đổi</span>
-              <input type="password" id="kidsPinInput" maxlength="4" placeholder="4 số PIN" class="kids-input-pin" inputmode="numeric" pattern="[0-9]*">
+              <div class="kids-pin-text-wrap">
+                <span class="kids-pin-desc" id="kidsPinStatusDesc">Nhập 4 số để khóa cài đặt (để trống nếu không cần)</span>
+              </div>
+              <div class="kids-pin-input-wrap">
+                <input type="password" id="kidsPinInput" maxlength="4" placeholder="4 số PIN" class="kids-input-pin" inputmode="numeric" pattern="[0-9]*">
+                <button type="button" id="kidsClearPinBtn" class="kids-btn-clear-pin" title="Xóa mã PIN" hidden>✕</button>
+              </div>
             </div>
           </div>
         </div>

@@ -314,7 +314,7 @@ const vi = {
   teamScoreSub: 'Tỷ số: A12 {s0} – {s1} WFM',
   // Kids Mode (Chế độ chơi cho trẻ)
   kids_mode_title: 'Giờ chơi của bé',
-  kids_mode_modal_head: 'QUẢN LÝ GIỜ CHƠI CHO BÉ 👶',
+  kids_mode_modal_head: 'QUẢN LÝ GIỜ CHƠI CHO BÉ',
   kids_mode_sub: 'Bảo vệ mắt & cân bằng thời gian chơi lành mạnh',
   kids_time_limit: 'Giới hạn thời gian chơi',
   kids_lives_limit: 'Giới hạn số mạng chơi (số lần hồi sinh)',
@@ -327,6 +327,7 @@ const vi = {
   kids_pin_required: 'Vui lòng nhập đủ 4 chữ số PIN',
   kids_pin_wrong: 'Mã PIN không đúng, vui lòng thử lại!',
   kids_save_btn: 'LƯU & KÍCH HOẠT',
+  kids_saved_toast: '👶 Đã lưu & kích hoạt Giờ chơi cho bé! ✨',
   kids_disable_btn: 'TẮT CHẾ ĐỘ TRẺ EM',
   kids_cancel_btn: 'ĐÓNG',
   kids_warning_toast: '👶 Sắp hết giờ chơi rồi bé ơi! Còn 2 phút nhé! ✨',
@@ -757,7 +758,7 @@ const en: Record<keyof typeof vi, string> = {
   teamScoreSub: 'Score: A12 {s0} – {s1} WFM',
   // Kids Mode (Parental Playtime & Lives Management)
   kids_mode_title: 'Kids Playtime',
-  kids_mode_modal_head: 'KIDS PLAYTIME & LIVES 👶',
+  kids_mode_modal_head: 'KIDS PLAYTIME & LIVES',
   kids_mode_sub: 'Healthy screen time & eyesight protection',
   kids_time_limit: 'Playtime Limit',
   kids_lives_limit: 'Lives / Respawns Limit',
@@ -770,6 +771,7 @@ const en: Record<keyof typeof vi, string> = {
   kids_pin_required: 'Please enter 4 digits PIN',
   kids_pin_wrong: 'Incorrect PIN, please try again!',
   kids_save_btn: 'SAVE & ACTIVATE',
+  kids_saved_toast: '👶 Kids Playtime & Lives saved successfully! ✨',
   kids_disable_btn: 'DISABLE KIDS MODE',
   kids_cancel_btn: 'CLOSE',
   kids_warning_toast: '👶 Almost time to rest! 2 minutes remaining! ✨',
