@@ -1,6 +1,11 @@
 import type { ClientMsg, ServerMsg } from '@shared/protocol';
 import type { Handler, Transport } from './transport';
 
+export function isTier0Colo(colo?: string): boolean {
+  if (!colo) return false;
+  return /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL|PNH|VTE)$/i.test(colo);
+}
+
 export function isFastColo(colo?: string): boolean {
   if (!colo) return false;
   return /^(SIN|HKG|HAN|SGN|DAD|BKK|KUL|TPE|KHH|MNL|CEB|NRT|HND|KIX|FUK|OKA|ICN|PUS|CGK|DPS|PNH|VTE|BNY|RGN|CAN|SZX|APAC)$/i.test(colo);
@@ -39,10 +44,12 @@ export class WsClient implements Transport {
   }
 
   public isColoHealthy(): boolean {
-    // Kết nối chỉ khỏe khi độ trễ thực tế <= 160ms VÀ trạm biên thuộc châu Á
-    if (this.rttMin <= 0) return true; // Chưa có mẫu ping
-    if (this.rttMin > 160) return false;
-    return isFastColo(this.colo) && this.rttMin <= 140;
+    if (this.rttMin <= 0) return true;
+    // Trạm Tier 0 (SIN, HKG, SGN...) đạt chuẩn khi ping <= 80ms
+    if (isTier0Colo(this.colo) && this.rttMin <= 80) return true;
+    // Nếu trạm ở ngoài Tier 0 (như NRT, KIX, LAX, MRS) hoặc ping > 80ms: coi như cần tối ưu về SIN/HKG
+    if (this.rttMin > 90) return false;
+    return isFastColo(this.colo) && this.rttMin <= 60;
   }
 
   private lockMigration(durationMs = 12000): void {
@@ -274,14 +281,12 @@ export class WsClient implements Transport {
       const search = u.search;
       const isCustom = u.hostname.includes('get-go.site');
 
-      if (isCustom) {
-        // Tên miền riêng bị ISP đưa qua châu Âu -> Thử ngay workers.dev cùng tài khoản
-        urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
-        urls.push(this.activeUrl);
-      } else {
-        urls.push(`wss://brawl.get-go.site/ws${search}`);
+      // Ứng viên số 1 luôn là custom domain chính thức (play.get-go.site) trỏ thẳng vào Worker SIN
+      urls.push(`wss://play.get-go.site/ws${search}`);
+      if (u.hostname !== 'play.get-go.site') {
         urls.push(this.activeUrl);
       }
+      urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
     } catch (_) {
       urls.push(this.activeUrl);
     }
@@ -300,8 +305,8 @@ export class WsClient implements Transport {
   public triggerHotMigration(force = false): void {
     if (!this.inGame || this.closed) return;
     if (!force && this.migrationLocked) return;
-    // Strict Guard: Nếu ping đang tốt (<= 120ms) và trạm châu Á thì không cần di dời
-    if (!force && this.isColoHealthy() && this.rttMin <= 120) {
+    // Strict Guard: Nếu đang ở Tier 0 (SIN, HKG...) với ping <= 65ms thì không cần di dời
+    if (!force && isTier0Colo(this.colo) && this.rttMin <= 65) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;
@@ -366,17 +371,19 @@ export class WsClient implements Transport {
           const probeColo = msg.colo;
           const probeRtt = performance.now() - msg.c;
           console.log(`[WS Watchdog] Hot migration probe response from ${new URL(candidateUrl).host}: colo=${probeColo}, rtt=${Math.round(probeRtt)}ms`);
+          const currentlyTier0 = isTier0Colo(this.colo);
+          const isProbeTier0 = isTier0Colo(probeColo);
           const currentlyFast = isFastColo(this.colo);
           const isProbeFast = isFastColo(probeColo);
 
           // Điều kiện chuyển tuyến ưu tiên:
-          // 1. Trạm hiện tại ngoài châu Á (WAW/FRA/CDG/SJC) và trạm probe thuộc châu Á
-          // 2. Hoặc trạm probe có độ trễ thấp hơn rõ rệt (< 85% rtt hiện tại)
-          // 3. Hoặc trạm probe là SIN/HKG với ping <= 120ms và ping hiện tại > 130ms
-          const isBetter = (!currentlyFast && isProbeFast)
-            || (isProbeFast && probeRtt > 0 && probeRtt < this.rttMin * 0.85)
-            || (probeRtt > 0 && probeRtt < this.rttMin * 0.65)
-            || ((probeColo === 'SIN' || probeColo === 'HKG') && probeRtt <= 120 && this.rttMin > 130);
+          // 1. Probe là Tier 0 (SIN/HKG) trong khi hiện tại không phải Tier 0 (như NRT/KIX/LAX/WAW/MRS)
+          // 2. Hoặc trạm hiện tại ngoài châu Á và probe thuộc châu Á
+          // 3. Hoặc trạm probe có độ trễ thấp hơn rõ rệt (< 80% rtt hiện tại)
+          const isBetter = (!currentlyTier0 && isProbeTier0 && probeRtt <= 90)
+            || (!currentlyFast && isProbeFast)
+            || (isProbeFast && probeRtt > 0 && probeRtt < this.rttMin * 0.80)
+            || (probeRtt > 0 && probeRtt < this.rttMin * 0.65);
 
           if (isBetter) {
             this.probeAttempts = 0;

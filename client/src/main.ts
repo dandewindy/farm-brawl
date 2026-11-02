@@ -2428,9 +2428,14 @@ function getClientId(): string {
   const isViteDev = window.location.port === '5180';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   let host = isViteDev ? 'localhost:8787' : window.location.host;
-  const savedFastHost = sessionStorage.getItem('fb_fast_host');
-  if (!isViteDev && savedFastHost && (savedFastHost === 'farm-brawl.windydande.workers.dev' || savedFastHost === 'brawl.get-go.site')) {
-    host = savedFastHost;
+  if (!isViteDev) {
+    const savedFastHost = sessionStorage.getItem('fb_fast_host');
+    if (savedFastHost && (savedFastHost === 'play.get-go.site' || savedFastHost === 'farm-brawl.windydande.workers.dev')) {
+      host = savedFastHost;
+    } else if (host === 'farm-brawl.windydande.workers.dev' || host.endsWith('.workers.dev') || host === 'brawl.get-go.site') {
+      // Mặc định tự động ép sang custom domain chính thức (play.get-go.site) để đưa mạng về thẳng SIN/HKG
+      host = 'play.get-go.site';
+    }
   }
   const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;
   const wsUrl = `${proto}//${host}${query}`;
