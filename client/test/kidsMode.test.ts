@@ -1,0 +1,110 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+
+// Polyfill localStorage for node environment in test
+const storage = new Map<string, string>();
+(globalThis as any).localStorage = {
+  getItem: (k: string) => storage.get(k) ?? null,
+  setItem: (k: string, v: string) => storage.set(k, String(v)),
+  removeItem: (k: string) => storage.delete(k),
+  clear: () => storage.clear(),
+};
+
+import { KidsPlayManager } from '../src/features/kidsMode';
+
+describe('KidsPlayManager', () => {
+  beforeEach(() => {
+    storage.clear();
+    const mgr = KidsPlayManager.getInstance();
+    mgr.config = {
+      enabled: false,
+      timeLimitEnabled: true,
+      timeLimitMinutes: 20,
+      livesLimitEnabled: false,
+      livesLimit: 5,
+      pinHash: '',
+    };
+    mgr.resetSession();
+  });
+
+  it('initializes with default config and session', () => {
+    const mgr = KidsPlayManager.getInstance();
+    expect(mgr.config.enabled).toBe(false);
+    expect(mgr.config.timeLimitMinutes).toBe(20);
+    expect(mgr.state.timeRemainingSec).toBe(1200);
+    expect(mgr.state.isLocked).toBe(false);
+  });
+
+  it('updates limits and hashes parent PIN', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 15, true, 3, '1234');
+
+    expect(mgr.config.enabled).toBe(true);
+    expect(mgr.config.timeLimitMinutes).toBe(15);
+    expect(mgr.state.timeRemainingSec).toBe(900);
+    expect(mgr.config.livesLimit).toBe(3);
+    expect(mgr.state.livesRemaining).toBe(3);
+    expect(mgr.hasPin()).toBe(true);
+
+    // Verify PIN
+    expect(mgr.verifyPin('1234')).toBe(true);
+    expect(mgr.verifyPin('9999')).toBe(false);
+  });
+
+  it('ticks down playtime and locks when time reaches 0', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 1, false, 5); // 1 minute = 60s
+    expect(mgr.state.timeRemainingSec).toBe(60);
+
+    // Tick 30 seconds
+    mgr.tick(30);
+    expect(mgr.state.timeRemainingSec).toBe(30);
+    expect(mgr.state.isLocked).toBe(false);
+
+    // Tick another 35 seconds -> should lock
+    mgr.tick(35);
+    expect(mgr.state.timeRemainingSec).toBe(0);
+    expect(mgr.state.isLocked).toBe(true);
+    expect(mgr.state.lockReason).toBe('time');
+  });
+
+  it('consumes lives and locks when lives reach 0', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, false, 20, true, 2); // 2 lives
+    expect(mgr.state.livesRemaining).toBe(2);
+
+    // Lose life 1
+    const locked1 = mgr.consumeLife();
+    expect(locked1).toBe(false);
+    expect(mgr.state.livesRemaining).toBe(1);
+    expect(mgr.state.isLocked).toBe(false);
+
+    // Lose life 2 -> locks
+    const locked2 = mgr.consumeLife();
+    expect(locked2).toBe(true);
+    expect(mgr.state.livesRemaining).toBe(0);
+    expect(mgr.state.isLocked).toBe(true);
+    expect(mgr.state.lockReason).toBe('lives');
+  });
+
+  it('allows parent to extend time or lives with valid PIN', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 10, true, 3, '4321');
+    mgr.lock('time');
+    expect(mgr.state.isLocked).toBe(true);
+
+    // Wrong PIN fails
+    const failRes = mgr.extendTime(15, '0000');
+    expect(failRes).toBe(false);
+    expect(mgr.state.isLocked).toBe(true);
+
+    // Correct PIN unlocks and extends
+    const okRes = mgr.extendTime(15, '4321');
+    expect(okRes).toBe(true);
+    expect(mgr.state.isLocked).toBe(false);
+    expect(mgr.state.timeRemainingSec).toBe(10 * 60 + 15 * 60);
+
+    // Extend lives
+    mgr.extendLives(3, '4321');
+    expect(mgr.state.livesRemaining).toBe(6);
+  });
+});

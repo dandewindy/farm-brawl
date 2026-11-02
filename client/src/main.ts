@@ -27,6 +27,11 @@ import { WorldRenderer } from './render/world';
 import { BananaRenderer } from './render/bananas';
 import { HudManager } from './ui/hud';
 import { getArenaTheme, onThemeChange } from './theme';
+import { KidsPlayManager } from './features/kidsMode';
+import { KidsUiController } from './ui/kidsUi';
+
+// Initialize Kids UI Controller
+KidsUiController.init();
 
 // Apply translations to static HTML tags
 applyTexts();
@@ -198,9 +203,10 @@ function updateRevivingHearts(dt: number, now: number): void {
     h.group.position.y = floatY;
     h.group.rotation.y = now * 0.0015;
 
-    h.bodyMesh.material.color.copy(curColor);
-    h.bodyMesh.material.emissive.copy(curColor);
-    h.bodyMesh.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(now * 0.007);
+    const bodyMat = h.bodyMesh.material as THREE.MeshStandardMaterial;
+    bodyMat.color.copy(curColor);
+    bodyMat.emissive.copy(curColor);
+    bodyMat.emissiveIntensity = 0.6 + 0.4 * Math.sin(now * 0.007);
     h.bodyMesh.scale.set(beat, beat, beat);
 
     h.halo.rotation.z = now * 0.0025;
@@ -1798,6 +1804,7 @@ function handleGameEvent(ev: GameEvent): void {
         pendingEatHintsToSend.length = 0;
         optimisticEatenMap.clear();
         missingMeTicks = 0;
+        KidsPlayManager.getInstance().consumeLife();
         isDeadAwaitingScreen = true;
         isSpectating = false;
         spectateTargetId = null;
@@ -2698,6 +2705,8 @@ function animate(now: number): void {
 
   const dt = Math.min(0.05, Math.max(0.001, (now - lastPhysicsTime) / 1000));
   lastPhysicsTime = now;
+
+  KidsPlayManager.getInstance().tick(dt);
 
   fpsFrames++;
   if (now - lastFpsTime >= 500) {

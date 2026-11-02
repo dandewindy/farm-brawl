@@ -3,7 +3,6 @@ import { CFG, radiusOf, type Species } from '@shared/constants';
 import { FLAG, type PlayerMeta } from '@shared/protocol';
 import { t } from '../i18n';
 import { getArenaTheme, type ArenaTheme } from '../theme';
-import { createHeartGeometry } from './tools';
 
 interface AnimalVisual {
   root: THREE.Group;

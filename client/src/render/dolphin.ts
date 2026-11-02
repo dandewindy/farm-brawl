@@ -34,7 +34,6 @@ export class DolphinRenderer {
   private jumpTimer = 0;
   private jumpDur = 2.0; // seconds
   private nextJumpTimer = 8 + Math.random() * 6;
-  private heartCycleTimer = 30; // 30s interval
   private surfaceHoldTimer = 0;
   private wakeTimer = 0;
   private centerRippleTimer = 0;
@@ -73,7 +72,6 @@ export class DolphinRenderer {
     this.swimAngle = Math.random() * Math.PI * 2;
     this.state = 'swim';
     this.nextJumpTimer = 7 + Math.random() * 6;
-    this.heartCycleTimer = 30;
   }
 
   private updateLabel(x: number, y: number, z: number): void {

@@ -2,6 +2,8 @@
 import { CFG } from './constants';
 import { type Blob, type Circle, mulberry32 } from './math';
 
+export type { Blob, Circle };
+
 export type TreeSize = 0 | 1 | 2; // 0: Small (100kg, 10 fruits), 1: Medium (500kg, 20 fruits), 2: Large (1000kg, 30 fruits)
 
 export interface TreeData {

@@ -279,7 +279,6 @@ export class WsClient implements Transport {
       if (isDev) return [this.activeUrl];
 
       const search = u.search;
-      const isCustom = u.hostname.includes('get-go.site');
 
       // Ứng viên số 1 luôn là custom domain chính thức (brawl.get-go.site) trỏ thẳng vào Worker SIN
       urls.push(`wss://brawl.get-go.site/ws${search}`);
