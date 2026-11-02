@@ -99,6 +99,9 @@ export class InputManager {
 
     window.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') {
+        if (e.button === 0) {
+          document.body.classList.add('is-mouse-down');
+        }
         handleMove(e.clientX, e.clientY);
         const target = e.target as HTMLElement | null;
         if (target && target.closest('button, input, select, textarea, a, .screen, .modal, .card, .dialog, #start, #death, #pcSettingsMenu, #gameDrawerModal, #netPerf, #gameControls')) {
@@ -110,8 +113,13 @@ export class InputManager {
 
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'mouse' && e.button === 0) {
+        document.body.classList.remove('is-mouse-down');
         this.releaseRam();
       }
+    });
+
+    window.addEventListener('blur', () => {
+      document.body.classList.remove('is-mouse-down');
     });
 
     window.addEventListener('keydown', (e) => {
