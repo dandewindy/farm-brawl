@@ -2430,11 +2430,11 @@ function getClientId(): string {
   let host = isViteDev ? 'localhost:8787' : window.location.host;
   if (!isViteDev) {
     const savedFastHost = sessionStorage.getItem('fb_fast_host');
-    if (savedFastHost && (savedFastHost === 'play.get-go.site' || savedFastHost === 'farm-brawl.windydande.workers.dev')) {
+    if (savedFastHost && (savedFastHost === 'brawl.get-go.site' || savedFastHost === 'farm-brawl.windydande.workers.dev')) {
       host = savedFastHost;
     } else if (host === 'farm-brawl.windydande.workers.dev' || host.endsWith('.workers.dev') || host === 'brawl.get-go.site') {
-      // Mặc định tự động ép sang custom domain chính thức (play.get-go.site) để đưa mạng về thẳng SIN/HKG
-      host = 'play.get-go.site';
+      // Mặc định tự động ép sang custom domain chính thức (brawl.get-go.site) để đưa mạng về thẳng SIN/HKG
+      host = 'brawl.get-go.site';
     }
   }
   const query = `/ws?room=${encodeURIComponent(targetRoom)}&cid=${encodeURIComponent(getClientId())}&theme=${encodeURIComponent(getArenaTheme())}`;

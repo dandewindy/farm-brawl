@@ -281,9 +281,9 @@ export class WsClient implements Transport {
       const search = u.search;
       const isCustom = u.hostname.includes('get-go.site');
 
-      // Ứng viên số 1 luôn là custom domain chính thức (play.get-go.site) trỏ thẳng vào Worker SIN
-      urls.push(`wss://play.get-go.site/ws${search}`);
-      if (u.hostname !== 'play.get-go.site') {
+      // Ứng viên số 1 luôn là custom domain chính thức (brawl.get-go.site) trỏ thẳng vào Worker SIN
+      urls.push(`wss://brawl.get-go.site/ws${search}`);
+      if (u.hostname !== 'brawl.get-go.site') {
         urls.push(this.activeUrl);
       }
       urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
