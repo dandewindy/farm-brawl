@@ -7,6 +7,7 @@ import { blobOutline, type Blob } from '@shared/math';
 import { t } from '../i18n';
 import { getArenaTheme, type ArenaTheme } from '../theme';
 import { sfxZap } from '../audio/sfx';
+import { createThemeGroundTextures, type ArenaGroundTextures } from './groundTextures';
 
 function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, size: number) => void, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -937,6 +938,7 @@ export class WorldRenderer {
   private outerMat!: THREE.MeshStandardMaterial;
   private arenaMat!: THREE.MeshStandardMaterial;
   private warnMat!: THREE.MeshStandardMaterial;
+  private groundTextures: Record<ArenaTheme, ArenaGroundTextures> | null = null;
 
   // Local player cooldown ground indicator ring & arc
   private readonly cdArc: THREE.Mesh;
@@ -1053,9 +1055,11 @@ export class WorldRenderer {
   private buildStaticGround(): void {
     const R = CFG.R;
 
+    this.groundTextures = createThemeGroundTextures();
+
     // Outer endless field
     const outerGeo = new THREE.PlaneGeometry(1000, 1000);
-    this.outerMat = new THREE.MeshStandardMaterial({ color: 0x6aa84f, roughness: 0.85, flatShading: true });
+    this.outerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: false });
     const outer = new THREE.Mesh(outerGeo, this.outerMat);
     outer.rotation.x = -Math.PI / 2;
     outer.position.y = -0.05;
@@ -1064,7 +1068,7 @@ export class WorldRenderer {
 
     // Inner farm arena
     const arenaGeo = new THREE.CircleGeometry(R, 128);
-    this.arenaMat = new THREE.MeshStandardMaterial({ color: 0x8ccf5e, roughness: 0.85, flatShading: true });
+    this.arenaMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: false });
     const arena = new THREE.Mesh(arenaGeo, this.arenaMat);
     arena.rotation.x = -Math.PI / 2;
     arena.receiveShadow = true;
@@ -1078,6 +1082,23 @@ export class WorldRenderer {
     warn.position.y = 0.02;
     warn.receiveShadow = true;
     this.scene.add(warn);
+  }
+
+  private applyGroundTextures(theme: ArenaTheme): void {
+    if (!this.groundTextures) {
+      this.groundTextures = createThemeGroundTextures();
+    }
+    const texs = this.groundTextures[theme];
+    if (this.arenaMat) {
+      this.arenaMat.map = texs.arena;
+      this.arenaMat.color.setHex(0xffffff);
+      this.arenaMat.needsUpdate = true;
+    }
+    if (this.outerMat) {
+      this.outerMat.map = texs.outer;
+      this.outerMat.color.setHex(0xffffff);
+      this.outerMat.needsUpdate = true;
+    }
   }
 
   setShadowsEnabled(enabled: boolean): void {
@@ -1112,8 +1133,7 @@ export class WorldRenderer {
       if (this.scene.fog) {
         (this.scene.fog as THREE.Fog).color.copy(sky);
       }
-      if (this.outerMat) this.outerMat.color.setHex(0xdb839d);
-      if (this.arenaMat) this.arenaMat.color.setHex(0xf5a3b7);
+      this.applyGroundTextures('women_day');
       if (this.warnMat) this.warnMat.color.setHex(0xe65c82);
       for (const r of this.fenceRails) {
         (r.material as THREE.MeshStandardMaterial).emissive.setHex(0xff4081);
@@ -1124,8 +1144,7 @@ export class WorldRenderer {
       if (this.scene.fog) {
         (this.scene.fog as THREE.Fog).color.setHex(0x280e38);
       }
-      if (this.outerMat) this.outerMat.color.setHex(0x22181c);
-      if (this.arenaMat) this.arenaMat.color.setHex(0x34222a);
+      this.applyGroundTextures('halloween');
       if (this.warnMat) this.warnMat.color.setHex(0xc45e00);
       for (const r of this.fenceRails) {
         (r.material as THREE.MeshStandardMaterial).emissive.setHex(0x39ff14);
@@ -1136,8 +1155,7 @@ export class WorldRenderer {
       if (this.scene.fog) {
         (this.scene.fog as THREE.Fog).color.copy(sky);
       }
-      if (this.outerMat) this.outerMat.color.setHex(0x6aa84f);
-      if (this.arenaMat) this.arenaMat.color.setHex(0x8ccf5e);
+      this.applyGroundTextures('classic');
       if (this.warnMat) this.warnMat.color.setHex(0xc9b56a);
       for (const r of this.fenceRails) {
         (r.material as THREE.MeshStandardMaterial).emissive.setHex(0x00bfff);
