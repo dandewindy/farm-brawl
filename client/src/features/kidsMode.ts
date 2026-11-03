@@ -134,8 +134,12 @@ export class KidsPlayManager {
         const parsed = JSON.parse(stRaw);
         this.state = { ...this.state, ...parsed };
 
-        // Kiểm tra nếu đã bị khóa và đã qua 1 tiếng -> Tự động mở khóa!
-        if (this.state.isLocked) {
+        if (!this.config.enabled) {
+          this.state.isLocked = false;
+          this.state.lockReason = null;
+          this.state.lockedAtTs = undefined;
+        } else if (this.state.isLocked) {
+          // Kiểm tra nếu đã bị khóa và đã qua 1 tiếng -> Tự động mở khóa!
           const now = Date.now();
           if (!this.state.lockedAtTs) {
             this.state.lockedAtTs = now;

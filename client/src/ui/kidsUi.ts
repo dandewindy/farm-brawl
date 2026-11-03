@@ -552,7 +552,10 @@ export class KidsUiController {
   }
 
   private hideLockOverlay(): void {
-    if (this.lockOverlayEl) this.lockOverlayEl.hidden = true;
+    if (this.lockOverlayEl) {
+      this.lockOverlayEl.hidden = true;
+      this.lockOverlayEl.style.setProperty('display', 'none', 'important');
+    }
     if (this.lockOptionsBox) this.lockOptionsBox.hidden = true;
     if (this.lockPinBox) this.lockPinBox.hidden = true;
     this.isParentUnlocked = false;
@@ -616,8 +619,9 @@ export class KidsUiController {
 
     // 4. Handle Lock State & Auto-unlock countdown
     if (this.lockOverlayEl) {
-      if (state.isLocked) {
+      if (state.isLocked && config.enabled) {
         this.lockOverlayEl.hidden = false;
+        this.lockOverlayEl.style.removeProperty('display');
         if (this.lockHeadEl) {
           this.lockHeadEl.textContent = state.lockReason === 'lives' ? t('kids_lock_lives_head') : t('kids_lock_time_head');
         }

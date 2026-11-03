@@ -5095,25 +5095,29 @@ input:checked + .slider:before {
 
 /* Rest Lock Screen (Căn giữa tuyệt đối màn hình - Dead Center) */
 .kids-lock-screen {
-  position: fixed !important;
-  inset: 0 !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
-  background: radial-gradient(circle at center, rgba(30, 42, 22, 0.97) 0%, rgba(12, 18, 10, 0.99) 100%) !important;
-  backdrop-filter: blur(14px) !important;
-  z-index: 9999999 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 20px !important;
-  margin: 0 !important;
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: radial-gradient(circle at center, rgba(30, 42, 22, 0.97) 0%, rgba(12, 18, 10, 0.99) 100%);
+  backdrop-filter: blur(14px);
+  z-index: 9999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  margin: 0;
   user-select: none;
   overflow: auto;
+}
+.kids-lock-screen[hidden],
+#kidsLockOverlay[hidden] {
+  display: none !important;
 }
 .kids-lock-card {
   width: min(92vw, 460px);
