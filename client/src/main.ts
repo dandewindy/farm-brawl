@@ -29,9 +29,11 @@ import { HudManager } from './ui/hud';
 import { getArenaTheme, onThemeChange } from './theme';
 import { KidsPlayManager } from './features/kidsMode';
 import { KidsUiController } from './ui/kidsUi';
+import { voiceAnnouncer } from './audio/voiceAnnouncer';
 
-// Initialize Kids UI Controller
+// Initialize Kids UI Controller & Voice Announcer (Decoupled)
 KidsUiController.init();
+voiceAnnouncer.init();
 
 // Apply translations to static HTML tags
 applyTexts();
@@ -470,6 +472,7 @@ hud.onChangeLanguage = () => {
   syncBoardUi();
   syncStatsUi();
   syncShadowUi();
+  voiceAnnouncer.syncUI();
   world.updateBarnSign();
   hud.updateTeamCounts(hud.lastCount0, hud.lastCount1);
   hud.updateSpecPlayBtn();
@@ -1606,6 +1609,11 @@ const gameState = new GameState({
 
 function handleGameEvent(ev: GameEvent): void {
   const myId = gameState.myId;
+  voiceAnnouncer.handleEvent(ev, {
+    myId,
+    napoleonId: gameState.napoleonId,
+    myTeam: hud.selectedMode === 'team' ? hud.selectedTeam : undefined,
+  });
   switch (ev.k) {
     case 'hit': {
       if (ev.minion) {
