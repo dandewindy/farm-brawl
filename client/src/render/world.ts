@@ -975,8 +975,8 @@ export class WorldRenderer {
 
     this.tex = createTextures();
 
-    // Cooldown ground meter
-    const arcGeo = new THREE.RingGeometry(1.45, 1.72, ARC_SEG, 1, -Math.PI / 2, Math.PI * 2);
+    // Cooldown ground meter (thu nhỏ lại bằng với vòng tròn màu đội)
+    const arcGeo = new THREE.RingGeometry(0.88, 1.08, ARC_SEG, 1, -Math.PI / 2, Math.PI * 2);
     this.cdArc = new THREE.Mesh(
       arcGeo,
       new THREE.MeshBasicMaterial({

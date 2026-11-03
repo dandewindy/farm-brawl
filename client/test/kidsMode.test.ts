@@ -107,4 +107,24 @@ describe('KidsPlayManager', () => {
     mgr.extendLives(3, '4321');
     expect(mgr.state.livesRemaining).toBe(6);
   });
+
+  it('automatically unlocks after 1 hour (3600s) if parent forgets to unlock', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 10, true, 3, '4321');
+    mgr.lock('time');
+    expect(mgr.state.isLocked).toBe(true);
+    expect(mgr.state.lockedAtTs).toBeDefined();
+
+    // After 30 minutes (1800s) -> still locked
+    mgr.state.lockedAtTs = Date.now() - 1800 * 1000;
+    mgr.tick(1);
+    expect(mgr.state.isLocked).toBe(true);
+    expect(mgr.getAutoUnlockRemainingSec()).toBeLessThanOrEqual(1800);
+
+    // After 60 minutes (3600s) -> automatically unlocked & new session initialized!
+    mgr.state.lockedAtTs = Date.now() - 3601 * 1000;
+    mgr.tick(1);
+    expect(mgr.state.isLocked).toBe(false);
+    expect(mgr.state.timeRemainingSec).toBe(10 * 60);
+  });
 });

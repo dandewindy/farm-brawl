@@ -18,7 +18,10 @@ export interface KidsModeState {
   isLocked: boolean;
   lockReason: 'time' | 'lives' | null;
   lastTickTs: number;
+  lockedAtTs?: number; // Thời điểm bị khóa để tính tự động mở sau 1 tiếng
 }
+
+export const MAX_LOCK_DURATION_SEC = 3600; // Khóa tối đa 1 tiếng (60 phút) sau đó tự động mở lại
 
 const STORAGE_KEY_CONFIG = 'fb_kids_config';
 const STORAGE_KEY_STATE = 'fb_kids_state';
@@ -118,6 +121,15 @@ export class KidsPlayManager {
         const parsed = JSON.parse(stRaw);
         this.state = { ...this.state, ...parsed };
 
+        // Kiểm tra nếu đã bị khóa và đã qua 1 tiếng -> Tự động mở khóa!
+        if (this.state.isLocked && this.state.lockedAtTs) {
+          const now = Date.now();
+          if ((now - this.state.lockedAtTs) >= MAX_LOCK_DURATION_SEC * 1000) {
+            this.resetSession();
+            return;
+          }
+        }
+
         // Nếu chế độ đang bật và game bị reload: trừ thời gian trôi qua giữa 2 lần tick
         if (this.config.enabled && !this.state.isLocked && this.config.timeLimitEnabled) {
           const now = Date.now();
@@ -187,14 +199,31 @@ export class KidsPlayManager {
     this.state.livesRemaining = this.config.livesLimit;
     this.state.isLocked = false;
     this.state.lockReason = null;
+    this.state.lockedAtTs = undefined;
     this.state.lastTickTs = Date.now();
     this.warningTriggered = false;
     this.saveState();
     this.notify();
   }
 
+  public getAutoUnlockRemainingSec(): number {
+    if (!this.state.isLocked || !this.state.lockedAtTs) return 0;
+    const elapsed = (Date.now() - this.state.lockedAtTs) / 1000;
+    return Math.max(0, Math.floor(MAX_LOCK_DURATION_SEC - elapsed));
+  }
+
   public tick(dtSec: number): void {
-    if (!this.config.enabled || this.state.isLocked) return;
+    if (!this.config.enabled) return;
+
+    // Nếu đang bị khóa: kiểm tra tự động mở khóa sau 1 tiếng (3600s)
+    if (this.state.isLocked) {
+      if (this.state.lockedAtTs && (Date.now() - this.state.lockedAtTs) >= MAX_LOCK_DURATION_SEC * 1000) {
+        this.resetSession();
+        return;
+      }
+      this.notify();
+      return;
+    }
 
     this.state.lastTickTs = Date.now();
 
@@ -237,6 +266,7 @@ export class KidsPlayManager {
   public lock(reason: 'time' | 'lives'): void {
     this.state.isLocked = true;
     this.state.lockReason = reason;
+    this.state.lockedAtTs = Date.now();
     this.saveState();
     this.notify();
   }

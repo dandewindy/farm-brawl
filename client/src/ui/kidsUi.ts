@@ -11,6 +11,9 @@ export class KidsUiController {
   private hudWidgetEl!: HTMLElement | null;
   private hudTimerEl!: HTMLElement | null;
   private hudLivesEl!: HTMLElement | null;
+  private topTimerEl!: HTMLElement | null;
+  private topTimerValEl!: HTMLElement | null;
+  private autoUnlockTextEl!: HTMLElement | null;
 
   // PIN Verify View
   private pinVerifyView!: HTMLElement | null;
@@ -71,6 +74,9 @@ export class KidsUiController {
     this.hudWidgetEl = document.getElementById('hudKidsWidget');
     this.hudTimerEl = document.getElementById('hudKidsTimerText');
     this.hudLivesEl = document.getElementById('hudKidsLivesText');
+    this.topTimerEl = document.getElementById('kidsTopTimer');
+    this.topTimerValEl = document.getElementById('kidsTopTimerVal');
+    this.autoUnlockTextEl = document.getElementById('kidsAutoUnlockText');
 
     this.pinVerifyView = document.getElementById('kidsPinVerifyView');
     this.pinDigits = Array.from(document.querySelectorAll('.kids-pin-inputs .pin-digit')) as HTMLInputElement[];
@@ -524,7 +530,20 @@ export class KidsUiController {
   }
 
   private onStateChange(state: KidsModeState, config: KidsModeConfig): void {
-    // 1. Update In-Game Floating Badge
+    // 1. Update Top Bar Timer Widget (Chỉ hiện thời gian, highlight khi còn <= 30s)
+    if (this.topTimerEl) {
+      const showTopTimer = config.enabled && config.timeLimitEnabled && !state.isLocked;
+      this.topTimerEl.hidden = !showTopTimer;
+      if (showTopTimer && this.topTimerValEl) {
+        const mins = Math.floor(state.timeRemainingSec / 60);
+        const secs = Math.floor(state.timeRemainingSec % 60);
+        this.topTimerValEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        // Highlight đỏ cam nhấp nháy khi còn 30 giây
+        this.topTimerEl.classList.toggle('urgent', state.timeRemainingSec <= 30);
+      }
+    }
+
+    // 2. Update In-Game Floating Badge
     if (this.hudWidgetEl) {
       this.hudWidgetEl.hidden = !config.enabled;
       if (config.enabled) {
@@ -554,7 +573,7 @@ export class KidsUiController {
       }
     }
 
-    // 2. Update Top Bar / Menu Badges
+    // 3. Update Top Bar / Menu Badges
     const statusText = config.enabled ? t('kids_status_active') : t('kids_status_off');
     const sbmKidsVal = document.getElementById('sbmKidsVal');
     if (sbmKidsVal) sbmKidsVal.textContent = statusText;
@@ -566,7 +585,7 @@ export class KidsUiController {
     ];
     btns.forEach((b) => b?.classList.toggle('active', config.enabled));
 
-    // 3. Handle Lock State
+    // 4. Handle Lock State & Auto-unlock countdown
     if (this.lockOverlayEl) {
       if (state.isLocked) {
         this.lockOverlayEl.hidden = false;
@@ -575,6 +594,14 @@ export class KidsUiController {
         }
         if (this.lockMsgEl) {
           this.lockMsgEl.textContent = state.lockReason === 'lives' ? t('kids_lock_lives_msg') : t('kids_lock_time_msg');
+        }
+
+        // Cập nhật đồng hồ đếm ngược tự động mở lại sau tối đa 1 tiếng
+        if (this.autoUnlockTextEl) {
+          const remSec = this.mgr.getAutoUnlockRemainingSec();
+          const uMins = Math.floor(remSec / 60);
+          const uSecs = Math.floor(remSec % 60);
+          this.autoUnlockTextEl.innerHTML = `Tự động mở lại sau: <b>${String(uMins).padStart(2, '0')}:${String(uSecs).padStart(2, '0')}</b> (hoặc khi Bố Mẹ mở khóa)`;
         }
       } else {
         this.hideLockOverlay();

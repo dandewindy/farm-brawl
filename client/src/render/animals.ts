@@ -2582,8 +2582,10 @@ export class AnimalRenderer {
       }
     }
 
-    // Body hopping & positioning
-    let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * 0.1 * r);
+    // Body hopping & positioning: Khi tốc độ chạy tăng thì độ cao nhún nhảy bốc lên cao hơn rõ rệt
+    const speedBounceMult = Math.min(2.2, Math.max(0, speed * 2.2 + (isDashing ? 1.4 : 0)));
+    const hopHeight = 0.10 + 0.22 * speedBounceMult;
+    let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * hopHeight * r);
     // Monkey bipedal bobbing run
     if (vis.species === 'monkey' && !isMonkeyLeap && !isWater && speed > 0.02) {
       bodyY += Math.abs(Math.sin(vis.phase * 1.3)) * 0.15 * r;
@@ -2717,7 +2719,7 @@ export class AnimalRenderer {
       vis.root.rotation.x = hk * 0.9 * (id % 2 ? 1 : -1);
       vis.root.scale.y *= 1 - 0.3 * hk;
       vis.root.scale.x *= 1 + 0.2 * hk;
-      vis.root.position.y += hk * 0.8;
+      vis.root.position.y += hk * 1.5; // Khi bị húc nảy tung lên cao hơn
     } else if (vis.species !== 'gorilla' || speed <= 0.02) {
       vis.root.rotation.x = 0;
     }
@@ -3164,39 +3166,15 @@ export class AnimalRenderer {
       }
     }
 
-    // Ground indicator ring
-    vis.ring.visible = !isWater;
+    // Ground indicator ring: Tạm thời ẩn vòng tròn màu đội bình thường, chỉ giữ lại khi gồng lực (và thu nhỏ bằng vòng tròn đội)
     vis.ring.position.set(x, smoothBaseY + 0.06, z);
-    vis.ring.scale.setScalar(sq > 0.3 ? r * (1 + 0.45 * sq) : r);
-    if (isWheel) {
-      vis.ring.scale.setScalar(r * 1.35);
-      vis.ringMat.color.set(0xff5722);
-      vis.ringMat.opacity = 0.95;
-    } else if (isSuper) {
-      vis.ring.scale.setScalar(r * 1.25);
-      vis.ringMat.color.setHSL((now / 500) % 1, 1, 0.6);
-      vis.ringMat.opacity = 0.9;
-    } else if (isCharging) {
-      vis.ring.scale.setScalar(r * (1 + 0.6 * lvl));
+    if (isCharging) {
+      vis.ring.visible = !isWater;
+      vis.ring.scale.setScalar(r); // Nhỏ lại đúng bằng vòng tròn màu đội cơ sở
       vis.ringMat.color.set(lvl >= 1 ? 0xff3b30 : 0xfff3a0);
-      vis.ringMat.opacity = 0.5 + Math.sin(now / (lvl >= 1 ? 40 : 90)) * 0.4;
-    } else if (isStunned) {
-      vis.ringMat.color.set(0x55504a);
-      vis.ringMat.opacity = 0.5;
-    } else if (isDashing) {
-      vis.ring.scale.setScalar(r * 1.25);
-      vis.ringMat.color.set(0xff3b30);
-      vis.ringMat.opacity = 0.95;
-    } else if (isKing) {
-      vis.ring.scale.setScalar(r * 1.15);
-      vis.ringMat.color.set(0xffc928);
-      vis.ringMat.opacity = 0.9;
+      vis.ringMat.opacity = 0.6 + Math.sin(now / (lvl >= 1 ? 40 : 90)) * 0.35;
     } else {
-      const ringColor = meta.team !== undefined
-        ? (meta.team === 0 ? 0x4fc3f7 : 0xf44336)
-        : (SPECIES_RING_COLOR[vis.species] ?? 0xffffff);
-      vis.ringMat.color.set(ringColor);
-      vis.ringMat.opacity = 0.85;
+      vis.ring.visible = false;
     }
 
     // Collar color reflects team (A12 Blue 0x2196f3, WFM Red 0xf44336) or gold for King

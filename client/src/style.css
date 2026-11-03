@@ -5051,29 +5051,100 @@ input:checked + .slider:before {
   outline: none;
 }
 
-/* Rest Lock Screen */
-.kids-lock-screen {
-  background: radial-gradient(circle at center, rgba(30, 42, 22, 0.96) 0%, rgba(12, 18, 10, 0.99) 100%);
-  backdrop-filter: blur(14px);
-  z-index: 9999999 !important;
-  display: grid;
-  place-items: center;
-  padding: 20px;
+/* Top Timer for Kids Mode (Chỉ hiện thời gian, highlight khi còn <= 30s) */
+.kids-top-timer {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(22, 28, 18, 0.88);
+  border: 2px solid #81c784;
+  border-radius: 20px;
+  padding: 4px 14px;
+  color: #fff9c4;
+  font-family: 'Baloo 2', cursive, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  pointer-events: none;
   user-select: none;
+  transition: all 0.3s ease;
+}
+.kids-top-timer .kids-timer-ico {
+  font-size: 14px;
+}
+.kids-top-timer.urgent {
+  background: linear-gradient(135deg, rgba(183, 28, 28, 0.95), rgba(216, 67, 21, 0.95));
+  border-color: #ffeb3b;
+  color: #ffffff;
+  font-size: 17px;
+  padding: 5px 16px;
+  box-shadow: 0 0 18px rgba(255, 87, 34, 0.85);
+  animation: kidsTimerPulse 0.9s infinite alternate;
+}
+@keyframes kidsTimerPulse {
+  0% { transform: translateX(-50%) scale(1); filter: brightness(1); }
+  100% { transform: translateX(-50%) scale(1.08); filter: brightness(1.2); }
+}
+
+/* Rest Lock Screen (Căn giữa tuyệt đối màn hình - Dead Center) */
+.kids-lock-screen {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: radial-gradient(circle at center, rgba(30, 42, 22, 0.97) 0%, rgba(12, 18, 10, 0.99) 100%) !important;
+  backdrop-filter: blur(14px) !important;
+  z-index: 9999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  margin: 0 !important;
+  user-select: none;
+  overflow: auto;
 }
 .kids-lock-card {
   width: min(92vw, 460px);
   background: linear-gradient(180deg, #242f1d 0%, #172013 100%);
   border: 3px solid #81c784;
   border-radius: 28px;
-  padding: 30px 24px;
+  padding: 28px 24px;
   text-align: center;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), inset 0 2px 6px rgba(255, 255, 255, 0.15);
   color: #f1f8e9;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  margin: auto !important;
+}
+.kids-auto-unlock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 235, 59, 0.12);
+  border: 1px solid rgba(255, 235, 59, 0.4);
+  border-radius: 20px;
+  padding: 6px 14px;
+  color: #fff59d;
+  font-size: 13px;
+  font-weight: 600;
+}
+.kids-auto-unlock-pill b {
+  color: #ffeb3b;
+  font-size: 14px;
 }
 .kids-mascot-badge {
   width: 72px;

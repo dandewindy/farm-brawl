@@ -22,6 +22,12 @@
 <body class="menu">
   <canvas id="c"></canvas>
 
+  <!-- Top Timer for Kids Mode (Chỉ hiện thời gian, highlight khi còn <= 30s) -->
+  <div id="kidsTopTimer" class="kids-top-timer" hidden>
+    <span class="kids-timer-ico">⏳</span>
+    <span id="kidsTopTimerVal">20:00</span>
+  </div>
+
   <!-- Team mode: reign time per farm and match clock -->
   <div id="teamBar" hidden>
     <span class="tb tb0"><b data-i18n="team0">A12</b><span class="tb-count" id="tbCount0">(0)</span><i id="ts0">0</i></span>
@@ -833,6 +839,12 @@
       <p id="kidsLockMsg" class="kids-lock-msg">
         Bé đã chơi rất ngoan và giỏi hôm nay! Hãy đứng dậy uống nước, vươn vai và cho đôi mắt nghỉ ngơi nhé!
       </p>
+
+      <!-- Auto-unlock Countdown (tối đa 1 tiếng tự mở khóa) -->
+      <div id="kidsAutoUnlockBox" class="kids-auto-unlock-pill">
+        <span class="auto-unlock-icon">⏰</span>
+        <span id="kidsAutoUnlockText">Tự động mở lại sau: <b>60:00</b></span>
+      </div>
 
       <div class="kids-lock-graphic">
         <div class="rest-tip-card">

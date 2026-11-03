@@ -3067,10 +3067,11 @@ export class World {
 
     const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
     const ramFactor = TRAITS[att.species].ram ?? 1.0;
-    // Dynamic knockback ceiling based on mass ratio and charging power (gồng húc)
+    // Dynamic knockback ceiling based on mass ratio, charging power and speed
     const massAdvantage = Math.pow(ma / mv, 0.4);
     const chargeAdvantage = att.power > 1.0 ? (1 + (att.power - 1) * 0.45) : 1.0;
-    const dynamicMax = clamp(CFG.KNOCKBACK_MAX * Math.max(0.65, Math.min(2.0, massAdvantage * chargeAdvantage)), CFG.KNOCKBACK_MIN + 10, 52);
+    const speedRatio = Math.max(1.0, speed / 10.0);
+    const dynamicMax = clamp(CFG.KNOCKBACK_MAX * Math.max(0.65, Math.min(2.6, massAdvantage * chargeAdvantage * speedRatio)), CFG.KNOCKBACK_MIN + 10, 78);
     let k = clamp(speed * att.power * ramFactor * CFG.KNOCKBACK * Math.pow(ma / mv, 0.38), CFG.KNOCKBACK_MIN, dynamicMax);
 
     // Rule: "titan" (Titan clash - colossal impacts)

@@ -1837,7 +1837,7 @@ function handleGameEvent(ev: GameEvent): void {
           if (ev.spoils > 0) {
             hud.showToast(t('spoils', { kg: ev.spoils }));
           }
-          if (ev.streak >= 2) {
+          if (ev.streak >= 2 && ev.by === myId) {
             const sKey = `streak${Math.min(5, ev.streak)}` as const;
             hud.showToast(t(sKey));
           }
@@ -1862,8 +1862,6 @@ function handleGameEvent(ev: GameEvent): void {
         hud.showBanner(`🌈 ${t('superHead')}`, t('superSub'));
       } else {
         sfxSuperFood(0.6);
-        const m = gameState.metas.get(ev.id);
-        hud.showToast(t('superOther', { name: m ? m.name : 'Ai đó' }));
       }
       break;
     }
@@ -2339,9 +2337,6 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner('🦍 ' + t('name_gorilla'), '🔥 TIẾN HOÁ THÀNH GORILLA KHỔNG LỒ! 🔥');
           const myPos = animals.getPosition(myId) || { x: mx, z: mz };
           hud.floatText('🔥 TIẾN HOÁ GORILLA! 🔥', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
-        } else {
-          const m = gameState.metas.get(ev.id);
-          hud.showToast(`🦍 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Gorilla!`);
         }
       } else if (ev.species === 'mammoth') {
         // Spectacular 3-stage evolution shockwave rings
@@ -2358,9 +2353,6 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner('🦣 ' + t('name_mammoth'), '✨ TIẾN HOÁ THÀNH VOI MA MÚT (MAMMOTH)! ✨');
           const myPos = animals.getPosition(myId) || { x: mx, z: mz };
           hud.floatText('🦣 TIẾN HOÁ MAMMOTH! 🦣', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
-        } else {
-          const m = gameState.metas.get(ev.id);
-          hud.showToast(`🦣 ${m ? m.name : 'Ai đó'} đã tiến hoá thành Voi Ma Mút!`);
         }
       } else {
         foodParts.smokePoof(mx, 1.2, mz, Math.max(1.6, r * 1.3), 40);
