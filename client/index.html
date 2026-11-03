@@ -720,7 +720,7 @@
       <!-- PIN Verification Screen (if PIN is set and not yet unlocked) -->
       <div id="kidsPinVerifyView" hidden>
         <div class="kids-pin-box">
-          <p class="kids-pin-title" data-i18n="kids_pin_enter">Nhập mã PIN phụ huynh để mở khoá:</p>
+          <p class="kids-pin-title" data-i18n="kids_pin_enter">Nhập mã PIN ba mẹ để mở khóa:</p>
           <div class="kids-pin-inputs">
             <input type="password" maxlength="1" class="pin-digit" inputmode="numeric" pattern="[0-9]*" autofocus>
             <input type="password" maxlength="1" class="pin-digit" inputmode="numeric" pattern="[0-9]*">
@@ -732,22 +732,10 @@
       </div>
 
       <!-- Main Settings Form View -->
-      <div id="kidsSettingsFormView">
-        <!-- Master Enable Toggle -->
-        <div class="kids-row-toggle master-toggle">
-          <div class="kids-toggle-info">
-            <b data-i18n="kids_mode_title">Chế độ giờ chơi của bé</b>
-            <span class="kids-toggle-sub">Tự động khóa màn hình và nhắc nhở khi hết giờ hoặc hết mạng</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="kidsMasterToggle">
-            <span class="slider round"></span>
-          </label>
-        </div>
-
-        <div id="kidsConfigSections" class="kids-sections">
+      <div id="kidsSettingsFormView" class="kids-settings-layout">
+        <div class="kids-form-col-left">
           <!-- 1. Playtime Limit Section -->
-          <div class="kids-section-card">
+          <div id="kidsTimeSectionCard" class="kids-section-card">
             <div class="kids-section-head">
               <span class="kids-section-title">⏱️ <span data-i18n="kids_time_limit">Giới hạn thời gian chơi</span></span>
               <label class="switch switch-sm" title="Bật/Tắt giới hạn thời gian">
@@ -775,7 +763,7 @@
           </div>
 
           <!-- 2. Lives Limit Section -->
-          <div class="kids-section-card">
+          <div id="kidsLivesSectionCard" class="kids-section-card">
             <div class="kids-section-head">
               <span class="kids-section-title">❤️ <span data-i18n="kids_lives_limit">Giới hạn số mạng chơi</span></span>
               <label class="switch switch-sm" title="Bật/Tắt giới hạn số mạng">
@@ -800,11 +788,25 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- 3. Parent PIN Section -->
-          <div class="kids-section-card">
+        <div class="kids-form-col-right">
+          <!-- 3. Master Enable Toggle -->
+          <div id="kidsMasterToggleRow" class="kids-row-toggle master-toggle">
+            <div class="kids-toggle-info">
+              <b data-i18n="kids_mode_title">Chế độ giờ chơi của bé</b>
+              <span class="kids-toggle-sub">Tự động khóa màn hình và nhắc nhở khi hết giờ hoặc hết mạng</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="kidsMasterToggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <!-- 4. Parent PIN Section -->
+          <div id="kidsPinSectionCard" class="kids-section-card">
             <div class="kids-section-head">
-              <span class="kids-section-title">🔑 <span data-i18n="kids_pin_label">Mã PIN phụ huynh (Tùy chọn)</span></span>
+              <span class="kids-section-title">🔑 <span data-i18n="kids_pin_label">Mã PIN ba mẹ (Tùy chọn)</span></span>
             </div>
             <div class="kids-pin-setting-row">
               <div class="kids-pin-text-wrap">
@@ -816,14 +818,15 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <div id="kidsFormError" class="kids-error-msg" hidden></div>
-
-        <!-- Action Buttons -->
-        <div class="kids-actions">
-          <button type="button" id="kidsSaveBtn" class="btn-green kids-btn-save" data-i18n="kids_save_btn">LƯU & KÍCH HOẠT</button>
-          <button type="button" id="kidsDisableBtn" class="btn-ghost kids-btn-disable" data-i18n="kids_disable_btn" hidden>TẮT CHẾ ĐỘ TRẺ EM</button>
+          <!-- 5. Actions Area -->
+          <div id="kidsFormActionsCol" class="kids-form-actions-wrap">
+            <div id="kidsFormError" class="kids-error-msg" hidden></div>
+            <div class="kids-actions">
+              <button type="button" id="kidsSaveBtn" class="btn-green kids-btn-save" data-i18n="kids_save_btn">LƯU & KÍCH HOẠT</button>
+              <button type="button" id="kidsDisableBtn" class="btn-ghost kids-btn-disable" data-i18n="kids_disable_btn" hidden>TẮT CHẾ ĐỘ TRẺ EM</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -832,44 +835,47 @@
   <!-- Kids Mode Friendly Rest Lock Screen -->
   <div id="kidsLockOverlay" class="screen kids-lock-screen" hidden>
     <div class="kids-lock-card">
-      <div class="kids-mascot-badge">
-        <span class="kids-mascot-emoji">🐥💤</span>
-      </div>
-      <h2 id="kidsLockHead" class="kids-lock-head">HẾT GIỜ CHƠI RỒI BÉ ƠI! 🌟</h2>
-      <p id="kidsLockMsg" class="kids-lock-msg">
-        Bé đã chơi rất ngoan và giỏi hôm nay! Hãy đứng dậy uống nước, vươn vai và cho đôi mắt nghỉ ngơi nhé!
-      </p>
-
-      <!-- Auto-unlock Countdown (tối đa 1 tiếng tự mở khóa) -->
-      <div id="kidsAutoUnlockBox" class="kids-auto-unlock-pill">
-        <span class="auto-unlock-icon">⏰</span>
-        <span id="kidsAutoUnlockText">Tự động mở lại sau: <b>60:00</b></span>
-      </div>
-
-      <div class="kids-lock-graphic">
-        <div class="rest-tip-card">
-          <span class="rest-tip-icon">🥛</span>
-          <span class="rest-tip-text">Uống một cốc nước ấm</span>
+      <!-- Kid Rest Column -->
+      <div class="kids-lock-col-kid">
+        <div class="kids-mascot-badge">
+          <span class="kids-mascot-emoji">🐥💤</span>
         </div>
-        <div class="rest-tip-card">
-          <span class="rest-tip-icon">🌳</span>
-          <span class="rest-tip-text">Nhìn xa ra cây xanh 20 giây</span>
+        <h2 id="kidsLockHead" class="kids-lock-head">HẾT GIỜ CHƠI RỒI BÉ ƠI! 🌟</h2>
+        <p id="kidsLockMsg" class="kids-lock-msg">
+          Bé đã chơi rất ngoan và giỏi hôm nay! Hãy đứng dậy uống nước, vươn vai và cho đôi mắt nghỉ ngơi nhé!
+        </p>
+
+        <!-- Auto-unlock Countdown (tối đa 1 tiếng tự mở khóa) -->
+        <div id="kidsAutoUnlockBox" class="kids-auto-unlock-pill">
+          <span class="auto-unlock-icon">⏰</span>
+          <span id="kidsAutoUnlockText">Tự động mở lại sau: <b>60:00</b></span>
         </div>
-        <div class="rest-tip-card">
-          <span class="rest-tip-icon">🤸</span>
-          <span class="rest-tip-text">Vận động tay chân thư giãn</span>
+
+        <div class="kids-lock-graphic">
+          <div class="rest-tip-card">
+            <span class="rest-tip-icon">🥛</span>
+            <span class="rest-tip-text">Uống một cốc nước ấm</span>
+          </div>
+          <div class="rest-tip-card">
+            <span class="rest-tip-icon">🌳</span>
+            <span class="rest-tip-text">Nhìn xa ra cây xanh 20 giây</span>
+          </div>
+          <div class="rest-tip-card">
+            <span class="rest-tip-icon">🤸</span>
+            <span class="rest-tip-text">Vận động tay chân thư giãn</span>
+          </div>
         </div>
       </div>
 
-      <!-- Parent Extension Row -->
+      <!-- Parent Extension Zone -->
       <div class="kids-lock-parent-zone">
         <button type="button" id="kidsLockParentBtn" class="btn-ghost kids-btn-parent">
-          <span data-i18n="kids_parent_btn">Dành cho Bố Mẹ 🔑</span>
+          <span data-i18n="kids_parent_btn">Dành cho Ba Mẹ 🔑</span>
         </button>
 
         <!-- Parent PIN Drawer / Unlocked Options -->
         <div id="kidsLockPinBox" class="kids-lock-pin-box" hidden>
-          <p class="kids-lock-pin-prompt" data-i18n="kids_pin_enter">Nhập mã PIN phụ huynh:</p>
+          <p class="kids-lock-pin-prompt" data-i18n="kids_pin_enter">Nhập mã PIN ba mẹ:</p>
           <div class="kids-lock-pin-row">
             <input type="password" id="kidsLockPinInput" maxlength="4" placeholder="4 số" class="kids-input-pin" inputmode="numeric">
             <button type="button" id="kidsLockPinSubmit" class="btn-green btn-sm">Mở</button>

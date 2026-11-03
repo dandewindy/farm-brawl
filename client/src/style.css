@@ -4701,6 +4701,32 @@ body.spectating #lbList li:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Settings Form Layout */
+.kids-settings-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.kids-form-col-left,
+.kids-form-col-right {
+  display: contents;
+}
+#kidsMasterToggleRow {
+  order: 1;
+}
+#kidsTimeSectionCard {
+  order: 2;
+}
+#kidsLivesSectionCard {
+  order: 3;
+}
+#kidsPinSectionCard {
+  order: 4;
+}
+#kidsFormActionsCol {
+  order: 5;
+}
+
 /* Master Toggle Row */
 .kids-row-toggle.master-toggle {
   display: flex;
@@ -5178,6 +5204,14 @@ input:checked + .slider:before {
   margin: auto !important;
   overflow-y: auto;
 }
+.kids-lock-col-kid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  width: 100%;
+}
 .kids-mascot-badge {
   width: 60px;
   height: 60px;
@@ -5470,10 +5504,17 @@ input:checked + .slider:before {
   }
   .kids-card {
     width: min(96vw, 420px);
-    padding: 16px 14px;
-    max-height: 88vh;
+    padding: 14px 14px;
+    max-height: 92vh;
     border-radius: 20px;
-    gap: 12px;
+    gap: 8px;
+  }
+  .kids-row-toggle.master-toggle {
+    padding: 10px 12px;
+  }
+  .kids-section-card {
+    padding: 10px 12px;
+    gap: 8px;
   }
   .kids-header {
     padding-bottom: 8px;
@@ -5549,27 +5590,147 @@ input:checked + .slider:before {
 }
 
 @media (max-height: 540px) and (orientation: landscape) {
-  /* Landscape phone */
+  /* Landscape phone: Settings Modal */
   .kids-card {
-    max-height: 94dvh;
-    padding: 10px 14px;
+    width: min(96vw, 760px);
+    max-height: min(94vh, 94dvh);
+    padding: 10px 16px;
     gap: 8px;
+    border-radius: 18px;
+  }
+  .kids-header {
+    padding-bottom: 6px;
+    gap: 8px;
+  }
+  .kids-header-icon {
+    font-size: 26px;
+  }
+  .kids-title {
+    font-size: 16px;
+  }
+  .kids-sub {
+    font-size: 11px;
+  }
+  .kids-close-btn {
+    font-size: 18px;
+    padding: 2px 6px;
+  }
+  
+  /* 2-column balanced grid for settings in landscape */
+  .kids-settings-layout {
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: 10px;
+    align-items: start;
+  }
+  .kids-form-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kids-form-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #kidsMasterToggleRow,
+  #kidsTimeSectionCard,
+  #kidsLivesSectionCard,
+  #kidsPinSectionCard,
+  #kidsFormActionsCol {
+    order: unset;
+  }
+  .kids-row-toggle.master-toggle {
+    padding: 6px 12px;
+    border-radius: 12px;
+  }
+  .kids-toggle-info b {
+    font-size: 13px;
+  }
+  .kids-toggle-sub {
+    display: none; /* Hide long subtext in landscape to keep it clean */
   }
   .kids-sections {
-    gap: 8px;
+    gap: 6px;
   }
   .kids-section-card {
-    padding: 8px 10px;
+    padding: 6px 10px;
+    gap: 4px;
+    border-radius: 12px;
+  }
+  .kids-section-title {
+    font-size: 12.5px;
+  }
+  .kids-chips {
+    gap: 4px;
+  }
+  .kids-chip {
+    padding: 4px 8px;
+    font-size: 11.5px;
+    border-radius: 8px;
+  }
+  .kids-custom-input-row {
+    padding: 3px 6px;
     gap: 6px;
   }
+  .kids-custom-label {
+    font-size: 11px;
+  }
+  .kids-input-num {
+    width: 60px;
+    padding: 2px 6px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  .kids-unit {
+    font-size: 11px;
+  }
+  .kids-pin-desc {
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
+  .kids-input-pin {
+    width: 85px;
+    padding: 4px 8px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  .kids-actions {
+    margin-top: 2px;
+    gap: 4px;
+  }
+  .kids-btn-save {
+    padding: 8px 14px;
+    font-size: 13.5px;
+    border-radius: 10px;
+  }
+  .kids-btn-disable {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  /* Landscape phone: Lock Screen */
   .kids-lock-card {
-    max-height: 94dvh;
-    padding: 10px 14px;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 14px;
+    align-items: center;
+    width: min(96vw, 760px);
+    max-height: min(94vh, 94dvh);
+    padding: 12px 18px;
+    border-radius: 20px;
+  }
+  .kids-lock-col-kid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 5px;
+    width: 100%;
   }
   .kids-mascot-badge {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
   }
   .kids-mascot-emoji {
     font-size: 24px;
@@ -5579,42 +5740,117 @@ input:checked + .slider:before {
     margin: 0;
   }
   .kids-lock-msg {
-    font-size: 11.5px;
+    font-size: 11px;
     line-height: 1.35;
     margin: 0;
+    max-width: 320px;
+  }
+  .kids-auto-unlock-pill {
+    padding: 3px 10px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  .kids-auto-unlock-pill b {
+    font-size: 12px;
   }
   .kids-lock-graphic {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin: 2px 0;
+    gap: 5px;
+    margin: 2px 0 0;
+    width: 100%;
   }
   .rest-tip-card {
-    padding: 6px 8px;
+    padding: 4px 6px;
     flex-direction: column;
     text-align: center;
-    gap: 4px;
-    border-radius: 10px;
+    gap: 3px;
+    border-radius: 9px;
   }
   .rest-tip-icon {
-    width: 28px;
-    height: 28px;
-    font-size: 15px;
+    width: 24px;
+    height: 24px;
+    font-size: 13px;
+    border-radius: 6px;
   }
   .rest-tip-text {
-    font-size: 11px;
-    line-height: 1.25;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  /* Right column: Parent zone in landscape */
   .kids-lock-parent-zone {
-    padding-top: 6px;
-    gap: 6px;
+    width: 100%;
+    border-top: none;
+    border-left: 1.5px dashed rgba(232, 182, 65, 0.25);
+    padding-top: 0;
+    padding-left: 14px;
+    gap: 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
   }
   .kids-btn-parent {
-    padding: 5px 14px;
-    font-size: 12px;
+    padding: 4px 12px;
+    font-size: 11.5px;
+    border-radius: 10px;
+    align-self: center;
+  }
+  .kids-lock-options-box {
+    padding: 8px 10px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+  .kids-options-title {
+    font-size: 11.5px;
+    text-align: center;
   }
   .kids-extend-btns {
-    grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
+    width: 100%;
+  }
+  #kidsUnlockAllBtn {
+    grid-column: span 2;
+    padding: 9px 4px;
+    font-size: 13px;
+  }
+  #kidsExtend15Btn,
+  #kidsExtend3LivesBtn {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  .kids-btn-lock-disable {
+    margin-top: 2px;
+    padding: 4px 12px;
+    font-size: 11px;
+    align-self: center;
+  }
+  .kids-lock-pin-box {
+    padding: 8px 10px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+  .kids-lock-pin-prompt {
+    font-size: 11.5px;
+    text-align: center;
+  }
+  .kids-lock-pin-row {
+    justify-content: center;
+    gap: 6px;
+  }
+  .kids-lock-pin-row .kids-input-pin {
+    width: 85px;
+    font-size: 15px;
+    padding: 4px 8px;
+  }
+  .kids-lock-pin-row .btn-green {
+    padding: 5px 12px;
+    font-size: 12px;
   }
 }

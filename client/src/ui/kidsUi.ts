@@ -248,7 +248,7 @@ export class KidsUiController {
       this.mgr.clearPin();
       if (this.pinInput) this.pinInput.value = '';
       this.updatePinSection();
-      this.showFeedbackToast('🔑 Đã xóa mã PIN phụ huynh!');
+      this.showFeedbackToast('🔑 Đã xóa mã PIN ba mẹ!');
     });
 
     // Save Button
@@ -266,14 +266,14 @@ export class KidsUiController {
     // Lock Screen: Parent zone toggle
     this.lockParentBtn?.addEventListener('click', () => {
       if (!this.mgr.hasPin()) {
-        // Chưa cài PIN -> Mở trực tiếp các tùy chọn gia hạn cho Bố Mẹ
+        // Chưa cài PIN -> Mở trực tiếp các tùy chọn gia hạn cho Ba Mẹ
         this.isParentUnlocked = true;
         if (this.lockPinBox) this.lockPinBox.hidden = true;
         if (this.lockOptionsBox) {
           this.lockOptionsBox.hidden = !this.lockOptionsBox.hidden;
         }
       } else {
-        // Đã cài PIN -> Nếu chưa unlock trong session thì mở ô nhập PIN
+        // Đã cài PIN -> Nếu đã unlock thì toggle Options, nếu chưa thì toggle PIN
         if (this.isParentUnlocked) {
           if (this.lockOptionsBox) {
             this.lockOptionsBox.hidden = !this.lockOptionsBox.hidden;
@@ -326,11 +326,13 @@ export class KidsUiController {
 
   private updateSectionsVisibility(): void {
     const isMaster = this.masterToggle?.checked ?? false;
-    const sections = document.getElementById('kidsConfigSections');
-    if (sections) {
-      sections.style.opacity = isMaster ? '1' : '0.45';
-      sections.style.pointerEvents = isMaster ? 'auto' : 'none';
-    }
+    ['kidsTimeSectionCard', 'kidsLivesSectionCard', 'kidsPinSectionCard'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.opacity = isMaster ? '1' : '0.45';
+        el.style.pointerEvents = isMaster ? 'auto' : 'none';
+      }
+    });
 
     const isTime = this.timeEnabledCheck?.checked ?? true;
     if (this.timeOptionsBox) {
@@ -561,6 +563,23 @@ export class KidsUiController {
     this.isParentUnlocked = false;
   }
 
+  private updateLockParentZone(): void {
+    if (!this.mgr.hasPin() || this.isParentUnlocked) {
+      if (this.lockPinBox) this.lockPinBox.hidden = true;
+      if (this.lockOptionsBox) {
+        this.lockOptionsBox.hidden = false;
+        this.lockOptionsBox.style.removeProperty('display');
+      }
+    } else {
+      if (this.lockPinBox) {
+        this.lockPinBox.hidden = false;
+        this.lockPinBox.style.removeProperty('display');
+        if (this.lockPinError) this.lockPinError.hidden = true;
+      }
+      if (this.lockOptionsBox) this.lockOptionsBox.hidden = true;
+    }
+  }
+
   private onStateChange(state: KidsModeState, config: KidsModeConfig): void {
     // 1. Update Top Bar Timer Widget (Chỉ hiện thời gian, highlight khi còn <= 30s)
     if (this.topTimerEl) {
@@ -628,6 +647,9 @@ export class KidsUiController {
         if (this.lockMsgEl) {
           this.lockMsgEl.textContent = state.lockReason === 'lives' ? t('kids_lock_lives_msg') : t('kids_lock_time_msg');
         }
+
+        // Luôn hiển thị sẵn khu vực cài đặt mở rộng của ba mẹ (không ẩn sau nút bấm)
+        this.updateLockParentZone();
 
         // Cập nhật đồng hồ đếm ngược tự động mở lại sau tối đa 1 tiếng
         if (this.autoUnlockTextEl) {

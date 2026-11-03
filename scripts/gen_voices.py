@@ -1,11 +1,10 @@
 """
 Generate static Vietnamese Voice Announcer MP3 clips for Farm Brawl using VieNeu-TTS v3 Turbo.
 Uses Southern Female voices:
-  - "Thùy Dung" (Nữ · Nam · Phong cách tin tức): Rõ chữ, dứt khoát cho thông báo chiến thuật & luật chơi.
-  - "Thục Đoan" (Nữ · Nam · Phong cách kể chuyện): Truyền cảm, tươi vui cho sự kiện lễ hội & phần thưởng.
+  - "Thùy Dung" (Nữ · Nam · Phong cách tin tức): Rõ chữ, dứt khoát cho thông báo chiến thuật, item, hạ gục & luật chơi.
+  - "Thục Đoan" (Nữ · Nam · Phong cách kể chuyện): Truyền cảm, tươi vui cho chào mừng, giờ chơi của bé, sự kiện lễ hội & phần thưởng.
 """
 
-import os
 import sys
 import time
 from pathlib import Path
@@ -15,9 +14,36 @@ from vieneu.v3turbo import V3TurboVieNeuTTS
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "client" / "public" / "voices" / "vi"
 
-# Danh sách 28 câu thông báo quan trọng (Không đọc tên người chơi, ngắn gọn, súc tích)
-VOICE_LINES: list[tuple[str, str, str]] = [
-    # (key, voice_name, text)
+SPECIES_VI: dict[str, str] = {
+    "chicken": "Gà",
+    "sheep": "Cừu",
+    "horse": "Ngựa",
+    "cow": "Bò",
+    "duck": "Vịt",
+    "pig": "Heo",
+    "dog": "Chó",
+    "elephant": "Voi",
+    "monkey": "Khỉ",
+    "gorilla": "Khỉ đột",
+    "mammoth": "Voi ma mút",
+}
+
+CAUSE_BY_VI: dict[str, str] = {
+    "fence": "húc vào hàng rào điện",
+    "drown": "húc chìm dưới ao nước",
+    "well": "húc rơi xuống hố sâu",
+    "fire": "húc vào lò lửa",
+    "dynamite": "cho nổ tung",
+    "crush": "cán dẹp lép",
+    "starve": "húc cạn sạch ký",
+}
+
+# Danh sách các câu thông báo cố định
+BASE_VOICE_LINES: list[tuple[str, str, str]] = [
+    # 0. Chào mừng vào trận & Kết thúc giờ chơi của bé (Windy)
+    ("welcome", "Thục Đoan", "Chào mừng đến với nông trại!"),
+    ("kids_lock", "Thục Đoan", "Kết thúc giờ chơi rồi Windy ơi, hãy nghỉ ngơi một chút nhé!"),
+
     # Nhóm A: Vương quyền & Bục Vinh Quang
     ("king_you", "Thùy Dung", "Bạn đã lên ngôi Vua nông trại! Hãy ban hành điều răn mới!"),
     ("king_new", "Thùy Dung", "Ngai vàng đã có chủ mới! Hãy cẩn thận!"),
@@ -52,11 +78,58 @@ VOICE_LINES: list[tuple[str, str, str]] = [
     ("self_super", "Thục Đoan", "Hóa siêu thú cầu vồng! Bấm húc để bay như tên lửa!"),
     ("self_gorilla", "Thùy Dung", "Đột phá ba tấn! Tiến hóa thành Khỉ đột khổng lồ!"),
     ("self_mammoth", "Thùy Dung", "Đột phá ba tấn! Tiến hóa thành Voi ma mút cổ đại!"),
-    ("self_heart_get", "Thục Đoan", "Đã nhận trái tim bảo hộ! Tự động hồi sinh khi gặp nạn!"),
+    ("self_heart_get", "Thục Đoan", "Trái tim bảo hộ!"),
     ("self_revive", "Thục Đoan", "Trái tim bảo hộ kích hoạt! Chuẩn bị hồi sinh!"),
     ("self_streak", "Thùy Dung", "Hạ gục liên hoàn! Không ai cản nổi bạn!"),
     ("match_win", "Thục Đoan", "Chiến thắng chung cuộc! Xin chúc mừng!"),
+
+    # Nhóm E: Các Item Đặc Biệt ngắn gọn 2-3 từ
+    ("item_speed", "Thùy Dung", "Giày tăng tốc!"),
+    ("item_dynamite", "Thùy Dung", "Pháo thuốc nổ!"),
+    ("item_shield", "Thùy Dung", "Khiên bảo vệ!"),
+    ("item_pitchfork", "Thùy Dung", "Chĩa ba cướp ký!"),
+    ("item_wheel", "Thùy Dung", "Bánh xe càn quét!"),
+    ("item_star", "Thục Đoan", "Trứng thần hộ vệ!"),
+    ("item_heart", "Thục Đoan", "Trái tim bảo hộ!"),
+    ("item_banana_monkey", "Thục Đoan", "Biến hình Khỉ!"),
+    ("item_banana_elephant", "Thục Đoan", "Biến hình Voi!"),
+
+    # Nhóm F: Hạ gục đối thủ (KO)
+    ("ko_double", "Thùy Dung", "Hai mạng liên tiếp!"),
+    ("ko_generic", "Thùy Dung", "Đã hạ gục đối thủ!"),
+    ("ko_chicken", "Thùy Dung", "Đã hạ gục Gà!"),
+    ("ko_sheep", "Thùy Dung", "Đã hạ gục Cừu!"),
+    ("ko_horse", "Thùy Dung", "Đã hạ gục Ngựa!"),
+    ("ko_cow", "Thùy Dung", "Đã hạ gục Bò!"),
+    ("ko_duck", "Thùy Dung", "Đã hạ gục Vịt!"),
+    ("ko_pig", "Thùy Dung", "Đã hạ gục Heo!"),
+    ("ko_dog", "Thùy Dung", "Đã hạ gục Chó!"),
+    ("ko_elephant", "Thùy Dung", "Đã hạ gục Voi!"),
+    ("ko_monkey", "Thùy Dung", "Đã hạ gục Khỉ!"),
+    ("ko_gorilla", "Thùy Dung", "Đã hạ gục Khỉ đột!"),
+    ("ko_mammoth", "Thùy Dung", "Đã hạ gục Voi ma mút!"),
+
+    # Nhóm G: Lý do tự chết do địa hình (Self Death Causes)
+    ("die_self_fence", "Thùy Dung", "Bạn tự lao vào hàng rào điện!"),
+    ("die_self_drown", "Thùy Dung", "Bạn bị chìm dưới ao nước!"),
+    ("die_self_well", "Thùy Dung", "Bạn rơi xuống đáy hố sâu!"),
+    ("die_self_fire", "Thùy Dung", "Bạn lao đầu vào lò lửa!"),
+    ("die_self_starve", "Thùy Dung", "Bạn đã kiệt sức vì đói!"),
+    ("die_self_till", "Thùy Dung", "Bạn bị xe máy cày cán dẹp lép!"),
+    ("die_self_dynamite", "Thùy Dung", "Bạn bị pháo nổ tung!"),
+    ("die_self_crush", "Thùy Dung", "Bạn đã bị cán dẹp lép!"),
 ]
+
+
+def build_all_voice_lines() -> list[tuple[str, str, str]]:
+    lines = list(BASE_VOICE_LINES)
+    # Nhóm H: Bị con vật khác hạ gục (11 con vật x 7 nguyên nhân)
+    for sp_key, sp_vi in SPECIES_VI.items():
+        for cause_key, cause_vi in CAUSE_BY_VI.items():
+            key = f"die_{sp_key}_{cause_key}"
+            text = f"Bạn bị {sp_vi} {cause_vi}!"
+            lines.append((key, "Thùy Dung", text))
+    return lines
 
 
 def normalize_peak(wav: np.ndarray, target_peak: float = 0.92) -> np.ndarray:
@@ -64,7 +137,7 @@ def normalize_peak(wav: np.ndarray, target_peak: float = 0.92) -> np.ndarray:
     wav = np.asarray(wav, dtype=np.float32)
     nonzero = np.flatnonzero(np.abs(wav) > 0.008)
     if nonzero.size > 0:
-        pad = int(0.04 * 48000)
+        pad = int(0.035 * 48000)
         start = max(0, int(nonzero[0]) - pad)
         end = min(len(wav), int(nonzero[-1]) + pad)
         wav = wav[start:end]
@@ -79,18 +152,21 @@ def main() -> None:
     force = "--force" in sys.argv
     precision = "int8" if "--int8" in sys.argv else "fp32"
 
+    all_lines = build_all_voice_lines()
+    pending = [item for item in all_lines if force or not (OUT_DIR / f"{item[0]}.mp3").exists()]
+    print(f"[*] Tổng số câu: {len(all_lines)} | Cần sinh mới: {len(pending)}")
+    if not pending:
+        print("[+] Tất cả file âm thanh đã tồn tại!")
+        return
+
     print(f"[*] Khởi tạo VieNeu-TTS v3 Turbo (ONNX CPU, precision={precision})...")
     t0 = time.time()
     tts = V3TurboVieNeuTTS(backend="onnx", precision=precision)
     print(f"[+] Model sẵn sàng sau {time.time() - t0:.1f}s. Thư mục xuất: {OUT_DIR}")
 
-    total = len(VOICE_LINES)
-    for idx, (key, voice_name, text) in enumerate(VOICE_LINES, 1):
+    total = len(pending)
+    for idx, (key, voice_name, text) in enumerate(pending, 1):
         out_path = OUT_DIR / f"{key}.mp3"
-        if out_path.exists() and not force:
-            print(f"[{idx:02d}/{total:02d}] Bỏ qua (đã có): {key}.mp3")
-            continue
-
         t_start = time.time()
         wav = tts.infer(
             text=text,
@@ -103,7 +179,7 @@ def main() -> None:
         elapsed = time.time() - t_start
         size_kb = out_path.stat().st_size / 1024.0
         dur_s = len(wav) / tts.sample_rate
-        print(f"[{idx:02d}/{total:02d}] {key}.mp3 ({voice_name}) -> {dur_s:.2f}s | {size_kb:.1f} KB | gen: {elapsed:.2f}s")
+        print(f"[{idx:03d}/{total:03d}] {key}.mp3 ({voice_name}) -> {dur_s:.2f}s | {size_kb:.1f} KB | gen: {elapsed:.2f}s")
 
     tts.close()
     print("[+] Hoàn tất sinh toàn bộ gói âm thanh thông báo!")
