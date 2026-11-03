@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Quy tắc cho phòng chơi bạn bè (Friend Rooms / Lobby Presence)
+    match /rooms/{roomId} {
+      // Cho phép tất cả người chơi đọc thông tin phòng (mã phòng, số người, host)
+      allow read: if true;
+
+      // Cho phép tạo hoặc cập nhật phòng chơi với định dạng mã phòng hợp lệ (3 đến 16 ký tự)
+      allow create, update: if roomId.size() >= 3 && roomId.size() <= 16;
+
+      // Cho phép xóa phòng khi phòng kết thúc hoặc chủ phòng rời đi
+      allow delete: if true;
+    }
+
+    // 2. Khóa toàn bộ các collection khác để bảo vệ an toàn tuyệt đối
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
