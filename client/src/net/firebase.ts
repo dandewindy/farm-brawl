@@ -11,7 +11,7 @@ export interface FriendRoomMeta {
   updatedAt: number;
 }
 
-const FIREBASE_API_KEY = (import.meta as any).env?.VITE_FIREBASE_API_KEY || '';
+const FIREBASE_API_KEY = (import.meta as any).env?.VITE_FIREBASE_API_KEY || 'AIzaSyBDgKuwPN1fUZ2sSv4PmfcsQe-OBepjk5U';
 const FIRESTORE_PROJECT_ID = (import.meta as any).env?.VITE_FIRESTORE_PROJECT_ID || 'farm-arena-game';
 const FIRESTORE_DATABASE_ID = (import.meta as any).env?.VITE_FIRESTORE_DATABASE_ID || 'farmarena';
 
