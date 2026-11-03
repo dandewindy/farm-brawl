@@ -3005,7 +3005,31 @@ export class AnimalRenderer {
     // Dust particles
     vis.dust -= dt;
     if (vis.dust <= 0) {
-      if (isWater && vis.species !== 'duck') {
+      if (isMonkeyLeap) {
+        // Làn hơi khi Khỉ/Gorilla nhảy: bám theo thân con vật trên quỹ đạo cung (lên cao rồi vòng xuống)
+        vis.dust = 0.02;
+        const tailOff = r * 0.95;
+        const emitX = x - Math.cos(angle) * tailOff;
+        const emitY = bodyY + 0.25 * sc;
+        const emitZ = z - Math.sin(angle) * tailOff;
+
+        // Bụi mây hơi bồng bềnh bám theo thân ở độ cao 3D
+        const vaporCol = isSuper
+          ? (Math.random() < 0.5 ? 0xff80df : 0x80d8ff)
+          : (Math.random() < 0.6 ? 0xffffff : 0xf1f5f9);
+        this.onPuff?.(
+          emitX + (Math.random() - 0.5) * 0.25 * r,
+          emitY + (Math.random() - 0.5) * 0.2 * r,
+          emitZ + (Math.random() - 0.5) * 0.25 * r,
+          vaporCol,
+          (1.15 + Math.random() * 0.45) * r,
+          0.42,
+          0.05
+        );
+
+        // Vệt gió khí động học vuốt dài sau lưng bám theo độ cao thân
+        this.onWindTrail?.(x, emitY, z, angle, r * 1.15, speed);
+      } else if (isWater && vis.species !== 'duck') {
         vis.dust = 0.32; // 25% less frequent
         this.onPuff?.(x - Math.cos(angle) * r, 0.12, z - Math.sin(angle) * r, 0xbfe3ff, 0.55 * r, 0.5, 0.8);
       } else if (isCharging) {
@@ -3056,7 +3080,8 @@ export class AnimalRenderer {
         if (vis.shockwaveTimer >= 0.065) {
           vis.shockwaveTimer = 0;
           const swColor = Math.random() < 0.5 ? 0x64d8cb : 0xe0f7fa;
-          this.spawnShockwave(x, y + 0.1, z, r * 1.15, swColor);
+          // Khi đang nhảy (Khỉ/Gorilla) không vẽ vòng sóng dưới đất mà để sóng âm bám theo thân
+          if (!isMonkeyLeap) this.spawnShockwave(x, y + 0.1, z, r * 1.15, swColor);
           this.onSonicWave?.(x, bodyY + 0.3, z, r);
         }
       }

@@ -2825,6 +2825,49 @@ describe('fruit trees', () => {
       // Revives with 3s immunity shield
       expect(p.shieldT).toBeGreaterThan(0);
     });
+
+    it('preserves morphed species (e.g. elephant from monkey) upon heart revive instead of reverting to monkey', () => {
+      const w = emptyWorld();
+      const id = w.addPlayer('PlayerMonkey', 'monkey', false);
+      const p = w.players.get(id)!;
+      expect(p.species).toBe('monkey');
+
+      // Morph into elephant (like banana item)
+      p.morphOrigSpecies = 'monkey';
+      p.species = 'elephant';
+      p.morphT = 25;
+      p.hasHeart = true;
+
+      // Kill player with hazard
+      (w as any).kill(p, 'fence');
+
+      expect(p.heartReviving).toBe(true);
+      // Species must still be elephant!
+      expect(p.species).toBe('elephant');
+      expect(p.morphOrigSpecies).toBe('monkey');
+
+      // Step past 3.0s until revived
+      for (let i = 0; i < Math.ceil(3.2 / DT); i++) {
+        w.step();
+      }
+      expect(p.heartReviving).toBe(false);
+      expect(p.alive).toBe(true);
+      expect(p.species).toBe('elephant');
+      expect(p.morphOrigSpecies).toBe('monkey');
+      expect(p.morphT).toBeGreaterThan(0);
+
+      // Verify that player has elephant ability (normal dash), NOT monkey banana throw
+      p.input.btn = true;
+      p.input.a = 0;
+      w.step();
+      p.input.btn = false;
+      w.step();
+      // Elephant dashes forward
+      expect(p.dashT).toBeGreaterThan(0);
+      expect(p.monkeyLeapT).toBe(0);
+      // No banana projectile created
+      expect((w as any).projectiles?.length || 0).toBe(0);
+    });
   });
 });
 

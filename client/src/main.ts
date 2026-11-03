@@ -1426,6 +1426,7 @@ const gameState = new GameState({
     }
     if (!isReconnecting) {
       hud.showBanner(t('welcome'), t('welcomeSub'));
+      voiceAnnouncer.onWelcome();
       prevMass = CFG.START_MASS;
       gainAcc = 0;
       gainTimer = 0;
@@ -1613,6 +1614,7 @@ function handleGameEvent(ev: GameEvent): void {
     myId,
     napoleonId: gameState.napoleonId,
     myTeam: hud.selectedMode === 'team' ? hud.selectedTeam : undefined,
+    metas: gameState.metas,
   });
   switch (ev.k) {
     case 'hit': {

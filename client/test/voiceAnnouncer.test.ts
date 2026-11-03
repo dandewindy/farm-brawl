@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { voiceAnnouncer, ENABLE_VOICE_ANNOUNCER } from '../src/audio/voiceAnnouncer';
+import type { PlayerMeta } from '@shared/protocol';
 
-describe('VoiceAnnouncer (Decoupled Module)', () => {
+describe('VoiceAnnouncer (Decoupled Preemptive Module)', () => {
   beforeEach(() => {
+    voiceAnnouncer.stopCurrent();
     voiceAnnouncer.setEnabled(true);
   });
 
@@ -17,36 +19,75 @@ describe('VoiceAnnouncer (Decoupled Module)', () => {
     expect(voiceAnnouncer.isEnabled()).toBe(true);
   });
 
-  it('triggers only on high-impact events and ignores minor combat noise', () => {
+  it('plays welcome, special items, death causes with killer species, and KOs', () => {
     const playSpy = vi.spyOn(voiceAnnouncer, 'play').mockImplementation(() => {});
+    const metas = new Map<number, PlayerMeta>([
+      [1, { id: 1, name: 'Player', species: 'dog', skin: 0, bot: false }],
+      [2, { id: 2, name: 'BotHeo', species: 'pig', skin: 0, bot: true }],
+      [3, { id: 3, name: 'BotGa', species: 'chicken', skin: 0, bot: true }],
+    ]);
 
-    // 1. Minor events (hit, join, leave, normal bot death) -> MUST BE IGNORED
-    voiceAnnouncer.handleEvent({ k: 'hit', a: 1, v: 2, x: 0, z: 0, s: 20 }, { myId: 1, napoleonId: 3 });
-    voiceAnnouncer.handleEvent({ k: 'join', id: 5, name: 'Bot', species: 'pig', skin: 0, bot: true }, { myId: 1, napoleonId: 3 });
-    voiceAnnouncer.handleEvent({ k: 'leave', id: 5 }, { myId: 1, napoleonId: 3 });
+    // 1. Welcome
+    voiceAnnouncer.onWelcome();
+    expect(playSpy).toHaveBeenCalledWith('welcome', 3);
+
+    // 2. Special items (2-3 words)
+    voiceAnnouncer.handleEvent({ k: 'tool', id: 1, kind: 'speed', x: 0, z: 0 }, { myId: 1, napoleonId: 0, metas });
+    expect(playSpy).toHaveBeenCalledWith('item_speed', 3);
+
+    voiceAnnouncer.handleEvent({ k: 'tool', id: 1, kind: 'dynamite', x: 0, z: 0 }, { myId: 1, napoleonId: 0, metas });
+    expect(playSpy).toHaveBeenCalledWith('item_dynamite', 3);
+
+    voiceAnnouncer.handleEvent({ k: 'tool', id: 1, kind: 'shield', x: 0, z: 0 }, { myId: 1, napoleonId: 0, metas });
+    expect(playSpy).toHaveBeenCalledWith('item_shield', 3);
+
+    // 3. Killed by another animal (Pig + fence -> die_pig_fence)
     voiceAnnouncer.handleEvent(
-      { k: 'die', id: 4, by: 2, cause: 'fence', x: 0, z: 0, mass: 30, best: 30, kills: 0, alive: 5, spoils: 10, streak: 1 },
-      { myId: 1, napoleonId: 3 }
+      { k: 'die', id: 1, by: 2, cause: 'fence', x: 0, z: 0, mass: 50, best: 50, kills: 1, alive: 10, spoils: 20, streak: 0 },
+      { myId: 1, napoleonId: 0, metas }
     );
-    expect(playSpy).not.toHaveBeenCalled();
+    expect(playSpy).toHaveBeenCalledWith('die_pig_fence', 1);
 
-    // 2. Player becomes King -> Priority 1 'king_you'
-    voiceAnnouncer.handleEvent({ k: 'napoleon', id: 1 }, { myId: 1, napoleonId: 1 });
-    expect(playSpy).toHaveBeenCalledWith('king_you', 1);
+    // 4. Self death by hazard (by = 0, drown -> die_self_drown)
+    voiceAnnouncer.handleEvent(
+      { k: 'die', id: 1, by: 0, cause: 'drown', x: 0, z: 0, mass: 50, best: 50, kills: 1, alive: 10, spoils: 0, streak: 0 },
+      { myId: 1, napoleonId: 0, metas }
+    );
+    expect(playSpy).toHaveBeenCalledWith('die_self_drown', 1);
 
-    // 3. New Commandment Rule -> Priority 1 'rule_titan'
-    voiceAnnouncer.handleEvent({ k: 'rule', id: 'titan' }, { myId: 1, napoleonId: 1 });
-    expect(playSpy).toHaveBeenCalledWith('rule_titan', 1);
-
-    // 4. Self Gorilla evolution -> Priority 1 'self_gorilla'
-    voiceAnnouncer.handleEvent({ k: 'morph', id: 1, species: 'gorilla', dur: 0 }, { myId: 1, napoleonId: 2 });
-    expect(playSpy).toHaveBeenCalledWith('self_gorilla', 1);
-
-    // 5. Other player morph -> Ignored
-    playSpy.mockClear();
-    voiceAnnouncer.handleEvent({ k: 'morph', id: 2, species: 'gorilla', dur: 0 }, { myId: 1, napoleonId: 2 });
-    expect(playSpy).not.toHaveBeenCalled();
+    // 5. Player eliminates enemy Chicken (streak = 1 -> ko_chicken)
+    voiceAnnouncer.handleEvent(
+      { k: 'die', id: 3, by: 1, cause: 'fence', x: 0, z: 0, mass: 30, best: 30, kills: 0, alive: 5, spoils: 15, streak: 1 },
+      { myId: 1, napoleonId: 0, metas }
+    );
+    expect(playSpy).toHaveBeenCalledWith('ko_chicken', 3);
 
     playSpy.mockRestore();
+  });
+
+  it('preempts lower or equal priority announcements and protects higher priority ones', () => {
+    const stopSpy = vi.spyOn(voiceAnnouncer, 'stopCurrent');
+
+    // Start playing a Priority 3 item voice
+    voiceAnnouncer.play('item_speed', 3);
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+
+    // A lower priority event (Priority 4 map_warn) arrives while Priority 3 is active -> ignored!
+    voiceAnnouncer.play('map_warn', 4);
+    expect(stopSpy).toHaveBeenCalledTimes(1); // Did NOT stop current!
+
+    // An equal priority event (Priority 3 item_shield) arrives -> preempts!
+    voiceAnnouncer.play('item_shield', 3);
+    expect(stopSpy).toHaveBeenCalledTimes(2);
+
+    // A higher priority event (Priority 1 die_pig_fence) arrives -> preempts!
+    voiceAnnouncer.play('die_pig_fence', 1);
+    expect(stopSpy).toHaveBeenCalledTimes(3);
+
+    // While Priority 1 is active, Priority 2 (rule_titan) cannot interrupt it!
+    voiceAnnouncer.play('rule_titan', 2);
+    expect(stopSpy).toHaveBeenCalledTimes(3);
+
+    stopSpy.mockRestore();
   });
 });

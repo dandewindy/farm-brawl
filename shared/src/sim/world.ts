@@ -3262,16 +3262,9 @@ export class World {
       p.treeShakeTimer = undefined;
       p.treeShakeDropStage = undefined;
       p.mammothRoarT = 0;
-      if (p.species === 'gorilla') {
-        p.species = 'monkey';
-      } else if (p.species === 'mammoth') {
-        p.species = 'elephant';
-      }
-      if (p.morphOrigSpecies) {
-        p.species = p.morphOrigSpecies;
-        delete p.morphOrigSpecies;
-        delete p.morphT;
-      }
+      // Hồi sinh bằng Trái Tim giữ nguyên hình dạng hiện tại (kể cả đang biến hình từ chuối, Gorilla/Mammoth)
+      // vì client chỉ đồng bộ loài qua sự kiện 'morph' — đổi loài ngầm ở đây khiến hình là Voi nhưng kỹ năng lại là Khỉ.
+      // Thời gian biến hình còn lại (morphT) tạm dừng trong 3s hồi sinh và tiếp tục đếm sau khi sống lại.
       for (const [mid, m] of this.minions) {
         if (m.ownerId === p.id) this.minions.delete(mid);
       }
