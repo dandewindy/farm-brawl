@@ -127,4 +127,35 @@ describe('KidsPlayManager', () => {
     expect(mgr.state.isLocked).toBe(false);
     expect(mgr.state.timeRemainingSec).toBe(10 * 60);
   });
+
+  it('unlockAndReset resets full playtime and lives for a fresh session', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 20, true, 5, '4321');
+    mgr.lock('lives');
+    expect(mgr.state.isLocked).toBe(true);
+
+    mgr.unlockAndReset();
+    expect(mgr.state.isLocked).toBe(false);
+    expect(mgr.state.timeRemainingSec).toBe(20 * 60);
+    expect(mgr.state.livesRemaining).toBe(5);
+  });
+
+  it('restores lives when extending time if lives were zero, and restores time when extending lives if time was zero', () => {
+    const mgr = KidsPlayManager.getInstance();
+    mgr.updateLimits(true, true, 20, true, 5);
+
+    // Case 1: Locked on lives (0 lives remaining), parent extends 15 minutes
+    mgr.state.livesRemaining = 0;
+    mgr.lock('lives');
+    mgr.extendTime(15);
+    expect(mgr.state.isLocked).toBe(false);
+    expect(mgr.state.livesRemaining).toBeGreaterThan(0);
+
+    // Case 2: Locked on time (0 time remaining), parent extends 3 lives
+    mgr.state.timeRemainingSec = 0;
+    mgr.lock('time');
+    mgr.extendLives(3);
+    expect(mgr.state.isLocked).toBe(false);
+    expect(mgr.state.timeRemainingSec).toBeGreaterThan(0);
+  });
 });

@@ -59,9 +59,11 @@ export class KidsPlayManager {
 
   private listeners: Array<(state: KidsModeState, config: KidsModeConfig) => void> = [];
   private warningTriggered = false;
+  private timerInterval: any = null;
 
   private constructor() {
     this.loadFromStorage();
+    this.startBackgroundClock();
   }
 
   public static getInstance(): KidsPlayManager {
@@ -69,6 +71,17 @@ export class KidsPlayManager {
       KidsPlayManager.instance = new KidsPlayManager();
     }
     return KidsPlayManager.instance;
+  }
+
+  public startBackgroundClock(): void {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+    // Background interval: 1000ms wall-clock cadence
+    this.timerInterval = setInterval(() => {
+      this.tickWallClock();
+    }, 1000);
   }
 
   public subscribe(fn: (state: KidsModeState, config: KidsModeConfig) => void): () => void {
@@ -79,7 +92,7 @@ export class KidsPlayManager {
     };
   }
 
-  private notify(): void {
+  public notify(): void {
     this.listeners.forEach((fn) => fn(this.state, this.config));
   }
 
@@ -122,8 +135,11 @@ export class KidsPlayManager {
         this.state = { ...this.state, ...parsed };
 
         // Kiểm tra nếu đã bị khóa và đã qua 1 tiếng -> Tự động mở khóa!
-        if (this.state.isLocked && this.state.lockedAtTs) {
+        if (this.state.isLocked) {
           const now = Date.now();
+          if (!this.state.lockedAtTs) {
+            this.state.lockedAtTs = now;
+          }
           if ((now - this.state.lockedAtTs) >= MAX_LOCK_DURATION_SEC * 1000) {
             this.resetSession();
             return;
@@ -134,7 +150,6 @@ export class KidsPlayManager {
         if (this.config.enabled && !this.state.isLocked && this.config.timeLimitEnabled) {
           const now = Date.now();
           const elapsedSec = Math.max(0, (now - (this.state.lastTickTs || now)) / 1000);
-          // Giới hạn trừ tối đa thời gian trôi qua
           if (elapsedSec > 0 && elapsedSec < 24 * 3600) {
             this.state.timeRemainingSec = Math.max(0, this.state.timeRemainingSec - elapsedSec);
           }
@@ -184,6 +199,7 @@ export class KidsPlayManager {
     } else {
       this.state.isLocked = false;
       this.state.lockReason = null;
+      this.state.lockedAtTs = undefined;
       this.saveState();
       this.notify();
     }
@@ -207,9 +223,62 @@ export class KidsPlayManager {
   }
 
   public getAutoUnlockRemainingSec(): number {
-    if (!this.state.isLocked || !this.state.lockedAtTs) return 0;
+    if (!this.state.isLocked) return 0;
+    if (!this.state.lockedAtTs) {
+      this.state.lockedAtTs = Date.now();
+    }
     const elapsed = (Date.now() - this.state.lockedAtTs) / 1000;
     return Math.max(0, Math.floor(MAX_LOCK_DURATION_SEC - elapsed));
+  }
+
+  /**
+   * Đồng hồ đếm ngược độc lập chạy mỗi giây (1000ms wall-clock).
+   * Giúp đếm giờ chính xác không phụ thuộc vào FPS hay GPU rendering.
+   */
+  public tickWallClock(): void {
+    if (!this.config.enabled) return;
+
+    const now = Date.now();
+
+    // 1. Khi đang bị khóa: tự động mở sau 1 tiếng (3600s), đếm ngược trực tiếp mỗi giây
+    if (this.state.isLocked) {
+      if (!this.state.lockedAtTs) {
+        this.state.lockedAtTs = now;
+      }
+      const elapsed = (now - this.state.lockedAtTs) / 1000;
+      if (elapsed >= MAX_LOCK_DURATION_SEC) {
+        // Đã hết 1 tiếng -> Tự động mở khóa lượt mới cho bé!
+        this.resetSession();
+        return;
+      }
+      this.notify();
+      return;
+    }
+
+    // 2. Khi đang chơi: đếm ngược thời gian chơi
+    if (this.config.timeLimitEnabled) {
+      const last = this.state.lastTickTs || now;
+      const elapsedSec = Math.min(5, Math.max(0.5, (now - last) / 1000));
+      this.state.lastTickTs = now;
+      this.state.timeRemainingSec = Math.max(0, this.state.timeRemainingSec - elapsedSec);
+
+      if (this.state.timeRemainingSec <= 120 && !this.warningTriggered) {
+        this.warningTriggered = true;
+      }
+
+      if (this.state.timeRemainingSec <= 0) {
+        this.lock('time');
+        return;
+      }
+
+      if (Math.floor(this.state.timeRemainingSec) % 5 === 0) {
+        this.saveState();
+      }
+    } else {
+      this.state.lastTickTs = now;
+    }
+
+    this.notify();
   }
 
   public tick(dtSec: number): void {
@@ -225,28 +294,23 @@ export class KidsPlayManager {
       return;
     }
 
-    this.state.lastTickTs = Date.now();
+    // Hỗ trợ vitest tests hoặc bước nhảy thời gian lớn dtSec >= 1s
+    if (dtSec >= 1) {
+      this.state.lastTickTs = Date.now();
+      if (this.config.timeLimitEnabled) {
+        this.state.timeRemainingSec = Math.max(0, this.state.timeRemainingSec - dtSec);
 
-    if (this.config.timeLimitEnabled) {
-      this.state.timeRemainingSec = Math.max(0, this.state.timeRemainingSec - dtSec);
+        if (this.state.timeRemainingSec <= 120 && !this.warningTriggered) {
+          this.warningTriggered = true;
+        }
 
-      // Cảnh báo khi còn 2 phút
-      if (this.state.timeRemainingSec <= 120 && !this.warningTriggered) {
-        this.warningTriggered = true;
-        this.notify();
+        if (this.state.timeRemainingSec <= 0) {
+          this.lock('time');
+          return;
+        }
       }
-
-      if (this.state.timeRemainingSec <= 0) {
-        this.lock('time');
-        return;
-      }
+      this.notify();
     }
-
-    // Lưu định kỳ mỗi 5s
-    if (Math.floor(this.state.timeRemainingSec) % 5 === 0) {
-      this.saveState();
-    }
-    this.notify();
   }
 
   public consumeLife(): boolean {
@@ -271,20 +335,32 @@ export class KidsPlayManager {
     this.notify();
   }
 
+  public unlockAndReset(pin?: string): boolean {
+    if (pin !== undefined && !this.verifyPin(pin)) return false;
+    this.resetSession();
+    return true;
+  }
+
   public unlockWithPin(pin: string): boolean {
     if (!this.verifyPin(pin)) return false;
     this.state.isLocked = false;
     this.state.lockReason = null;
+    this.state.lockedAtTs = undefined;
     this.saveState();
     this.notify();
     return true;
   }
 
-  public extendTime(minutes: number, pin: string): boolean {
-    if (!this.verifyPin(pin)) return false;
+  public extendTime(minutes: number, pin?: string): boolean {
+    if (pin !== undefined && !this.verifyPin(pin)) return false;
     this.state.timeRemainingSec += minutes * 60;
+    // Nếu trước đó bị khóa do hết mạng, cấp thêm ít nhất 3 mạng để bé tiếp tục chơi được
+    if (this.config.livesLimitEnabled && this.state.livesRemaining <= 0) {
+      this.state.livesRemaining = Math.max(3, this.config.livesLimit);
+    }
     this.state.isLocked = false;
     this.state.lockReason = null;
+    this.state.lockedAtTs = undefined;
     this.state.lastTickTs = Date.now();
     this.warningTriggered = false;
     this.saveState();
@@ -292,21 +368,28 @@ export class KidsPlayManager {
     return true;
   }
 
-  public extendLives(lives: number, pin: string): boolean {
-    if (!this.verifyPin(pin)) return false;
+  public extendLives(lives: number, pin?: string): boolean {
+    if (pin !== undefined && !this.verifyPin(pin)) return false;
     this.state.livesRemaining += lives;
+    // Nếu trước đó bị khóa do hết giờ, cấp thêm ít nhất 15 phút để bé tiếp tục chơi được
+    if (this.config.timeLimitEnabled && this.state.timeRemainingSec <= 0) {
+      this.state.timeRemainingSec = Math.max(15 * 60, this.config.timeLimitMinutes * 60);
+    }
     this.state.isLocked = false;
     this.state.lockReason = null;
+    this.state.lockedAtTs = undefined;
+    this.state.lastTickTs = Date.now();
     this.saveState();
     this.notify();
     return true;
   }
 
-  public disableKidsMode(pin: string): boolean {
-    if (!this.verifyPin(pin)) return false;
+  public disableKidsMode(pin?: string): boolean {
+    if (pin !== undefined && !this.verifyPin(pin)) return false;
     this.config.enabled = false;
     this.state.isLocked = false;
     this.state.lockReason = null;
+    this.state.lockedAtTs = undefined;
     this.saveConfig();
     this.saveState();
     this.notify();

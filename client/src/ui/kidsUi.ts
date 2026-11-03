@@ -50,10 +50,12 @@ export class KidsUiController {
   private extend15Btn!: HTMLElement | null;
   private extend3LivesBtn!: HTMLElement | null;
   private unlockAllBtn!: HTMLElement | null;
+  private lockDisableBtn!: HTMLElement | null;
 
   private selectedMinutes = 20;
   private selectedLives = 5;
   private isPinVerifiedForSession = false;
+  private isParentUnlocked = false;
 
   private constructor() {
     this.initDOMElements();
@@ -112,6 +114,7 @@ export class KidsUiController {
     this.extend15Btn = document.getElementById('kidsExtend15Btn');
     this.extend3LivesBtn = document.getElementById('kidsExtend3LivesBtn');
     this.unlockAllBtn = document.getElementById('kidsUnlockAllBtn');
+    this.lockDisableBtn = document.getElementById('kidsLockDisableBtn');
   }
 
   private bindEvents(): void {
@@ -262,11 +265,27 @@ export class KidsUiController {
 
     // Lock Screen: Parent zone toggle
     this.lockParentBtn?.addEventListener('click', () => {
-      if (this.lockPinBox) {
-        this.lockPinBox.hidden = !this.lockPinBox.hidden;
-        if (!this.lockPinBox.hidden && this.lockPinInput) {
-          this.lockPinInput.value = '';
-          this.lockPinInput.focus();
+      if (!this.mgr.hasPin()) {
+        // Chưa cài PIN -> Mở trực tiếp các tùy chọn gia hạn cho Bố Mẹ
+        this.isParentUnlocked = true;
+        if (this.lockPinBox) this.lockPinBox.hidden = true;
+        if (this.lockOptionsBox) {
+          this.lockOptionsBox.hidden = !this.lockOptionsBox.hidden;
+        }
+      } else {
+        // Đã cài PIN -> Nếu chưa unlock trong session thì mở ô nhập PIN
+        if (this.isParentUnlocked) {
+          if (this.lockOptionsBox) {
+            this.lockOptionsBox.hidden = !this.lockOptionsBox.hidden;
+          }
+        } else {
+          if (this.lockPinBox) {
+            this.lockPinBox.hidden = !this.lockPinBox.hidden;
+            if (!this.lockPinBox.hidden && this.lockPinInput) {
+              this.lockPinInput.value = '';
+              this.lockPinInput.focus();
+            }
+          }
         }
       }
     });
@@ -279,26 +298,29 @@ export class KidsUiController {
       if (e.key === 'Enter') this.handleLockPinSubmit();
     });
 
-    // Lock Screen: Extend buttons
+    // Lock Screen: Action buttons
     this.extend15Btn?.addEventListener('click', () => {
-      const pin = this.lockPinInput?.value || '';
-      if (this.mgr.extendTime(15, pin)) {
-        this.hideLockOverlay();
-      }
+      this.mgr.extendTime(15);
+      this.hideLockOverlay();
+      this.showFeedbackToast('👶 Đã thêm +15 phút chơi cho bé! ✨');
     });
 
     this.extend3LivesBtn?.addEventListener('click', () => {
-      const pin = this.lockPinInput?.value || '';
-      if (this.mgr.extendLives(3, pin)) {
-        this.hideLockOverlay();
-      }
+      this.mgr.extendLives(3);
+      this.hideLockOverlay();
+      this.showFeedbackToast('👶 Đã thêm +3 mạng chơi cho bé! ✨');
     });
 
     this.unlockAllBtn?.addEventListener('click', () => {
-      const pin = this.lockPinInput?.value || '';
-      if (this.mgr.disableKidsMode(pin)) {
-        this.hideLockOverlay();
-      }
+      this.mgr.unlockAndReset();
+      this.hideLockOverlay();
+      this.showFeedbackToast('👶 Đã mở khóa lượt chơi mới cho bé! ✨');
+    });
+
+    this.lockDisableBtn?.addEventListener('click', () => {
+      this.mgr.disableKidsMode();
+      this.hideLockOverlay();
+      this.showFeedbackToast('👶 Đã tắt chế độ Giờ chơi của bé.');
     });
   }
 
@@ -513,12 +535,18 @@ export class KidsUiController {
   private handleLockPinSubmit(): void {
     const pin = this.lockPinInput?.value?.trim() || '';
     if (this.mgr.verifyPin(pin)) {
+      this.isParentUnlocked = true;
       if (this.lockPinBox) this.lockPinBox.hidden = true;
       if (this.lockOptionsBox) this.lockOptionsBox.hidden = false;
+      if (this.lockPinError) this.lockPinError.hidden = true;
     } else {
       if (this.lockPinError) {
         this.lockPinError.textContent = t('kids_pin_wrong');
         this.lockPinError.hidden = false;
+      }
+      if (this.lockPinInput) {
+        this.lockPinInput.value = '';
+        this.lockPinInput.focus();
       }
     }
   }
@@ -527,6 +555,7 @@ export class KidsUiController {
     if (this.lockOverlayEl) this.lockOverlayEl.hidden = true;
     if (this.lockOptionsBox) this.lockOptionsBox.hidden = true;
     if (this.lockPinBox) this.lockPinBox.hidden = true;
+    this.isParentUnlocked = false;
   }
 
   private onStateChange(state: KidsModeState, config: KidsModeConfig): void {
@@ -601,7 +630,7 @@ export class KidsUiController {
           const remSec = this.mgr.getAutoUnlockRemainingSec();
           const uMins = Math.floor(remSec / 60);
           const uSecs = Math.floor(remSec % 60);
-          this.autoUnlockTextEl.innerHTML = `Tự động mở lại sau: <b>${String(uMins).padStart(2, '0')}:${String(uSecs).padStart(2, '0')}</b> (hoặc khi Bố Mẹ mở khóa)`;
+          this.autoUnlockTextEl.innerHTML = `Tự động mở lại sau: <b>${String(uMins).padStart(2, '0')}:${String(uSecs).padStart(2, '0')}</b>`;
         }
       } else {
         this.hideLockOverlay();

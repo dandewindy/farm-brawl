@@ -5253,6 +5253,25 @@ input:checked + .slider:before {
   font-size: 12px;
   font-weight: 800;
 }
+.kids-btn-lock-disable {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #cfd8dc;
+  font-family: 'Baloo 2', cursive, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  align-self: center;
+  transition: all 0.2s ease;
+}
+.kids-btn-lock-disable:hover {
+  background: rgba(239, 83, 80, 0.2);
+  border-color: #ef5350;
+  color: #ffcdd2;
+}
 
 /* Responsive adjustments for Mobile & iPad */
 @media (max-width: 600px) {
