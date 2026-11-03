@@ -2358,10 +2358,15 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.smokePoof(mx, 1.2, mz, Math.max(1.6, r * 1.3), 40);
         if (ev.id === myId) {
           sfxReward();
-          hud.showBanner(
-            ev.species === 'monkey' ? '🐒 Biến hình thành Khỉ!' : '🐘 Biến hình thành Voi!',
-            ev.dur > 0 ? t('tk_banana') : t('sp_' + ev.species)
-          );
+          const isMonkey = ev.species === 'monkey';
+          const isElephant = ev.species === 'elephant';
+          const head = isMonkey ? '🐒 ' + t('morph_monkey')
+            : isElephant ? '🐘 ' + t('morph_elephant')
+            : '✨ ' + (t('name_' + ev.species) || ev.species);
+          const sub = isMonkey ? t('banner_morph_monkey')
+            : isElephant ? t('banner_morph_elephant')
+            : (t('sp_' + ev.species) || '');
+          hud.showBanner(head, sub);
         }
       }
       break;

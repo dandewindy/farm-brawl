@@ -2379,12 +2379,15 @@ export class HudManager {
     this.bannerEl.innerHTML = '';
     const h = document.createElement('span');
     h.className = 'head';
-    h.textContent = head;
+    const trimmedHead = (head || '').trim();
+    h.textContent = trimmedHead.length > 45 ? trimmedHead.slice(0, 42) + '...' : trimmedHead;
     this.bannerEl.appendChild(h);
     if (sub) {
       const s = document.createElement('span');
       s.className = 'sub';
-      s.textContent = sub;
+      // Safety clamp: keep red banner punchy and readable without overflowing
+      const trimmedSub = sub.trim();
+      s.textContent = trimmedSub.length > 85 ? trimmedSub.slice(0, 82) + '...' : trimmedSub;
       this.bannerEl.appendChild(s);
     }
     this.bannerEl.classList.remove('show');
