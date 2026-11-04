@@ -2219,12 +2219,16 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'monkeyLeap': {
       const isMe = ev.id === myId;
-      if (isMe && !ev.bounce) {
-        // Người chơi cục bộ đã kích hoạt cú nhảy ban đầu này từ input.onReleaseRam!
-        // Chỉ đồng bộ thông số độ cao/thời lượng, không kích hoạt nhảy lại lần 2
-        animals.syncLeapParams(ev.id, ev.dur, ev.height);
+      if (isMe) {
+        if (ev.bounce) {
+          predictor.predictBounceLeap(ev.dur);
+          animals.notifyLeap(ev.id, ev.dur, ev.height, true);
+        } else {
+          // Người chơi cục bộ đã kích hoạt cú nhảy ban đầu này từ input.onReleaseRam!
+          // Chỉ đồng bộ thông số độ cao/thời lượng, không kích hoạt nhảy lại lần 2
+          animals.syncLeapParams(ev.id, ev.dur, ev.height);
+        }
       } else {
-        // Con vật khác nhảy, hoặc cú nảy quán tính thực sự do server xác nhận va chạm
         animals.notifyLeap(ev.id, ev.dur, ev.height, !!ev.bounce);
       }
       if (ev.rainbow) {

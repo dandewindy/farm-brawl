@@ -49,6 +49,8 @@ interface AnimalVisual {
   leapDur?: number;
   leapHeight?: number;
   leapDone?: boolean;
+  leapActive?: boolean;
+  lastLeapStart?: number;
   morphTimer?: number;
   throwTimer?: number;
   mudSplats: THREE.Mesh[];
@@ -2300,18 +2302,29 @@ export class AnimalRenderer {
   notifyLeap(id: number, dur: number, height: number, isBounce = false): void {
     const vis = this.visuals.get(id);
     if (vis) {
-      vis.leapDur = dur;
-      vis.leapHeight = height;
+      const now = performance.now();
       if (isBounce) {
-        // Cú nhảy nảy quán tính do server xác nhận: reset timer để bay tiếp
+        // Cú nhảy nảy quán tính do server xác nhận va chạm trực tiếp với con vật khác: reset timer để nảy tiếp
+        vis.leapDur = dur;
+        vis.leapHeight = height;
         vis.leapTimer = 0;
         vis.leapDone = false;
+        vis.leapActive = true;
+        vis.lastLeapStart = now;
       } else {
-        // Cú nhảy ban đầu: chỉ khởi chạy nếu chưa ở trong trạng thái đang nhảy
-        if (!vis.leapTimer || vis.leapTimer <= 0) {
-          vis.leapTimer = 0;
-          vis.leapDone = false;
+        // Cú nhảy ban đầu: chặn tuyệt đối kích hoạt trùng lặp khi đang nhảy hoặc vừa mới nhảy xong
+        const minCooldownMs = ((vis.leapDur || dur) * 1000) + 250;
+        if (vis.leapActive || (vis.lastLeapStart && (now - vis.lastLeapStart) < minCooldownMs)) {
+          vis.leapDur = dur;
+          vis.leapHeight = height;
+          return;
         }
+        vis.leapDur = dur;
+        vis.leapHeight = height;
+        vis.leapTimer = 0;
+        vis.leapDone = false;
+        vis.leapActive = true;
+        vis.lastLeapStart = now;
       }
     }
   }
@@ -2470,26 +2483,22 @@ export class AnimalRenderer {
     const isFlying = (flags & FLAG.FLYING) !== 0;
     const isSquished = (flags & FLAG.SQUISHED) !== 0;
     const isWheel = (flags & FLAG.WHEEL) !== 0;
-    const isMonkeyLeap = (flags & FLAG.MONKEY_LEAP) !== 0;
     const isTreeShake = (flags & FLAG.TREE_SHAKE) !== 0;
     const isMammothRoar = (flags & FLAG.MAMMOTH_ROAR) !== 0;
     const lvl = (charge || 0) / 10;
 
-    const isLeapingVisual = isMonkeyLeap || (vis.leapTimer !== undefined && vis.leapTimer > 0 && !vis.leapDone);
-    if (isLeapingVisual) {
-      if (!vis.leapDone) {
-        vis.leapTimer = (vis.leapTimer || 0) + dt;
-        if (vis.leapTimer >= (vis.leapDur || 0.7)) {
-          vis.leapTimer = vis.leapDur || 0.7;
-          vis.leapDone = true; // Tiếp đất hoàn tất! Giữ chắc trên đất, không bao giờ tự ý lặp lại cú nhảy thứ 2
-        }
+    if (vis.leapActive) {
+      vis.leapTimer = (vis.leapTimer || 0) + dt;
+      if (vis.leapTimer >= (vis.leapDur || 0.7)) {
+        vis.leapActive = false;
+        vis.leapDone = true;
+        vis.leapTimer = 0;
+        vis.leapDur = undefined;
+        vis.leapHeight = undefined;
       }
-    } else {
-      vis.leapTimer = 0;
-      vis.leapDone = false;
-      vis.leapDur = undefined;
-      vis.leapHeight = undefined;
     }
+    const isLeapingVisual = !!vis.leapActive;
+    const isMonkeyLeap = isLeapingVisual;
 
     // Smooth squish factor transition: fast flatten on impact (dt * 16), gentle cartoon pop back up (dt * 5)
     vis.squishFactor = isSquished

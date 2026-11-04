@@ -127,13 +127,10 @@ export class ClientPredictor {
     }
 
     const isServerStun = (flags & 8) !== 0;
-    const isServerLeaping = (flags & FLAG.MONKEY_LEAP) !== 0;
-    if (isServerLeaping) {
-      this.isLeaping = true;
+    this.isLeaping = this.leapT > 0;
+    if (this.isLeaping) {
       this.stunned = false;
       this.stunT = 0;
-    } else if (this.leapT <= 0) {
-      this.isLeaping = false;
     }
     if (isServerStun && !this.isLeaping) {
       if (!this.stunned) {
@@ -155,6 +152,20 @@ export class ClientPredictor {
     this.sx = x;
     this.sz = z;
     this.sTick = snapTick;
+  }
+
+  predictBounceLeap(dur: number): void {
+    if (!this.on) return;
+    const bounceDist = 7.5;
+    const bounceSpeed = bounceDist / dur;
+    this.vx = Math.cos(this.a) * bounceSpeed;
+    this.vz = Math.sin(this.a) * bounceSpeed;
+    this.dashT = dur;
+    this.leapT = dur;
+    this.isLeaping = true;
+    this.plow = false;
+    this.stunned = false;
+    this.stunT = 0;
   }
 
   predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false, _dashSeq?: number): void {
