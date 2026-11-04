@@ -2301,7 +2301,10 @@ export class AnimalRenderer {
     if (vis) {
       vis.leapDur = dur;
       vis.leapHeight = height;
-      vis.leapTimer = 0;
+      // Tránh reset timer về 0 nếu đang trong quỹ đạo nhảy (đặc biệt local player đã bắt đầu trước từ prediction)
+      if (!vis.leapTimer || vis.leapTimer <= 0 || vis.leapTimer >= dur * 0.75) {
+        vis.leapTimer = 0;
+      }
     }
   }
 
@@ -2456,8 +2459,14 @@ export class AnimalRenderer {
     const isMammothRoar = (flags & FLAG.MAMMOTH_ROAR) !== 0;
     const lvl = (charge || 0) / 10;
 
-    if (isMonkeyLeap) {
+    const isLeapingVisual = isMonkeyLeap || (vis.leapTimer !== undefined && vis.leapTimer > 0 && vis.leapTimer < (vis.leapDur || 0.7));
+    if (isLeapingVisual) {
       vis.leapTimer = (vis.leapTimer || 0) + dt;
+      if (vis.leapTimer >= (vis.leapDur || 0.7)) {
+        vis.leapTimer = 0;
+        vis.leapDur = undefined;
+        vis.leapHeight = undefined;
+      }
     } else {
       vis.leapTimer = 0;
       vis.leapDur = undefined;
@@ -2582,20 +2591,21 @@ export class AnimalRenderer {
       }
     }
 
-    // Body hopping & positioning: Khi tốc độ chạy tăng thì độ cao nhún nhảy bốc lên cao hơn rõ rệt
+    // Body hopping & positioning: Khi tốc độ chạy tăng thì độ cao nhún nhảy bốc lên cao hơn rõ rệt (trên không khi nhảy Super Leap thì bỏ nhún bước chân để đường bay mượt mà)
+    const isGroundHopping = !isLeapingVisual && (!isWater || isSuper);
     const speedBounceMult = Math.min(2.2, Math.max(0, speed * 2.2 + (isDashing ? 1.4 : 0)));
     const hopHeight = 0.10 + 0.22 * speedBounceMult;
-    let bodyY = y + (isWater && !isSuper ? 0 : Math.abs(Math.sin(vis.phase)) * hopHeight * r);
+    let bodyY = y + (isGroundHopping ? Math.abs(Math.sin(vis.phase)) * hopHeight * r : 0);
     // Monkey bipedal bobbing run
-    if (vis.species === 'monkey' && !isMonkeyLeap && !isWater && speed > 0.02) {
+    if (vis.species === 'monkey' && !isLeapingVisual && !isWater && speed > 0.02) {
       bodyY += Math.abs(Math.sin(vis.phase * 1.3)) * 0.15 * r;
     }
     // Gorilla knuckle-walking swagger & bobbing
-    if (vis.species === 'gorilla' && !isMonkeyLeap && !isWater && speed > 0.02) {
+    if (vis.species === 'gorilla' && !isLeapingVisual && !isWater && speed > 0.02) {
       bodyY += Math.abs(Math.sin(vis.phase * 0.9)) * 0.13 * r;
     }
-    // Super Leap parabolic arc (chuẩn quỹ đạo ném xiên không rơi sớm, bay vọt qua chướng ngại vật)
-    if (isMonkeyLeap) {
+    // Super Leap parabolic arc (chuẩn quỹ đạo ném xiên không rơi sớm, bay vọt qua chướng ngại vật mượt mà)
+    if (isLeapingVisual) {
       const dur = vis.leapDur || 0.7;
       const progress = Math.min(1.0, (vis.leapTimer || 0) / dur);
       const arc = Math.sin(progress * Math.PI);
@@ -3006,29 +3016,30 @@ export class AnimalRenderer {
     vis.dust -= dt;
     if (vis.dust <= 0) {
       if (isMonkeyLeap) {
-        // Làn hơi khi Khỉ/Gorilla nhảy: bám theo thân con vật trên quỹ đạo cung (lên cao rồi vòng xuống)
-        vis.dust = 0.02;
-        const tailOff = r * 0.95;
-        const emitX = x - Math.cos(angle) * tailOff;
-        const emitY = bodyY + 0.25 * sc;
-        const emitZ = z - Math.sin(angle) * tailOff;
+        // Vệt bụi nhỏ tracking theo Khỉ và Gorilla theo vòng cung khi nhảy (nhỏ nhẹ cho khỉ giống cú húc, to hơn chút cho gorilla)
+        vis.dust = 0.035;
+        const isGorilla = vis.species === 'gorilla';
+        const tailOff = r * 0.85;
+        const emitX = x - Math.cos(angle) * tailOff + (Math.random() - 0.5) * 0.18 * r;
+        const emitY = bodyY + 0.15 * sc + (Math.random() - 0.5) * 0.12 * r;
+        const emitZ = z - Math.sin(angle) * tailOff + (Math.random() - 0.5) * 0.18 * r;
 
-        // Bụi mây hơi bồng bềnh bám theo thân ở độ cao 3D
-        const vaporCol = isSuper
+        const dustCol = isSuper
           ? (Math.random() < 0.5 ? 0xff80df : 0x80d8ff)
-          : (Math.random() < 0.6 ? 0xffffff : 0xf1f5f9);
-        this.onPuff?.(
-          emitX + (Math.random() - 0.5) * 0.25 * r,
-          emitY + (Math.random() - 0.5) * 0.2 * r,
-          emitZ + (Math.random() - 0.5) * 0.25 * r,
-          vaporCol,
-          (1.15 + Math.random() * 0.45) * r,
-          0.42,
-          0.05
-        );
+          : (Math.random() < 0.5 ? 0xebdcc4 : 0xd8c09a);
+        const dustSize = isGorilla
+          ? (1.05 + Math.random() * 0.3) * r
+          : (0.65 + Math.random() * 0.25) * r;
 
-        // Vệt gió khí động học vuốt dài sau lưng bám theo độ cao thân
-        this.onWindTrail?.(x, emitY, z, angle, r * 1.15, speed);
+        this.onPuff?.(
+          emitX,
+          emitY,
+          emitZ,
+          dustCol,
+          dustSize,
+          isGorilla ? 0.38 : 0.28,
+          0.02
+        );
       } else if (isWater && vis.species !== 'duck') {
         vis.dust = 0.32; // 25% less frequent
         this.onPuff?.(x - Math.cos(angle) * r, 0.12, z - Math.sin(angle) * r, 0xbfe3ff, 0.55 * r, 0.5, 0.8);

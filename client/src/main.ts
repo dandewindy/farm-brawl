@@ -2230,7 +2230,9 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'monkeyLeap': {
-      animals.notifyLeap(ev.id, ev.dur, ev.height);
+      if (ev.id !== myId) {
+        animals.notifyLeap(ev.id, ev.dur, ev.height);
+      }
       if (ev.rainbow) {
         animals.spawnShockwave(ev.x, 0.1, ev.z, 4.0, 0xff007f);
         foodParts.burst(ev.x, 0.5, ev.z, 0xffeb3b, 16, 4, 6, 0.6);
@@ -2996,6 +2998,8 @@ function animate(now: number): void {
         if (predictor.isLeaping || predictor.leapT > 0) {
           pFlags |= FLAG.MONKEY_LEAP;
           pFlags &= ~FLAG.STUN;
+        } else {
+          pFlags &= ~FLAG.MONKEY_LEAP;
         }
         if (input.holding && (now - input.holdStart) >= CFG.CHARGE_SLOW_AFTER * 1000) pFlags |= FLAG.CHARGING;
       }
