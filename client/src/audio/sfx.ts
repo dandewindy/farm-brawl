@@ -197,6 +197,7 @@ const SQUEAK: Record<Species, number> = {
   monkey: 850,
   gorilla: 140,
   mammoth: 120,
+  wolf: 210,
 };
 
 export function yelp(species: Species, vol = 1): void {
@@ -220,6 +221,25 @@ export function sfxMammothRoar(vol = 1): void {
   tone('sawtooth', 210, 460, 1.20, 0.40 * vol, { attack: 0.12 });
   tone('sine', 72, 38, 1.50, 0.85 * vol, { attack: 0.08 });
   noise('bandpass', 520, 240, 4.2, 1.25, 0.42 * vol, { attack: 0.08 });
+}
+
+export function sfxWolfHowl(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('sawtooth', 190, 440, 0.45, 0.42 * vol, { attack: 0.08 });
+  tone('triangle', 440, 380, 0.65, 0.48 * vol, { delay: 0.35, attack: 0.06 });
+  tone('sine', 220, 140, 0.55, 0.38 * vol, { delay: 0.75, attack: 0.05 });
+  noise('bandpass', 650, 320, 3.0, 0.85, 0.25 * vol, { attack: 0.06 });
+}
+
+export function sfxWolfBite(vol = 1, rainbow = false): void {
+  if (!ready() || vol < 0.03) return;
+  // Fierce fang snap + slash crunch
+  tone('sawtooth', rainbow ? 480 : 320, 95, 0.14, 0.55 * vol, { attack: 0.004 });
+  tone('square', rainbow ? 720 : 540, 140, 0.09, 0.32 * vol, { attack: 0.003 });
+  noise('bandpass', 2400, 680, 2.2, 0.11, 0.55 * vol, { attack: 0.003 });
+  if (rainbow) {
+    tone('triangle', 880, 1560, 0.11, 0.28 * vol, { delay: 0.02, attack: 0.005 });
+  }
 }
 
 // Rising whine while a charged ram is winding up; level 0..1

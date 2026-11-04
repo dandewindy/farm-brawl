@@ -55,6 +55,7 @@ const VALID_SPECIES = new Set<string>([
   'monkey',
   'gorilla',
   'mammoth',
+  'wolf',
 ]);
 
 const CAUSE_WITH_KILLER = new Set<DeathCause>([

@@ -79,7 +79,7 @@ export const radiusOf = (m: number): number => {
   return r3000 + Math.log1p(extraKg / 1200) * 0.42;
 };
 
-export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey', 'gorilla', 'mammoth'] as const;
+export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey', 'gorilla', 'mammoth', 'wolf'] as const;
 export type Species = (typeof SPECIES)[number];
 
 export interface SpeciesTraits {
@@ -109,6 +109,7 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
   monkey: { speed: 1.05, dash: 1.0, weight: 0.95, water: 0.45, mud: 0.50, ram: 1.0 },
   gorilla: { speed: 1.02, dash: 1.15, weight: 1.5, water: 0.45, mud: 0.50, ram: 1.4 },
   mammoth: { speed: 0.95, dash: 1.0, weight: 1.6, water: 0.45, mud: 0.45, ram: 1.6 },
+  wolf: { speed: 1.30, dash: 1.15, weight: 1.45, water: 0.35, mud: 0.50, ram: 1.45 },
 };
 
 export const SKIN_COUNT = 4;

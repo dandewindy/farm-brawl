@@ -225,12 +225,13 @@ export class AnimalPreviewRenderer {
       monkey: 1.05,
       gorilla: 0.95,
       mammoth: 0.80,
+      wolf: 0.96,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
 
     // Center pig / elephant / gorilla pivot so their protruding parts stay nicely inside the frame
-    if (species === 'pig' || species === 'elephant' || species === 'gorilla') {
+    if (species === 'pig' || species === 'elephant' || species === 'gorilla' || species === 'wolf') {
       root.position.x = -0.12;
     } else {
       root.position.x = 0;
@@ -361,10 +362,11 @@ export class AnimalPreviewRenderer {
       monkey: 1.05,
       gorilla: 0.95,
       mammoth: 0.80,
+      wolf: 0.96,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
-    if (species === 'pig' || species === 'elephant') {
+    if (species === 'pig' || species === 'elephant' || species === 'wolf') {
       root.position.x = -0.12;
     }
 

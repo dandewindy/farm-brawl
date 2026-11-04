@@ -71,8 +71,8 @@ export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrai
       b.vz += (Math.sin(inp.a) * ms - b.vz) * k;
     }
   }
-  // ponds drag everyone but ducks and dogs, even while knocked back
-  if (t === 1 && sp !== 'duck' && sp !== 'dog' && b.dashT <= 0) {
+  // ponds drag everyone but ducks, dogs, and wolves, even while knocked back
+  if (t === 1 && sp !== 'duck' && sp !== 'dog' && sp !== 'wolf' && b.dashT <= 0) {
     const d = Math.exp(-2 * dt);
     b.vx *= d;
     b.vz *= d;

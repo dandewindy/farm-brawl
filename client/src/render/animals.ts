@@ -53,6 +53,7 @@ interface AnimalVisual {
   lastLeapStart?: number;
   morphTimer?: number;
   throwTimer?: number;
+  wolfBiteTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -158,6 +159,7 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   monkey: 0x8d5b38,
   gorilla: 0xff6d00,
   mammoth: 0x8d6e63,
+  wolf: 0x78909c,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -227,6 +229,12 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0xedeae4, hump: 0xdcd8cf, skirt: 0xe2dfd8, tusk: 0xfffcf5, innerEar: 0xdec4c4, toenails: 0xe8e2d8, tuft: 0xbab4aa }, // Arctic Snow Mammoth
     { body: 0x422616, hump: 0x2e170c, skirt: 0x361c0f, tusk: 0xfaeed2, innerEar: 0x54321d, toenails: 0xa8998a, tuft: 0x221107 }, // Dark Earth Mammoth
     { body: 0x8c5b36, hump: 0x6e4221, skirt: 0x7a4b29, tusk: 0xfdf5e2, innerEar: 0x9e6d4c, toenails: 0xd0c0a8, tuft: 0x522f16 }, // Golden Tawny Mammoth
+  ],
+  wolf: [
+    { body: 0x546e7a, mane: 0x263238, chest: 0xcfd8dc, snout: 0xb0bec5, ear: 0x37474f, innerEar: 0x90a4ae, eye: 0xffca28, legs: 0x455a64, paws: 0xcfd8dc, tailTip: 0x1c262b }, // Sói Xám Bắc Cực (Timber Wolf)
+    { body: 0x212529, mane: 0x111315, chest: 0x495057, snout: 0x343a40, ear: 0x16191d, innerEar: 0x6c757d, eye: 0xff3d00, legs: 0x1b1e22, paws: 0x343a40, tailTip: 0x0b0d0e }, // Sói Đen Hắc Ám (Dire Black Wolf)
+    { body: 0xeceff1, mane: 0xb0bec5, chest: 0xffffff, snout: 0xfafafa, ear: 0xcfd8dc, innerEar: 0xf8bbd0, eye: 0x00e5ff, legs: 0xdce1e5, paws: 0xffffff, tailTip: 0x90a4ae }, // Sói Trắng Tuyết (Arctic White Wolf)
+    { body: 0x7f3822, mane: 0x3e190e, chest: 0xd7ccc8, snout: 0xbcaaa4, ear: 0x4e2012, innerEar: 0xa1887f, eye: 0xffab00, legs: 0x5d2716, paws: 0xd7ccc8, tailTip: 0x271008 }, // Sói Đỏ Huyết Nguyệt (Blood Moon Wolf)
   ],
 };
 
@@ -661,6 +669,180 @@ function buildDog(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 
   addEyes(g, 0.94, 1.55, 0.15, 0.07);
   return addLegs(g, s.legs ?? s.body, [[0.28, 0.13], [0.28, -0.13], [-0.28, 0.13], [-0.28, -0.13]], 0.90, 0.095, s.paws ?? 0x2b2522);
+}
+
+function buildWolf(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0x546e7a;
+  const maneColor = s.mane ?? 0x263238;
+  const chestColor = s.chest ?? 0xcfd8dc;
+  const snoutColor = s.snout ?? 0xb0bec5;
+  const earColor = s.ear ?? 0x37474f;
+  const innerEarColor = s.innerEar ?? 0x90a4ae;
+  const eyeColor = s.eye ?? 0xffca28;
+  const legsColor = s.legs ?? 0x455a64;
+  const pawsColor = s.paws ?? 0xcfd8dc;
+  const tailTipColor = s.tailTip ?? 0x1c262b;
+
+  // 1. Thân sói cơ bắp, ngực nở vai u, thon gọn săn chắc về phía hông (Apex Predator Torso)
+  const chestTorso = blob(g, bodyColor, 0.44, [1.22, 1.05, 1.04], 0.22, 1.24, 0, undefined, true);
+  chestTorso.rotation.z = -0.08;
+  const waistTorso = blob(g, bodyColor, 0.36, [1.25, 0.92, 0.88], -0.28, 1.16, 0, undefined, true);
+  waistTorso.rotation.z = 0.06;
+
+  // Mảng lông sống lưng đậm màu kéo dọc từ vai xuống hông
+  const dorsalStripe = blob(g, maneColor, 0.32, [1.55, 0.45, 0.72], -0.05, 1.46, 0);
+  dorsalStripe.rotation.z = -0.08;
+
+  // Mảng ngực trước sáng màu săn chắc
+  blob(g, chestColor, 0.31, [1.05, 0.96, 0.88], 0.44, 1.12, 0, [0, 0, -0.18]);
+  blob(g, chestColor, 0.24, [1.20, 0.65, 0.72], -0.02, 0.98, 0);
+
+  // 2. BỜM LÔNG CỔ DÀY XÙ & DŨNG MÃNH (Multi-layered Fierce Wolf Neck Fur Ruff / Mane)
+  const ruffGroup = new THREE.Group();
+  ruffGroup.position.set(0.50, 1.38, 0);
+
+  // Khối đệm bờm cổ chính bao quanh cổ và vai
+  blob(ruffGroup, maneColor, 0.42, [0.95, 1.12, 1.18], -0.06, 0.02, 0, [0, 0, 0.15], true);
+  blob(ruffGroup, chestColor, 0.36, [0.92, 1.02, 1.06], 0.08, -0.16, 0, [0, 0, -0.22]);
+
+  // Vòng gai lông cổ tầng trên & hai bên vai (chĩa ngược ra sau đầy uy lực)
+  const ruffCones = 12;
+  for (let i = 0; i < ruffCones; i++) {
+    const a = (i / ruffCones) * Math.PI * 2;
+    const cy = Math.cos(a);
+    const sz = Math.sin(a);
+    const isBottom = cy < -0.15;
+    const spikeCol = isBottom ? chestColor : (i % 2 === 0 ? maneColor : bodyColor);
+    const coneR = isBottom ? 0.12 : 0.135;
+    const coneH = isBottom ? 0.34 : 0.40;
+    const tuft = part(new THREE.ConeGeometry(coneR, coneH, 7), spikeCol, -0.05 + cy * 0.06, cy * 0.30, sz * 0.34);
+    // Hướng chóp lông chĩa ra ngoài và vuốt ngược về phía sau
+    tuft.rotation.z = 1.15 + cy * 0.45;
+    tuft.rotation.x = sz * 0.85;
+    ruffGroup.add(tuft);
+  }
+
+  // Vòng gai lông cổ tầng thứ hai (xếp so le tạo độ dày bồng bềnh)
+  for (let i = 0; i < 8; i++) {
+    const a = ((i + 0.5) / 8) * Math.PI * 2;
+    const cy = Math.cos(a);
+    const sz = Math.sin(a);
+    const spikeCol = cy < 0 ? chestColor : maneColor;
+    const tuft = part(new THREE.ConeGeometry(0.11, 0.34, 6), spikeCol, -0.18, cy * 0.26, sz * 0.30);
+    tuft.rotation.z = 1.32 + cy * 0.35;
+    tuft.rotation.x = sz * 0.75;
+    ruffGroup.add(tuft);
+  }
+  g.add(ruffGroup);
+
+  // 3. ĐẦU SÓI DŨNG MÃNH, MÕM DÀI & RĂNG NANH SẮC NHỌN (Fierce Wolf Head, Cheek Tufts & Fangs)
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0.80, 1.56, 0);
+
+  // Hộp sọ góc cạnh mạnh mẽ
+  const skull = blob(headGroup, bodyColor, 0.34, [1.14, 0.96, 1.04], 0, 0, 0, undefined, true);
+  skull.rotation.z = -0.06;
+
+  // Mảng lông trán chữ V đậm màu
+  blob(headGroup, maneColor, 0.25, [1.15, 0.62, 0.86], -0.02, 0.14, 0, [0, 0, -0.10]);
+
+  // Chùm lông má sói xòe ngang hai bên hàm (Cheek Fur Ruffs)
+  for (const side of [-1, 1]) {
+    for (let j = 0; j < 3; j++) {
+      const cheekSpike = part(
+        new THREE.ConeGeometry(0.085, 0.26, 6),
+        j === 1 ? chestColor : bodyColor,
+        0.02 - j * 0.04,
+        -0.06 - j * 0.05,
+        side * (0.28 + j * 0.03)
+      );
+      cheekSpike.rotation.x = side * (1.15 + j * 0.12);
+      cheekSpike.rotation.z = 0.65;
+      headGroup.add(cheekSpike);
+    }
+  }
+
+  // Sống mũi & Mõm trên dài sắc bén (Long Lupine Upper Snout)
+  const upperSnout = blob(headGroup, bodyColor, 0.16, [1.75, 0.72, 0.82], 0.32, -0.03, 0, [0, 0, -0.08]);
+  upperSnout.castShadow = true;
+  blob(headGroup, snoutColor, 0.145, [1.65, 0.55, 0.86], 0.33, -0.08, 0, [0, 0, -0.06]);
+
+  // Hàm dưới hơi hé mở khoe nanh (Slightly parted fierce Lower Jaw)
+  blob(headGroup, chestColor, 0.12, [1.55, 0.45, 0.74], 0.28, -0.17, 0, [0, 0, -0.18]);
+
+  // 4 Răng nanh trắng sắc nhọn (2 nanh trên + 2 nanh dưới)
+  const fangMatOpts = { roughness: 0.2, metalness: 0.1 };
+  for (const side of [-1, 1]) {
+    const upperFang = part(new THREE.ConeGeometry(0.028, 0.11, 6), 0xffffff, 0.44, -0.13, side * 0.085, fangMatOpts, false);
+    upperFang.rotation.z = Math.PI - 0.12; // Chĩa xuống
+    headGroup.add(upperFang);
+
+    const lowerFang = part(new THREE.ConeGeometry(0.022, 0.085, 6), 0xffffff, 0.38, -0.14, side * 0.072, fangMatOpts, false);
+    lowerFang.rotation.z = 0.15; // Chĩa lên
+    headGroup.add(lowerFang);
+  }
+
+  // Chóp mũi đen lớn của sói săn mồi
+  const nose = part(new THREE.SphereGeometry(0.058, 10, 8), 0x141210, 0.56, 0.01, 0, { roughness: 0.35 });
+  nose.scale.set(0.95, 0.85, 1.15);
+  headGroup.add(nose);
+
+  // Đôi mắt sói phát sáng sắc lạnh + Chân mày xếch dữ dằn (Glowing Predator Eyes & Scowling Brows)
+  const eyeGlowMat = animalMat(eyeColor, { roughness: 0.2, emissive: eyeColor, emissiveIntensity: 0.45 });
+  const pupilMat = animalMat(0x111111, { roughness: 0.2 });
+  for (const side of [-1, 1]) {
+    const eyeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), eyeGlowMat);
+    eyeMesh.position.set(0.20, 0.07, side * 0.165);
+    eyeMesh.scale.set(0.95, 0.82, 0.90);
+    eyeMesh.userData.eye = true;
+    headGroup.add(eyeMesh);
+
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 8), pupilMat);
+    pupil.position.set(0.255, 0.07, side * 0.172);
+    pupil.scale.set(0.65, 1.05, 0.65);
+    pupil.userData.eye = true;
+    headGroup.add(pupil);
+
+    // Gờ chân mày xếch chéo tạo ánh nhìn hung dữ
+    const browGeo = new THREE.CapsuleGeometry(0.032, 0.14, 6, 8);
+    browGeo.rotateZ(Math.PI / 2);
+    const brow = part(browGeo, maneColor, 0.22, 0.135, side * 0.165);
+    brow.rotation.y = side * -0.45;
+    brow.rotation.x = side * -0.38;
+    brow.rotation.z = -0.22;
+    headGroup.add(brow);
+  }
+
+  // Đôi tai sói dựng đứng, cao và nhọn hoắt (Tall Erect Pointed Wolf Ears)
+  for (const side of [-1, 1]) {
+    const earOuter = part(new THREE.ConeGeometry(0.115, 0.36, 8), earColor, -0.06, 0.36, side * 0.20);
+    earOuter.rotation.z = -0.18;
+    earOuter.rotation.x = side * 0.22;
+    headGroup.add(earOuter);
+
+    const earInner = part(new THREE.ConeGeometry(0.072, 0.28, 6), innerEarColor, -0.035, 0.35, side * 0.205);
+    earInner.rotation.z = -0.18;
+    earInner.rotation.x = side * 0.22;
+    headGroup.add(earInner);
+  }
+
+  g.add(headGroup);
+  g.userData.head = headGroup;
+
+  // 4. Đuôi sói rậm dài vểnh nhẹ uy phong (Bushy Wolf Tail)
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(-0.62, 1.20, 0);
+  tailGroup.rotation.z = 0.85;
+  const tailBase = blob(tailGroup, bodyColor, 0.11, [0.95, 1.85, 0.95], 0, 0.16, 0);
+  tailBase.castShadow = true;
+  const tailMid = blob(tailGroup, maneColor, 0.125, [1.0, 1.95, 1.0], -0.02, 0.36, 0);
+  tailMid.castShadow = true;
+  const tailTip = part(new THREE.ConeGeometry(0.11, 0.28, 8), tailTipColor, -0.03, 0.60, 0);
+  tailGroup.add(tailTip);
+  g.add(tailGroup);
+
+  // 5. 4 Chân sói cơ bắp săn chắc (Muscular Wolf Legs)
+  return addLegs(g, legsColor, [[0.32, 0.17], [0.32, -0.17], [-0.32, 0.17], [-0.32, -0.17]], 0.96, 0.11, pawsColor);
 }
 
 function buildElephant(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1399,6 +1581,7 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   monkey: buildMonkey,
   gorilla: buildGorilla,
   mammoth: buildMammoth,
+  wolf: buildWolf,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -1523,6 +1706,17 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'wolf': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.042, 8, 24), mat);
+      band.position.set(0.58, 1.40, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.38;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 8), goldMat);
+      medal.position.set(0.74, 1.24, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -1540,6 +1734,7 @@ const HEAD: Record<Species, [number, number]> = {
   monkey: [0.12, 1.95],
   gorilla: [0.58, 2.15],
   mammoth: [1.02, 2.30],
+  wolf: [0.80, 1.98],
 };
 
 // Back of each species for the cape
@@ -1555,6 +1750,7 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   monkey: [-0.15, 1.10, 0.45, 0.45, 1.0],
   gorilla: [-0.15, 1.45, 0.65, 0.65, 1.35],
   mammoth: [-0.15, 1.55, 0.70, 0.70, 1.45],
+  wolf: [-0.15, 1.25, 0.62, 0.62, 1.22],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -1629,6 +1825,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     monkey: 0.16,
     gorilla: 0.22,
     mammoth: 0.28,
+    wolf: 0.22,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -1642,6 +1839,7 @@ export function buildFlowerHat(species: Species): THREE.Group {
     monkey: 0.06,
     gorilla: 0.08,
     mammoth: 0.10,
+    wolf: 0.08,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -1946,6 +2144,7 @@ const LABEL_Y: Record<Species, number> = {
   monkey: 2.2,
   gorilla: 2.6,
   mammoth: 2.8,
+  wolf: 2.4,
 };
 
 export function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -2299,6 +2498,13 @@ export class AnimalRenderer {
     }
   }
 
+  notifyWolfBite(id: number): void {
+    const vis = this.visuals.get(id);
+    if (vis) {
+      vis.wolfBiteTimer = 0.24;
+    }
+  }
+
   notifyLeap(id: number, dur: number, height: number, isBounce = false): void {
     const vis = this.visuals.get(id);
     if (vis) {
@@ -2565,7 +2771,7 @@ export class AnimalRenderer {
     const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
 
     // Visual sinking effect reduced by 25%
-    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'dog'
+    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf'
       ? Math.max(0.72, 1 - sinkProgress * 0.28)
       : 1;
 
@@ -2573,8 +2779,8 @@ export class AnimalRenderer {
       if (vis.species === 'duck') {
         // Ducks float peacefully on the surface with subtle bobbing
         y = -0.20 * sc + Math.sin(now / 300) * 0.035;
-      } else if (vis.species === 'dog') {
-        // Dogs can swim, half body submerged under water with paddling bob
+      } else if (vis.species === 'dog' || vis.species === 'wolf') {
+        // Dogs & Wolves can swim, half body submerged under water with paddling bob
         y = -0.90 * sc + Math.sin(now / 220) * 0.022;
       } else {
         // Visual sinking speed reduced by 25%
@@ -2666,7 +2872,7 @@ export class AnimalRenderer {
       ? Math.sin(now / 180) * 0.3
       : isWater && vis.species === 'duck'
       ? Math.sin(vis.phase * 0.7) * 0.08
-      : isWater && vis.species !== 'duck' && vis.species !== 'dog'
+      : isWater && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf'
       ? Math.sin(now / 120) * 0.15
       : isCharging
       ? (vis.species === 'mammoth' ? 0 : 0.15 + lvl * 0.15)
@@ -2795,7 +3001,7 @@ export class AnimalRenderer {
     // Dynamic leg swinging with amplitude 0.7
     const gorillaCycle = Math.sin(vis.phase * 0.9);
     vis.legs.forEach((leg, idx) => {
-      if (isWater && vis.species === 'dog') {
+      if (isWater && (vis.species === 'dog' || vis.species === 'wolf')) {
         leg.visible = false;
         return;
       }
@@ -2987,6 +3193,43 @@ export class AnimalRenderer {
       const sway = Math.sin(vis.phase) * 0.16;
       vis.trunk.rotation.z = sway * 0.6;
       vis.trunk.rotation.y = Math.sin(now * 0.003) * 0.06;
+    } else if (vis.species === 'wolf') {
+      const isWolfFrenzy = (flags & FLAG.WOLF_FRENZY) !== 0;
+      if (vis.wolfBiteTimer && vis.wolfBiteTimer > 0) {
+        vis.wolfBiteTimer = Math.max(0, vis.wolfBiteTimer - dt);
+        const biteProg = 1 - vis.wolfBiteTimer / 0.24;
+        const snap = Math.sin(biteProg * Math.PI);
+        vis.body.position.x = snap * 0.36;
+        vis.body.rotation.z = -snap * 0.25;
+        if (vis.head) {
+          vis.head.rotation.z = -snap * 0.35;
+          vis.head.rotation.x = Math.sin(biteProg * Math.PI * 2) * 0.22;
+        }
+      } else if (isCharging) {
+        // Sói hạ thấp trọng tâm gồng mình chuẩn bị vồ mồi
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = -0.14 * t;
+        vis.body.rotation.z = 0.14 * t;
+        if (vis.head) {
+          vis.head.rotation.z = -0.18 * t;
+          vis.head.rotation.x = 0;
+        }
+      } else if (isWolfFrenzy) {
+        const snap = Math.sin(now * 0.045);
+        vis.body.position.x = 0.15;
+        vis.body.rotation.z = -0.15;
+        if (vis.head) {
+          vis.head.rotation.z = snap * 0.25;
+          vis.head.rotation.x = Math.cos(now * 0.045) * 0.18;
+        }
+      } else {
+        vis.body.position.x = 0;
+        vis.body.rotation.z = 0;
+        if (vis.head) {
+          vis.head.rotation.z = 0;
+          vis.head.rotation.x = 0;
+        }
+      }
     }
 
     // Under-foot dark mud patches (prominent black mud pools on ground under each foot)
@@ -3217,7 +3460,7 @@ export class AnimalRenderer {
     }
 
     if (vis.label) {
-      const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'dog' && sinkProgress >= 0.85;
+      const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf' && sinkProgress >= 0.85;
       vis.label.visible = !isHiddenInWater;
       if (!isHiddenInWater) {
         const lh = 1.3 + r * 0.25;

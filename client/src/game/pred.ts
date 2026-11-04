@@ -154,6 +154,22 @@ export class ClientPredictor {
     this.sTick = snapTick;
   }
 
+  syncWolfBitePos(x: number, z: number, targetX?: number, targetZ?: number): void {
+    if (!this.on) return;
+    this.x = x;
+    this.z = z;
+    this.sx = x;
+    this.sz = z;
+    this.vx = 0;
+    this.vz = 0;
+    this.dashT = 0;
+    this.flyT = 0;
+    this.plow = false;
+    if (targetX !== undefined && targetZ !== undefined) {
+      this.a = Math.atan2(targetZ - z, targetX - x);
+    }
+  }
+
   predictBounceLeap(dur: number): void {
     if (!this.on) return;
     const bounceDist = 7.5;
@@ -194,6 +210,19 @@ export class ClientPredictor {
       this.leapT = leapDur;
       this.isLeaping = true;
       this.plow = false;
+      return;
+    }
+
+    if (species === 'wolf' && held > 0.15) {
+      const clampedHold = Math.max(0.2, Math.min(1.2, held));
+      const ratio = (clampedHold - 0.2) / 1.0;
+      const sp = isSuper ? 54 : (46 + ratio * 12);
+      const dur = isSuper ? (0.32 + ratio * 0.14) : (0.26 + ratio * 0.14);
+      this.vx = Math.cos(aimA) * sp;
+      this.vz = Math.sin(aimA) * sp;
+      this.a = aimA;
+      this.dashT = dur;
+      this.plow = true;
       return;
     }
 
@@ -271,9 +300,11 @@ export class ClientPredictor {
   ): void {
     if (!this.on || !map) return;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
+    // Wolf bite frenzy: the server pins the wolf in place between bites (it teleports via wolfBite events)
+    const wolfFrenzy = species === 'wolf' && (flags & FLAG.WOLF_FRENZY) !== 0;
     const mm = Math.max(1, myMass);
-    const charging = !stun && holding;
-    const canMove = !stun && aimMove;
+    const charging = !stun && !wolfFrenzy && holding;
+    const canMove = !stun && !wolfFrenzy && aimMove;
     const plowing = (flags & 2) !== 0 || this.plow;
 
     for (let left = dt; left > 1e-4;) {
@@ -294,9 +325,9 @@ export class ClientPredictor {
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
 
       let terrain = water
-        ? species === 'duck' ? 1.25 : species === 'dog' ? 0.35 : 0.45
+        ? species === 'duck' ? 1.25 : (species === 'dog' || species === 'wolf') ? 0.35 : 0.45
         : mud
-        ? species === 'pig' ? 1.1 : 0.45
+        ? species === 'pig' ? 1.1 : species === 'wolf' ? 0.50 : 0.45
         : species === 'duck' ? 0.87 : 1;
 
       const spMult = TRAITS[species]?.speed ?? 1.0;
@@ -315,6 +346,9 @@ export class ClientPredictor {
           this.vx *= d;
           this.vz *= d;
         }
+      } else if (wolfFrenzy) {
+        this.vx = 0;
+        this.vz = 0;
       } else if (stun || !canMove) {
         const d = Math.exp(-3.5 * h);
         this.vx *= d;
@@ -338,13 +372,13 @@ export class ClientPredictor {
         }
       }
 
-      if (water && species !== 'duck' && this.dashT <= 0 && !this.isLeaping) {
+      if (water && species !== 'duck' && species !== 'dog' && species !== 'wolf' && this.dashT <= 0 && !this.isLeaping) {
         const d = Math.exp(-2 * h);
         this.vx *= d;
         this.vz *= d;
       }
 
-      if (!stun && this.dashT <= 0) {
+      if (!stun && !wolfFrenzy && this.dashT <= 0) {
         this.a += wrapAngle(aimA - this.a) * Math.min(1, 12 * h);
       }
 

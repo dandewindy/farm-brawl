@@ -6,7 +6,7 @@ import {
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type Blob, type MapData, type TreeData, type TreeSize } from '../map';
-import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
+import { clamp, insideBlob, mulberry32, distToSegmentSq, wrapAngle } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
@@ -76,6 +76,16 @@ export interface Player extends Body {
   treeShakeDropStage?: number;
   mammothRoarT?: number;
   mammothRoarCd?: number;
+  wolfFrenzyT?: number;
+  wolfLungeT?: number;
+  wolfRatio?: number;
+  wolfTargetId?: number;
+  wolfBitesLeft?: number;
+  wolfBiteTotal?: number;
+  wolfBiteStep?: number;
+  wolfBiteTimer?: number;
+  wolfChainTargets?: number[];
+  wolfChainRainbow?: boolean;
   morphT?: number;
   morphOrigSpecies?: Species;
   hasHeart?: boolean;
@@ -431,6 +441,8 @@ export class World {
       p.species = 'monkey';
     } else if (p.species === 'mammoth') {
       p.species = 'elephant';
+    } else if (p.species === 'wolf') {
+      p.species = 'dog';
     }
     let spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
     if (this.currentRule === 'titan') {
@@ -447,6 +459,7 @@ export class World {
       pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
       hasHeart: false, heartReviving: false, heartReviveTimer: undefined,
       monkeyLeapT: 0, monkeyBounced: false, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
+      wolfFrenzyT: 0, wolfLungeT: 0, wolfTargetId: undefined, wolfBitesLeft: 0, wolfChainTargets: undefined, wolfChainRainbow: false,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -742,12 +755,19 @@ export class World {
           p.btnLatch = false;
         }
         const isLeaping = (p.monkeyLeapT !== undefined && p.monkeyLeapT > 0);
+        const isWolfFrenzyActive = (p.wolfFrenzyT !== undefined && p.wolfFrenzyT > 0) && (!p.wolfLungeT || p.wolfLungeT <= 0);
         if (isLeaping) {
           p.x += p.vx * h;
           p.z += p.vz * h;
           p.stunT = 0;
           p.charging = false;
           p.holdT = 0;
+        } else if (isWolfFrenzyActive) {
+          p.stunT = 0;
+          p.charging = false;
+          p.holdT = 0;
+          p.vx = 0;
+          p.vz = 0;
         } else if (p.wheelT > 0) {
           // Wheel vehicle mode: cannot stop! Continuous forward motion at speed 19
           p.a = p.input.a;
@@ -927,7 +947,7 @@ export class World {
 
       // 1. Electric fence
       if (outsideFence(p)) {
-        if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.flyT > 0 || p.shieldT > 0) {
+        if ((p.monkeyLeapT && p.monkeyLeapT > 0) || (p.wolfFrenzyT && p.wolfFrenzyT > 0) || p.flyT > 0 || p.shieldT > 0) {
           const d = Math.hypot(p.x, p.z), lim = CFG.R - radiusOf(p.mass) * 0.3 - 1;
           if (d > 0) {
             p.x = (p.x / d) * lim;
@@ -943,8 +963,8 @@ export class World {
         }
       }
 
-      // Monkey leaping or Shield immunity over terrain hazards (well, fire, water, etc.)
-      if ((p.monkeyLeapT && p.monkeyLeapT > 0) || p.shieldT > 0) {
+      // Monkey leaping, Wolf frenzy, or Shield immunity over terrain hazards (well, fire, water, etc.)
+      if ((p.monkeyLeapT && p.monkeyLeapT > 0) || (p.wolfFrenzyT && p.wolfFrenzyT > 0) || p.shieldT > 0) {
         p.inWaterT = 0;
         continue;
       }
@@ -967,8 +987,8 @@ export class World {
       }
       if (!p.alive) continue;
 
-      // 4. Pond drowning (ducks & dogs swim freely; other animals struggle for 1.5s before drowning)
-      if (p.species !== 'duck' && p.species !== 'dog') {
+      // 4. Pond drowning (ducks, dogs & wolves swim freely; other animals struggle for 1.5s before drowning)
+      if (p.species !== 'duck' && p.species !== 'dog' && p.species !== 'wolf') {
         let inPond = false;
         for (const b of (this.map.pond || [])) {
           if (insideBlob(b, p.x, p.z, -0.7)) {
@@ -1141,6 +1161,10 @@ export class World {
       }
       if (p.mammothRoarCd && p.mammothRoarCd > 0) {
         p.mammothRoarCd = Math.max(0, p.mammothRoarCd - DT);
+      }
+
+      if ((p.wolfFrenzyT && p.wolfFrenzyT > 0) || (p.wolfLungeT && p.wolfLungeT > 0)) {
+        this.stepWolfFrenzy(p, DT);
       }
 
       // Monkey & Gorilla Leap landing check
@@ -1412,6 +1436,32 @@ export class World {
           k: 'morph',
           id: p.id,
           species: 'elephant',
+          dur: 0,
+        });
+      }
+
+      // Dog Evolution into Wolf when reaching 3 tons (3000 kg)
+      if (p.alive && p.species === 'dog' && p.mass >= 3000) {
+        p.species = 'wolf';
+        delete p.morphT; // Permanent evolution while alive
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'wolf',
+          dur: 0,
+        });
+      }
+
+      // Wolf De-evolution into Dog when dropping below 1 ton (1000 kg)
+      if (p.alive && p.species === 'wolf' && p.mass < 1000) {
+        p.species = 'dog';
+        delete p.morphT;
+        delete p.morphOrigSpecies;
+        this.events.push({
+          k: 'morph',
+          id: p.id,
+          species: 'dog',
           dur: 0,
         });
       }
@@ -2061,6 +2111,10 @@ export class World {
         this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
+      if (p.species === 'wolf' && p.holdT > 0.15) {
+        this.startWolfChargedSkill(p, true);
+        return;
+      }
       p.a = p.input.a;
       p.vx = Math.cos(p.a) * 62;
       p.vz = Math.sin(p.a) * 62;
@@ -2178,6 +2232,11 @@ export class World {
       }
     }
 
+    if (p.species === 'wolf' && p.holdT > 0.15) {
+      this.startWolfChargedSkill(p, false);
+      return;
+    }
+
     const d = dashParams(p.species, p.holdT, p.terrain);
     p.a = p.input.a;
     p.vx = Math.cos(p.a) * d.speed;
@@ -2250,6 +2309,414 @@ export class World {
         dur: r2(stunDur),
         rainbow: false,
       });
+    }
+  }
+
+  private clampSafeArenaPos(x: number, z: number, r: number): [number, number] {
+    let nx = x;
+    let nz = z;
+    const maxR = CFG.R - r - 1.8;
+    const d = Math.hypot(nx, nz);
+    if (d > maxR && d > 1e-6) {
+      nx = (nx / d) * maxR;
+      nz = (nz / d) * maxR;
+    }
+    for (const [wx, wz, wr] of this.map.well || []) {
+      const dw = Math.hypot(nx - wx, nz - wz);
+      const minW = wr + r + 1.2;
+      if (dw < minW) {
+        const ang = dw > 1e-4 ? Math.atan2(nz - wz, nx - wx) : 0;
+        nx = wx + Math.cos(ang) * minW;
+        nz = wz + Math.sin(ang) * minW;
+      }
+    }
+    for (const [fx, fz, fr] of this.map.fire || []) {
+      const df = Math.hypot(nx - fx, nz - fz);
+      const minF = fr + r + 1.2;
+      if (df < minF) {
+        const ang = df > 1e-4 ? Math.atan2(nz - fz, nx - fx) : 0;
+        nx = fx + Math.cos(ang) * minF;
+        nz = fz + Math.sin(ang) * minF;
+      }
+    }
+    return [nx, nz];
+  }
+
+  private startWolfChargedSkill(p: Player, isRainbow: boolean): void {
+    const clampedHold = Math.max(0.2, Math.min(1.2, p.holdT));
+    const ratio = (clampedHold - 0.2) / 1.0;
+    p.a = p.input.a;
+    p.wolfRatio = ratio;
+    p.dashHit.clear();
+
+    if (isRainbow) {
+      // Rainbow Charged Skill:
+      // Lướt/Biến ảnh liên tiếp qua tối đa 6 con vật khác nhau trong phạm vi (tuỳ thời gian gồng: 1..6 con),
+      // cắn mỗi con 1 phát cực nhanh trong vòng 0.3s (tổng max 6 con = 1.8s), gây sát thương và cướp kg!
+      const maxTargets = Math.max(1, Math.min(6, Math.round(1 + ratio * 5)));
+      const scanR = 20.0 + ratio * 25.0;
+      const forwardX = p.x + Math.cos(p.a) * (8.0 + ratio * 12.0);
+      const forwardZ = p.z + Math.sin(p.a) * (8.0 + ratio * 12.0);
+
+      const candidates: { id: number; score: number }[] = [];
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id) continue;
+        if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+        const dFromPlayer = Math.hypot(other.x - p.x, other.z - p.z);
+        const dFromForward = Math.hypot(other.x - forwardX, other.z - forwardZ);
+        if (dFromPlayer <= scanR || dFromForward <= scanR) {
+          const angDiff = Math.abs(wrapAngle(Math.atan2(other.z - p.z, other.x - p.x) - p.a));
+          const score = dFromPlayer + angDiff * 3.5;
+          candidates.push({ id: other.id, score });
+        }
+      }
+      candidates.sort((a, b) => a.score - b.score);
+      const targets = candidates.slice(0, maxTargets).map((c) => c.id);
+
+      if (targets.length > 0) {
+        p.wolfChainTargets = targets;
+        p.wolfChainRainbow = true;
+        p.wolfBiteTotal = targets.length;
+        p.wolfBiteStep = 0;
+        p.wolfFrenzyT = targets.length * 0.3;
+        p.wolfBiteTimer = 0;
+        p.wolfLungeT = 0;
+        p.dashT = 0;
+        p.cd = 0.6;
+        this.stepWolfFrenzy(p, 0);
+      } else {
+        // Không có con vật nào trong phạm vi -> lướt vọt nhanh tới vị trí ngắm
+        const lungeDur = 0.32 + ratio * 0.14;
+        const lungeSpeed = 54;
+        p.vx = Math.cos(p.a) * lungeSpeed;
+        p.vz = Math.sin(p.a) * lungeSpeed;
+        p.dashT = lungeDur;
+        p.flyT = lungeDur;
+        p.plow = true;
+        p.power = 3.5;
+        p.cd = 0.5;
+      }
+      return;
+    }
+
+    // Normal Charged Skill (không có cầu vồng):
+    // Lướt nhanh tới vị trí con vật khác, sau đó cắn liên hồi vào con vật đó ở những vị trí khác nhau xung quanh nó!
+    const searchDist = 16.0 + ratio * 16.0;
+    const totalBites = 3 + Math.round(ratio * 3); // 3 đến 6 nhát cắn liên hồi quanh mục tiêu
+    let bestTarget: Player | null = null;
+    let bestScore = Infinity;
+
+    for (const other of this.players.values()) {
+      if (!other.alive || other.id === p.id) continue;
+      if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+      const dx = other.x - p.x;
+      const dz = other.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > searchDist) continue;
+      const angDiff = Math.abs(wrapAngle(Math.atan2(dz, dx) - p.a));
+      const closeRange = radiusOf(p.mass) + radiusOf(other.mass) + 4.5;
+      if (angDiff <= 1.2 || dist <= closeRange) {
+        const score = dist + angDiff * 5.0;
+        if (score < bestScore) {
+          bestScore = score;
+          bestTarget = other;
+        }
+      }
+    }
+
+    p.wolfChainRainbow = false;
+    p.wolfChainTargets = undefined;
+    p.wolfBitesLeft = totalBites;
+    p.wolfBiteTotal = totalBites;
+    p.wolfBiteStep = 0;
+
+    if (bestTarget) {
+      p.wolfTargetId = bestTarget.id;
+      const gap = Math.hypot(bestTarget.x - p.x, bestTarget.z - p.z) - radiusOf(p.mass) - radiusOf(bestTarget.mass);
+      if (gap > 2.2) {
+        const lungeSpeed = 52;
+        const lungeDur = clamp(gap / lungeSpeed, 0.05, 0.35);
+        const aimA = Math.atan2(bestTarget.z - p.z, bestTarget.x - p.x);
+        p.a = aimA;
+        p.vx = Math.cos(aimA) * lungeSpeed;
+        p.vz = Math.sin(aimA) * lungeSpeed;
+        p.dashT = lungeDur;
+        p.wolfLungeT = lungeDur;
+        p.wolfFrenzyT = lungeDur + totalBites * 0.15;
+        p.cd = CFG.DASH_CD + ratio * 0.4;
+      } else {
+        p.wolfLungeT = 0;
+        p.dashT = 0;
+        p.wolfFrenzyT = totalBites * 0.15;
+        p.wolfBiteTimer = 0;
+        p.cd = CFG.DASH_CD + ratio * 0.4;
+        this.stepWolfFrenzy(p, 0);
+      }
+    } else {
+      // Lướt nhanh về hướng ngắm; nếu trên đường lướt gặp con vật nào sẽ lập tức vồ cắn liên hồi vào con đó
+      const lungeSpeed = 46 + ratio * 12;
+      const lungeDur = 0.26 + ratio * 0.14;
+      p.wolfTargetId = undefined;
+      p.vx = Math.cos(p.a) * lungeSpeed;
+      p.vz = Math.sin(p.a) * lungeSpeed;
+      p.dashT = lungeDur;
+      p.wolfLungeT = lungeDur;
+      p.wolfFrenzyT = lungeDur;
+      p.cd = CFG.DASH_CD + ratio * 0.4;
+    }
+  }
+
+  private stepWolfFrenzy(p: Player, dt: number): void {
+    if (!p.alive || p.species !== 'wolf') {
+      p.wolfFrenzyT = 0;
+      p.wolfLungeT = 0;
+      p.wolfBitesLeft = 0;
+      p.wolfTargetId = undefined;
+      p.wolfChainTargets = undefined;
+      return;
+    }
+
+    // Giai đoạn 1: Đang lướt nhanh tiếp cận mục tiêu
+    if (p.wolfLungeT && p.wolfLungeT > 0) {
+      p.wolfLungeT = Math.max(0, p.wolfLungeT - dt);
+      const rWolf = radiusOf(p.mass);
+
+      if (p.wolfTargetId) {
+        const vic = this.players.get(p.wolfTargetId);
+        if (vic && vic.alive) {
+          const dx = vic.x - p.x;
+          const dz = vic.z - p.z;
+          const dist = Math.hypot(dx, dz);
+          const aimA = Math.atan2(dz, dx);
+          p.a = aimA;
+          p.vx = Math.cos(aimA) * 52;
+          p.vz = Math.sin(aimA) * 52;
+          if (dist <= rWolf + radiusOf(vic.mass) + 2.4 || p.wolfLungeT <= 0) {
+            p.wolfLungeT = 0;
+            p.dashT = 0;
+            p.wolfFrenzyT = (p.wolfBitesLeft || 3) * 0.15;
+            p.wolfBiteTimer = 0;
+          }
+        } else {
+          p.wolfTargetId = undefined;
+        }
+      }
+
+      if (!p.wolfTargetId) {
+        // Quét xem có chạm gần con vật nào trên đường lướt không
+        for (const other of this.players.values()) {
+          if (!other.alive || other.id === p.id) continue;
+          if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+          const d = Math.hypot(other.x - p.x, other.z - p.z);
+          if (d <= rWolf + radiusOf(other.mass) + 2.8) {
+            p.wolfTargetId = other.id;
+            p.wolfLungeT = 0;
+            p.dashT = 0;
+            p.wolfFrenzyT = (p.wolfBitesLeft || 3) * 0.15;
+            p.wolfBiteTimer = 0;
+            break;
+          }
+        }
+      }
+
+      if (p.wolfLungeT <= 0 && !p.wolfTargetId) {
+        p.wolfBitesLeft = 0;
+        p.wolfFrenzyT = 0;
+        return;
+      }
+      if (p.wolfLungeT > 0) return;
+    }
+
+    // Giai đoạn 2: Thực thi chuỗi cắn
+    if (dt > 0 && p.wolfFrenzyT && p.wolfFrenzyT > 0) {
+      p.wolfFrenzyT = Math.max(0, p.wolfFrenzyT - dt);
+    }
+    p.wolfBiteTimer = (p.wolfBiteTimer ?? 0) - dt;
+    if (p.wolfBiteTimer > 1e-6) return;
+
+    // 2A. Tuyệt kỹ Cầu Vồng: Biến ảnh liên hoàn qua tối đa 6 con vật khác nhau (0.3s / con, max 1.8s)
+    if (p.wolfChainRainbow && p.wolfChainTargets && p.wolfChainTargets.length > 0) {
+      let vic: Player | undefined;
+      while ((p.wolfBiteStep ?? 0) < p.wolfChainTargets.length) {
+        const candId = p.wolfChainTargets[p.wolfBiteStep ?? 0];
+        p.wolfBiteStep = (p.wolfBiteStep ?? 0) + 1;
+        const cand = this.players.get(candId);
+        if (cand && cand.alive) {
+          vic = cand;
+          break;
+        }
+      }
+
+      if (!vic) {
+        p.wolfChainTargets = undefined;
+        p.wolfFrenzyT = 0;
+        return;
+      }
+
+      p.wolfBiteTimer = 0.30; // Cắn mỗi con trong vòng 0.3s
+      const fromX = p.x;
+      const fromZ = p.z;
+      const rWolf = radiusOf(p.mass);
+      const rVic = radiusOf(vic.mass);
+      const stepNum = p.wolfBiteStep ?? 1;
+      const strikeAng = Math.atan2(fromZ - vic.z, fromX - vic.x) + (stepNum % 2 === 0 ? 0.85 : -0.85);
+      const strikeDist = (rWolf + rVic) * 0.82;
+      const [nx, nz] = this.clampSafeArenaPos(
+        vic.x + Math.cos(strikeAng) * strikeDist,
+        vic.z + Math.sin(strikeAng) * strikeDist,
+        rWolf
+      );
+
+      p.x = nx;
+      p.z = nz;
+      p.vx = 0;
+      p.vz = 0;
+      p.a = Math.atan2(vic.z - p.z, vic.x - p.x);
+
+      const loss = Math.min(vic.mass - CFG.MIN_MASS, Math.max(12, Math.round(vic.mass * 0.14)));
+      const stolen = Math.max(8, Math.round(loss * 0.65));
+      const dropped = Math.max(0, loss - stolen);
+      if (loss > 0) {
+        vic.mass = Math.max(CFG.MIN_MASS, vic.mass - loss);
+        p.mass += stolen;
+        p.best = Math.max(p.best, p.mass);
+        if (dropped > 0) {
+          this.scatter(vic.x, vic.z, dropped, rVic + 1.2, Math.cos(p.a), Math.sin(p.a));
+        }
+      }
+
+      vic.lastHitBy = p.id;
+      vic.lastHitT = this.time;
+      p.lastAttackedId = vic.id;
+      p.lastAttackedT = this.time;
+
+      if (vic.shieldT <= 0) {
+        vic.stunT = Math.max(vic.stunT, 0.75);
+        vic.slowT = Math.max(vic.slowT, 1.2);
+        vic.dashT = 0;
+        vic.plow = false;
+        vic.vx = Math.cos(p.a) * 16;
+        vic.vz = Math.sin(p.a) * 16;
+      }
+
+      this.events.push({
+        k: 'wolfBite',
+        id: p.id,
+        targetId: vic.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        fromX: r2(fromX),
+        fromZ: r2(fromZ),
+        stolen,
+        loss,
+        rainbow: true,
+        step: stepNum,
+        total: p.wolfBiteTotal || 1,
+      });
+      this.events.push({
+        k: 'hit',
+        a: p.id,
+        v: vic.id,
+        x: r2(vic.x),
+        z: r2(vic.z),
+        s: 24,
+        loss,
+      });
+
+      if ((p.wolfBiteStep ?? 0) >= p.wolfChainTargets.length) {
+        p.wolfChainTargets = undefined;
+      }
+      return;
+    }
+
+    // 2B. Kỹ năng Gồng Thường: Cắn liên hồi vào 1 mục tiêu ở những vị trí khác nhau xung quanh nó
+    if (!p.wolfChainRainbow && p.wolfTargetId && (p.wolfBitesLeft ?? 0) > 0) {
+      const vic = this.players.get(p.wolfTargetId);
+      if (!vic || !vic.alive) {
+        p.wolfBitesLeft = 0;
+        p.wolfFrenzyT = 0;
+        p.wolfTargetId = undefined;
+        return;
+      }
+
+      p.wolfBitesLeft!--;
+      p.wolfBiteStep = (p.wolfBiteStep ?? 0) + 1;
+      p.wolfBiteTimer = 0.15;
+
+      const fromX = p.x;
+      const fromZ = p.z;
+      const rWolf = radiusOf(p.mass);
+      const rVic = radiusOf(vic.mass);
+      // Mỗi nhát cắn đổi sang 1 vị trí góc khác nhau quanh mục tiêu (+135 độ mỗi nhát)
+      const baseAng = Math.atan2(fromZ - vic.z, fromX - vic.x);
+      const biteAng = p.wolfBiteStep === 1 ? baseAng : baseAng + 2.35619;
+      const strikeDist = (rWolf + rVic) * 0.85;
+      const [nx, nz] = this.clampSafeArenaPos(
+        vic.x + Math.cos(biteAng) * strikeDist,
+        vic.z + Math.sin(biteAng) * strikeDist,
+        rWolf
+      );
+
+      p.x = nx;
+      p.z = nz;
+      p.vx = 0;
+      p.vz = 0;
+      p.a = Math.atan2(vic.z - p.z, vic.x - p.x);
+
+      const ratio = p.wolfRatio ?? 0.5;
+      const loss = Math.min(vic.mass - CFG.MIN_MASS, Math.max(4, Math.round(vic.mass * (0.035 + ratio * 0.015))));
+      const stolen = Math.max(2, Math.round(loss * 0.5));
+      const dropped = Math.max(0, loss - stolen);
+      if (loss > 0) {
+        vic.mass = Math.max(CFG.MIN_MASS, vic.mass - loss);
+        p.mass += stolen;
+        p.best = Math.max(p.best, p.mass);
+        if (dropped > 0) {
+          this.scatter(vic.x, vic.z, dropped, rVic + 1.0, Math.cos(p.a), Math.sin(p.a));
+        }
+      }
+
+      vic.lastHitBy = p.id;
+      vic.lastHitT = this.time;
+      p.lastAttackedId = vic.id;
+      p.lastAttackedT = this.time;
+
+      if (vic.shieldT <= 0) {
+        vic.stunT = Math.max(vic.stunT, 0.22);
+        vic.slowT = Math.max(vic.slowT, 0.6);
+        vic.dashT = 0;
+        vic.plow = false;
+        vic.vx *= 0.25;
+        vic.vz *= 0.25;
+      }
+
+      this.events.push({
+        k: 'wolfBite',
+        id: p.id,
+        targetId: vic.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        fromX: r2(fromX),
+        fromZ: r2(fromZ),
+        stolen,
+        loss,
+        rainbow: false,
+        step: p.wolfBiteStep,
+        total: p.wolfBiteTotal || 3,
+      });
+      this.events.push({
+        k: 'hit',
+        a: p.id,
+        v: vic.id,
+        x: r2(vic.x),
+        z: r2(vic.z),
+        s: 16,
+        loss,
+      });
+
+      if ((p.wolfBitesLeft ?? 0) <= 0) {
+        p.wolfTargetId = undefined;
+      }
     }
   }
 
@@ -2520,11 +2987,11 @@ export class World {
         const nx = dx / d, nz = dz / d;
         const ma = a.mass * TRAITS[a.species].weight, mb = b.mass * TRAITS[b.species].weight;
 
-        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals or animals they just slammed/squished; Shield is unyielding against all
+        // separate, the lighter one moves more; Gorilla, Mammoth & Wolf are unyielding against < 1 ton animals or animals they just slammed/squished; Shield is unyielding against all
         const aJustHitB = b.lastHitBy === a.id && (this.time - b.lastHitT) < 0.6;
         const bJustHitA = a.lastHitBy === b.id && (this.time - a.lastHitT) < 0.6;
-        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth') && (b.mass < 1000 || aJustHitB || b.squishT > 0)) || a.shieldT > 0 || (a.species === 'monkey' && aJustHitB);
-        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth') && (a.mass < 1000 || bJustHitA || a.squishT > 0)) || b.shieldT > 0 || (b.species === 'monkey' && bJustHitA);
+        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth' || a.species === 'wolf') && (b.mass < 1000 || aJustHitB || b.squishT > 0)) || a.shieldT > 0 || (a.species === 'monkey' && aJustHitB);
+        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth' || b.species === 'wolf') && (a.mass < 1000 || bJustHitA || a.squishT > 0)) || b.shieldT > 0 || (b.species === 'monkey' && bJustHitA);
         let wa = mb / (ma + mb);
         if (aImmune) wa = 0;
         else if (bImmune) wa = 1;
@@ -3104,8 +3571,8 @@ export class World {
       return;
     }
 
-    // Gorilla & Mammoth immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
-    if ((vic.species === 'gorilla' || vic.species === 'mammoth') && att.mass < 1000 && !(att.superT > 0)) {
+    // Gorilla, Mammoth & Wolf immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
+    if ((vic.species === 'gorilla' || vic.species === 'mammoth' || vic.species === 'wolf') && att.mass < 1000 && !(att.superT > 0)) {
       att.vx = -nx * 18;
       att.vz = -nz * 18;
       att.dashT = 0;
@@ -3313,6 +3780,11 @@ export class World {
       p.treeShakeTimer = undefined;
       p.treeShakeDropStage = undefined;
       p.mammothRoarT = 0;
+      p.wolfFrenzyT = 0;
+      p.wolfLungeT = 0;
+      p.wolfBitesLeft = 0;
+      p.wolfTargetId = undefined;
+      p.wolfChainTargets = undefined;
       // Hồi sinh bằng Trái Tim giữ nguyên hình dạng hiện tại (kể cả đang biến hình từ chuối, Gorilla/Mammoth)
       // vì client chỉ đồng bộ loài qua sự kiện 'morph' — đổi loài ngầm ở đây khiến hình là Voi nhưng kỹ năng lại là Khỉ.
       // Thời gian biến hình còn lại (morphT) tạm dừng trong 3s hồi sinh và tiếp tục đếm sau khi sống lại.
@@ -3399,10 +3871,17 @@ export class World {
     p.treeShakeTimer = undefined;
     p.treeShakeDropStage = undefined;
     p.mammothRoarT = 0;
+    p.wolfFrenzyT = 0;
+    p.wolfLungeT = 0;
+    p.wolfBitesLeft = 0;
+    p.wolfTargetId = undefined;
+    p.wolfChainTargets = undefined;
     if (p.species === 'gorilla') {
       p.species = 'monkey';
     } else if (p.species === 'mammoth') {
       p.species = 'elephant';
+    } else if (p.species === 'wolf') {
+      p.species = 'dog';
     }
     if (p.morphOrigSpecies) {
       p.species = p.morphOrigSpecies;
@@ -3833,7 +4312,7 @@ export class World {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
         | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0)
-        | (o.species !== 'duck' && o.species !== 'dog' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
+        | (o.species !== 'duck' && o.species !== 'dog' && o.species !== 'wolf' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
         | (o.slowT > 0 ? FLAG.SONG : 0)
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)
@@ -3847,7 +4326,8 @@ export class World {
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
         | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
         | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0)
-        | (o.mammothRoarT && o.mammothRoarT > 0 ? FLAG.MAMMOTH_ROAR : 0);
+        | (o.mammothRoarT && o.mammothRoarT > 0 ? FLAG.MAMMOTH_ROAR : 0)
+        | (o.wolfFrenzyT && o.wolfFrenzyT > 0 ? FLAG.WOLF_FRENZY : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;

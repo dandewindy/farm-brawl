@@ -4,7 +4,7 @@ import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
   cycleAudioMode, getAudioMode, type AudioMode,
@@ -1640,7 +1640,7 @@ function handleGameEvent(ev: GameEvent): void {
             yelp(vm.species, 0.4);
           }
           const FLUFF_COLORS: Record<Species, number> = {
-            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28,
+            chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28, wolf: 0x546e7a,
           };
           foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
         }
@@ -1666,7 +1666,7 @@ function handleGameEvent(ev: GameEvent): void {
         yelp(vm.species, isMine ? 1 : 0.5);
       }
       const FLUFF_COLORS: Record<Species, number> = {
-        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28,
+        chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28, wolf: 0x546e7a,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -2317,6 +2317,63 @@ function handleGameEvent(ev: GameEvent): void {
       }
       break;
     }
+    case 'wolfBite': {
+      animals.notifyWolfBite(ev.id);
+      animals.notifyHit(ev.targetId);
+      const isMine = ev.id === myId || ev.targetId === myId;
+      sfxWolfBite(isMine ? 1.0 : 0.45, !!ev.rainbow);
+
+      const wolfEnt = gameState.ents.get(ev.id);
+      if (wolfEnt) {
+        wolfEnt.x = ev.x;
+        wolfEnt.z = ev.z;
+      }
+      const targetEnt = gameState.ents.get(ev.targetId);
+      if (ev.id === myId) {
+        predictor.syncWolfBitePos(ev.x, ev.z);
+        if (targetEnt) {
+          predictor.a = Math.atan2(targetEnt.z - ev.z, targetEnt.x - ev.x);
+        }
+        shake = Math.max(shake, ev.rainbow ? 0.85 : 0.55);
+      } else if (ev.targetId === myId) {
+        shake = Math.max(shake, 0.55);
+      }
+
+      if (ev.fromX !== undefined && ev.fromZ !== undefined) {
+        animals.spawnShockwave(ev.fromX, 0.1, ev.fromZ, ev.rainbow ? 2.2 : 1.5, ev.rainbow ? 0x00e5ff : 0xb0bec5);
+        const steps = ev.rainbow ? 8 : 5;
+        for (let i = 0; i <= steps; i++) {
+          const k = i / steps;
+          const tx = ev.fromX + (ev.x - ev.fromX) * k;
+          const tz = ev.fromZ + (ev.z - ev.fromZ) * k;
+          const trailCol = ev.rainbow
+            ? (i % 2 === 0 ? 0x00e5ff : 0xff007f)
+            : (i % 2 === 0 ? 0x90a4ae : 0xeceff1);
+          foodParts.puff(tx, 0.9, tz, trailCol, ev.rainbow ? 1.05 : 0.75, 0.32, 0.5);
+        }
+      }
+
+      animals.spawnShockwave(ev.x, 0.1, ev.z, ev.rainbow ? 2.6 : 1.9, ev.rainbow ? 0xff1744 : 0xff5252);
+      foodParts.burst(ev.x, 1.3, ev.z, ev.rainbow ? 0xff1744 : 0xd32f2f, ev.rainbow ? 20 : 14, 7, 7, 0.5);
+      foodParts.burst(ev.x, 1.4, ev.z, 0xffffff, 10, 6, 6, 0.45);
+
+      const vm = gameState.metas.get(ev.targetId);
+      if (vm) {
+        yelp(vm.species, isMine ? 0.9 : 0.4);
+      }
+
+      if (ev.id === myId && ev.stolen && ev.stolen >= 1) {
+        const myMass = wolfEnt ? wolfEnt.mass : 3000;
+        hud.floatText(`+${Math.round(ev.stolen)} kg 🐺`, 'spoil', myId, { x: ev.x, z: ev.z, mass: myMass });
+      }
+      if (ev.loss && ev.loss >= 1 && (ev.id === myId || ev.targetId === myId)) {
+        const tMass = targetEnt ? targetEnt.mass : 100;
+        const tx = targetEnt ? targetEnt.x : ev.x;
+        const tz = targetEnt ? targetEnt.z : ev.z;
+        hud.floatText(`-${Math.round(ev.loss)} kg`, 'loss', ev.targetId, { x: tx, z: tz, mass: tMass });
+      }
+      break;
+    }
     case 'morph': {
       const targetMeta = gameState.metas.get(ev.id);
       if (targetMeta) {
@@ -2350,6 +2407,21 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner('🦍 ' + t('name_gorilla'), '🔥 TIẾN HOÁ THÀNH GORILLA KHỔNG LỒ! 🔥');
           const myPos = animals.getPosition(myId) || { x: mx, z: mz };
           hud.floatText('🔥 TIẾN HOÁ GORILLA! 🔥', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'wolf') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.2, 0x78909c);
+        animals.spawnShockwave(mx, 0.12, mz, 3.8, 0x00e5ff);
+        animals.spawnShockwave(mx, 0.16, mz, 2.4, 0xffca28);
+        foodParts.burst(mx, 1.5, mz, 0x90a4ae, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffca28, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
+        sfxWolfHowl(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🐺 ' + t('name_wolf'), '🔥 TIẾN HOÁ THÀNH CHÓ SÓI DŨNG MÃNH! 🔥');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🐺 TIẾN HOÁ CHÓ SÓI! 🐺', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
         }
       } else if (ev.species === 'mammoth') {
         // Spectacular 3-stage evolution shockwave rings

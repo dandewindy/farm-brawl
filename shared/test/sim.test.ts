@@ -568,6 +568,7 @@ describe('bonus weapons and tools', () => {
           monkey: ['Khỉ', 'Tề', 'Tôn', 'Vượn', 'Mỹ'],
           gorilla: ['Gorilla', 'King', 'Titan', 'Đại', 'Tinh'],
           mammoth: ['Voi', 'Mammoth', 'Ma', 'Titan', 'Bé'],
+          wolf: ['Sói', 'Hắc', 'Bạch', 'Chó', 'Cún', 'Cậu', 'Bé', 'Gâu'],
         };
         const checkSpecies = p.morphOrigSpecies || p.species;
         const prefixes = validPrefixes[checkSpecies] || [];
@@ -2978,6 +2979,131 @@ describe('fruit trees', () => {
       expect(m.monkeyBounced).toBe(false);
       const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
       expect(leapEvents.length).toBe(1);
+    });
+  });
+
+  describe('wolf evolution and combat mechanics', () => {
+    it('dog evolves to wolf at 3000kg and de-evolves back to dog below 1000kg', () => {
+      const w = emptyWorld();
+      const dId = w.addPlayer('Shiba', 'dog', false);
+      const p = place(w, dId, 0, 0, 2999);
+      w.step();
+      expect(p.species).toBe('dog');
+
+      p.mass = 3000;
+      w.step();
+      expect(p.species).toBe('wolf');
+      expect(w.events.some((e) => e.k === 'morph' && e.id === dId && e.species === 'wolf')).toBe(true);
+
+      // Inherits +30% land speed and slow swimming without drowning
+      expect(TRAITS.wolf.speed).toBe(1.30);
+      expect(TRAITS.wolf.water).toBe(0.35);
+
+      // De-evolves below 1000kg
+      p.mass = 999;
+      w.step();
+      expect(p.species).toBe('dog');
+    });
+
+    it('wolf swims in water without drowning and moves 30% faster on land', () => {
+      const w = emptyWorld();
+      w.map.ponds = [[0, 0, 8, 8, 0, 1, 1, 1, 1, 1, 1, 1, 1]];
+      const wId = w.addPlayer('Fenrir', 'wolf', false);
+      const wolf = place(w, wId, 0, 0, 3000);
+
+      for (let i = 0; i < 60; i++) {
+        w.step();
+      }
+      expect(wolf.alive).toBe(true);
+      expect(wolf.inWaterT).toBe(0);
+    });
+
+    it('normal wolf tap pounces lightly, while charged hold lunges to target and bites repeatedly at different angles', () => {
+      const w = emptyWorld();
+      const wId = w.addPlayer('Fenrir', 'dog', false);
+      const tId = w.addPlayer('TargetCow', 'cow', false);
+      const wolf = place(w, wId, 0, 0, 3000);
+      const target = place(w, tId, 12, 0, 1500);
+      w.step(); // Evolves dog -> wolf at 3000kg
+      expect(wolf.species).toBe('wolf');
+
+      // 1. Tap pounce (holdT <= 0.15)
+      wolf.holdT = 0.08;
+      wolf.input.a = 0;
+      (w as any).dash(wolf);
+      expect(wolf.dashT).toBeGreaterThan(0);
+      expect(wolf.wolfFrenzyT || 0).toBe(0);
+
+      // Reset for charged hold
+      wolf.dashT = 0;
+      wolf.cd = 0;
+      wolf.x = 0;
+      wolf.z = 0;
+      wolf.vx = 0;
+      wolf.vz = 0;
+
+      // 2. Charged hold (holdT = 1.2s -> max 6 bites on single target at different positions)
+      wolf.holdT = 1.2;
+      wolf.input.a = 0;
+      (w as any).dash(wolf);
+      expect(wolf.wolfTargetId).toBe(tId);
+      expect(wolf.wolfBiteTotal).toBe(6);
+
+      const anglesSeen = new Set<string>();
+      for (let i = 0; i < 25; i++) {
+        w.step();
+        const biteEvs = w.events.filter((e) => e.k === 'wolfBite' && e.id === wId);
+        for (const ev of biteEvs) {
+          if (ev.k === 'wolfBite') {
+            const ang = Math.atan2(ev.z - target.z, ev.x - target.x).toFixed(2);
+            anglesSeen.add(ang);
+          }
+        }
+      }
+
+      // Multiple distinct angles around target were bitten, target lost mass, wolf stole mass!
+      expect(anglesSeen.size).toBeGreaterThanOrEqual(4);
+      expect(target.mass).toBeLessThan(1500);
+      expect(wolf.mass).toBeGreaterThan(3000);
+    });
+
+    it('rainbow wolf charged hold chain-blinks across up to 6 different animals (0.3s per target, 1.8s total) and steals mass', () => {
+      const w = emptyWorld();
+      const wId = w.addPlayer('RainbowFenrir', 'dog', false);
+      const wolf = place(w, wId, 0, 0, 3000);
+      w.step(); // Evolves dog -> wolf at 3000kg
+      expect(wolf.species).toBe('wolf');
+      wolf.superT = 8.0; // Rainbow power active!
+
+      const enemyIds: number[] = [];
+      for (let i = 0; i < 7; i++) {
+        const ang = (i / 7) * Math.PI * 2;
+        const eid = w.addPlayer(`Enemy${i}`, 'pig', false);
+        place(w, eid, Math.cos(ang) * 14, Math.sin(ang) * 14, 600);
+        enemyIds.push(eid);
+      }
+
+      // Max charge (holdT = 1.2s) -> max 6 targets, 0.3s each = 1.8s total
+      wolf.holdT = 1.2;
+      wolf.input.a = 0;
+      (w as any).dash(wolf);
+
+      expect(wolf.wolfChainRainbow).toBe(true);
+      expect(wolf.wolfChainTargets?.length).toBe(6);
+      expect(wolf.wolfFrenzyT).toBeCloseTo(1.8, 1);
+
+      const bittenTargets = new Set<number>();
+      for (let i = 0; i < 40; i++) {
+        w.step();
+        for (const ev of w.events) {
+          if (ev.k === 'wolfBite' && ev.id === wId) {
+            bittenTargets.add(ev.targetId);
+          }
+        }
+      }
+
+      expect(bittenTargets.size).toBe(6);
+      expect(wolf.mass).toBeGreaterThan(3000);
     });
   });
 });

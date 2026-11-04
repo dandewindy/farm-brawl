@@ -196,6 +196,7 @@ export class HudManager {
     monkey: 0,
     gorilla: 0,
     mammoth: 0,
+    wolf: 0,
   };
 
   private readonly friendPanel: HTMLElement | null;
@@ -436,6 +437,7 @@ export class HudManager {
       monkey: [0x6e472b, 0x362b28, 0xd4a373, 0x934b28],
       gorilla: [0x242528, 0x332822, 0x18191c, 0x4a4d52],
       mammoth: [0x5a3d28, 0xedeae4, 0x422616, 0x8c5b36],
+      wolf: [0x546e7a, 0x212529, 0xeceff1, 0x7f3822],
     };
 
     SPECIES.forEach((sp) => {
@@ -2209,7 +2211,7 @@ export class HudManager {
 
   updateHof(hof: HofRow[]): void {
     const emojis: Record<Species, string> = {
-      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘', monkey: '🐒', gorilla: '🦍', mammoth: '🦣',
+      chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘', monkey: '🐒', gorilla: '🦍', mammoth: '🦣', wolf: '🐺',
     };
     if (this.hofList) this.hofList.innerHTML = '';
     if (this.drawerHofList) this.drawerHofList.innerHTML = '';
