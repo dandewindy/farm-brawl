@@ -214,14 +214,14 @@ export class ClientPredictor {
     const CMIN = CFG.CHARGE_MIN;
     const CMAX = CFG.CHARGE_MAX;
 
-    const chickenDash = species === 'chicken' ? 1.30 : 1;
-    let sp = DS * mud * chickenDash;
+    const dashTrait = TRAITS[species]?.dash ?? 1;
+    let sp = DS * mud * dashTrait;
     let dashT = DT * mudT;
 
     this.plow = held >= CMIN;
     if (this.plow) {
       const c = Math.min(1, Math.max(0, (held - CMIN) / (CMAX - CMIN)));
-      sp = DS * (1 + 0.45 * c) * mud * chickenDash;
+      sp = DS * (1 + 0.45 * c) * mud * dashTrait;
       dashT = (DT + 0.28 * c) * mudT;
     }
 

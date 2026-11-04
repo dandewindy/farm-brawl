@@ -2618,10 +2618,9 @@ export class AnimalRenderer {
       }
     }
 
-    // Body hopping & positioning: Khi tốc độ chạy tăng thì độ cao nhún nhảy bốc lên cao hơn rõ rệt (trên không khi nhảy Super Leap thì bỏ nhún bước chân để đường bay mượt mà)
+    // Body hopping & positioning: lướt mượt mà khi húc (isDashing), nhún bước chân nhẹ nhàng khi đi bộ
     const isGroundHopping = !isLeapingVisual && (!isWater || isSuper);
-    const speedBounceMult = Math.min(2.2, Math.max(0, speed * 2.2 + (isDashing ? 1.4 : 0)));
-    const hopHeight = 0.10 + 0.22 * speedBounceMult;
+    const hopHeight = isDashing ? 0.05 : 0.10;
     let bodyY = y + (isGroundHopping ? Math.abs(Math.sin(vis.phase)) * hopHeight * r : 0);
     // Monkey bipedal bobbing run
     if (vis.species === 'monkey' && !isLeapingVisual && !isWater && speed > 0.02) {
