@@ -700,6 +700,10 @@ function syncAudioUi(): void {
     muteInGameBtn.textContent = ico;
     muteInGameBtn.title = txt;
   }
+  const drawerMuteIco = document.getElementById('drawerMuteIco');
+  const drawerMuteLbl = document.getElementById('drawerMuteLbl');
+  if (drawerMuteIco) drawerMuteIco.textContent = ico;
+  if (drawerMuteLbl) drawerMuteLbl.textContent = `${t('audioSetting') || 'Âm thanh'}: ${txt}`;
   const startMuteBtn = document.getElementById('mute');
   if (startMuteBtn) {
     startMuteBtn.innerHTML = `<span class="ico">${ico}</span>`;
@@ -1224,6 +1228,7 @@ const drawerBackdrop = document.getElementById('drawerBackdrop');
 const drawerBoardToggle = document.getElementById('drawerBoardToggle');
 const drawerStatsToggle = document.getElementById('drawerStatsToggle');
 const drawerShadowToggle = document.getElementById('drawerShadowToggle');
+const drawerMuteBtn = document.getElementById('drawerMuteBtn');
 
 // PC Settings Menu
 const pcSettingsBtn = document.getElementById('pcSettingsBtn');
@@ -1292,6 +1297,7 @@ function syncShadowUi(): void {
 if (burgerBtn && gameDrawerModal) {
   bindFastTap(burgerBtn, () => {
     gameDrawerModal.hidden = false;
+    syncAudioUi();
     syncBoardUi();
     syncStatsUi();
     syncShadowUi();
@@ -1322,6 +1328,10 @@ bindFastTap(drawerShadowToggle, () => {
   try { localStorage.setItem('fb_shadows', showShadows ? '1' : '0'); } catch (_) {}
   syncShadowUi();
 });
+
+if (drawerMuteBtn) {
+  bindFastTap(drawerMuteBtn, handleAudioToggle);
+}
 
 // PC Settings controls
 if (pcSettingsBtn && pcSettingsMenu) {
@@ -1987,22 +1997,6 @@ function handleGameEvent(ev: GameEvent): void {
         } else {
           hud.showToast(t(`tk_${ev.kind}`));
         }
-      } else {
-        const pickerMeta = gameState.metas.get(ev.id);
-        const pName = pickerMeta ? pickerMeta.name : 'Ai đó';
-        if (ev.kind === 'wheel') {
-          hud.showToast(t('wheel_other', { name: pName }));
-        } else if (ev.kind === 'star') {
-          hud.showToast(t('star_other', { name: pName }));
-        } else if (ev.kind === 'banana') {
-          hud.showToast(t('banana_other', { name: pName }));
-        } else if (ev.kind === 'speed') {
-          hud.showToast(t('speed_other', { name: pName }));
-        } else if (ev.kind === 'shield') {
-          hud.showToast(t('shield_other', { name: pName }));
-        } else if (ev.kind === 'heart') {
-          hud.showToast(t('heart_other', { name: pName }));
-        }
       }
       break;
     }
@@ -2011,8 +2005,6 @@ function handleGameEvent(ev: GameEvent): void {
       if (ev.id === myId) {
         sfxReward();
         hud.showBanner(`💖 ${t('heart_head')}`, t('tk_heart'));
-      } else {
-        hud.showToast(t('heart_other', { name: ev.name }), 2500);
       }
       break;
     }
@@ -2037,10 +2029,6 @@ function handleGameEvent(ev: GameEvent): void {
         if (transport) transport.inGame = true;
         deathCamTarget = { x: ev.x, z: ev.z };
         hud.showBanner(`💖 ${t('heart_head')}`, t('heartRevivingBanner', { s: '3' }));
-      } else {
-        const victim = gameState.metas.get(ev.id);
-        const name = victim ? victim.name : 'Ai đó';
-        hud.showToast(`💖 ${name} đã biến thành Trái Tim và đang hồi sinh...`, 2500);
       }
       break;
     }

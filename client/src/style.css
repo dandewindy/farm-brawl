@@ -574,7 +574,7 @@ body.is-pc.mode-friend #howBox {
 }
 
 .death-exit-btn svg,
-#gameControls button svg {
+#gameControls > button svg {
   width: 20px;
   height: 20px;
   display: block;
@@ -721,6 +721,59 @@ body.is-pc.mode-friend #howBox {
   z-index: 30;
   pointer-events: auto;
   animation: fadeIn 0.15s;
+}
+.pc-settings-dropdown .settings-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 2px 0;
+}
+.pc-settings-dropdown .pc-settings-kids-btn {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  padding: 0 12px !important;
+  background: rgba(255, 193, 7, 0.14) !important;
+  border: 1.5px solid #ffb300 !important;
+  border-radius: 8px !important;
+  color: #fff9c4 !important;
+  font-family: inherit !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  line-height: 38px !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  text-align: left !important;
+}
+.pc-settings-dropdown .pc-settings-kids-btn:hover {
+  background: rgba(255, 193, 7, 0.28) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(255, 179, 0, 0.35) !important;
+}
+.pc-settings-dropdown .pc-settings-kids-btn.active {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.3) 0%, rgba(56, 142, 60, 0.4) 100%) !important;
+  border-color: #81c784 !important;
+  color: #e8f5e9 !important;
+}
+.pc-settings-dropdown .pc-settings-kids-btn .ico {
+  font-size: 17px !important;
+  line-height: 1 !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
+.pc-settings-dropdown .pc-settings-kids-btn span:not(.ico) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .pc-settings-dropdown .settings-title {
   font-family: var(--f-display);
@@ -1195,7 +1248,7 @@ body.touch #lb {
   z-index: 25;
   pointer-events: auto;
 }
-#gameControls button {
+#gameControls > button {
   width: 38px;
   height: 38px;
   border-radius: 8px;
@@ -1211,11 +1264,11 @@ body.touch #lb {
   transition: transform .1s, background .15s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
-#gameControls button:hover {
+#gameControls > button:hover {
   background: rgba(50,42,37,.95);
   transform: scale(1.05);
 }
-#gameControls button:active {
+#gameControls > button:active {
   background: rgba(20,16,14,.98);
   transform: scale(0.95);
 }
@@ -1249,8 +1302,8 @@ body.mobile-phone #gameControls {
   right: 6px;
   gap: 4px;
 }
-body.touch:not(.is-pc) #gameControls button,
-body.mobile-phone #gameControls button {
+body.touch:not(.is-pc) #gameControls > button,
+body.mobile-phone #gameControls > button {
   width: 36px;
   height: 36px;
   font-size: 16px;
@@ -1271,13 +1324,20 @@ body.ipad #lb {
   display: none !important;
 }
 
+/* On mobile phones: Only keep #fsBtn (fullscreen) and #burgerBtn in top bar; all other buttons hidden into burger drawer */
+body.mobile-phone #gameControls > button:not(#fsBtn):not(#burgerBtn),
+body.touch:not(.is-pc):not(.ipad) #gameControls > button:not(#fsBtn):not(#burgerBtn),
+body:not(.is-pc):not(.ipad) #gameControls > button:not(#fsBtn):not(#burgerBtn) {
+  display: none !important;
+}
+
 @media (max-width: 1024px) {
   body:not(.is-pc) #gameControls {
     top: 6px;
     right: 6px;
     gap: 4px;
   }
-  body:not(.is-pc) #gameControls button {
+  body:not(.is-pc) #gameControls > button {
     width: 36px;
     height: 36px;
     font-size: 16px;
@@ -1285,6 +1345,12 @@ body.ipad #lb {
   body:not(.is-pc) #gameControls #burgerBtn { display: grid !important; }
   body:not(.is-pc) #gameControls #pcSettingsBtn { display: none !important; }
   body:not(.is-pc) #lb { display: none !important; }
+}
+
+@media (max-width: 768px) {
+  #gameControls > button:not(#fsBtn):not(#burgerBtn) {
+    display: none !important;
+  }
 }
 
 #floats { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
@@ -2174,6 +2240,10 @@ body.mobile-phone #gameControls #burgerBtn {
 }
 body:not(.ipad):not(.is-pc) #gameControls #pcSettingsBtn,
 body.mobile-phone #gameControls #pcSettingsBtn {
+  display: none !important;
+}
+body:not(.ipad):not(.is-pc) #gameControls > button:not(#fsBtn):not(#burgerBtn),
+body.mobile-phone #gameControls > button:not(#fsBtn):not(#burgerBtn) {
   display: none !important;
 }
 body:not(.ipad):not(.is-pc) #board,
@@ -5121,9 +5191,10 @@ input:checked + .slider:before {
 /* Top Timer for Kids Mode (Chỉ hiện thời gian, highlight khi còn <= 30s) */
 .kids-top-timer {
   position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 52px;
+  right: 242px;
+  left: auto;
+  transform: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -5133,7 +5204,7 @@ input:checked + .slider:before {
   padding: 4px 14px;
   color: #fff9c4;
   font-family: 'Baloo 2', cursive, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.5px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
@@ -5150,14 +5221,32 @@ input:checked + .slider:before {
   background: linear-gradient(135deg, rgba(183, 28, 28, 0.95), rgba(216, 67, 21, 0.95));
   border-color: #ffeb3b;
   color: #ffffff;
-  font-size: 17px;
+  font-size: 15px;
   padding: 5px 16px;
   box-shadow: 0 0 18px rgba(255, 87, 34, 0.85);
   animation: kidsTimerPulse 0.9s infinite alternate;
 }
 @keyframes kidsTimerPulse {
-  0% { transform: translateX(-50%) scale(1); filter: brightness(1); }
-  100% { transform: translateX(-50%) scale(1.08); filter: brightness(1.2); }
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.08); filter: brightness(1.2); }
+}
+
+/* On mobile / touch: Góc phải màn hình, bên dưới các icon setting và gần mini map */
+body.mobile-phone .kids-top-timer,
+body.touch:not(.is-pc) .kids-top-timer,
+body:not(.is-pc) .kids-top-timer {
+  top: 48px !important;
+  right: 84px !important;
+  left: auto !important;
+  transform: none !important;
+}
+@media (max-width: 768px) {
+  .kids-top-timer {
+    top: 48px !important;
+    right: 84px !important;
+    left: auto !important;
+    transform: none !important;
+  }
 }
 
 /* Rest Lock Screen (Căn giữa tuyệt đối màn hình - Dead Center) */

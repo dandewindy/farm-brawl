@@ -361,6 +361,10 @@ export class KidsUiController {
 
   private openSettingsModal(): void {
     if (!this.modalEl) return;
+    const pcMenu = document.getElementById('pcSettingsMenu');
+    if (pcMenu) pcMenu.hidden = true;
+    const drawer = document.getElementById('gameDrawerModal');
+    if (drawer) drawer.hidden = true;
     this.modalEl.hidden = false;
 
     // Reset errors
