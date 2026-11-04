@@ -6,7 +6,7 @@ import {
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type Blob, type MapData, type TreeData, type TreeSize } from '../map';
-import { clamp, insideBlob, mulberry32, distToSegmentSq, wrapAngle } from '../math';
+import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
@@ -1187,8 +1187,6 @@ export class World {
           if (inWater) {
             p.inWaterT = 0.05;
           }
-
-          let hitAnyAnimal = false;
           let touchedAnimal = false;
           for (const other of this.players.values()) {
             if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
@@ -1201,7 +1199,6 @@ export class World {
               touchedAnimal = true;
             }
             if (dist <= shockwaveR) {
-              hitAnyAnimal = true;
               // Gorilla & Mammoth immunity: immune to shockwaves from leapers < 1 ton without rainbow!
               if ((other.species === 'gorilla' || other.species === 'mammoth') && p.mass < 1000 && !isRainbowLanding) {
                 continue;
@@ -2348,32 +2345,69 @@ export class World {
     p.a = p.input.a;
     p.wolfRatio = ratio;
     p.dashHit.clear();
+    const rWolf = radiusOf(p.mass);
+    const cosA = Math.cos(p.a);
+    const sinA = Math.sin(p.a);
 
     if (isRainbow) {
       // Rainbow Charged Skill:
-      // Lướt/Biến ảnh liên tiếp qua tối đa 6 con vật khác nhau trong phạm vi (tuỳ thời gian gồng: 1..6 con),
-      // cắn mỗi con 1 phát cực nhanh trong vòng 0.3s (tổng max 6 con = 1.8s), gây sát thương và cướp kg!
+      // Phải có ít nhất 1 mục tiêu nằm trong vùng húc phía trước (tính theo kích thước con vật) mới kích hoạt chuỗi tốc biến
       const maxTargets = Math.max(1, Math.min(6, Math.round(1 + ratio * 5)));
-      const scanR = 20.0 + ratio * 25.0;
-      const forwardX = p.x + Math.cos(p.a) * (8.0 + ratio * 12.0);
-      const forwardZ = p.z + Math.sin(p.a) * (8.0 + ratio * 12.0);
+      let primaryTarget: Player | null = null;
+      let primaryScore = Infinity;
 
-      const candidates: { id: number; score: number }[] = [];
       for (const other of this.players.values()) {
         if (!other.alive || other.id === p.id) continue;
         if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
-        const dFromPlayer = Math.hypot(other.x - p.x, other.z - p.z);
-        const dFromForward = Math.hypot(other.x - forwardX, other.z - forwardZ);
-        if (dFromPlayer <= scanR || dFromForward <= scanR) {
-          const angDiff = Math.abs(wrapAngle(Math.atan2(other.z - p.z, other.x - p.x) - p.a));
-          const score = dFromPlayer + angDiff * 3.5;
-          candidates.push({ id: other.id, score });
+        const rOther = radiusOf(other.mass);
+        const rSum = rWolf + rOther;
+        const dx = other.x - p.x;
+        const dz = other.z - p.z;
+        const forward = dx * cosA + dz * sinA;
+        const lateral = Math.abs(-dx * sinA + dz * cosA);
+        const maxDist = rSum * 2.8 + ratio * (rSum * 2.0 + 6.0);
+        const maxLateral = rSum * 1.05;
+        const dist = Math.hypot(dx, dz);
+        const inStrikeZone = (forward > 0 && forward <= maxDist && lateral <= maxLateral) || dist <= rSum * 1.35;
+        if (inStrikeZone) {
+          const score = dist + lateral * 2.5;
+          if (score < primaryScore) {
+            primaryScore = score;
+            primaryTarget = other;
+          }
         }
       }
-      candidates.sort((a, b) => a.score - b.score);
-      const targets = candidates.slice(0, maxTargets).map((c) => c.id);
 
-      if (targets.length > 0) {
+      if (primaryTarget) {
+        const targets: number[] = [primaryTarget.id];
+        const visited = new Set<number>([primaryTarget.id]);
+        let currX = primaryTarget.x;
+        let currZ = primaryTarget.z;
+
+        while (targets.length < maxTargets) {
+          let nextTarget: Player | null = null;
+          let nextMinDist = Infinity;
+          for (const other of this.players.values()) {
+            if (!other.alive || other.id === p.id || visited.has(other.id)) continue;
+            if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+            const rOther = radiusOf(other.mass);
+            const chainR = (rWolf + rOther) * 2.5 + 16.0 + ratio * 14.0;
+            const d = Math.hypot(other.x - currX, other.z - currZ);
+            if (d <= chainR && d < nextMinDist) {
+              nextMinDist = d;
+              nextTarget = other;
+            }
+          }
+          if (nextTarget) {
+            targets.push(nextTarget.id);
+            visited.add(nextTarget.id);
+            currX = nextTarget.x;
+            currZ = nextTarget.z;
+          } else {
+            break;
+          }
+        }
+
         p.wolfChainTargets = targets;
         p.wolfChainRainbow = true;
         p.wolfBiteTotal = targets.length;
@@ -2385,11 +2419,11 @@ export class World {
         p.cd = 0.6;
         this.stepWolfFrenzy(p, 0);
       } else {
-        // Không có con vật nào trong phạm vi -> lướt vọt nhanh tới vị trí ngắm
+        // Không có con vật nào trong vùng húc -> lướt nhanh về phía trước bình thường
         const lungeDur = 0.32 + ratio * 0.14;
         const lungeSpeed = 54;
-        p.vx = Math.cos(p.a) * lungeSpeed;
-        p.vz = Math.sin(p.a) * lungeSpeed;
+        p.vx = cosA * lungeSpeed;
+        p.vz = sinA * lungeSpeed;
         p.dashT = lungeDur;
         p.flyT = lungeDur;
         p.plow = true;
@@ -2400,8 +2434,8 @@ export class World {
     }
 
     // Normal Charged Skill (không có cầu vồng):
-    // Lướt nhanh tới vị trí con vật khác, sau đó cắn liên hồi vào con vật đó ở những vị trí khác nhau xung quanh nó!
-    const searchDist = 16.0 + ratio * 16.0;
+    // Thu hẹp vùng đủ điều kiện kích hoạt: chỉ bắt mục tiêu khi nằm trong hướng húc phía trước,
+    // phạm vi và độ lệch ngang tỷ lệ thuận chặt chẽ với kích thước của hai con vật!
     const totalBites = 3 + Math.round(ratio * 3); // 3 đến 6 nhát cắn liên hồi quanh mục tiêu
     let bestTarget: Player | null = null;
     let bestScore = Infinity;
@@ -2409,14 +2443,19 @@ export class World {
     for (const other of this.players.values()) {
       if (!other.alive || other.id === p.id) continue;
       if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+      const rOther = radiusOf(other.mass);
+      const rSum = rWolf + rOther;
       const dx = other.x - p.x;
       const dz = other.z - p.z;
+      const forward = dx * cosA + dz * sinA;
+      const lateral = Math.abs(-dx * sinA + dz * cosA);
+      const maxDist = rSum * 2.2 + ratio * (rSum * 1.8 + 4.0);
+      const maxLateral = rSum * 0.92;
       const dist = Math.hypot(dx, dz);
-      if (dist > searchDist) continue;
-      const angDiff = Math.abs(wrapAngle(Math.atan2(dz, dx) - p.a));
-      const closeRange = radiusOf(p.mass) + radiusOf(other.mass) + 4.5;
-      if (angDiff <= 1.2 || dist <= closeRange) {
-        const score = dist + angDiff * 5.0;
+      const inStrikeZone = (forward > 0 && forward <= maxDist && lateral <= maxLateral) || dist <= rSum * 1.25;
+
+      if (inStrikeZone) {
+        const score = dist + lateral * 3.0;
         if (score < bestScore) {
           bestScore = score;
           bestTarget = other;
@@ -2433,7 +2472,7 @@ export class World {
     if (bestTarget) {
       p.wolfTargetId = bestTarget.id;
       const gap = Math.hypot(bestTarget.x - p.x, bestTarget.z - p.z) - radiusOf(p.mass) - radiusOf(bestTarget.mass);
-      if (gap > 2.2) {
+      if (gap > 2.0) {
         const lungeSpeed = 52;
         const lungeDur = clamp(gap / lungeSpeed, 0.05, 0.35);
         const aimA = Math.atan2(bestTarget.z - p.z, bestTarget.x - p.x);
@@ -2453,12 +2492,12 @@ export class World {
         this.stepWolfFrenzy(p, 0);
       }
     } else {
-      // Lướt nhanh về hướng ngắm; nếu trên đường lướt gặp con vật nào sẽ lập tức vồ cắn liên hồi vào con đó
+      // Húc hụt hoặc không có con vật phía trước -> chỉ lướt thường, không tự động bám skill
       const lungeSpeed = 46 + ratio * 12;
       const lungeDur = 0.26 + ratio * 0.14;
       p.wolfTargetId = undefined;
-      p.vx = Math.cos(p.a) * lungeSpeed;
-      p.vz = Math.sin(p.a) * lungeSpeed;
+      p.vx = cosA * lungeSpeed;
+      p.vz = sinA * lungeSpeed;
       p.dashT = lungeDur;
       p.wolfLungeT = lungeDur;
       p.wolfFrenzyT = lungeDur;
@@ -2508,7 +2547,7 @@ export class World {
           if (!other.alive || other.id === p.id) continue;
           if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
           const d = Math.hypot(other.x - p.x, other.z - p.z);
-          if (d <= rWolf + radiusOf(other.mass) + 2.8) {
+          if (d <= rWolf + radiusOf(other.mass)) {
             p.wolfTargetId = other.id;
             p.wolfLungeT = 0;
             p.dashT = 0;

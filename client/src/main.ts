@@ -87,6 +87,8 @@ let gainTimer = 0;
 let wasDashing = false;
 let wasSuper = false;
 let deathCamTarget: { x: number; z: number } | null = null;
+let wolfCamLockPos: { x: number; z: number; mass: number } | null = null;
+let wolfCamLockTimer = 0;
 let deathScreenTimer: number | null = null;
 let isDeadAwaitingScreen = false;
 let isHeartReviving = false;
@@ -2321,6 +2323,11 @@ function handleGameEvent(ev: GameEvent): void {
       const isMine = ev.id === myId || ev.targetId === myId;
       sfxWolfBite(isMine ? 1.0 : 0.45, !!ev.rainbow);
 
+      // Play fierce wolf howl sound effect on the initial frenzy strike
+      if (ev.step === 1) {
+        sfxWolfHowl(isMine ? 1.0 : 0.65);
+      }
+
       const wolfEnt = gameState.ents.get(ev.id);
       if (wolfEnt) {
         wolfEnt.x = ev.x;
@@ -2333,6 +2340,17 @@ function handleGameEvent(ev: GameEvent): void {
           predictor.a = Math.atan2(targetEnt.z - ev.z, targetEnt.x - ev.x);
         }
         shake = Math.max(shake, ev.rainbow ? 0.85 : 0.55);
+
+        // Lock camera firmly on the initial victim so camera does not jerk during multi-target blitz
+        if (ev.step === 1 || !wolfCamLockPos) {
+          const tx = targetEnt ? targetEnt.x : ev.x;
+          const tz = targetEnt ? targetEnt.z : ev.z;
+          const tMass = targetEnt ? targetEnt.mass : 1000;
+          wolfCamLockPos = { x: tx, z: tz, mass: tMass };
+        }
+        const biteDur = ev.rainbow ? 0.32 : 0.16;
+        const totalDuration = ((ev.total || 4) - (ev.step || 1) + 1) * biteDur + 0.35;
+        wolfCamLockTimer = Math.max(wolfCamLockTimer, totalDuration);
       } else if (ev.targetId === myId) {
         shake = Math.max(shake, 0.55);
       }
@@ -2348,6 +2366,19 @@ function handleGameEvent(ev: GameEvent): void {
             ? (i % 2 === 0 ? 0x00e5ff : 0xff007f)
             : (i % 2 === 0 ? 0x90a4ae : 0xeceff1);
           foodParts.puff(tx, 0.9, tz, trailCol, ev.rainbow ? 1.05 : 0.75, 0.32, 0.5);
+          if (ev.rainbow && i % 2 === 0) {
+            foodParts.dustPuff(tx, 0.45, tz, 2.2, 14);
+          }
+        }
+      }
+
+      if (ev.rainbow) {
+        // High-impact billowing dust effect and ground fractures for Rainbow frenzy
+        foodParts.dustPuff(ev.x, 0.4, ev.z, 3.8, 38);
+        animals.spawnGroundCracks(ev.x, ev.z, 2.6);
+        if (ev.step === 1 && ev.fromX !== undefined && ev.fromZ !== undefined) {
+          foodParts.dustPuff(ev.fromX, 0.3, ev.fromZ, 4.5, 48);
+          animals.spawnShockwave(ev.fromX, 0.1, ev.fromZ, 3.8, 0xffd54f);
         }
       }
 
@@ -3124,6 +3155,11 @@ function animate(now: number): void {
     if (deathCamTarget) {
       targetX = deathCamTarget.x;
       targetZ = deathCamTarget.z;
+    } else if (wolfCamLockTimer > 0 && wolfCamLockPos) {
+      // Lock camera firmly on initial victim while wolf executes frenzy bites
+      targetX = wolfCamLockPos.x;
+      targetZ = wolfCamLockPos.z;
+      targetMass = wolfCamLockPos.mass;
     } else if (me) {
       targetX = predictor.on ? predictor.x : me.x;
       targetZ = predictor.on ? predictor.z : me.z;
@@ -3139,6 +3175,16 @@ function animate(now: number): void {
   }
   world.updateCamera(targetX, targetZ, targetMass, dt, shake);
   shake = Math.max(0, shake - dt * 2.5);
+  if (wolfCamLockTimer > 0) {
+    wolfCamLockTimer = Math.max(0, wolfCamLockTimer - dt);
+    if (wolfCamLockTimer <= 0) {
+      wolfCamLockPos = null;
+    }
+  }
+  if (!gameState.alive) {
+    wolfCamLockTimer = 0;
+    wolfCamLockPos = null;
+  }
 
   // Update dynamic food and particle effects
   foodParts.updateFood(gameState.food, now, gameState.map?.podium);

@@ -3067,6 +3067,26 @@ describe('fruit trees', () => {
       expect(wolf.mass).toBeGreaterThan(3000);
     });
 
+    it('wolf charged skill does not activate frenzy when aiming away from animals or missing the strike zone', () => {
+      const w = emptyWorld();
+      const wId = w.addPlayer('Fenrir', 'dog', false);
+      const tId = w.addPlayer('SidewaysPig', 'pig', false);
+      const wolf = place(w, wId, 0, 0, 3000);
+      // Target is far to the side (Z = 20) while wolf aims along +X (a = 0)
+      place(w, tId, 0, 20, 600);
+      w.step();
+      expect(wolf.species).toBe('wolf');
+
+      wolf.holdT = 1.2;
+      wolf.input.a = 0; // Aiming +X away from the target at Z=20
+      (w as any).dash(wolf);
+
+      // Should NOT lock on or trigger frenzy
+      expect(wolf.wolfTargetId).toBeUndefined();
+      expect(wolf.wolfChainTargets).toBeUndefined();
+      expect(wolf.dashT).toBeGreaterThan(0); // Standard charged dash
+    });
+
     it('rainbow wolf charged hold chain-blinks across up to 6 different animals (0.3s per target, 1.8s total) and steals mass', () => {
       const w = emptyWorld();
       const wId = w.addPlayer('RainbowFenrir', 'dog', false);

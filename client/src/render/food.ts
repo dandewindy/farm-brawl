@@ -637,6 +637,33 @@ export class FoodAndParticleRenderer {
     }
   }
 
+  dustPuff(x: number, y: number, z: number, radius = 2.0, count = 28): void {
+    const dustColors = [0xd7ccc8, 0xbcaaa4, 0xa1887f, 0xffecb3, 0xefebe9, 0xf5deb3, 0xffffff, 0xe0e0e0];
+    const available = Math.min(count, this.maxParticles - this.particles.length);
+    for (let i = 0; i < available; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 2.2 + Math.random() * 5.8;
+      const dist = Math.random() * radius * 0.75;
+      const colHex = dustColors[Math.floor(Math.random() * dustColors.length)];
+      const life = 0.55 + Math.random() * 0.65;
+      const pSize = (1.2 + Math.random() * 1.6) * Math.max(0.7, radius * 0.5);
+
+      this.particles.push({
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.random() * 0.35,
+        z: z + Math.sin(angle) * dist,
+        vx: Math.cos(angle) * spd,
+        vy: 1.2 + Math.random() * 2.8,
+        vz: Math.sin(angle) * spd,
+        life,
+        maxLife: life,
+        color: new THREE.Color(colHex),
+        size: pSize,
+        g: -0.35, // Billows upward naturally like dust
+      });
+    }
+  }
+
   smokePoof(x: number, y: number, z: number, radius = 1.8, count = 40): void {
     const whiteShades = [0xffffff, 0xfbfcfe, 0xf1f5f9, 0xe2e8f0, 0xdbe4ee];
     const available = Math.min(count, this.maxParticles - this.particles.length);
