@@ -69,6 +69,7 @@ export interface Player extends Body {
   monkeyLeapDur?: number;
   monkeyLeapHeight?: number;
   monkeyLeapRatio?: number;
+  monkeyBounced?: boolean;
   treeShakeT?: number;
   treeShakeTreeId?: number;
   treeShakeTimer?: number;
@@ -445,7 +446,7 @@ export class World {
       best: Math.max(spawnMass, p.best || 0), btnLatch: false, releaseLatch: false, releaseAimA: 0, inWaterT: 0,
       pitchforkT: 0, pitchforkHits: undefined, hasDynamite: false, slowT: 0, superT: 0, flyT: 0, speedT: 0, shieldT: 0, lastEatT: this.time, squishT: 0, wheelT: 0,
       hasHeart: false, heartReviving: false, heartReviveTimer: undefined,
-      monkeyLeapT: 0, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
+      monkeyLeapT: 0, monkeyBounced: false, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -1163,12 +1164,14 @@ export class World {
             p.inWaterT = 0.05;
           }
 
+          let hitAnyAnimal = false;
           for (const other of this.players.values()) {
             if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
             const dx = other.x - p.x;
             const dz = other.z - p.z;
             const dist = Math.hypot(dx, dz);
             if (dist <= shockwaveR) {
+              hitAnyAnimal = true;
               // Gorilla & Mammoth immunity: immune to shockwaves from leapers < 1 ton without rainbow!
               if ((other.species === 'gorilla' || other.species === 'mammoth') && p.mass < 1000 && !isRainbowLanding) {
                 continue;
@@ -1317,6 +1320,36 @@ export class World {
             inWater,
             rainbow: isRainbowLanding,
           });
+
+          // Cơ chế quán tính: Khỉ khi gồng max (isMaxCharge >= 0.85) nếu vừa rớt xuống chạm con vật khác (hitAnyAnimal)
+          // thì nhảy quán tính thêm 1 cái về phía trước! (Gorilla luôn chỉ nhảy 1 cái; Khỉ chỉ nảy 1 lần không lặp)
+          if (!isGorilla && isMaxCharge && hitAnyAnimal && !p.monkeyBounced && !inWater) {
+            p.monkeyBounced = true;
+            const bounceDur = 0.38;
+            const bounceDist = 7.5;
+            const bounceHeight = 2.8;
+            const bounceSpeed = bounceDist / bounceDur;
+            p.monkeyLeapT = bounceDur;
+            p.monkeyLeapDur = bounceDur;
+            p.monkeyLeapHeight = bounceHeight;
+            p.monkeyLeapRatio = 0.5;
+            p.dashT = bounceDur;
+            p.vx = Math.cos(p.a) * bounceSpeed;
+            p.vz = Math.sin(p.a) * bounceSpeed;
+            p.cd = Math.max(p.cd, 0.35);
+            this.events.push({
+              k: 'monkeyLeap',
+              id: p.id,
+              x: r2(p.x),
+              z: r2(p.z),
+              dur: r2(bounceDur),
+              height: r2(bounceHeight),
+              ratio: 0.5,
+              rainbow: isRainbowLanding,
+            });
+          } else {
+            p.monkeyBounced = false;
+          }
         }
       }
 
@@ -1975,6 +2008,8 @@ export class World {
         p.monkeyLeapDur = leapDur;
         p.monkeyLeapHeight = peakHeight;
         p.monkeyLeapRatio = ratio;
+      p.monkeyBounced = false;
+        p.monkeyBounced = false;
         p.a = p.input.a;
         const leapSpeed = leapDist / leapDur;
         p.vx = Math.cos(p.a) * leapSpeed;
@@ -2099,6 +2134,7 @@ export class World {
       p.monkeyLeapDur = leapDur;
       p.monkeyLeapHeight = peakHeight;
       p.monkeyLeapRatio = ratio;
+      p.monkeyBounced = false;
       p.a = p.input.a;
       const leapSpeed = leapDist / leapDur;
       p.vx = Math.cos(p.a) * leapSpeed;
@@ -3257,7 +3293,7 @@ export class World {
       p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
       p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
       p.inWaterT = 0; p.slowT = 0; p.squishT = 0;
-      p.monkeyLeapT = 0; p.treeShakeT = 0;
+      p.monkeyLeapT = 0; p.monkeyBounced = false; p.treeShakeT = 0;
       p.treeShakeTreeId = undefined;
       p.treeShakeTimer = undefined;
       p.treeShakeDropStage = undefined;
@@ -3343,7 +3379,7 @@ export class World {
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
     p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
     p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
-    p.monkeyLeapT = 0; p.treeShakeT = 0;
+    p.monkeyLeapT = 0; p.monkeyBounced = false; p.treeShakeT = 0;
     p.treeShakeTreeId = undefined;
     p.treeShakeTimer = undefined;
     p.treeShakeDropStage = undefined;

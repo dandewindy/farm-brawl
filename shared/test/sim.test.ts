@@ -2868,6 +2868,92 @@ describe('fruit trees', () => {
       // No banana projectile created
       expect((w as any).projectiles?.length || 0).toBe(0);
     });
+
+    it('Gorilla only leaps once and never bounces upon landing', () => {
+      const w = emptyWorld();
+      const gId = w.addPlayer('KingKong', 'gorilla', false);
+      const enemyId = w.addPlayer('VictimPig', 'pig', false);
+      const g = w.players.get(gId)!;
+      place(w, gId, 0, 0, 3000);
+      place(w, enemyId, 15, 0, 200);
+
+      // Max charge leap towards enemy
+      g.holdT = 1.2;
+      g.input.a = 0;
+      (w as any).dash(g);
+      expect(g.monkeyLeapT).toBeGreaterThan(0);
+
+      // Fast forward until gorilla lands
+      while (g.monkeyLeapT && g.monkeyLeapT > 0) {
+        w.step();
+      }
+
+      // Gorilla has landed
+      expect(g.monkeyLeapT).toBe(0);
+      expect(g.monkeyBounced).toBeFalsy();
+      // Only 1 monkeyLeap event was pushed
+      const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === gId);
+      expect(leapEvents.length).toBe(1);
+    });
+
+    it('Monkey max charge leap bounces forward once if landing hits another animal', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('SunWukong', 'monkey', false);
+      const victimId = w.addPlayer('SheepVictim', 'sheep', false);
+      const m = w.players.get(mId)!;
+      place(w, mId, 0, 0, 100);
+      place(w, victimId, 22, 0, 100);
+
+      m.holdT = 1.2; // max charge
+      m.input.a = 0;
+      (w as any).dash(m);
+      expect(m.monkeyLeapT).toBeGreaterThan(0);
+      expect(m.monkeyBounced).toBe(false);
+
+      // Step until landing
+      const initialDur = m.monkeyLeapDur!;
+      for (let i = 0; i < Math.ceil(initialDur / DT); i++) {
+        w.step();
+      }
+
+      // Landing on victim triggered forward inertial bounce!
+      expect(m.monkeyBounced).toBe(true);
+      expect(m.monkeyLeapT).toBeGreaterThan(0);
+      const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
+      expect(leapEvents.length).toBe(2); // Initial leap + forward inertial bounce leap
+
+      // Now step until the bounce leap finishes
+      while (m.monkeyLeapT && m.monkeyLeapT > 0) {
+        w.step();
+      }
+      expect(m.monkeyLeapT).toBe(0);
+      expect(m.monkeyBounced).toBe(false);
+      // No 3rd bounce!
+      const finalLeapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
+      expect(finalLeapEvents.length).toBe(2);
+    });
+
+    it('Monkey max charge leap does NOT bounce if landing on empty ground', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('SunWukongSolo', 'monkey', false);
+      const m = w.players.get(mId)!;
+      place(w, mId, 0, 0, 100);
+
+      m.holdT = 1.2; // max charge
+      m.input.a = 0;
+      (w as any).dash(m);
+      expect(m.monkeyLeapT).toBeGreaterThan(0);
+
+      // Step until landing
+      while (m.monkeyLeapT && m.monkeyLeapT > 0) {
+        w.step();
+      }
+      // Lands on empty ground without bouncing
+      expect(m.monkeyLeapT).toBe(0);
+      expect(m.monkeyBounced).toBe(false);
+      const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
+      expect(leapEvents.length).toBe(1);
+    });
   });
 });
 

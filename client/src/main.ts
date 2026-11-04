@@ -2230,9 +2230,7 @@ function handleGameEvent(ev: GameEvent): void {
       break;
     }
     case 'monkeyLeap': {
-      if (ev.id !== myId) {
-        animals.notifyLeap(ev.id, ev.dur, ev.height);
-      }
+      animals.notifyLeap(ev.id, ev.dur, ev.height);
       if (ev.rainbow) {
         animals.spawnShockwave(ev.x, 0.1, ev.z, 4.0, 0xff007f);
         foodParts.burst(ev.x, 0.5, ev.z, 0xffeb3b, 16, 4, 6, 0.6);

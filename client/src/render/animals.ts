@@ -48,6 +48,7 @@ interface AnimalVisual {
   leapTimer?: number;
   leapDur?: number;
   leapHeight?: number;
+  leapDone?: boolean;
   morphTimer?: number;
   throwTimer?: number;
   mudSplats: THREE.Mesh[];
@@ -2301,9 +2302,10 @@ export class AnimalRenderer {
     if (vis) {
       vis.leapDur = dur;
       vis.leapHeight = height;
-      // Tránh reset timer về 0 nếu đang trong quỹ đạo nhảy (đặc biệt local player đã bắt đầu trước từ prediction)
-      if (!vis.leapTimer || vis.leapTimer <= 0 || vis.leapTimer >= dur * 0.75) {
+      // Tránh reset timer về 0 nếu đang ở giữa quỹ đạo nhảy của cùng cú nhảy
+      if (!vis.leapTimer || vis.leapTimer <= 0 || vis.leapDone || vis.leapTimer >= (vis.leapDur || dur) * 0.70) {
         vis.leapTimer = 0;
+        vis.leapDone = false;
       }
     }
   }
@@ -2459,16 +2461,18 @@ export class AnimalRenderer {
     const isMammothRoar = (flags & FLAG.MAMMOTH_ROAR) !== 0;
     const lvl = (charge || 0) / 10;
 
-    const isLeapingVisual = isMonkeyLeap || (vis.leapTimer !== undefined && vis.leapTimer > 0 && vis.leapTimer < (vis.leapDur || 0.7));
+    const isLeapingVisual = isMonkeyLeap || (vis.leapTimer !== undefined && vis.leapTimer > 0 && !vis.leapDone);
     if (isLeapingVisual) {
-      vis.leapTimer = (vis.leapTimer || 0) + dt;
-      if (vis.leapTimer >= (vis.leapDur || 0.7)) {
-        vis.leapTimer = 0;
-        vis.leapDur = undefined;
-        vis.leapHeight = undefined;
+      if (!vis.leapDone) {
+        vis.leapTimer = (vis.leapTimer || 0) + dt;
+        if (vis.leapTimer >= (vis.leapDur || 0.7)) {
+          vis.leapTimer = vis.leapDur || 0.7;
+          vis.leapDone = true; // Tiếp đất hoàn tất! Giữ chắc trên đất, không bao giờ tự ý lặp lại cú nhảy thứ 2
+        }
       }
     } else {
       vis.leapTimer = 0;
+      vis.leapDone = false;
       vis.leapDur = undefined;
       vis.leapHeight = undefined;
     }
