@@ -1685,7 +1685,10 @@ function handleGameEvent(ev: GameEvent): void {
       }
 
       // Attacker hit someone with normal (non-plow) dash: stop dash velocity immediately on impact!
-      if (ev.a === myId && !predictor.plow && isPhysicallyNearHit) {
+      // (Không áp dụng cho Khỉ / Gorilla vì sự kiện hit của chúng là chấn động nhảy đáp đất hoặc ném chuối, không phải húc cản vật lý)
+      const myMetaForHit = gameState.metas.get(myId);
+      const isPrimateAttacker = myMetaForHit?.species === 'monkey' || myMetaForHit?.species === 'gorilla';
+      if (ev.a === myId && !predictor.plow && !predictor.isLeaping && !isPrimateAttacker && isPhysicallyNearHit) {
         predictor.dashT = 0;
         predictor.vx *= 0.25;
         predictor.vz *= 0.25;

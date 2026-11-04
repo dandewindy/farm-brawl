@@ -1299,6 +1299,10 @@ export class World {
                 other.dashT = 0;
                 other.plow = false;
                 other.stunT = Math.max(other.stunT, isRainbowLanding ? (0.5 + ratio * 0.8) : 0.2);
+                other.lastHitBy = p.id;
+                other.lastHitT = this.time;
+                p.lastAttackedId = other.id;
+                p.lastAttackedT = this.time;
                 const massLoss = Math.max(1, Math.round(other.mass * (isRainbowLanding ? (0.04 + ratio * 0.06) : (0.02 + ratio * 0.03))));
                 other.mass = Math.max(10, other.mass - massLoss);
                 this.scatter(other.x, other.z, massLoss, radiusOf(other.mass) + 1.5, Math.cos(pushAng), Math.sin(pushAng));
@@ -2516,9 +2520,11 @@ export class World {
         const nx = dx / d, nz = dz / d;
         const ma = a.mass * TRAITS[a.species].weight, mb = b.mass * TRAITS[b.species].weight;
 
-        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals; Shield is unyielding against all
-        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth') && b.mass < 1000) || a.shieldT > 0;
-        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth') && a.mass < 1000) || b.shieldT > 0;
+        // separate, the lighter one moves more; Gorilla & Mammoth are unyielding against < 1 ton animals or animals they just slammed/squished; Shield is unyielding against all
+        const aJustHitB = b.lastHitBy === a.id && (this.time - b.lastHitT) < 0.6;
+        const bJustHitA = a.lastHitBy === b.id && (this.time - a.lastHitT) < 0.6;
+        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth') && (b.mass < 1000 || aJustHitB || b.squishT > 0)) || a.shieldT > 0 || (a.species === 'monkey' && aJustHitB);
+        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth') && (a.mass < 1000 || bJustHitA || a.squishT > 0)) || b.shieldT > 0 || (b.species === 'monkey' && bJustHitA);
         let wa = mb / (ma + mb);
         if (aImmune) wa = 0;
         else if (bImmune) wa = 1;
