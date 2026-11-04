@@ -1950,7 +1950,6 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'flowerBloom': {
       sfxReward();
-      hud.showToast(t('flowerBloomToast'), 5000);
       hud.showBanner(t('r_womenday'), t('d_womenday'));
       setTimeout(() => {
         for (const f of gameState.food.values()) {
@@ -1965,7 +1964,6 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'trickOrTreat': {
       sfxReward();
-      hud.showToast(t('trickOrTreatToast'), 5000);
       hud.showBanner(t('r_halloween'), t('d_halloween'));
       setTimeout(() => {
         for (const f of gameState.food.values()) {

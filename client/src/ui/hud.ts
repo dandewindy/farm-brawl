@@ -2260,14 +2260,14 @@ export class HudManager {
     setTimeout(() => div.remove(), 4000);
   }
 
-  showToast(text: string, durationMs = 2600): void {
+  showToast(text: string, durationMs = 2400): void {
+    // Luôn dọn thông báo cũ, giữ tối đa 1 thông báo hiển thị để tuyệt đối không che tầm nhìn
+    while (this.toastsEl.children.length >= 1) {
+      this.toastsEl.firstElementChild?.remove();
+    }
     const isMobile = document.body.classList.contains('mobile-phone') ||
       (!document.body.classList.contains('ipad') && !document.body.classList.contains('is-pc') && window.innerWidth <= 640);
     if (isMobile) {
-      // Trên điện thoại: dọn bớt thông báo cũ, giữ tối đa 1-2 cái xếp chồng cùng 1 vị trí
-      while (this.toastsEl.children.length >= 2) {
-        this.toastsEl.firstElementChild?.remove();
-      }
       durationMs = Math.min(durationMs, 1800);
     }
     const div = document.createElement('div');
