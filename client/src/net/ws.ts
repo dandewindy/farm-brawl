@@ -32,8 +32,6 @@ export class WsClient implements Transport {
   private smoothedPing = 0;
   private lastPingUpdateTs = 0;
   private badPingStreak = 0;
-  private lastLobbyReconnectTime = 0;
-  private lobbySteerAttempts = 0;
   private currentPingDelay = 1000; // Cố định chu kỳ 1s (1000ms), tránh flooding socket
   private migrationLocked = false;
   private migrationLockTimer: number | null = null;
@@ -44,15 +42,14 @@ export class WsClient implements Transport {
   }
 
   public isColoHealthy(): boolean {
+    if (!this.colo) return true;
+    // Chỉ coi là khỏe khi đang ở trạm Tier 0 (SIN, HKG, SGN...) và ping ổn định
+    if (!isTier0Colo(this.colo)) return false;
     if (this.rttMin <= 0) return true;
-    // Trạm Tier 0 (SIN, HKG, SGN...) đạt chuẩn khi ping <= 80ms
-    if (isTier0Colo(this.colo) && this.rttMin <= 80) return true;
-    // Nếu trạm ở ngoài Tier 0 (như NRT, KIX, LAX, MRS) hoặc ping > 80ms: coi như cần tối ưu về SIN/HKG
-    if (this.rttMin > 90) return false;
-    return isFastColo(this.colo) && this.rttMin <= 60;
+    return this.rttMin <= 95;
   }
 
-  private lockMigration(durationMs = 12000): void {
+  private lockMigration(durationMs = 6000): void {
     this.migrationLocked = true;
     if (this.migrationLockTimer !== null) clearTimeout(this.migrationLockTimer);
     this.migrationLockTimer = window.setTimeout(() => {
@@ -61,11 +58,11 @@ export class WsClient implements Transport {
     }, durationMs);
   }
 
-  // In-Game Zero-Downtime Hot Migration
+  // Zero-Downtime Parallel Multi-Probe Hot Migration (hoạt động cả ở Lobby lẫn trong trận)
   public isMigrating = false;
-  private migrationWs: WebSocket | null = null;
+  private migrationSockets: WebSocket[] = [];
   private lastMigrationProbeTime = 0;
-  private probeAttempts = 0;
+  private probeWaveCount = 0;
   private migrationRetryTimer: number | null = null;
   public onMigrationSuccess?: (newColo: string) => void;
   public onMigrationStatus?: (status: 'probing' | 'migrated' | 'failed', colo?: string) => void;
@@ -89,6 +86,19 @@ export class WsClient implements Transport {
     } catch {
       return 'pub-1';
     }
+  }
+
+  private closeAllMigrationSockets(except?: WebSocket): void {
+    for (const s of this.migrationSockets) {
+      if (s !== except) {
+        s.onopen = null;
+        s.onmessage = null;
+        s.onclose = null;
+        s.onerror = null;
+        try { s.close(); } catch (_) {}
+      }
+    }
+    this.migrationSockets = except ? [except] : [];
   }
 
   private connect(): void {
@@ -138,7 +148,7 @@ export class WsClient implements Transport {
           const now = Math.round(performance.now());
           this.send({ t: 'ping', c: now });
         }
-      }, 50);
+      }, 30);
 
       this.startPing();
     };
@@ -173,7 +183,6 @@ export class WsClient implements Transport {
               if (this.smoothedPing === 0 || this.rttRawSamples.length <= 2) {
                 this.smoothedPing = baseRtt;
               } else {
-                // Giảm nhanh (alpha = 0.4) khi mạng tốt hơn, tăng điềm tĩnh (alpha = 0.1) khi có spike/jitter
                 const alpha = baseRtt < this.smoothedPing ? 0.4 : 0.1;
                 this.smoothedPing = alpha * baseRtt + (1 - alpha) * this.smoothedPing;
               }
@@ -188,35 +197,26 @@ export class WsClient implements Transport {
                 this.lastPingUpdateTs = now;
               }
 
-              // 5. Watchdog kiểm tra định tuyến
-              const isHealthy = this.isColoHealthy();
-              const isOptimal = (this.colo === 'SIN' || this.colo === 'HKG') && this.rttMin <= 90;
-              const isCriticalSlow = !isHealthy && (this.rttMin > 160 || !isFastColo(this.colo));
+              // 5. Watchdog kiểm tra định tuyến SIN/HKG (Tier 0)
+              const onTier0 = isTier0Colo(this.colo);
+              const isOptimal = onTier0 && this.rttMin <= 90;
+              const needsOptimization = !onTier0 || this.rttMin > 120;
 
-              if (isOptimal || (isHealthy && this.rttMin <= 120)) {
-                this.lobbySteerAttempts = 0;
+              if (isOptimal) {
+                this.probeWaveCount = 0;
                 this.badPingStreak = 0;
-              } else if (isCriticalSlow) {
+              } else if (needsOptimization) {
                 this.badPingStreak++;
               } else {
                 this.badPingStreak = Math.max(0, this.badPingStreak - 1);
               }
 
-              // Silent Lobby Steer: khi ở sảnh nếu kết nối bị chậm (>160ms) hoặc ngoài châu Á
-              if (!this.inGame && isCriticalSlow && !this.closed) {
-                if (this.rttRawSamples.length >= 2 && this.lobbySteerAttempts < 3) {
-                  if (now - this.lastLobbyReconnectTime > 3000) {
-                    this.lastLobbyReconnectTime = now;
-                    this.lobbySteerAttempts++;
-                    console.log(`[WS Watchdog] Lobby on non-optimal node (${this.colo}, ~${Math.round(this.rttMin)}ms). Attempt ${this.lobbySteerAttempts}/3 switching route...`);
-                    this.steerToBestRoute();
-                  }
+              // Nếu không ở SIN/HKG (ví dụ rơi vào NRT, SJC, LAX, MRS, LHR) hoặc ping cao:
+              // Kích hoạt ngay đua probe ngầm (cả ở sảnh chờ lẫn trong trận) để kéo về SIN/HKG không gây đứt kết nối!
+              if (!this.closed && !this.migrationLocked && !this.isMigrating) {
+                if (!onTier0 || this.badPingStreak >= 2) {
+                  this.triggerHotMigration();
                 }
-              }
-
-              // Hot migration trong trận: khi lag liên tục (streak >= 3, rttMin > 170ms hoặc ngoài châu Á)
-              if (this.inGame && this.badPingStreak >= 3 && !this.migrationLocked && !this.closed) {
-                this.triggerHotMigration();
               }
             }
           }
@@ -224,6 +224,15 @@ export class WsClient implements Transport {
         }
 
         const msg = JSON.parse(raw) as ServerMsg;
+        if ((msg as any).t === 'hello') {
+          const h = msg as any;
+          if (h.colo) this.colo = h.colo;
+          if (h.doColo) this.doColo = h.doColo;
+          // Phát hiện tức thì ngay ở gói hello đầu tiên (t=0ms): nếu chưa vào đúng SIN/HKG thì phóng probe ngầm ngay!
+          if (this.colo && !isTier0Colo(this.colo) && !this.closed && !this.migrationLocked && !this.isMigrating) {
+            this.triggerHotMigration();
+          }
+        }
         if (msg.t === 'joined') {
           if (msg.colo) this.colo = msg.colo;
           if (msg.doColo) this.doColo = msg.doColo;
@@ -251,12 +260,10 @@ export class WsClient implements Transport {
         this.onStatus?.('closed');
         return;
       }
-      if (this.isMigrating || this.migrationWs !== null) {
-        // Handover handled cleanly by migration probe; ignore close of old socket
+      if (this.isMigrating || this.migrationSockets.length > 0) {
         return;
       }
       if (ev.reason === 'Handover') {
-        // Handover handled cleanly by probeSocket
         return;
       }
       this.isReconnecting = true;
@@ -266,7 +273,7 @@ export class WsClient implements Transport {
 
     socket.onerror = () => {
       if (this.ws !== socket) return;
-      if (this.isMigrating || this.migrationWs !== null) return;
+      if (this.isMigrating || this.migrationSockets.length > 0) return;
       this.onStatus?.('error');
     };
   }
@@ -279,12 +286,10 @@ export class WsClient implements Transport {
       if (isDev) return [this.activeUrl];
 
       const search = u.search;
-
-      // Ứng viên số 1 luôn là custom domain chính thức (brawl.get-go.site) trỏ thẳng vào Worker SIN
+      // Phóng song song 3 kết nối TCP/WebSocket độc lập (2 trên custom domain chính thức + 1 trên workers.dev)
+      // để vượt qua ECMP load-balancing của nhà mạng và bắt trúng cổng SIN/HKG ngay lập tức
       urls.push(`wss://brawl.get-go.site/ws${search}`);
-      if (u.hostname !== 'brawl.get-go.site') {
-        urls.push(this.activeUrl);
-      }
+      urls.push(`wss://brawl.get-go.site/ws${search}`);
       urls.push(`wss://farm-brawl.windydande.workers.dev/ws${search}`);
     } catch (_) {
       urls.push(this.activeUrl);
@@ -293,197 +298,221 @@ export class WsClient implements Transport {
   }
 
   public steerToBestRoute(): void {
-    if (this.closed || this.inGame) return;
-    const candidates = this.getCandidateUrls();
-    const nextUrl = candidates[this.lobbySteerAttempts % candidates.length];
-    this.activeUrl = nextUrl;
-    try { sessionStorage.setItem('fb_fast_host', new URL(nextUrl).host); } catch (_) {}
-    this.forceReconnect();
+    this.triggerHotMigration(true);
   }
 
   public triggerHotMigration(force = false): void {
-    if (!this.inGame || this.closed) return;
+    if (this.closed || this.isAfk) return;
     if (!force && this.migrationLocked) return;
-    // Strict Guard: Nếu đang ở Tier 0 (SIN, HKG...) với ping <= 65ms thì không cần di dời
-    if (!force && isTier0Colo(this.colo) && this.rttMin <= 65) {
+    // Strict Guard: Nếu đã ở Tier 0 (SIN, HKG...) với ping tốt (<= 80ms) thì giữ nguyên kết nối
+    if (!force && isTier0Colo(this.colo) && (this.rttMin <= 0 || this.rttMin <= 80)) {
       this.isMigrating = false;
       this.badPingStreak = 0;
       return;
     }
     const now = performance.now();
-    // Throttle attempts: probe cách nhau tối thiểu 2.5s
-    if (this.migrationWs !== null || now - this.lastMigrationProbeTime < 2500) return;
+    if (this.migrationSockets.length > 0 || (now - this.lastMigrationProbeTime < 2200 && !force)) return;
     this.lastMigrationProbeTime = now;
     this.isMigrating = true;
+    this.probeWaveCount++;
     this.onMigrationStatus?.('probing', this.colo);
 
     const candidates = this.getCandidateUrls();
-    const candidateUrl = candidates[this.probeAttempts % candidates.length];
-    const probeUrl = candidateUrl + (candidateUrl.includes('?') ? '&' : '?') + `probe=${Date.now()}&_r=${Math.random().toString(36).slice(2)}`;
+    const ts = Date.now();
+    let winnerClaimed = false;
+    let completedProbes = 0;
 
-    console.log(`[WS Watchdog] High latency / non-APAC node detected (${this.colo}, ~${Math.round(this.rttMin)}ms). Starting hot migration probe on ${new URL(candidateUrl).host}...`);
-    let probeSocket: WebSocket;
-    try {
-      probeSocket = new WebSocket(probeUrl);
-      this.migrationWs = probeSocket;
-    } catch (e) {
-      console.warn('[WS Watchdog] Failed to create hot migration socket:', e);
-      this.isMigrating = false;
-      this.onMigrationStatus?.('failed', this.colo);
-      return;
-    }
+    console.log(`[WS Watchdog] Current node ${this.colo || 'unknown'} (~${Math.round(this.rttMin)}ms) is non-Tier0. Launching parallel SIN/HKG probe wave #${this.probeWaveCount}...`);
 
-    // Auto-timeout probe socket if it hangs or takes longer than 2.0s
-    const probeTimeout = window.setTimeout(() => {
-      if (this.migrationWs === probeSocket) {
-        console.warn('[WS Watchdog] Probe socket connection timed out.');
-        try { probeSocket.close(); } catch (_) {}
-        this.migrationWs = null;
+    const finishWaveIfAllFailed = () => {
+      if (winnerClaimed) return;
+      completedProbes++;
+      if (completedProbes >= candidates.length) {
+        this.closeAllMigrationSockets();
         this.isMigrating = false;
-        this.probeAttempts++;
         this.onMigrationStatus?.('failed', this.colo);
-        if (this.probeAttempts >= candidates.length) {
-          this.probeAttempts = 0;
+        if (this.probeWaveCount >= 5) {
+          this.probeWaveCount = 0;
           this.badPingStreak = 0;
-          this.lockMigration(12000);
+          this.lockMigration(10000);
+        } else {
+          this.lockMigration(2500);
         }
       }
-    }, 2000);
+    };
 
-    let pendingInit: ServerMsg | null = null;
+    candidates.forEach((candidateUrl, idx) => {
+      const probeUrl =
+        candidateUrl +
+        (candidateUrl.includes('?') ? '&' : '?') +
+        `probe=${ts}_${idx}&_r=${Math.random().toString(36).slice(2)}`;
 
-    probeSocket.onopen = () => {
-      if (this.migrationWs !== probeSocket || this.closed) {
-        clearTimeout(probeTimeout);
-        probeSocket.close();
+      let probeSocket: WebSocket;
+      try {
+        probeSocket = new WebSocket(probeUrl);
+        this.migrationSockets.push(probeSocket);
+      } catch (e) {
+        finishWaveIfAllFailed();
         return;
       }
-      probeSocket.send(JSON.stringify({ t: 'ping', c: Math.round(performance.now()) }));
-    };
 
-    probeSocket.onmessage = (event) => {
-      if (this.migrationWs !== probeSocket || this.closed) return;
-      try {
-        const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
-        const msg = JSON.parse(raw) as ServerMsg;
-        if (msg.t === 'pong') {
-          const probeColo = msg.colo;
-          const probeRtt = performance.now() - msg.c;
-          console.log(`[WS Watchdog] Hot migration probe response from ${new URL(candidateUrl).host}: colo=${probeColo}, rtt=${Math.round(probeRtt)}ms`);
-          const currentlyTier0 = isTier0Colo(this.colo);
-          const isProbeTier0 = isTier0Colo(probeColo);
-          const currentlyFast = isFastColo(this.colo);
-          const isProbeFast = isFastColo(probeColo);
+      const probeTimeout = window.setTimeout(() => {
+        if (!winnerClaimed && this.migrationSockets.includes(probeSocket)) {
+          try { probeSocket.close(); } catch (_) {}
+          finishWaveIfAllFailed();
+        }
+      }, 2200);
 
-          // Điều kiện chuyển tuyến ưu tiên:
-          // 1. Probe là Tier 0 (SIN/HKG) trong khi hiện tại không phải Tier 0 (như NRT/KIX/LAX/WAW/MRS)
-          // 2. Hoặc trạm hiện tại ngoài châu Á và probe thuộc châu Á
-          // 3. Hoặc trạm probe có độ trễ thấp hơn rõ rệt (< 80% rtt hiện tại)
-          const isBetter = (!currentlyTier0 && isProbeTier0 && probeRtt <= 90)
-            || (!currentlyFast && isProbeFast)
-            || (isProbeFast && probeRtt > 0 && probeRtt < this.rttMin * 0.80)
-            || (probeRtt > 0 && probeRtt < this.rttMin * 0.65);
+      let pendingInit: ServerMsg | null = null;
+      let isThisSocketWinner = false;
 
-          if (isBetter) {
-            this.probeAttempts = 0;
-            this.activeUrl = candidateUrl;
-            try { sessionStorage.setItem('fb_fast_host', new URL(candidateUrl).host); } catch (_) {}
-            // Hand over existing session token
-            if (this.lastJoinMsg) {
-              probeSocket.send(JSON.stringify({
-                ...this.lastJoinMsg,
-                token: this.sessionToken || undefined,
-              }));
+      const swapToProbeSocket = (newColo: string) => {
+        clearTimeout(probeTimeout);
+        this.probeWaveCount = 0;
+        this.activeUrl = candidateUrl;
+        console.log(`[WS Watchdog] Handover complete! Switched from ${this.colo || 'unknown'} to ${newColo} on ${new URL(candidateUrl).host}`);
+        const oldWs = this.ws;
+        this.ws = probeSocket;
+        this.closeAllMigrationSockets();
+        this.isMigrating = false;
+        this.isReconnecting = false;
+        if (this.reconnectTimer !== null) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
+        if (newColo) this.colo = newColo;
+        this.rttRawSamples.length = 0;
+        this.smoothedPing = 0;
+        this.displayPing = 0;
+        this.badPingStreak = 0;
+        this.currentPingDelay = 1000;
+
+        if (oldWs && oldWs !== probeSocket) {
+          oldWs.onopen = null;
+          oldWs.onmessage = null;
+          oldWs.onclose = null;
+          oldWs.onerror = null;
+          try { oldWs.close(1000, 'Handover'); } catch (_) {}
+        }
+
+        this.bindActiveSocket(probeSocket);
+        this.startPing();
+        setTimeout(() => {
+          if (!this.closed && this.ws === probeSocket && probeSocket.readyState === WebSocket.OPEN) {
+            this.send({ t: 'ping', c: Math.round(performance.now()) });
+          }
+        }, 20);
+        if (pendingInit) {
+          this.onMsg(pendingInit);
+        }
+        this.onMigrationStatus?.('migrated', this.colo);
+        this.onMigrationSuccess?.(this.colo);
+      };
+
+      probeSocket.onopen = () => {
+        if (winnerClaimed || this.closed) {
+          clearTimeout(probeTimeout);
+          try { probeSocket.close(); } catch (_) {}
+          return;
+        }
+        probeSocket.send(JSON.stringify({ t: 'ping', c: Math.round(performance.now()) }));
+      };
+
+      probeSocket.onmessage = (event) => {
+        if (this.closed) return;
+        if (winnerClaimed && !isThisSocketWinner) return;
+        try {
+          const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
+          const msg = JSON.parse(raw) as ServerMsg;
+
+          if (msg.t === 'pong' && !isThisSocketWinner) {
+            const probeColo = msg.colo || '';
+            const probeRtt = performance.now() - msg.c;
+            const currentlyTier0 = isTier0Colo(this.colo);
+            const isProbeTier0 = isTier0Colo(probeColo);
+            const currentlyFast = isFastColo(this.colo);
+            const isProbeFast = isFastColo(probeColo);
+
+            console.log(`[WS Watchdog] Probe #${idx} (${new URL(candidateUrl).host}): colo=${probeColo}, rtt=${Math.round(probeRtt)}ms`);
+
+            // Ưu tiên tuyệt đối:
+            // 1. Hiện tại chưa ở Tier 0 (SIN/HKG) và probe vào trúng Tier 0 (SIN/HKG)
+            // 2. Hoặc hiện tại ở ngoài châu Á (LAX/SJC/MRS/LHR) và probe vào châu Á (NRT/TPE...)
+            // 3. Hoặc đang cùng Tier nhưng probe có RTT thấp hơn rõ rệt (< 75% RTT hiện tại)
+            const isBetter =
+              (!currentlyTier0 && isProbeTier0) ||
+              (!currentlyFast && isProbeFast) ||
+              (isProbeTier0 && this.rttMin > 90 && probeRtt > 0 && probeRtt < this.rttMin * 0.75);
+
+            const triggerHandover = () => {
+              if (winnerClaimed) return;
+              winnerClaimed = true;
+              isThisSocketWinner = true;
+              // Đóng ngay các probe khác trong cùng đợt
+              this.closeAllMigrationSockets(probeSocket);
+
+              if (msg.doColo) this.doColo = msg.doColo;
+
+              // Nếu đang ở sảnh chờ (chưa join trận): chuyển thẳng sang socket SIN/HKG ngay lập tức!
+              if (!this.inGame || !this.lastJoinMsg) {
+                swapToProbeSocket(probeColo || 'SIN');
+              } else {
+                // Đang trong trận: gửi lệnh join kèm sessionToken để server bàn giao nhân vật không mất trạng thái
+                probeSocket.send(
+                  JSON.stringify({
+                    ...this.lastJoinMsg,
+                    token: this.sessionToken || undefined,
+                  })
+                );
+              }
+            };
+
+            if (!currentlyTier0 && isProbeTier0) {
+              // Bắt trúng SIN/HKG -> Chốt ngay lập tức!
+              triggerHandover();
+            } else if (isBetter) {
+              // Nếu chỉ là Tier 1 (như NRT tốt hơn LAX), chờ 180ms xem có probe nào trong đợt vào trúng SIN/HKG không
+              setTimeout(() => {
+                if (!winnerClaimed && !this.closed && probeSocket.readyState === WebSocket.OPEN) {
+                  triggerHandover();
+                }
+              }, 180);
             } else {
               clearTimeout(probeTimeout);
-              probeSocket.close();
-              this.migrationWs = null;
-              this.isMigrating = false;
-              this.onMigrationStatus?.('failed', this.colo);
+              try { probeSocket.close(); } catch (_) {}
+              finishWaveIfAllFailed();
             }
-          } else {
-            // Not optimal yet, quietly close probe
-            clearTimeout(probeTimeout);
-            probeSocket.close();
-            this.migrationWs = null;
-            this.isMigrating = false;
-            this.probeAttempts++;
-            this.onMigrationStatus?.('failed', this.colo);
-            console.log(`[WS Watchdog] Probe landed on ${probeColo} (~${Math.round(probeRtt)}ms), not optimal (attempt ${this.probeAttempts}/${candidates.length}).`);
-            if (this.probeAttempts >= candidates.length) {
-              this.probeAttempts = 0;
-              this.badPingStreak = 0;
-              this.lockMigration(12000);
+          } else if (msg.t === 'init' && isThisSocketWinner) {
+            pendingInit = msg;
+          } else if (msg.t === 'joined' && isThisSocketWinner) {
+            if (msg.doColo) this.doColo = msg.doColo;
+            if (msg.token) {
+              this.sessionToken = msg.token;
+              if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
             }
+            swapToProbeSocket(msg.colo || this.colo || 'SIN');
+            this.onMsg(msg);
+          } else if (this.ws === probeSocket) {
+            this.onMsg(msg);
           }
-        } else if (msg.t === 'init') {
-          // Buffer init so it can be delivered right before joined
-          pendingInit = msg;
-        } else if (msg.t === 'joined') {
-          // Handover acknowledged by server! Seamlessly swap active socket
-          clearTimeout(probeTimeout);
-          this.probeAttempts = 0;
-          this.activeUrl = candidateUrl;
-          try { sessionStorage.setItem('fb_fast_host', new URL(candidateUrl).host); } catch (_) {}
-          console.log(`[WS Watchdog] Hot migration handover complete! Switched from ${this.colo} to ${msg.colo || 'APAC'} on ${new URL(candidateUrl).host}`);
-          const oldWs = this.ws;
-          this.ws = probeSocket;
-          this.migrationWs = null;
-          this.isMigrating = false;
-          this.isReconnecting = false;
-          if (this.reconnectTimer !== null) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-          }
-          if (msg.colo) this.colo = msg.colo;
-          if (msg.doColo) this.doColo = msg.doColo;
-          if (msg.token) {
-            this.sessionToken = msg.token;
-            if (this.lastJoinMsg) this.lastJoinMsg.token = msg.token;
-          }
-          this.rttRawSamples.length = 0;
-          this.smoothedPing = 0;
-          this.displayPing = 0;
-          this.badPingStreak = 0;
-          this.currentPingDelay = 1000;
-
-          if (oldWs) {
-            oldWs.onopen = null;
-            oldWs.onmessage = null;
-            oldWs.onclose = null;
-            oldWs.onerror = null;
-            try { oldWs.close(1000, 'Handover'); } catch (_) {}
-          }
-
-          this.bindActiveSocket(probeSocket);
-          this.startPing();
-          if (pendingInit) {
-            this.onMsg(pendingInit);
-          }
-          this.onMsg(msg);
-          this.onMigrationStatus?.('migrated', this.colo);
-          this.onMigrationSuccess?.(this.colo);
-        } else if (this.ws === probeSocket) {
-          this.onMsg(msg);
+        } catch (err) {
+          console.error('[WS Watchdog] Error during hot migration:', err);
         }
-      } catch (err) {
-        console.error('[WS Watchdog] Error during hot migration:', err);
-      }
-    };
+      };
 
-    const cleanupProbe = () => {
-      clearTimeout(probeTimeout);
-      if (this.migrationWs === probeSocket) {
-        this.migrationWs = null;
-        this.isMigrating = false;
-        // If the main socket closed while probe was in progress, ensure we reconnect
-        if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
+      const cleanupProbe = () => {
+        clearTimeout(probeTimeout);
+        if (!winnerClaimed || isThisSocketWinner) {
+          finishWaveIfAllFailed();
+        }
+        if (!this.closed && (!this.ws || this.ws.readyState !== WebSocket.OPEN) && this.migrationSockets.length === 0) {
+          this.isMigrating = false;
           this.scheduleReconnect();
         }
-      }
-    };
-    probeSocket.onclose = cleanupProbe;
-    probeSocket.onerror = cleanupProbe;
+      };
+      probeSocket.onclose = cleanupProbe;
+      probeSocket.onerror = cleanupProbe;
+    });
   }
 
   private startPing(): void {
@@ -546,10 +575,7 @@ export class WsClient implements Transport {
       sessionStorage.removeItem(`fb_tok_${this.getRoomKey()}`);
       sessionStorage.removeItem('fb_session_token');
     } catch (_) {}
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
-    }
+    this.closeAllMigrationSockets();
     if (this.migrationRetryTimer !== null) {
       clearTimeout(this.migrationRetryTimer);
       this.migrationRetryTimer = null;
@@ -561,24 +587,17 @@ export class WsClient implements Transport {
 
   public manualRetune(): void {
     this.migrationLocked = false;
-    this.probeAttempts = 0;
+    this.probeWaveCount = 0;
     this.badPingStreak = 0;
-    if (this.inGame) {
-      this.triggerHotMigration(true);
-    } else {
-      this.forceReconnect();
-    }
+    this.triggerHotMigration(true);
   }
 
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();
-    this.probeAttempts = 0;
+    this.probeWaveCount = 0;
     this.isMigrating = false;
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
-    }
+    this.closeAllMigrationSockets();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -609,10 +628,7 @@ export class WsClient implements Transport {
     if (this.closed || this.isAfk) return;
     this.isAfk = true;
     this.stopPing();
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
-    }
+    this.closeAllMigrationSockets();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -643,10 +659,7 @@ export class WsClient implements Transport {
     this.closed = true;
     this.isMigrating = false;
     this.stopPing();
-    if (this.migrationWs) {
-      try { this.migrationWs.close(); } catch (_) {}
-      this.migrationWs = null;
-    }
+    this.closeAllMigrationSockets();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

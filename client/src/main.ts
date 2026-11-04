@@ -2446,10 +2446,8 @@ function getClientId(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   let host = isViteDev ? 'localhost:8787' : window.location.host;
   if (!isViteDev) {
-    const savedFastHost = sessionStorage.getItem('fb_fast_host');
-    if (savedFastHost && (savedFastHost === 'brawl.get-go.site' || savedFastHost === 'farm-brawl.windydande.workers.dev')) {
-      host = savedFastHost;
-    } else if (host === 'farm-brawl.windydande.workers.dev' || host.endsWith('.workers.dev') || host === 'brawl.get-go.site') {
+    try { sessionStorage.removeItem('fb_fast_host'); } catch (_) {}
+    if (host === 'farm-brawl.windydande.workers.dev' || host.endsWith('.workers.dev') || host === 'brawl.get-go.site') {
       // Mặc định tự động ép sang custom domain chính thức (brawl.get-go.site) để đưa mạng về thẳng SIN/HKG
       host = 'brawl.get-go.site';
     }
