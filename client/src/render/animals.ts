@@ -2297,16 +2297,30 @@ export class AnimalRenderer {
     }
   }
 
-  notifyLeap(id: number, dur: number, height: number): void {
+  notifyLeap(id: number, dur: number, height: number, isBounce = false): void {
     const vis = this.visuals.get(id);
     if (vis) {
       vis.leapDur = dur;
       vis.leapHeight = height;
-      // Tránh reset timer về 0 nếu đang ở giữa quỹ đạo nhảy của cùng cú nhảy
-      if (!vis.leapTimer || vis.leapTimer <= 0 || vis.leapDone || vis.leapTimer >= (vis.leapDur || dur) * 0.70) {
+      if (isBounce) {
+        // Cú nhảy nảy quán tính do server xác nhận: reset timer để bay tiếp
         vis.leapTimer = 0;
         vis.leapDone = false;
+      } else {
+        // Cú nhảy ban đầu: chỉ khởi chạy nếu chưa ở trong trạng thái đang nhảy
+        if (!vis.leapTimer || vis.leapTimer <= 0) {
+          vis.leapTimer = 0;
+          vis.leapDone = false;
+        }
       }
+    }
+  }
+
+  syncLeapParams(id: number, dur: number, height: number): void {
+    const vis = this.visuals.get(id);
+    if (vis) {
+      vis.leapDur = dur;
+      vis.leapHeight = height;
     }
   }
 

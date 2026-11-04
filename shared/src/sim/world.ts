@@ -1165,11 +1165,17 @@ export class World {
           }
 
           let hitAnyAnimal = false;
+          let touchedAnimal = false;
           for (const other of this.players.values()) {
             if (!other.alive || other.id === p.id || (other.monkeyLeapT && other.monkeyLeapT > 0)) continue;
             const dx = other.x - p.x;
             const dz = other.z - p.z;
             const dist = Math.hypot(dx, dz);
+            const otherR = radiusOf(other.mass);
+            // Va chạm vật lý trực tiếp giữa 2 con vật (cho cú nảy quán tính)
+            if (dist <= (bodyR + otherR) * 1.15) {
+              touchedAnimal = true;
+            }
             if (dist <= shockwaveR) {
               hitAnyAnimal = true;
               // Gorilla & Mammoth immunity: immune to shockwaves from leapers < 1 ton without rainbow!
@@ -1321,9 +1327,9 @@ export class World {
             rainbow: isRainbowLanding,
           });
 
-          // Cơ chế quán tính: Khỉ khi gồng max (isMaxCharge >= 0.85) nếu vừa rớt xuống chạm con vật khác (hitAnyAnimal)
+          // Cơ chế quán tính: Khỉ khi gồng max (isMaxCharge >= 0.85) nếu vừa rớt xuống CHẠM 1 con vật khác (touchedAnimal)
           // thì nhảy quán tính thêm 1 cái về phía trước! (Gorilla luôn chỉ nhảy 1 cái; Khỉ chỉ nảy 1 lần không lặp)
-          if (!isGorilla && isMaxCharge && hitAnyAnimal && !p.monkeyBounced && !inWater) {
+          if (!isGorilla && isMaxCharge && touchedAnimal && !p.monkeyBounced && !inWater) {
             p.monkeyBounced = true;
             const bounceDur = 0.38;
             const bounceDist = 7.5;
@@ -1346,6 +1352,7 @@ export class World {
               height: r2(bounceHeight),
               ratio: 0.5,
               rainbow: isRainbowLanding,
+              bounce: true,
             });
           } else {
             p.monkeyBounced = false;
@@ -2025,6 +2032,7 @@ export class World {
           height: r2(peakHeight),
           ratio: r2(ratio),
           rainbow: true,
+          bounce: false,
         });
         return;
       }
@@ -2149,6 +2157,7 @@ export class World {
         dur: r2(leapDur),
         height: r2(peakHeight),
         ratio: r2(ratio),
+        bounce: false,
       });
       return;
     }

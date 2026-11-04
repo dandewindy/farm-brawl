@@ -2954,6 +2954,31 @@ describe('fruit trees', () => {
       const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
       expect(leapEvents.length).toBe(1);
     });
+
+    it('Monkey max charge leap does NOT bounce if enemy is inside shockwave but not physically touched', () => {
+      const w = emptyWorld();
+      const mId = w.addPlayer('SunWukongShockwave', 'monkey', false);
+      const bystanderId = w.addPlayer('SheepBystander', 'sheep', false);
+      const m = w.players.get(mId)!;
+      place(w, mId, 0, 0, 100);
+      // Max leap covers 22m (lands at x=22). Place bystander at x=26.5 (distance 4.5m, inside 6.8m shockwave, but > 1.8m touch radius)
+      place(w, bystanderId, 26.5, 0, 100);
+
+      m.holdT = 1.2; // max charge
+      m.input.a = 0;
+      (w as any).dash(m);
+      expect(m.monkeyLeapT).toBeGreaterThan(0);
+
+      // Step until landing
+      while (m.monkeyLeapT && m.monkeyLeapT > 0) {
+        w.step();
+      }
+      // Lands and does NOT bounce, because bystander was not physically touched!
+      expect(m.monkeyLeapT).toBe(0);
+      expect(m.monkeyBounced).toBe(false);
+      const leapEvents = w.events.filter((e) => e.k === 'monkeyLeap' && (e as any).id === mId);
+      expect(leapEvents.length).toBe(1);
+    });
   });
 });
 
