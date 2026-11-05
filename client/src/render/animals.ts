@@ -1619,48 +1619,82 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const crestColor = s.crest ?? 0xffd600;
   const beakColor = s.beak ?? 0xffab00;
 
-  // 1. Athletic fiery torso
-  blob(g, bodyColor, 0.70, [1.25, 0.95, 0.92], 0, 1.05, 0, undefined, true);
-  // Fiery chest plumage
-  blob(g, chestColor, 0.40, [1.10, 0.95, 0.75], 0.42, 1.15, 0, [0, 0, -0.22]);
+  // 1. Athletic fiery torso with layered chest armor
+  blob(g, bodyColor, 0.72, [1.32, 0.98, 0.94], 0, 1.05, 0, undefined, true);
+  // Fiery chest plumage (triple tiered radiant scales)
+  blob(g, chestColor, 0.42, [1.15, 0.95, 0.75], 0.44, 1.18, 0, [0, 0, -0.22]);
+  blob(g, crestColor, 0.32, [1.05, 0.85, 0.65], 0.52, 1.25, 0, [0, 0, -0.25]);
 
-  // 2. Arched neck & head
-  blob(g, bodyColor, 0.28, [0.85, 1.35, 0.85], 0.48, 1.55, 0, [0, 0, -0.32]);
-  g.add(part(new THREE.SphereGeometry(0.38, 18, 12), bodyColor, 0.70, 1.90, 0));
-
-  // Curved raptor golden beak
-  const beak = part(new THREE.ConeGeometry(0.12, 0.38, 8), beakColor, 1.12, 1.84, 0);
-  beak.rotation.z = -Math.PI / 2 - 0.2;
-  g.add(beak);
-
-  // Triple royal crown phoenix crest plumes
-  blob(g, crestColor, 0.12, [2.4, 0.6, 0.4], 0.50, 2.30, 0, [0, 0, -0.55]);
-  blob(g, wingColor, 0.10, [2.1, 0.5, 0.35], 0.44, 2.18, 0.08, [0.15, 0, -0.45]);
-  blob(g, wingColor, 0.10, [2.1, 0.5, 0.35], 0.44, 2.18, -0.08, [-0.15, 0, -0.45]);
-
-  // 3. Wide flame wings
-  for (const z of [-0.62, 0.62]) {
-    blob(g, wingColor, 0.42, [1.4, 0.65, 0.25], 0.0, 1.15, z, [0, 0, 0.2]);
-    const f1 = part(new THREE.ConeGeometry(0.12, 0.60, 6), crestColor, -0.32, 1.25, z);
-    f1.rotation.z = 0.95;
-    g.add(f1);
-    const f2 = part(new THREE.ConeGeometry(0.10, 0.50, 6), tailColor, -0.48, 1.15, z * 0.95);
-    f2.rotation.z = 1.15;
-    g.add(f2);
+  // Flame collar / neck ruff (6 flame points around neck)
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    const ruff = part(new THREE.ConeGeometry(0.08, 0.38, 5), wingColor, 0.38 + Math.cos(ang) * 0.15, 1.48, Math.sin(ang) * 0.22);
+    ruff.rotation.x = Math.sin(ang) * 0.45;
+    ruff.rotation.z = -0.55 - Math.cos(ang) * 0.25;
+    g.add(ruff);
   }
 
-  // 4. Triple streaming phoenix tail plumes
-  blob(g, tailColor, 0.22, [0.7, 2.4, 0.4], -0.95, 1.60, 0, [0, 0, 0.65]);
-  blob(g, tailColor, 0.18, [0.65, 2.0, 0.35], -0.90, 1.48, 0.20, [0.35, 0, 0.60]);
-  blob(g, tailColor, 0.18, [0.65, 2.0, 0.35], -0.90, 1.48, -0.20, [-0.35, 0, 0.60]);
+  // 2. Arched neck & sculpted raptor head
+  blob(g, bodyColor, 0.29, [0.85, 1.35, 0.85], 0.48, 1.55, 0, [0, 0, -0.32]);
+  g.add(part(new THREE.SphereGeometry(0.39, 18, 12), bodyColor, 0.72, 1.92, 0));
 
-  // Gem tips on tail plumes
-  g.add(part(new THREE.SphereGeometry(0.08, 8, 8), crestColor, -1.35, 2.25, 0));
-  g.add(part(new THREE.SphereGeometry(0.07, 8, 8), crestColor, -1.25, 2.05, 0.26));
-  g.add(part(new THREE.SphereGeometry(0.07, 8, 8), crestColor, -1.25, 2.05, -0.26));
+  // Curved raptor golden beak with nostrils & sharp tip
+  const beak = part(new THREE.ConeGeometry(0.13, 0.42, 8), beakColor, 1.16, 1.84, 0);
+  beak.rotation.z = -Math.PI / 2 - 0.22;
+  g.add(beak);
+  const jaw = part(new THREE.ConeGeometry(0.09, 0.32, 6), beakColor, 1.08, 1.76, 0);
+  jaw.rotation.z = -Math.PI / 2 - 0.10;
+  g.add(jaw);
 
-  addEyes(g, 0.95, 1.96, 0.18, 0.085);
-  return addLegs(g, beakColor, [[0.05, 0.22], [0.05, -0.22]], 0.58, 0.075);
+  // Royal 5-tier solar crown phoenix crest plumes
+  blob(g, crestColor, 0.14, [2.6, 0.65, 0.35], 0.52, 2.36, 0, [0, 0, -0.55]);
+  blob(g, wingColor, 0.11, [2.3, 0.55, 0.30], 0.46, 2.22, 0.10, [0.18, 0, -0.45]);
+  blob(g, wingColor, 0.11, [2.3, 0.55, 0.30], 0.46, 2.22, -0.10, [-0.18, 0, -0.45]);
+  blob(g, tailColor, 0.09, [1.9, 0.45, 0.25], 0.40, 2.10, 0.18, [0.32, 0, -0.35]);
+  blob(g, tailColor, 0.09, [1.9, 0.45, 0.25], 0.40, 2.10, -0.18, [-0.32, 0, -0.35]);
+
+  // 3. Wide layered flame wings (3 tiers of burning feathers)
+  for (const z of [-0.65, 0.65]) {
+    blob(g, wingColor, 0.45, [1.5, 0.70, 0.25], 0.02, 1.18, z, [0, 0, 0.25]);
+    blob(g, crestColor, 0.34, [1.4, 0.55, 0.20], -0.25, 1.25, z * 0.98, [0, 0, 0.35]);
+    for (let f = 0; f < 4; f++) {
+      const flameTip = part(new THREE.ConeGeometry(0.10 - f * 0.015, 0.58 - f * 0.08, 6), f % 2 === 0 ? tailColor : crestColor, -0.30 - f * 0.14, 1.30 - f * 0.06, z * (0.95 + f * 0.05));
+      flameTip.rotation.z = 0.85 + f * 0.18;
+      flameTip.rotation.y = z > 0 ? 0.2 : -0.2;
+      g.add(flameTip);
+    }
+  }
+
+  // 4. Legendary 5-streamer phoenix tail plumes with glowing gem tips
+  const tailOffsets: [number, number, number, number][] = [
+    [0, 1.68, 0, 0.70],
+    [0.22, 1.54, 0.22, 0.62],
+    [-0.22, 1.54, -0.22, 0.62],
+    [0.40, 1.40, 0.38, 0.50],
+    [-0.40, 1.40, -0.38, 0.50],
+  ];
+  for (const [zOff, yOff, rotY, rotZ] of tailOffsets) {
+    const isCenter = zOff === 0;
+    const len = isCenter ? 2.6 : 2.1;
+    const clr = isCenter ? tailColor : wingColor;
+    blob(g, clr, 0.18, [0.65, len, 0.35], -0.95 - Math.abs(zOff) * 0.2, yOff, zOff, [rotY, 0, rotZ]);
+    const gem = part(new THREE.OctahedronGeometry(isCenter ? 0.09 : 0.075), crestColor, -1.0 - len * 0.36, yOff + len * 0.28, zOff * 1.25);
+    g.add(gem);
+  }
+
+  addEyes(g, 0.98, 1.98, 0.19, 0.085);
+  const legs = addLegs(g, beakColor, [[0.05, 0.22], [0.05, -0.22]], 0.58, 0.08);
+  for (const z of [-0.22, 0.22]) {
+    for (const a of [-0.25, 0, 0.25]) {
+      const talon = part(new THREE.ConeGeometry(0.04, 0.16, 6), 0xffd54f, 0.20, 0.08, z + a * 0.12);
+      talon.rotation.z = -Math.PI / 2;
+      g.add(talon);
+    }
+    const spur = part(new THREE.ConeGeometry(0.04, 0.14, 6), 0xffd54f, -0.10, 0.10, z);
+    spur.rotation.z = Math.PI / 2;
+    g.add(spur);
+  }
+  return legs;
 }
 
 function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1671,36 +1705,55 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const knobColor = s.knob ?? 0x212121;
   const crownColor = s.crown ?? 0xffd700;
 
-  // 1. Buoyant sleek hull
-  blob(g, bodyColor, 0.68, [1.45, 0.85, 0.95], -0.05, 0.92, 0, undefined, true);
-  // Upturned elegant tail fan
-  blob(g, wingColor, 0.28, [1.2, 0.6, 0.7], -0.85, 1.18, 0, [0, 0, 0.55]);
+  // 1. Sleek hydro-sculpted hull with faceted ice chest
+  blob(g, bodyColor, 0.70, [1.48, 0.88, 0.98], -0.05, 0.94, 0, undefined, true);
+  blob(g, wingColor, 0.44, [1.10, 0.75, 0.75], 0.45, 1.05, 0, [0, 0, -0.15]);
 
-  // 2. Majestic S-curved neck
-  blob(g, neckColor, 0.22, [0.85, 1.5, 0.85], 0.52, 1.30, 0, [0, 0, -0.45]);
-  blob(g, neckColor, 0.19, [0.85, 1.4, 0.85], 0.60, 1.82, 0, [0, 0, 0.28]);
-  g.add(part(new THREE.SphereGeometry(0.28, 18, 12), neckColor, 0.68, 2.15, 0));
-
-  // Regal ice crown
-  const crown = part(new THREE.ConeGeometry(0.09, 0.24, 7), crownColor, 0.66, 2.42, 0);
-  g.add(crown);
-
-  // Basal knob above bill
-  blob(g, knobColor, 0.08, [1.2, 1.0, 1.1], 0.88, 2.18, 0);
-
-  // Elegant tapered bill
-  const bill = part(new THREE.ConeGeometry(0.10, 0.34, 6), billColor, 1.08, 2.06, 0);
-  bill.rotation.z = -Math.PI / 2 - 0.25;
-  g.add(bill);
-
-  // 3. Layered folded wings
-  for (const z of [-0.52, 0.52]) {
-    blob(g, wingColor, 0.40, [1.5, 0.72, 0.25], -0.05, 1.05, z, [0, 0, 0.15]);
-    blob(g, wingColor, 0.22, [1.6, 0.45, 0.15], -0.55, 1.18, z * 0.95, [0, 0, 0.35]);
+  // Elegant 4-layered upturned tail fan
+  for (let i = 0; i < 4; i++) {
+    const tFan = part(new THREE.ConeGeometry(0.14 - i * 0.02, 0.55 - i * 0.06, 6), wingColor, -0.80 - i * 0.10, 1.15 + i * 0.08, (i - 1.5) * 0.10);
+    tFan.rotation.z = -1.25;
+    g.add(tFan);
   }
 
-  addEyes(g, 0.80, 2.20, 0.15, 0.065);
-  return addLegs(g, knobColor, [[0.05, 0.24], [0.05, -0.24]], 0.48, 0.07);
+  // 2. Majestic triple-jointed S-curved neck
+  blob(g, neckColor, 0.23, [0.85, 1.5, 0.85], 0.52, 1.30, 0, [0, 0, -0.45]);
+  blob(g, neckColor, 0.20, [0.85, 1.45, 0.85], 0.62, 1.84, 0, [0, 0, 0.28]);
+  g.add(part(new THREE.SphereGeometry(0.29, 18, 12), neckColor, 0.70, 2.18, 0));
+
+  // Royal 5-pointed ice crystal tiara / crown
+  const crownBase = part(new THREE.CylinderGeometry(0.14, 0.12, 0.06, 10), crownColor, 0.68, 2.38, 0);
+  g.add(crownBase);
+  for (let i = 0; i < 5; i++) {
+    const ang = (i / 4 - 0.5) * 1.2;
+    const spike = part(new THREE.ConeGeometry(0.04, 0.20 + (i === 2 ? 0.08 : 0), 5), crownColor, 0.68 + Math.cos(ang) * 0.08, 2.46, Math.sin(ang) * 0.12);
+    g.add(spike);
+  }
+
+  // Regal basal knob above bill
+  blob(g, knobColor, 0.09, [1.2, 1.0, 1.1], 0.90, 2.20, 0);
+
+  // Tapered graceful bill with black tip lining
+  const bill = part(new THREE.ConeGeometry(0.11, 0.36, 6), billColor, 1.12, 2.08, 0);
+  bill.rotation.z = -Math.PI / 2 - 0.25;
+  g.add(bill);
+  const billTip = part(new THREE.ConeGeometry(0.06, 0.12, 6), knobColor, 1.28, 2.02, 0);
+  billTip.rotation.z = -Math.PI / 2 - 0.25;
+  g.add(billTip);
+
+  // 3. Multi-tiered folded frost wings
+  for (const z of [-0.54, 0.54]) {
+    blob(g, wingColor, 0.44, [1.55, 0.75, 0.25], -0.05, 1.08, z, [0, 0, 0.15]);
+    blob(g, bodyColor, 0.28, [1.60, 0.50, 0.18], -0.45, 1.22, z * 0.95, [0, 0, 0.35]);
+    for (let f = 0; f < 3; f++) {
+      const quill = part(new THREE.ConeGeometry(0.08 - f * 0.015, 0.45 - f * 0.05, 6), wingColor, -0.65 - f * 0.12, 1.30 - f * 0.06, z * (0.92 + f * 0.06));
+      quill.rotation.z = 1.05 + f * 0.15;
+      g.add(quill);
+    }
+  }
+
+  addEyes(g, 0.82, 2.22, 0.16, 0.068);
+  return addLegs(g, knobColor, [[0.05, 0.24], [0.05, -0.24]], 0.48, 0.075);
 }
 
 function buildRam(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1709,64 +1762,90 @@ function buildRam(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const hornColor = s.horn ?? 0x3e2723;
   const hornRingColor = s.hornRing ?? 0x8d6e63;
   const legsColor = s.legs ?? 0x3e2723;
+  const plateColor = s.plate ?? 0x5d4037;
 
-  // 1. Armored thick wool coat
-  g.add(part(new THREE.IcosahedronGeometry(0.55, 1), woolColor, 0, 1.18, 0, undefined, true));
+  // 1. Armored thick wool coat with battle cuirass
+  g.add(part(new THREE.IcosahedronGeometry(0.58, 1), woolColor, 0, 1.20, 0, undefined, true));
   const woolPuffs: [number, number, number][] = [
-    [0.42, 1.25, 0.28], [0.42, 1.25, -0.28],
-    [-0.42, 1.25, 0.28], [-0.42, 1.25, -0.28],
-    [0, 1.55, 0], [0.05, 1.18, 0.45], [0.05, 1.18, -0.45],
-    [-0.15, 1.50, 0.22], [-0.15, 1.50, -0.22],
+    [0.44, 1.28, 0.30], [0.44, 1.28, -0.30],
+    [-0.44, 1.28, 0.30], [-0.44, 1.28, -0.30],
+    [0, 1.58, 0], [0.05, 1.20, 0.48], [0.05, 1.20, -0.48],
+    [-0.18, 1.52, 0.24], [-0.18, 1.52, -0.24],
+    [0.22, 1.54, 0.20], [0.22, 1.54, -0.20],
   ];
   for (const [x, y, z] of woolPuffs) {
-    g.add(part(new THREE.IcosahedronGeometry(0.40, 1), woolColor, x, y, z));
+    g.add(part(new THREE.IcosahedronGeometry(0.42, 1), woolColor, x, y, z));
   }
-  // Chest wool mantle
-  g.add(part(new THREE.IcosahedronGeometry(0.44, 1), woolColor, 0.46, 1.25, 0));
+  g.add(part(new THREE.IcosahedronGeometry(0.48, 1), woolColor, 0.48, 1.26, 0));
 
-  // 2. Chiseled Ram Head
-  g.add(part(new THREE.BoxGeometry(0.56, 0.52, 0.46), faceColor, 0.82, 1.44, 0));
-  blob(g, faceColor, 0.24, [1.2, 0.85, 0.9], 1.08, 1.34, 0);
-  g.add(part(new THREE.IcosahedronGeometry(0.24, 1), woolColor, 0.72, 1.76, 0));
+  // 2. Chiseled Ram Head with heavy metal battering brow plate
+  g.add(part(new THREE.BoxGeometry(0.58, 0.54, 0.48), faceColor, 0.84, 1.45, 0));
+  blob(g, faceColor, 0.25, [1.2, 0.85, 0.9], 1.10, 1.35, 0);
+  g.add(part(new THREE.IcosahedronGeometry(0.26, 1), woolColor, 0.74, 1.78, 0));
 
-  // 3. Colossal Spiral Horns (Curving back, down, and around cheeks)
-  for (const z of [-0.34, 0.34]) {
+  // Steel brow battering plate on forehead
+  const browPlate = part(new THREE.BoxGeometry(0.12, 0.38, 0.42), plateColor, 1.12, 1.56, 0);
+  browPlate.rotation.z = -0.35;
+  g.add(browPlate);
+  for (const rz of [-0.14, 0.14]) {
+    for (const ry of [-0.10, 0.10]) {
+      g.add(part(new THREE.SphereGeometry(0.03, 6, 6), 0xffd700, 1.18, 1.56 + ry, rz));
+    }
+  }
+
+  // 3. Colossal 4-segment Spiral Horns with gold reinforcing bands
+  for (const z of [-0.36, 0.36]) {
     const hornGroup = new THREE.Group();
-    hornGroup.position.set(0.78, 1.62, z);
+    hornGroup.position.set(0.80, 1.64, z);
 
     // Segment 1: base arches up and back
-    const s1 = part(new THREE.CylinderGeometry(0.14, 0.19, 0.36, 8), hornColor, -0.10, 0.16, z * 0.12);
+    const s1 = part(new THREE.CylinderGeometry(0.16, 0.22, 0.40, 8), hornColor, -0.12, 0.18, z * 0.12);
     s1.rotation.z = -1.15;
     s1.rotation.y = z > 0 ? 0.35 : -0.35;
     hornGroup.add(s1);
 
-    // Horn Ring accent
-    const r1 = part(new THREE.TorusGeometry(0.18, 0.035, 8, 16), hornRingColor, -0.05, 0.12, z * 0.08);
+    // Band 1
+    const r1 = part(new THREE.TorusGeometry(0.20, 0.04, 8, 16), hornRingColor, -0.06, 0.14, z * 0.08);
     r1.rotation.y = Math.PI / 2;
     hornGroup.add(r1);
 
     // Segment 2: curls down around cheek
-    const s2 = part(new THREE.CylinderGeometry(0.10, 0.14, 0.36, 8), hornColor, -0.24, -0.04, z * 0.22);
+    const s2 = part(new THREE.CylinderGeometry(0.12, 0.16, 0.40, 8), hornColor, -0.28, -0.05, z * 0.24);
     s2.rotation.z = 0.55;
     s2.rotation.x = z > 0 ? -0.45 : 0.45;
     hornGroup.add(s2);
 
-    // Segment 3: tapered tip curves forward
-    const tip = part(new THREE.ConeGeometry(0.10, 0.34, 8), hornColor, -0.12, -0.22, z * 0.26);
-    tip.rotation.z = 2.10;
-    tip.rotation.y = z > 0 ? -0.35 : 0.35;
+    // Band 2
+    const r2 = part(new THREE.TorusGeometry(0.15, 0.035, 8, 16), hornRingColor, -0.24, -0.12, z * 0.26);
+    r2.rotation.y = Math.PI / 2;
+    hornGroup.add(r2);
+
+    // Segment 3: arches forward
+    const s3 = part(new THREE.CylinderGeometry(0.09, 0.12, 0.32, 8), hornColor, -0.14, -0.26, z * 0.28);
+    s3.rotation.z = 1.95;
+    s3.rotation.y = z > 0 ? -0.30 : 0.30;
+    hornGroup.add(s3);
+
+    // Segment 4: sharp forward point
+    const tip = part(new THREE.ConeGeometry(0.09, 0.36, 8), hornColor, 0.06, -0.20, z * 0.22);
+    tip.rotation.z = 2.45;
+    tip.rotation.y = z > 0 ? -0.45 : 0.45;
     hornGroup.add(tip);
 
     g.add(hornGroup);
   }
 
-  // Floppy side ears
-  for (const z of [-0.36, 0.36]) {
-    blob(g, faceColor, 0.14, [1.1, 0.45, 1.5], 0.75, 1.48, z, [z > 0 ? 0.3 : -0.3, 0, 0]);
+  for (const z of [-0.38, 0.38]) {
+    blob(g, faceColor, 0.15, [1.1, 0.45, 1.5], 0.76, 1.48, z, [z > 0 ? 0.3 : -0.3, 0, 0]);
   }
 
-  addEyes(g, 1.08, 1.54, 0.18, 0.075);
-  return addLegs(g, legsColor, [[0.38, 0.26], [0.38, -0.26], [-0.38, 0.26], [-0.38, -0.26]], 0.70, 0.11, 0x1f1b18);
+  addEyes(g, 1.10, 1.55, 0.19, 0.078);
+  const legs = addLegs(g, legsColor, [[0.40, 0.28], [0.40, -0.28], [-0.40, 0.28], [-0.40, -0.28]], 0.72, 0.12, 0x1f1b18);
+  for (const [lx, lz] of [[0.40, 0.28], [0.40, -0.28], [-0.40, 0.28], [-0.40, -0.28]]) {
+    const greave = part(new THREE.CylinderGeometry(0.14, 0.13, 0.30, 8), plateColor, lx, 0.38, lz);
+    g.add(greave);
+  }
+  return legs;
 }
 
 function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1776,46 +1855,64 @@ function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const tuskColor = s.tusk ?? 0xf5f5f5;
   const bellyColor = s.belly ?? 0x6d4c41;
   const legsColor = s.legs ?? 0x271c19;
+  const plateColor = s.plate ?? 0x3e2723;
 
-  // 1. Muscular barrel torso
-  blob(g, bodyColor, 0.62, [1.32, 1.15, 1.08], 0.24, 1.25, 0, undefined, true);
-  blob(g, bodyColor, 0.52, [1.25, 0.98, 0.95], -0.32, 1.15, 0);
-  blob(g, bellyColor, 0.44, [1.35, 0.65, 0.88], -0.05, 0.95, 0);
+  // 1. Muscular tank barrel torso with reinforced shoulders
+  blob(g, bodyColor, 0.65, [1.36, 1.18, 1.12], 0.25, 1.28, 0, undefined, true);
+  blob(g, bodyColor, 0.55, [1.28, 1.02, 0.98], -0.34, 1.16, 0);
+  blob(g, bellyColor, 0.46, [1.38, 0.68, 0.90], -0.05, 0.96, 0);
 
-  // 2. Spine bristles (Dorsal crest)
-  for (let i = 0; i < 7; i++) {
-    const bristle = part(new THREE.ConeGeometry(0.08, 0.32, 5), crestColor, -0.45 + i * 0.16, 1.65 - Math.abs(i - 2) * 0.06, 0);
-    bristle.rotation.z = -0.25;
+  // Spiked battle collar around neck
+  const collar = part(new THREE.TorusGeometry(0.55, 0.07, 8, 18), plateColor, 0.62, 1.34, 0);
+  collar.rotation.y = Math.PI / 2;
+  g.add(collar);
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    const spike = part(new THREE.ConeGeometry(0.045, 0.22, 5), 0xcccccc, 0.62, 1.34 + Math.sin(ang) * 0.58, Math.cos(ang) * 0.58);
+    spike.rotation.x = ang;
+    spike.rotation.z = Math.PI / 2;
+    g.add(spike);
+  }
+
+  // 2. Spine bristles (8 razor dorsal crest spikes)
+  for (let i = 0; i < 8; i++) {
+    const bristle = part(new THREE.ConeGeometry(0.09, 0.38 - Math.abs(i - 3) * 0.03, 5), crestColor, -0.50 + i * 0.16, 1.68 - Math.abs(i - 3) * 0.06, 0);
+    bristle.rotation.z = -0.28;
     g.add(bristle);
   }
 
   // 3. Heavy armored head & snout
-  blob(g, bodyColor, 0.42, [1.2, 1.0, 0.95], 0.78, 1.35, 0);
-  const snout = part(new THREE.CylinderGeometry(0.24, 0.26, 0.40, 10), snoutColor, 1.12, 1.22, 0);
+  blob(g, bodyColor, 0.44, [1.22, 1.02, 0.98], 0.80, 1.36, 0);
+  const snout = part(new THREE.CylinderGeometry(0.25, 0.28, 0.42, 10), snoutColor, 1.14, 1.23, 0);
   snout.rotation.z = Math.PI / 2;
   g.add(snout);
 
-  const disk = part(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 12), crestColor, 1.33, 1.22, 0);
+  const disk = part(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 12), crestColor, 1.36, 1.23, 0);
   disk.rotation.z = Math.PI / 2;
   g.add(disk);
 
-  // 4. Wicked upward-curving razor tusks
-  for (const z of [-0.24, 0.24]) {
-    const tusk = part(new THREE.ConeGeometry(0.09, 0.48, 8), tuskColor, 1.16, 1.38, z);
-    tusk.rotation.x = z > 0 ? 0.35 : -0.35;
-    tusk.rotation.z = -0.45;
+  // 4. Wicked forward-curving giant razor tusks & secondary underfangs
+  for (const z of [-0.26, 0.26]) {
+    const tusk = part(new THREE.ConeGeometry(0.10, 0.55, 8), tuskColor, 1.18, 1.42, z);
+    tusk.rotation.x = z > 0 ? 0.38 : -0.38;
+    tusk.rotation.z = -0.48;
     g.add(tusk);
 
-    const tusk2 = part(new THREE.ConeGeometry(0.06, 0.24, 6), tuskColor, 1.05, 1.40, z * 1.15);
-    tusk2.rotation.z = -0.8;
+    const tusk2 = part(new THREE.ConeGeometry(0.07, 0.32, 6), tuskColor, 1.08, 1.12, z * 1.18);
+    tusk2.rotation.x = z > 0 ? 0.55 : -0.55;
+    tusk2.rotation.z = -0.15;
     g.add(tusk2);
 
-    // Boar bristled ears
-    blob(g, crestColor, 0.16, [0.6, 1.2, 0.3], 0.65, 1.70, z, [0, z > 0 ? 0.3 : -0.3, -0.3]);
+    blob(g, crestColor, 0.17, [0.65, 1.25, 0.35], 0.68, 1.74, z, [0, z > 0 ? 0.35 : -0.35, -0.32]);
   }
 
-  addEyes(g, 0.95, 1.48, 0.22, 0.065);
-  return addLegs(g, legsColor, [[0.36, 0.30], [0.36, -0.30], [-0.36, 0.28], [-0.36, -0.28]], 0.62, 0.12, 0x14100e);
+  addEyes(g, 0.98, 1.50, 0.23, 0.068);
+  const legs = addLegs(g, legsColor, [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]], 0.64, 0.13, 0x14100e);
+  for (const [lx, lz] of [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]]) {
+    const cuff = part(new THREE.CylinderGeometry(0.15, 0.14, 0.18, 8), plateColor, lx, 0.28, lz);
+    g.add(cuff);
+  }
+  return legs;
 }
 
 function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1824,56 +1921,72 @@ function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const maneColor = s.mane ?? 0xffd700;
   const hoofColor = s.hoof ?? 0xffd700;
   const featherTipColor = s.featherTip ?? 0xfff59d;
+  const harnessColor = s.harness ?? 0x4fc3f7;
 
-  // 1. Noble steed body
-  const bodyGeo = new THREE.CapsuleGeometry(0.40, 0.95, 8, 16);
+  // 1. Noble steed body with celestial breastplate
+  const bodyGeo = new THREE.CapsuleGeometry(0.42, 1.00, 8, 16);
   bodyGeo.rotateZ(Math.PI / 2);
-  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.50, 0, undefined, true);
+  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.52, 0, undefined, true);
   g.add(bodyMesh);
 
+  // Celestial Archangel breastplate
+  const breastplate = part(new THREE.CylinderGeometry(0.44, 0.42, 0.36, 12), harnessColor, 0.48, 1.54, 0);
+  breastplate.rotation.z = Math.PI / 2;
+  g.add(breastplate);
+  const gem = part(new THREE.OctahedronGeometry(0.10), 0xffffff, 0.72, 1.54, 0);
+  g.add(gem);
+
   // Arched neck & head
-  const neckGeo = new THREE.CapsuleGeometry(0.19, 0.65, 8, 14);
-  const neck = part(neckGeo, bodyColor, 0.82, 1.98, 0);
+  const neckGeo = new THREE.CapsuleGeometry(0.20, 0.68, 8, 14);
+  const neck = part(neckGeo, bodyColor, 0.84, 2.02, 0);
   neck.rotation.z = -0.55;
   g.add(neck);
 
-  const headGeo = new THREE.CapsuleGeometry(0.18, 0.48, 8, 14);
+  const headGeo = new THREE.CapsuleGeometry(0.19, 0.50, 8, 14);
   headGeo.rotateZ(Math.PI / 2);
-  const head = part(headGeo, bodyColor, 1.26, 2.38, 0);
+  const head = part(headGeo, bodyColor, 1.28, 2.42, 0);
   head.rotation.z = -0.28;
   g.add(head);
 
-  // Flowing golden mane
-  blob(g, maneColor, 0.22, [2.5, 0.65, 0.4], 0.60, 2.22, 0, [0, 0, -0.55]);
+  // Flowing mane (5 golden cascading waves)
+  for (let i = 0; i < 5; i++) {
+    blob(g, maneColor, 0.16, [1.8, 0.55, 0.35], 0.75 - i * 0.16, 2.45 - i * 0.18, 0, [0, 0, -0.50 - i * 0.08]);
+  }
 
-  // Celestial horn
-  const horn = part(new THREE.ConeGeometry(0.08, 0.45, 8), maneColor, 1.38, 2.68, 0);
-  horn.rotation.z = -0.7;
+  // Spiral celestial alicorn horn
+  const horn = part(new THREE.ConeGeometry(0.09, 0.55, 8), maneColor, 1.42, 2.75, 0);
+  horn.rotation.z = -0.72;
   g.add(horn);
+  for (let r = 0; r < 3; r++) {
+    const ring = part(new THREE.TorusGeometry(0.06 - r * 0.015, 0.02, 6, 12), 0xffffff, 1.36 + r * 0.09, 2.65 + r * 0.08, 0);
+    ring.rotation.y = Math.PI / 2;
+    g.add(ring);
+  }
 
-  // Flowing tail
-  blob(g, maneColor, 0.20, [0.55, 2.2, 0.4], -0.85, 1.25, 0, [0, 0, 0.35]);
+  // Flowing majestic tail (3 tiered streamers)
+  blob(g, maneColor, 0.22, [0.55, 2.4, 0.40], -0.88, 1.28, 0, [0, 0, 0.38]);
+  blob(g, featherTipColor, 0.16, [0.45, 1.9, 0.30], -0.92, 1.15, 0.12, [0.20, 0, 0.45]);
+  blob(g, featherTipColor, 0.16, [0.45, 1.9, 0.30], -0.92, 1.15, -0.12, [-0.20, 0, 0.45]);
 
-  // 2. Grand Angelic Wings
-  for (const z of [-0.48, 0.48]) {
+  // 2. Grand 6-blade Archangel Wings with layered feathers
+  for (const z of [-0.50, 0.50]) {
     const wingGroup = new THREE.Group();
-    wingGroup.position.set(0.10, 1.85, z);
-    wingGroup.rotation.y = z > 0 ? 0.22 : -0.22;
+    wingGroup.position.set(0.12, 1.88, z);
+    wingGroup.rotation.y = z > 0 ? 0.25 : -0.25;
 
-    // Main wing spar
-    const spar = part(new THREE.CapsuleGeometry(0.12, 1.10, 6, 10), wingColor, 0, 0.45, 0);
-    spar.rotation.z = -0.65;
+    const spar = part(new THREE.CapsuleGeometry(0.13, 1.25, 6, 10), wingColor, 0, 0.52, 0);
+    spar.rotation.z = -0.68;
     wingGroup.add(spar);
 
-    // 5 Feather blades along trailing edge
-    for (let i = 0; i < 5; i++) {
-      blob(wingGroup, featherTipColor, 0.14, [0.4, 1.8, 0.2], -0.18 - i * 0.12, 0.85 - i * 0.14, 0, [0, 0, 0.35 + i * 0.12]);
+    for (let i = 0; i < 6; i++) {
+      const fTip = (i % 2 === 0) ? featherTipColor : wingColor;
+      blob(wingGroup, fTip, 0.15, [0.42, 1.95 - i * 0.10, 0.20], -0.16 - i * 0.12, 0.95 - i * 0.14, 0, [0, 0, 0.35 + i * 0.12]);
     }
     g.add(wingGroup);
   }
 
-  addEyes(g, 1.35, 2.45, 0.18, 0.08);
-  return addLegs(g, bodyColor, [[0.45, 0.26], [0.45, -0.26], [-0.45, 0.26], [-0.45, -0.26]], 0.90, 0.11, hoofColor);
+  addEyes(g, 1.38, 2.48, 0.19, 0.082);
+  return addLegs(g, bodyColor, [[0.46, 0.28], [0.46, -0.28], [-0.46, 0.28], [-0.46, -0.28]], 0.92, 0.12, hoofColor);
 }
 
 function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1882,44 +1995,73 @@ function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const hornColor = s.horn ?? 0xffd700;
   const snoutColor = s.snout ?? 0x3e2723;
   const ringColor = s.ring ?? 0xffd700;
+  const plateColor = s.plate ?? 0x424242;
 
-  // 1. Massive Colossal Torso
-  blob(g, shoulderColor, 0.58, [1.25, 1.10, 1.15], 0.35, 1.62, 0, undefined, true);
-  blob(g, bodyColor, 0.65, [1.40, 1.05, 1.12], -0.05, 1.35, 0);
-  blob(g, bodyColor, 0.55, [1.15, 0.98, 1.02], -0.48, 1.30, 0);
+  // 1. Massive Colossal Titan Torso with heavy gladiator harness
+  blob(g, shoulderColor, 0.64, [1.32, 1.18, 1.22], 0.36, 1.66, 0, undefined, true);
+  blob(g, bodyColor, 0.68, [1.44, 1.08, 1.16], -0.06, 1.38, 0);
+  blob(g, bodyColor, 0.58, [1.18, 1.00, 1.05], -0.50, 1.32, 0);
 
-  // 2. Heavy Neck & Head
-  blob(g, shoulderColor, 0.44, [1.15, 1.15, 1.05], 0.72, 1.48, 0);
-  g.add(part(new THREE.BoxGeometry(0.65, 0.60, 0.55), bodyColor, 1.05, 1.55, 0));
-  g.add(part(new THREE.BoxGeometry(0.35, 0.36, 0.48), snoutColor, 1.38, 1.40, 0));
+  // Gladiator battle harness cross straps over shoulders
+  const harness1 = part(new THREE.TorusGeometry(0.68, 0.06, 8, 20), plateColor, 0.32, 1.62, 0);
+  harness1.rotation.y = 0.45;
+  g.add(harness1);
+  const harness2 = part(new THREE.TorusGeometry(0.68, 0.06, 8, 20), plateColor, 0.32, 1.62, 0);
+  harness2.rotation.y = -0.45;
+  g.add(harness2);
 
-  // Golden nose ring
-  const noseRing = part(new THREE.TorusGeometry(0.12, 0.035, 8, 20), ringColor, 1.52, 1.32, 0);
+  // 2. Heavy Neck & Gladiator Head
+  blob(g, shoulderColor, 0.48, [1.20, 1.20, 1.10], 0.74, 1.50, 0);
+  g.add(part(new THREE.BoxGeometry(0.68, 0.64, 0.58), bodyColor, 1.08, 1.58, 0));
+  g.add(part(new THREE.BoxGeometry(0.38, 0.38, 0.50), snoutColor, 1.42, 1.42, 0));
+
+  // Gladiator steel brow plate
+  const brow = part(new THREE.BoxGeometry(0.10, 0.28, 0.52), plateColor, 1.38, 1.68, 0);
+  brow.rotation.z = -0.32;
+  g.add(brow);
+
+  // Heavy golden nose ring
+  const noseRing = part(new THREE.TorusGeometry(0.14, 0.04, 8, 20), ringColor, 1.58, 1.32, 0);
   noseRing.rotation.y = Math.PI / 2;
   g.add(noseRing);
 
-  // 3. Long forward-sweeping sharp bull horns
-  for (const z of [-0.38, 0.38]) {
-    const hornBase = part(new THREE.CylinderGeometry(0.13, 0.16, 0.42, 8), hornColor, 1.02, 1.88, z);
-    hornBase.rotation.x = z > 0 ? 0.75 : -0.75;
+  // 3. Colossal forward-sweeping arena gladiator horns with steel tips
+  for (const z of [-0.42, 0.42]) {
+    const hornBase = part(new THREE.CylinderGeometry(0.15, 0.19, 0.48, 8), hornColor, 1.05, 1.92, z);
+    hornBase.rotation.x = z > 0 ? 0.78 : -0.78;
     g.add(hornBase);
 
-    const tip = part(new THREE.ConeGeometry(0.13, 0.55, 8), hornColor, 1.25, 1.98, z * 1.25);
-    tip.rotation.z = -0.85;
-    tip.rotation.x = z > 0 ? 0.35 : -0.35;
+    const hRing = part(new THREE.TorusGeometry(0.18, 0.035, 8, 16), plateColor, 1.15, 1.98, z * 1.15);
+    hRing.rotation.y = Math.PI / 2;
+    g.add(hRing);
+
+    const tip = part(new THREE.ConeGeometry(0.14, 0.65, 8), hornColor, 1.32, 2.05, z * 1.30);
+    tip.rotation.z = -0.92;
+    tip.rotation.x = z > 0 ? 0.38 : -0.38;
     g.add(tip);
 
-    blob(g, bodyColor, 0.18, [1.4, 0.5, 0.7], 0.95, 1.70, z * 1.3, [0, z > 0 ? 0.3 : -0.3, 0]);
+    const cap = part(new THREE.ConeGeometry(0.08, 0.22, 8), plateColor, 1.56, 2.14, z * 1.38);
+    cap.rotation.z = -0.92;
+    cap.rotation.x = z > 0 ? 0.38 : -0.38;
+    g.add(cap);
+
+    blob(g, bodyColor, 0.20, [1.4, 0.5, 0.7], 0.98, 1.72, z * 1.32, [0, z > 0 ? 0.3 : -0.3, 0]);
   }
 
-  // Tail with tassel
-  const tail = part(new THREE.CylinderGeometry(0.04, 0.05, 0.75, 6), bodyColor, -0.78, 1.05, 0);
+  // Tail with thick tuft
+  const tail = part(new THREE.CylinderGeometry(0.045, 0.055, 0.85, 6), bodyColor, -0.80, 1.08, 0);
   tail.rotation.z = 0.25;
   g.add(tail);
-  blob(g, shoulderColor, 0.12, [0.8, 1.8, 0.8], -0.88, 0.65, 0);
+  blob(g, shoulderColor, 0.15, [0.85, 2.1, 0.85], -0.92, 0.62, 0);
 
-  addEyes(g, 1.25, 1.62, 0.24, 0.08);
-  return addLegs(g, bodyColor, [[0.44, 0.32], [0.44, -0.32], [-0.42, 0.30], [-0.42, -0.30]], 0.78, 0.14, 0x111111);
+  addEyes(g, 1.28, 1.65, 0.25, 0.085);
+  const legs = addLegs(g, bodyColor, [[0.46, 0.34], [0.46, -0.34], [-0.44, 0.32], [-0.44, -0.32]], 0.82, 0.15, 0x111111);
+  for (const [lx, lz] of [[0.46, 0.34], [0.46, -0.34], [-0.44, 0.32], [-0.44, -0.32]]) {
+    const band = part(new THREE.TorusGeometry(0.16, 0.03, 8, 14), plateColor, lx, 0.35, lz);
+    band.rotation.x = Math.PI / 2;
+    g.add(band);
+  }
+  return legs;
 }
 
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
@@ -3352,12 +3494,12 @@ export class AnimalRenderer {
 
     // Charge trembling wind-up (không rung lắc toàn thân đối với voi mammoth)
     if (isCharging && vis.species !== 'mammoth') {
-      vis.root.position.x += (Math.random() - 0.5) * 0.12 * lvl * r;
-      vis.root.position.z += (Math.random() - 0.5) * 0.12 * lvl * r;
+      vis.root.position.x += (Math.random() - 0.5) * 0.18 * lvl * r;
+      vis.root.position.z += (Math.random() - 0.5) * 0.18 * lvl * r;
     }
 
-    // Squash & stretch & water shrinking (nén gồng sâu hơn cho voi mammoth)
-    const squash = isCharging ? (vis.species === 'mammoth' ? 1 - 0.22 * lvl : 1 - 0.18 * lvl) : 1;
+    // Squash & stretch & water shrinking (nén gồng sâu hơn)
+    const squash = isCharging ? (vis.species === 'mammoth' ? 1 - 0.22 * lvl : 1 - 0.24 * lvl) : 1;
     let baseSx = sc * inWaterShrink * (isPlowing ? 1.25 : isDashing ? 1.15 : 1 + 0.1 * lvl);
     let baseSy = sc * inWaterShrink * (isDashing ? 0.9 : squash);
     let baseSz = sc * inWaterShrink;
@@ -3667,6 +3809,7 @@ export class AnimalRenderer {
         // Sói hạ thấp trọng tâm gồng mình chuẩn bị vồ mồi
         const t = Math.min(1, Math.max(0, lvl));
         vis.body.position.x = -0.14 * t;
+        vis.body.position.y = 0;
         vis.body.rotation.z = 0.14 * t;
         if (vis.head) {
           vis.head.rotation.z = -0.18 * t;
@@ -3675,6 +3818,7 @@ export class AnimalRenderer {
       } else if (isWolfFrenzy) {
         const snap = Math.sin(now * 0.045);
         vis.body.position.x = 0.15;
+        vis.body.position.y = 0;
         vis.body.rotation.z = -0.15;
         if (vis.head) {
           vis.head.rotation.z = snap * 0.25;
@@ -3682,11 +3826,86 @@ export class AnimalRenderer {
         }
       } else {
         vis.body.position.x = 0;
+        vis.body.position.y = 0;
         vis.body.rotation.z = 0;
         if (vis.head) {
           vis.head.rotation.z = 0;
           vis.head.rotation.x = 0;
         }
+      }
+    } else if (vis.species === 'phoenix') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = 0.08 * t;
+        vis.body.position.y = -0.06 * t;
+        vis.body.rotation.z = -0.22 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else if (vis.species === 'swan') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = -0.06 * t;
+        vis.body.position.y = 0.04 * t;
+        vis.body.rotation.z = 0.22 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else if (vis.species === 'ram') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = 0.12 * t;
+        vis.body.position.y = -0.06 * t;
+        vis.body.rotation.z = -0.32 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else if (vis.species === 'boar') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = 0.10 * t;
+        vis.body.position.y = -0.14 * t * r;
+        vis.body.rotation.z = -0.22 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else if (vis.species === 'pegasus') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = -0.08 * t;
+        vis.body.position.y = 0.08 * t * r;
+        vis.body.rotation.z = 0.28 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else if (vis.species === 'bull') {
+      if (isCharging) {
+        const t = Math.min(1, Math.max(0, lvl));
+        vis.body.position.x = 0.14 * t;
+        vis.body.position.y = -0.08 * t * r;
+        vis.body.rotation.z = -0.35 * t;
+      } else {
+        vis.body.position.x = 0;
+        vis.body.position.y = 0;
+        vis.body.rotation.z = 0;
+      }
+    } else {
+      vis.body.position.x = 0;
+      vis.body.position.y = 0;
+      vis.body.rotation.z = 0;
+      if (vis.head) {
+        vis.head.rotation.z = 0;
+        vis.head.rotation.x = 0;
       }
     }
 
@@ -3771,10 +3990,26 @@ export class AnimalRenderer {
         vis.dust = 0.32; // 25% less frequent
         this.onPuff?.(x - Math.cos(angle) * r, 0.12, z - Math.sin(angle) * r, 0xbfe3ff, 0.55 * r, 0.5, 0.8);
       } else if (isCharging) {
-        vis.dust = 0.06;
-        const d = r * (1.6 + lvl);
+        vis.dust = Math.max(0.015, 0.05 - lvl * 0.034);
+        const d = r * (1.5 + lvl * 1.4);
         const ang = Math.random() * Math.PI * 2;
-        this.onPuff?.(x + Math.cos(ang) * d, 0.3, z + Math.sin(ang) * d, lvl >= 1 ? 0xff5a3c : 0xfff3a0, 0.6, 0.35, 1.5);
+        const pColors = isSuper
+          ? [0x00e5ff, 0xff4081, 0xffd700, 0x76ff03, 0xff1744]
+          : (lvl >= 1 ? [0xff1744, 0xff5252, 0xff9100] : [0xfff3a0, 0xffd54f, 0xffca28]);
+        const chosenCol = pColors[Math.floor(Math.random() * pColors.length)];
+        this.onPuff?.(
+          x + Math.cos(ang) * d,
+          smoothBaseY + 0.15 + Math.random() * 0.4 * r,
+          z + Math.sin(ang) * d,
+          chosenCol,
+          (0.55 + lvl * 0.45) * r,
+          0.45,
+          1.6 + lvl * 1.2
+        );
+        if (lvl >= 0.8 && Math.random() < 0.22) {
+          const swCol = isSuper ? 0xff4081 : (lvl >= 1.0 ? 0xff3d00 : 0xffd54f);
+          this.spawnShockwave(x, smoothBaseY + 0.08, z, r * (1.1 + lvl * 0.6), swCol);
+        }
       } else if (isPlowing) {
         vis.dust = 0.02;
         this.onPuff?.(x - Math.cos(angle) * r + (Math.random() - 0.5) * 0.6, 0.5, z - Math.sin(angle) * r + (Math.random() - 0.5) * 0.6, 0xff5a3c, 1.6, 0.5);
@@ -3929,13 +4164,19 @@ export class AnimalRenderer {
       }
     }
 
-    // Ground indicator ring: Tạm thời ẩn vòng tròn màu đội bình thường, chỉ giữ lại khi gồng lực (và thu nhỏ bằng vòng tròn đội)
+    // Ground indicator ring: Hiệu ứng vòng hào quang tụ lực dưới chân rực rỡ
     vis.ring.position.set(x, smoothBaseY + 0.06, z);
     if (isCharging) {
       vis.ring.visible = !isWater;
-      vis.ring.scale.setScalar(r); // Nhỏ lại đúng bằng vòng tròn màu đội cơ sở
-      vis.ringMat.color.set(lvl >= 1 ? 0xff3b30 : 0xfff3a0);
-      vis.ringMat.opacity = 0.6 + Math.sin(now / (lvl >= 1 ? 40 : 90)) * 0.35;
+      vis.ring.scale.setScalar(r * (1.15 + lvl * 0.65));
+      if (isSuper) {
+        // Cycling rainbow aura
+        vis.ringMat.color.setHSL((now * 0.0015) % 1, 1.0, 0.6);
+        vis.ringMat.opacity = 0.85 + Math.sin(now / (lvl >= 1 ? 20 : 45)) * 0.15;
+      } else {
+        vis.ringMat.color.set(lvl >= 1 ? 0xff1744 : 0xffea00);
+        vis.ringMat.opacity = 0.7 + Math.sin(now / (lvl >= 1 ? 25 : 55)) * 0.3;
+      }
     } else {
       vis.ring.visible = false;
     }

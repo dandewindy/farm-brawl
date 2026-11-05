@@ -296,6 +296,28 @@ export function sfxWolfBite(vol = 1, rainbow = false): void {
   }
 }
 
+export function sfxEvolveFanfare(_species: Species, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Grand mythical brass fanfare on evolution
+  tone('triangle', 330, 440, 0.22, 0.50 * vol, { attack: 0.02 });
+  tone('sawtooth', 440, 660, 0.35, 0.45 * vol, { delay: 0.10, attack: 0.03 });
+  tone('triangle', 660, 880, 0.55, 0.60 * vol, { delay: 0.22, attack: 0.04 });
+  tone('sine', 110, 55, 0.70, 0.70 * vol, { delay: 0.22, attack: 0.05 });
+  noise('bandpass', 1200, 400, 2.5, 0.45, 0.30 * vol, { delay: 0.22, attack: 0.02 });
+}
+
+export function sfxRainbowSuperSkill(_species: Species, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Shimmering celestial harmonic chord + explosive sub-bass
+  tone('sawtooth', 523.25, 1046.5, 0.45, 0.45 * vol, { attack: 0.01 });
+  tone('triangle', 659.25, 1318.5, 0.48, 0.40 * vol, { delay: 0.04, attack: 0.01 });
+  tone('sine', 783.99, 1567.98, 0.52, 0.38 * vol, { delay: 0.08, attack: 0.01 });
+  tone('sawtooth', 1046.5, 2093.0, 0.58, 0.35 * vol, { delay: 0.12, attack: 0.02 });
+  // Deep ground-shaking impact
+  tone('sine', 85, 28, 0.95, 0.85 * vol, { delay: 0.05, attack: 0.02 });
+  noise('bandpass', 2400, 800, 2.0, 0.60, 0.45 * vol, { delay: 0.05, attack: 0.02 });
+}
+
 // Rising whine while a charged ram is winding up; level 0..1
 export function chargeUpdate(level: number): void {
   if (!ready() || !ctx) {

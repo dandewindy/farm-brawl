@@ -2058,18 +2058,92 @@ export class World {
         this.startWolfChargedSkill(p, true);
         return;
       }
-      if (p.species === 'pegasus' || p.species === 'phoenix') {
+      if (p.species === 'phoenix') {
         p.a = p.input.a;
-        const flySpeed = p.species === 'phoenix' ? 68 : 65;
-        p.vx = Math.cos(p.a) * flySpeed;
-        p.vz = Math.sin(p.a) * flySpeed;
-        p.dashT = 0.55;
-        p.flyT = 0.55;
+        p.vx = Math.cos(p.a) * 72;
+        p.vz = Math.sin(p.a) * 72;
+        p.dashT = 0.58;
+        p.flyT = 0.58;
         p.plow = true;
-        p.power = 5.0;
-        p.cd = p.species === 'phoenix' ? CFG.DASH_CD * 0.5 : CFG.DASH_CD * 0.7;
+        p.power = 6.0;
+        p.cd = CFG.DASH_CD * 0.4;
         p.dashHit.clear();
         this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
+      }
+      if (p.species === 'pegasus') {
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 70;
+        p.vz = Math.sin(p.a) * 70;
+        p.dashT = 0.60;
+        p.flyT = 0.60;
+        p.plow = true;
+        p.power = 5.8;
+        p.cd = CFG.DASH_CD * 0.5;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
+      }
+      if (p.species === 'swan') {
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 66;
+        p.vz = Math.sin(p.a) * 66;
+        p.dashT = 0.58;
+        p.flyT = 0.58;
+        p.plow = true;
+        p.power = 5.5;
+        p.cd = CFG.DASH_CD * 0.5;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
+      }
+      if (p.species === 'ram') {
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 68;
+        p.vz = Math.sin(p.a) * 68;
+        p.dashT = 0.56;
+        p.plow = true;
+        p.power = 6.8;
+        p.cd = CFG.DASH_CD * 0.6;
+        p.dashHit.clear();
+        return;
+      }
+      if (p.species === 'boar') {
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 65;
+        p.vz = Math.sin(p.a) * 65;
+        p.dashT = 0.58;
+        p.plow = true;
+        p.power = 5.6;
+        p.cd = CFG.DASH_CD * 0.5;
+        p.dashHit.clear();
+        return;
+      }
+      if (p.species === 'bull') {
+        if (p.holdT > 0.15) {
+          const stompR = 16;
+          for (const other of this.players.values()) {
+            if (!other.alive || other.id === p.id) continue;
+            if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
+              if (!isEvolvedSpecies(other.species) && other.shieldT <= 0) {
+                other.stunT = Math.max(other.stunT, 0.8);
+                const siphon = Math.min(other.mass - 10, Math.round(other.mass * 0.08));
+                if (siphon > 0) {
+                  other.mass -= siphon;
+                  p.mass += siphon;
+                }
+              }
+            }
+          }
+        }
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 66;
+        p.vz = Math.sin(p.a) * 66;
+        p.dashT = 0.58;
+        p.plow = true;
+        p.power = 6.2;
+        p.cd = CFG.DASH_CD * 0.6;
+        p.dashHit.clear();
         return;
       }
       p.a = p.input.a;
@@ -3711,41 +3785,53 @@ export class World {
     if (att.plow || (att.species === 'mammoth' && vic.mass < 100)) { att.vx *= 0.8; att.vz *= 0.8; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
 
-    // Boar: mud blast slows target 50% for 2s
-    if (att.species === 'boar' && att.plow) {
-      vic.slowT = Math.max(vic.slowT, 2.0);
+    // Boar: mud blast slows target 50% for 2s, or 70% for 3.5s when rainbow powered
+    if (att.species === 'boar' && (att.plow || att.superT > 0)) {
+      vic.slowT = Math.max(vic.slowT, att.superT > 0 ? 3.5 : 2.0);
     }
 
-    // Ram: battering ram stun
+    // Ram: battering ram stun (0.8s normal, 2.0s with rainbow)
     if (att.species === 'ram') {
-      vic.stunT = Math.max(vic.stunT, 0.8);
+      const ramStun = att.superT > 0 ? 2.0 : 0.8;
+      vic.stunT = Math.max(vic.stunT, ramStun);
       if (outsideFence(vic)) {
-        vic.stunT = Math.max(vic.stunT, 1.2);
+        vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 2.5 : 1.2);
       }
     }
 
-    // Bull: ferocious gore and mass siphon
+    // Bull: ferocious gore and mass siphon (5% normal, 12% with rainbow)
     if (att.species === 'bull') {
-      vic.stunT = Math.max(vic.stunT, 0.45);
-      const stolen = Math.min(vic.mass - 10, Math.round(vic.mass * 0.05));
+      vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 0.9 : 0.45);
+      const siphonPct = att.superT > 0 ? 0.12 : 0.05;
+      const stolen = Math.min(vic.mass - 10, Math.round(vic.mass * siphonPct));
       if (stolen > 0) {
         vic.mass -= stolen;
         att.mass += stolen;
       }
     }
 
-    // Swan: ice wave surges and slides victim
+    // Swan: ice wave surges and slides victim (24 speed + 1.2s freeze stun with rainbow)
     if (att.species === 'swan') {
-      vic.vx += nx * 12;
-      vic.vz += nz * 12;
+      const slideF = att.superT > 0 ? 24 : 12;
+      vic.vx += nx * slideF;
+      vic.vz += nz * slideF;
+      if (att.superT > 0) {
+        vic.stunT = Math.max(vic.stunT, 1.2);
+      }
     }
 
-    // Phoenix: fiery blaze singes victim and scatters food
+    // Phoenix: fiery blaze singes victim and scatters food (14% with rainbow)
     if (att.species === 'phoenix') {
-      const burnDrop = Math.min(vic.mass - 10, Math.round(vic.mass * 0.05));
+      const dropPct = att.superT > 0 ? 0.14 : 0.05;
+      const burnDrop = Math.min(vic.mass - 10, Math.round(vic.mass * dropPct));
       if (burnDrop > 0) {
         vic.mass -= burnDrop;
-        this.scatter(vic.x, vic.z, burnDrop, radiusOf(vic.mass) + 1.5, nx * 8, nz * 8);
+        this.scatter(
+          vic.x, vic.z, burnDrop,
+          radiusOf(vic.mass) + (att.superT > 0 ? 2.5 : 1.5),
+          nx * (att.superT > 0 ? 14 : 8),
+          nz * (att.superT > 0 ? 14 : 8)
+        );
       }
     }
 

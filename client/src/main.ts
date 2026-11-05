@@ -6,6 +6,7 @@ import {
   chargeStop, chargeUpdate, repaint, setMood,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite,
   sfxPhoenixCry, sfxSwanCall, sfxRamBash, sfxBoarGrunt, sfxPegasusNeigh, sfxBullRoar,
+  sfxEvolveFanfare, sfxRainbowSuperSkill,
   sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
@@ -364,6 +365,12 @@ input.onReleaseRam = (held: number) => {
 
   if (canDash) {
     predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
+    if (isSuper) {
+      sfxRainbowSuperSkill(myMeta.species, 1.0);
+    } else {
+      sfxDash(1);
+    }
+    wasDashing = true;
     if ((myMeta.species === 'monkey' || myMeta.species === 'gorilla') && validHeld > 0.15) {
       const isGorilla = (myMeta.species === 'gorilla');
       const clampedHold = Math.max(0.2, Math.min(1.2, validHeld));
@@ -1519,15 +1526,22 @@ const gameState = new GameState({
         }
         prevMass = mass;
 
+        const isSuper = (flags & FLAG.SUPER) !== 0;
         const isDashing = (flags & 1) !== 0;
-        if (isDashing && !wasDashing) sfxDash(1);
+        if (isDashing && !wasDashing) {
+          if (isSuper) {
+            sfxRainbowSuperSkill(gameState.metas.get(gameState.myId)?.species ?? 'pig', 1.0);
+          } else {
+            sfxDash(1);
+          }
+        }
         wasDashing = isDashing;
 
         const inWater = (flags & FLAG.WATER) !== 0;
         if (inWater && !wasInWater && !predictor.on) sfxSplash(0.85);
         if (!predictor.on) wasInWater = inWater;
 
-        const isSuper = (flags & 32768) !== 0;
+        // isSuper evaluated above
         if (!isSuper && wasSuper) {
           hud.showToast(t('superEnd'));
         }
@@ -2434,6 +2448,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xff6d00, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2449,6 +2464,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffca28, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxWolfHowl(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2465,6 +2481,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffd54f, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
         sfxMammothRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2480,6 +2497,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffea00, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxPhoenixCry(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2495,6 +2513,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
         sfxSwanCall(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2510,6 +2529,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xd7ccc8, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.4, 52);
         sfxRamBash(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2525,6 +2545,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0x795548, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxBoarGrunt(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2540,6 +2561,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
         sfxPegasusNeigh(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2555,6 +2577,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffd700, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.6, 55);
         sfxBullRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
