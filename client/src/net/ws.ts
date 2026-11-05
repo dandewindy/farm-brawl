@@ -592,6 +592,18 @@ export class WsClient implements Transport {
     this.triggerHotMigration(true);
   }
 
+  public isOpen(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  public isConnecting(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.CONNECTING;
+  }
+
+  public isClosed(): boolean {
+    return !this.ws || this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING;
+  }
+
   public forceReconnect(): void {
     if (this.closed) return;
     this.stopPing();

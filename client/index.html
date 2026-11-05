@@ -557,6 +557,19 @@
           <p class="sp-skin-hint" data-i18n="skinHint">Nhấn 2 lần để đổi skin</p>
 
           <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>
+
+          <!-- Lobby Loading Progress Indicator & Status Bar -->
+          <div id="lobbyLoadingBox" class="lobby-loading-box" hidden>
+            <div class="llb-header">
+              <span class="llb-spinner"></span>
+              <span id="lobbyLoadingText" class="llb-text" data-i18n="connectingServer">Đang kết nối máy chủ...</span>
+              <span id="lobbyLoadingPercent" class="llb-pct">45%</span>
+            </div>
+            <div class="llb-bar">
+              <div id="lobbyLoadingFill" class="llb-fill" style="width: 45%;"></div>
+            </div>
+          </div>
+
           <p id="bestLine"></p>
 
           <!-- Hướng dẫn chơi -->

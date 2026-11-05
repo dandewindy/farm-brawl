@@ -422,6 +422,37 @@ if (isPC) {
   document.body.classList.add('is-pc');
 }
 
+let joinWatchdog: any = null;
+function clearJoinWatchdog(): void {
+  if (joinWatchdog) {
+    clearTimeout(joinWatchdog);
+    joinWatchdog = null;
+  }
+}
+
+function startJoinWatchdog(name: string, species: Species, skin: number, mode: 'ffa' | 'team' | 'friend', _roomCode?: string): void {
+  clearJoinWatchdog();
+  joinWatchdog = setTimeout(() => {
+    if (!gameState.alive && !gameState.myId) {
+      console.warn('[Watchdog] Join taking longer than expected. Retrying join packet...');
+      hud.setPlayLoading(true, t('connectSlowRetry'), 75);
+      if (transport && typeof (transport as any).isOpen === 'function' && (transport as any).isOpen()) {
+        const team = mode === 'team' ? hud.selectedTeam : undefined;
+        const matchDuration = mode === 'friend' ? hud.getMatchDuration() : undefined;
+        transport.send({ t: 'join', name, species, skin, team, matchDuration, theme: getArenaTheme() });
+      } else if (transport && typeof (transport as any).forceReconnect === 'function') {
+        (transport as any).forceReconnect();
+      }
+      joinWatchdog = setTimeout(() => {
+        if (!gameState.alive && !gameState.myId) {
+          hud.setPlayLoading(false);
+          hud.showToast(t('connectionTimeoutToast'), 3500);
+        }
+      }, 3500);
+    }
+  }, 2500);
+}
+
 const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team' | 'friend', skin: number, roomCode?: string) => {
   unlockAudio();
   firstSpawn = true;
@@ -453,6 +484,7 @@ const hud = new HudManager((name: string, species: Species, mode: 'ffa' | 'team'
     const matchDuration = mode === 'friend' ? hud.getMatchDuration() : undefined;
     transport.send({ t: 'join', name, species, skin, team, matchDuration, theme: getArenaTheme() });
   }
+  startJoinWatchdog(name, species, skin, mode, roomCode);
 });
 
 hud.onSetMatchDuration = (dur: number) => {
@@ -1422,6 +1454,8 @@ const gameState = new GameState({
       clearTimeout(deathScreenTimer);
       deathScreenTimer = null;
     }
+    clearJoinWatchdog();
+    hud.setPlayLoading(false, undefined, 100);
     isDeadAwaitingScreen = false;
     awaitingJoinAck = false;
     missingMeTicks = 0;
@@ -2613,7 +2647,11 @@ let fallbackLocal = false;
 
 function connectToRoom(targetRoom: string): void {
   if (currentRoomName === targetRoom && transport && !transport.isAfk) {
-    return;
+    if (typeof (transport as any).isClosed === 'function' && (transport as any).isClosed()) {
+      // Socket was closed, allow reconnection
+    } else {
+      return;
+    }
   }
 
   if (transport && typeof (transport as any).close === 'function') {
@@ -2660,10 +2698,10 @@ function getClientId(): string {
   return cid;
 }
 
-  const isViteDev = window.location.port === '5180';
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  let host = isViteDev ? 'localhost:8787' : window.location.host;
-  if (!isViteDev) {
+  let host = isLocalDev ? (window.location.port === '8787' ? window.location.host : 'localhost:8787') : window.location.host;
+  if (!isLocalDev) {
     try { sessionStorage.removeItem('fb_fast_host'); } catch (_) {}
     if (host === 'farm-brawl.windydande.workers.dev' || host.endsWith('.workers.dev') || host === 'brawl.get-go.site') {
       // Mặc định tự động ép sang custom domain chính thức (brawl.get-go.site) để đưa mạng về thẳng SIN/HKG
@@ -2689,6 +2727,7 @@ function getClientId(): string {
       gameState.handle(m);
     },
     (status) => {
+      hud.setConnectionStatus(status);
       if (status === 'open') {
         missingMeTicks = 0;
         if (targetRoom.startsWith('team-')) {
@@ -2708,7 +2747,7 @@ function getClientId(): string {
         if (gameState.alive) {
           hud.showToast(t('disconnectedToast'));
         }
-      } else if (status === 'error' && isViteDev && !fallbackLocal) {
+      } else if (status === 'error' && isLocalDev && !fallbackLocal) {
         console.warn('Worker server not detected at port 8787. Falling back to LocalServer.');
         fallbackLocal = true;
         transport = new LocalServer((m) => {

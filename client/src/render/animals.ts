@@ -426,29 +426,52 @@ function buildHorse(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const bodyMesh = part(bodyGeo, s.body, 0, 1.4, 0, undefined, true);
   bodyMesh.scale.set(1, 1.05, 0.9);
   g.add(bodyMesh);
+
+  // Upper leg haunches (nối liền khít chân vào thân, triệt tiêu hoàn toàn khe hở khi chạy)
+  for (const [hx, hz] of [[0.55, 0.2], [0.55, -0.2], [-0.55, 0.2], [-0.55, -0.2]]) {
+    const haunch = part(new THREE.SphereGeometry(0.14, 8, 8), s.body, hx, 1.28, hz);
+    haunch.scale.set(0.9, 1.3, 0.9);
+    g.add(haunch);
+  }
+
   // Neck (tilted capsule)
   const neckGeo = new THREE.CapsuleGeometry(0.16, 0.55, 6, 12);
   const neck = part(neckGeo, s.body, 0.72, 1.85, 0);
   neck.rotation.z = -0.5;
   g.add(neck);
+
   // Head (rounded snout)
   const headGeo = new THREE.CapsuleGeometry(0.15, 0.4, 6, 12);
   headGeo.rotateZ(Math.PI / 2);
   const head = part(headGeo, s.body, 1.12, 2.2, 0);
   head.rotation.z = -0.25;
   g.add(head);
-  // Mane
-  const mane = part(new THREE.CapsuleGeometry(0.05, 0.55, 4, 8), s.mane, 0.55, 2.0, 0);
-  mane.rotation.z = -0.5;
-  g.add(mane);
+
+  // Bờm ngựa: vuốt từ gáy, quét qua đỉnh đầu giữa 2 tai và phủ xuống trán (forelock)
+  // 1. Dải bờm cổ
+  const neckMane = part(new THREE.CapsuleGeometry(0.06, 0.58, 4, 8), s.mane, 0.58, 1.95, 0);
+  neckMane.rotation.z = -0.52;
+  g.add(neckMane);
+  // 2. Bờm đỉnh đầu giữa 2 tai (poll mane)
+  const pollMane = part(new THREE.CapsuleGeometry(0.06, 0.28, 4, 8), s.mane, 0.94, 2.38, 0);
+  pollMane.rotation.z = -0.32;
+  g.add(pollMane);
+  // 3. Bờm trán vươn dài (forelock quét qua đỉnh đầu xuống trán)
+  const forelock = part(new THREE.ConeGeometry(0.065, 0.26, 6), s.mane, 1.18, 2.34, 0);
+  forelock.rotation.z = -1.15;
+  g.add(forelock);
+
   // Tail: simple elongated blob slanting from top-rear downwards (từ trên chéo xuống)
   blob(g, s.mane, 0.14, [1, 3, 1], -0.83, 1.24, 0, [0, 0, -0.42]);
+
   // Ears
   for (const z of [-0.1, 0.1]) {
     g.add(part(new THREE.ConeGeometry(0.06, 0.2, 10), s.body, 0.95, 2.45, z));
   }
   addEyes(g, 1.22, 2.3, 0.17, 0.07);
-  return addLegs(g, s.legs ?? s.body, [[0.55, 0.2], [0.55, -0.2], [-0.55, 0.2], [-0.55, -0.2]], 1.05, 0.1, 0x2b2522);
+
+  // Chân ngựa: dài 1.22, pivot ăn khớp hoàn hảo vào khớp háng y=1.22 (không bị hở rời thân)
+  return addLegs(g, s.legs ?? s.body, [[0.55, 0.2], [0.55, -0.2], [-0.55, 0.2], [-0.55, -0.2]], 1.22, 0.10, 0x2b2522);
 }
 
 function buildCow(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -1612,85 +1635,165 @@ function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
 }
 
 function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
-  const bodyColor = s.body ?? 0xff3d00;
-  const wingColor = s.wing ?? 0xff9100;
-  const chestColor = s.chest ?? 0xffea00;
+  const bodyColor = s.body ?? 0xff2d00;
+  const wingColor = s.wing ?? 0xff8f00;
+  const chestColor = s.chest ?? 0xffd600;
   const tailColor = s.tail ?? 0xd50000;
-  const crestColor = s.crest ?? 0xffd600;
+  const crestColor = s.crest ?? 0xffea00;
   const beakColor = s.beak ?? 0xffab00;
 
-  // 1. Athletic fiery torso with layered chest armor
-  blob(g, bodyColor, 0.72, [1.32, 0.98, 0.94], 0, 1.05, 0, undefined, true);
-  // Fiery chest plumage (triple tiered radiant scales)
-  blob(g, chestColor, 0.42, [1.15, 0.95, 0.75], 0.44, 1.18, 0, [0, 0, -0.22]);
-  blob(g, crestColor, 0.32, [1.05, 0.85, 0.65], 0.52, 1.25, 0, [0, 0, -0.25]);
+  // 1. Thân chim ưng kiêu hãnh vươn cao, thanh thoát khí động học (Athletic aerodynamic raptor torso)
+  blob(g, bodyColor, 0.56, [1.68, 0.82, 0.70], 0.05, 1.18, 0, [0, 0, -0.24], true);
+  // Ngực nở kiêu hãnh dát giáp lông vũ rực lửa (Radiant golden chest armor plumage)
+  blob(g, chestColor, 0.38, [1.35, 0.85, 0.62], 0.42, 1.30, 0, [0, 0, -0.32]);
+  blob(g, crestColor, 0.28, [1.15, 0.70, 0.50], 0.54, 1.38, 0, [0, 0, -0.36]);
 
-  // Flame collar / neck ruff (6 flame points around neck)
-  for (let i = 0; i < 6; i++) {
-    const ang = (i / 6) * Math.PI * 2;
-    const ruff = part(new THREE.ConeGeometry(0.08, 0.38, 5), wingColor, 0.38 + Math.cos(ang) * 0.15, 1.48, Math.sin(ang) * 0.22);
+  // Vòng lửa bảo hộ cổ (Fiery neck plumage ruff - 8 ngọn lửa bập bùng quanh cổ)
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    const ruff = part(new THREE.ConeGeometry(0.07, 0.42, 5), i % 2 === 0 ? wingColor : crestColor, 0.42 + Math.cos(ang) * 0.16, 1.56, Math.sin(ang) * 0.22);
     ruff.rotation.x = Math.sin(ang) * 0.45;
-    ruff.rotation.z = -0.55 - Math.cos(ang) * 0.25;
+    ruff.rotation.z = -0.65 - Math.cos(ang) * 0.25;
     g.add(ruff);
   }
 
-  // 2. Arched neck & sculpted raptor head
-  blob(g, bodyColor, 0.29, [0.85, 1.35, 0.85], 0.48, 1.55, 0, [0, 0, -0.32]);
-  g.add(part(new THREE.SphereGeometry(0.39, 18, 12), bodyColor, 0.72, 1.92, 0));
+  // 2. Cổ vươn cao & Đầu chim ưng sắc sảo kiêu hãnh (Arched raptor neck & sculpted eagle head)
+  blob(g, bodyColor, 0.26, [0.82, 1.45, 0.80], 0.50, 1.68, 0, [0, 0, -0.38]);
+  g.add(part(new THREE.SphereGeometry(0.36, 18, 12), bodyColor, 0.75, 2.06, 0));
 
-  // Curved raptor golden beak with nostrils & sharp tip
-  const beak = part(new THREE.ConeGeometry(0.13, 0.42, 8), beakColor, 1.16, 1.84, 0);
-  beak.rotation.z = -Math.PI / 2 - 0.22;
+  // Mỏ chim ưng vàng kim cong sắc nhọn (Hooked golden raptor beak)
+  const beakMat = new THREE.MeshLambertMaterial({
+    color: beakColor,
+    emissive: 0xffaa00,
+    emissiveIntensity: 0.25,
+  });
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 8), beakMat);
+  beak.position.set(1.18, 1.98, 0);
+  beak.rotation.z = -Math.PI / 2 - 0.26;
   g.add(beak);
-  const jaw = part(new THREE.ConeGeometry(0.09, 0.32, 6), beakColor, 1.08, 1.76, 0);
-  jaw.rotation.z = -Math.PI / 2 - 0.10;
+
+  const jaw = part(new THREE.ConeGeometry(0.08, 0.34, 6), beakColor, 1.10, 1.90, 0);
+  jaw.rotation.z = -Math.PI / 2 - 0.12;
   g.add(jaw);
 
-  // Royal 5-tier solar crown phoenix crest plumes
-  blob(g, crestColor, 0.14, [2.6, 0.65, 0.35], 0.52, 2.36, 0, [0, 0, -0.55]);
-  blob(g, wingColor, 0.11, [2.3, 0.55, 0.30], 0.46, 2.22, 0.10, [0.18, 0, -0.45]);
-  blob(g, wingColor, 0.11, [2.3, 0.55, 0.30], 0.46, 2.22, -0.10, [-0.18, 0, -0.45]);
-  blob(g, tailColor, 0.09, [1.9, 0.45, 0.25], 0.40, 2.10, 0.18, [0.32, 0, -0.35]);
-  blob(g, tailColor, 0.09, [1.9, 0.45, 0.25], 0.40, 2.10, -0.18, [-0.32, 0, -0.35]);
+  // Mào lửa 5 chóp mặt trời bốc cháy vươn cao (5-flame solar crown crest plumes)
+  const crestPlumes: [number, number, number, number, number][] = [
+    [0, 2.62, 0.82, -0.65, 0xffd600],       // Giữa cao nhất
+    [0.12, 2.48, 0.68, -0.52, 0xff9100],    // Phải tầng 1
+    [-0.12, 2.48, 0.68, -0.52, 0xff9100],   // Trái tầng 1
+    [0.22, 2.32, 0.54, -0.40, 0xd50000],    // Phải ngoài
+    [-0.22, 2.32, 0.54, -0.40, 0xd50000],   // Trái ngoài
+  ];
+  for (const [zOff, yPos, length, rotZ, clr] of crestPlumes) {
+    const crestMat = new THREE.MeshLambertMaterial({
+      color: clr,
+      emissive: clr,
+      emissiveIntensity: 0.35,
+    });
+    const cMesh = new THREE.Mesh(new THREE.ConeGeometry(0.075, length, 5), crestMat);
+    cMesh.position.set(0.50, yPos, zOff);
+    cMesh.rotation.z = rotZ;
+    cMesh.rotation.x = zOff * 0.3;
+    g.add(cMesh);
+  }
 
-  // 3. Wide layered flame wings (3 tiers of burning feathers)
-  for (const z of [-0.65, 0.65]) {
-    blob(g, wingColor, 0.45, [1.5, 0.70, 0.25], 0.02, 1.18, z, [0, 0, 0.25]);
-    blob(g, crestColor, 0.34, [1.4, 0.55, 0.20], -0.25, 1.25, z * 0.98, [0, 0, 0.35]);
-    for (let f = 0; f < 4; f++) {
-      const flameTip = part(new THREE.ConeGeometry(0.10 - f * 0.015, 0.58 - f * 0.08, 6), f % 2 === 0 ? tailColor : crestColor, -0.30 - f * 0.14, 1.30 - f * 0.06, z * (0.95 + f * 0.05));
-      flameTip.rotation.z = 0.85 + f * 0.18;
-      flameTip.rotation.y = z > 0 ? 0.2 : -0.2;
-      g.add(flameTip);
+  // 3. Cánh lửa 3 tầng sải rộng rực rỡ (Triple-tiered wide sweeping flame wings)
+  for (const z of [-0.68, 0.68]) {
+    const side = z > 0 ? 1 : -1;
+    // Tầng cánh gốc (Primary wing spar)
+    blob(g, wingColor, 0.44, [1.60, 0.70, 0.22], 0.08, 1.28, z, [0, 0, 0.22]);
+    // Tầng lông vũ thứ 2 (Secondary flame feathers)
+    blob(g, chestColor, 0.32, [1.50, 0.52, 0.18], -0.22, 1.36, z * 0.98, [0, 0, 0.32]);
+
+    // Các lưỡi kiếm lửa vuốt dài về sau (5 radiant flame flight blades)
+    for (let f = 0; f < 5; f++) {
+      const bladeColor = f % 2 === 0 ? tailColor : crestColor;
+      const bladeMat = new THREE.MeshLambertMaterial({
+        color: bladeColor,
+        emissive: bladeColor,
+        emissiveIntensity: 0.3,
+      });
+      const blade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.10 - f * 0.012, 0.72 - f * 0.08, 6),
+        bladeMat
+      );
+      blade.position.set(-0.25 - f * 0.16, 1.40 - f * 0.06, z * (0.95 + f * 0.08));
+      blade.rotation.z = 0.85 + f * 0.16;
+      blade.rotation.y = side * (0.25 + f * 0.06);
+      blade.rotation.x = side * -0.15;
+      g.add(blade);
     }
   }
 
-  // 4. Legendary 5-streamer phoenix tail plumes with glowing gem tips
-  const tailOffsets: [number, number, number, number][] = [
-    [0, 1.68, 0, 0.70],
-    [0.22, 1.54, 0.22, 0.62],
-    [-0.22, 1.54, -0.22, 0.62],
-    [0.40, 1.40, 0.38, 0.50],
-    [-0.40, 1.40, -0.38, 0.50],
+  // 4. BỘ ĐUÔI PHƯỢNG HOÀNG HUYỀN THOẠI: 5 DẢI LÔNG DÀI 3.8 ĐƠN VỊ UỐN LƯỢN THƯỚT THA
+  // Thiết kế đa đốt cong mềm mại gắn liền từ hông sau, vút dài kiêu hãnh ra sau
+  const gemMat = new THREE.MeshLambertMaterial({
+    color: 0xffd700,
+    emissive: 0xffea00,
+    emissiveIntensity: 0.85,
+  });
+
+  const streamers: { z: number; y: number; rotY: number; len: number; color: number }[] = [
+    { z: 0, y: 1.24, rotY: 0, len: 3.8, color: tailColor },        // Dải trung tâm dài nhất
+    { z: 0.28, y: 1.18, rotY: 0.14, len: 3.4, color: wingColor },  // Dải phải trong
+    { z: -0.28, y: 1.18, rotY: -0.14, len: 3.4, color: wingColor },// Dải trái trong
+    { z: 0.52, y: 1.12, rotY: 0.28, len: 2.9, color: crestColor }, // Dải phải ngoài
+    { z: -0.52, y: 1.12, rotY: -0.28, len: 2.9, color: crestColor },// Dải trái ngoài
   ];
-  for (const [zOff, yOff, rotY, rotZ] of tailOffsets) {
-    const isCenter = zOff === 0;
-    const len = isCenter ? 2.6 : 2.1;
-    const clr = isCenter ? tailColor : wingColor;
-    blob(g, clr, 0.18, [0.65, len, 0.35], -0.95 - Math.abs(zOff) * 0.2, yOff, zOff, [rotY, 0, rotZ]);
-    const gem = part(new THREE.OctahedronGeometry(isCenter ? 0.09 : 0.075), crestColor, -1.0 - len * 0.36, yOff + len * 0.28, zOff * 1.25);
+
+  for (const st of streamers) {
+    // Mỗi dải được tạo thành từ 3 phân đoạn uốn lượn nối tiếp nhau (seamless flowing ribbon)
+    const segCount = 4;
+    const segLen = st.len / segCount;
+    let curX = -0.70;
+    let curY = st.y;
+    let curZ = st.z;
+
+    for (let seg = 0; seg < segCount; seg++) {
+      const t = seg / (segCount - 1);
+      const width = 0.22 * (1.0 - t * 0.55); // Vuốt thon dần về đuôi
+      const nextX = curX - segLen * 0.92;
+      const waveY = Math.sin(t * Math.PI * 1.5) * 0.25;
+      const nextY = curY + waveY;
+      const nextZ = curZ + Math.sin(st.rotY) * segLen;
+
+      // Khối lông vũ phân đoạn
+      blob(g, st.color, width, [1.45, 0.45, 0.28], (curX + nextX) * 0.5, (curY + nextY) * 0.5, (curZ + nextZ) * 0.5, [st.rotY, 0, 0.20 - t * 0.15]);
+
+      curX = nextX;
+      curY = nextY;
+      curZ = nextZ;
+    }
+
+    // Đính ngọc mặt trời hoàng kim phát quang rực rỡ ở đầu mút đuôi (Sun Gem Tip)
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12), gemMat);
+    gem.position.set(curX - 0.08, curY + 0.04, curZ);
     g.add(gem);
+
+    // Chùm 3 tia lửa đuôi vút nhọn từ ngọc mặt trời
+    for (let sp = -1; sp <= 1; sp++) {
+      const spark = part(new THREE.ConeGeometry(0.04, 0.35, 4), crestColor, curX - 0.24, curY + sp * 0.06, curZ + sp * 0.08);
+      spark.rotation.z = Math.PI / 2 + 0.15;
+      spark.rotation.y = sp * 0.25;
+      g.add(spark);
+    }
   }
 
-  addEyes(g, 0.98, 1.98, 0.19, 0.085);
-  const legs = addLegs(g, beakColor, [[0.05, 0.22], [0.05, -0.22]], 0.58, 0.08);
-  for (const z of [-0.22, 0.22]) {
-    for (const a of [-0.25, 0, 0.25]) {
-      const talon = part(new THREE.ConeGeometry(0.04, 0.16, 6), 0xffd54f, 0.20, 0.08, z + a * 0.12);
+  // 5. Mắt đại bàng vàng sắc sảo lộ rõ trên bề mặt đầu (x=1.02, y=2.12, z=±0.20)
+  addEyes(g, 1.02, 2.12, 0.20, 0.085);
+
+  // 6. Chân vuốt đại bàng sắc nhọn bám đất vững chắc
+  const legs = addLegs(g, beakColor, [[0.05, 0.24], [0.05, -0.24]], 0.62, 0.085);
+  for (const z of [-0.24, 0.24]) {
+    // 3 móng vuốt trước đại bàng
+    for (const a of [-0.28, 0, 0.28]) {
+      const talon = part(new THREE.ConeGeometry(0.045, 0.20, 6), 0xffd54f, 0.24, 0.08, z + a * 0.12);
       talon.rotation.z = -Math.PI / 2;
+      talon.rotation.y = a * 0.5;
       g.add(talon);
     }
-    const spur = part(new THREE.ConeGeometry(0.04, 0.14, 6), 0xffd54f, -0.10, 0.10, z);
+    // 1 cựa sau bám đất
+    const spur = part(new THREE.ConeGeometry(0.045, 0.18, 6), 0xffd54f, -0.12, 0.10, z);
     spur.rotation.z = Math.PI / 2;
     g.add(spur);
   }
@@ -1705,23 +1808,27 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const knobColor = s.knob ?? 0x212121;
   const crownColor = s.crown ?? 0xffd700;
 
-  // 1. Sleek hydro-sculpted hull with faceted ice chest
+  // 1. Sleek hydro-sculpted hull with faceted ice chest (Thân thiên nga thanh thoát kiêu sa)
   blob(g, bodyColor, 0.70, [1.48, 0.88, 0.98], -0.05, 0.94, 0, undefined, true);
   blob(g, wingColor, 0.44, [1.10, 0.75, 0.75], 0.45, 1.05, 0, [0, 0, -0.15]);
 
-  // Elegant 4-layered upturned tail fan
-  for (let i = 0; i < 4; i++) {
-    const tFan = part(new THREE.ConeGeometry(0.14 - i * 0.02, 0.55 - i * 0.06, 6), wingColor, -0.80 - i * 0.10, 1.15 + i * 0.08, (i - 1.5) * 0.10);
-    tFan.rotation.z = -1.25;
-    g.add(tFan);
-  }
+  // Đuôi thiên nga liền khối uốn cong mềm mại (Graceful seamless upturned tail plumage)
+  // Gắn liền khít từ hông sau, vuốt nhẹ chếch lên thanh tao không hề bị đứt đoạn
+  blob(g, wingColor, 0.32, [1.70, 0.65, 0.45], -0.85, 1.18, 0, [0, 0, -0.58]);
+  blob(g, wingColor, 0.25, [1.55, 0.55, 0.35], -0.98, 1.28, 0.14, [0.12, 0, -0.65]);
+  blob(g, wingColor, 0.25, [1.55, 0.55, 0.35], -0.98, 1.28, -0.14, [-0.12, 0, -0.65]);
+  blob(g, bodyColor, 0.20, [1.35, 0.45, 0.28], -0.82, 1.12, 0.28, [0.22, 0, -0.50]);
+  blob(g, bodyColor, 0.20, [1.35, 0.45, 0.28], -0.82, 1.12, -0.28, [-0.22, 0, -0.50]);
+  const tailTip = part(new THREE.ConeGeometry(0.13, 0.52, 6), wingColor, -1.22, 1.38, 0);
+  tailTip.rotation.z = -1.15;
+  g.add(tailTip);
 
-  // 2. Majestic triple-jointed S-curved neck
+  // 2. Cổ chữ S kiêu hãnh 3 khúc uốn lượn (Majestic triple-jointed S-curved neck)
   blob(g, neckColor, 0.23, [0.85, 1.5, 0.85], 0.52, 1.30, 0, [0, 0, -0.45]);
   blob(g, neckColor, 0.20, [0.85, 1.45, 0.85], 0.62, 1.84, 0, [0, 0, 0.28]);
   g.add(part(new THREE.SphereGeometry(0.29, 18, 12), neckColor, 0.70, 2.18, 0));
 
-  // Royal 5-pointed ice crystal tiara / crown
+  // Vương miện hoàng gia 5 chóp lấp lánh (Royal 5-pointed crystal tiara / crown)
   const crownBase = part(new THREE.CylinderGeometry(0.14, 0.12, 0.06, 10), crownColor, 0.68, 2.38, 0);
   g.add(crownBase);
   for (let i = 0; i < 5; i++) {
@@ -1730,10 +1837,15 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
     g.add(spike);
   }
 
-  // Regal basal knob above bill
+  // Mấu đen gốc mỏ đặc trưng của thiên nga (Regal basal knob above bill)
   blob(g, knobColor, 0.09, [1.2, 1.0, 1.1], 0.90, 2.20, 0);
 
-  // Tapered graceful bill with black tip lining
+  // Vệt lores đen nối từ gốc mỏ đến mắt quý phái
+  for (const z of [-0.22, 0.22]) {
+    blob(g, knobColor, 0.07, [1.4, 0.7, 0.4], 0.88, 2.22, z, [0, 0, -0.15]);
+  }
+
+  // Mỏ thon nhọn quý phái với chóp đen (Tapered graceful bill with black tip lining)
   const bill = part(new THREE.ConeGeometry(0.11, 0.36, 6), billColor, 1.12, 2.08, 0);
   bill.rotation.z = -Math.PI / 2 - 0.25;
   g.add(bill);
@@ -1741,7 +1853,7 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   billTip.rotation.z = -Math.PI / 2 - 0.25;
   g.add(billTip);
 
-  // 3. Multi-tiered folded frost wings
+  // 3. Cánh thiên nga xếp nhiều tầng lông vũ vểnh nhẹ (Multi-tiered folded frost wings)
   for (const z of [-0.54, 0.54]) {
     blob(g, wingColor, 0.44, [1.55, 0.75, 0.25], -0.05, 1.08, z, [0, 0, 0.15]);
     blob(g, bodyColor, 0.28, [1.60, 0.50, 0.18], -0.45, 1.22, z * 0.95, [0, 0, 0.35]);
@@ -1752,7 +1864,8 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
     }
   }
 
-  addEyes(g, 0.82, 2.22, 0.16, 0.068);
+  // Mắt thiên nga nổi rõ trên bề mặt đầu (x=0.84, y=2.24, z=±0.25)
+  addEyes(g, 0.84, 2.24, 0.25, 0.075);
   return addLegs(g, knobColor, [[0.05, 0.24], [0.05, -0.24]], 0.48, 0.075);
 }
 
@@ -1857,59 +1970,103 @@ function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const legsColor = s.legs ?? 0x271c19;
   const plateColor = s.plate ?? 0x3e2723;
 
-  // 1. Muscular tank barrel torso with reinforced shoulders
-  blob(g, bodyColor, 0.65, [1.36, 1.18, 1.12], 0.25, 1.28, 0, undefined, true);
-  blob(g, bodyColor, 0.55, [1.28, 1.02, 0.98], -0.34, 1.16, 0);
-  blob(g, bellyColor, 0.46, [1.38, 0.68, 0.90], -0.05, 0.96, 0);
+  // 1. Thân hình dã thú cơ bắp cuồn cuộn, vai và lưng gù cao đặc trưng Heo Rừng (Razorback War Boar)
+  // Khối gù vai trước nở to, dũng mãnh (shoulder withers hump)
+  blob(g, bodyColor, 0.72, [1.42, 1.34, 1.18], 0.22, 1.36, 0, undefined, true);
+  // Khối hông sau thon gọn cơ bắp (tapered muscular hindquarters)
+  blob(g, bodyColor, 0.58, [1.25, 1.05, 0.96], -0.42, 1.22, 0);
+  // Lồng ngực vạm vỡ dũng mãnh
+  blob(g, bellyColor, 0.52, [1.32, 0.88, 0.95], 0.08, 1.05, 0);
 
-  // Spiked battle collar around neck
-  const collar = part(new THREE.TorusGeometry(0.55, 0.07, 8, 18), plateColor, 0.62, 1.34, 0);
+  // Khớp háng cơ bắp nối liền thân vào 4 chân, không có khe hở
+  for (const [hx, hz] of [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]]) {
+    const haunch = part(new THREE.SphereGeometry(0.18, 8, 8), bodyColor, hx, 1.12, hz);
+    haunch.scale.set(1.0, 1.25, 0.9);
+    g.add(haunch);
+  }
+
+  // Vòng đai chiến giáp sắt bảo vệ cổ heo rừng
+  const collar = part(new THREE.TorusGeometry(0.58, 0.075, 8, 18), plateColor, 0.62, 1.36, 0);
   collar.rotation.y = Math.PI / 2;
   g.add(collar);
   for (let i = 0; i < 6; i++) {
     const ang = (i / 6) * Math.PI * 2;
-    const spike = part(new THREE.ConeGeometry(0.045, 0.22, 5), 0xcccccc, 0.62, 1.34 + Math.sin(ang) * 0.58, Math.cos(ang) * 0.58);
+    const spike = part(new THREE.ConeGeometry(0.05, 0.24, 5), 0xcccccc, 0.62, 1.36 + Math.sin(ang) * 0.60, Math.cos(ang) * 0.60);
     spike.rotation.x = ang;
     spike.rotation.z = Math.PI / 2;
     g.add(spike);
   }
 
-  // 2. Spine bristles (8 razor dorsal crest spikes)
-  for (let i = 0; i < 8; i++) {
-    const bristle = part(new THREE.ConeGeometry(0.09, 0.38 - Math.abs(i - 3) * 0.03, 5), crestColor, -0.50 + i * 0.16, 1.68 - Math.abs(i - 3) * 0.06, 0);
-    bristle.rotation.z = -0.28;
+  // 2. Bờm lông gai nhọn xù xì dọc sống lưng (Razorback Spine Mohawk - 9 gai nhọn sắc lẹm)
+  // Trải dài từ đỉnh đầu qua gáy, dọc đỉnh sống lưng gù đến tận gốc đuôi
+  for (let i = 0; i < 9; i++) {
+    const height = 0.52 - Math.abs(i - 4) * 0.045;
+    const rad = 0.12 - Math.abs(i - 4) * 0.012;
+    const bristle = part(new THREE.ConeGeometry(rad, height, 5), crestColor, -0.55 + i * 0.17, 1.82 - Math.abs(i - 4) * 0.08, 0);
+    bristle.rotation.z = -0.32;
     g.add(bristle);
   }
 
-  // 3. Heavy armored head & snout
-  blob(g, bodyColor, 0.44, [1.22, 1.02, 0.98], 0.80, 1.36, 0);
-  const snout = part(new THREE.CylinderGeometry(0.25, 0.28, 0.42, 10), snoutColor, 1.14, 1.23, 0);
+  // 3. Đầu heo rừng hình nêm dốc nhọn hung tợn (Wedge-shaped Boar Skull)
+  blob(g, bodyColor, 0.50, [1.50, 1.10, 0.96], 0.85, 1.38, 0, [0, 0, -0.25]);
+
+  // Mõm heo rừng dài vát dốc khỏe khoắn (Long sloping snout)
+  const snout = part(new THREE.CylinderGeometry(0.24, 0.35, 0.60, 10), snoutColor, 1.28, 1.18, 0);
   snout.rotation.z = Math.PI / 2;
   g.add(snout);
 
-  const disk = part(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 12), crestColor, 1.36, 1.23, 0);
+  // Đĩa mõm sừng dày chắc (Snout disc)
+  const disk = part(new THREE.CylinderGeometry(0.27, 0.27, 0.10, 12), crestColor, 1.58, 1.18, 0);
   disk.rotation.z = Math.PI / 2;
   g.add(disk);
-
-  // 4. Wicked forward-curving giant razor tusks & secondary underfangs
-  for (const z of [-0.26, 0.26]) {
-    const tusk = part(new THREE.ConeGeometry(0.10, 0.55, 8), tuskColor, 1.18, 1.42, z);
-    tusk.rotation.x = z > 0 ? 0.38 : -0.38;
-    tusk.rotation.z = -0.48;
-    g.add(tusk);
-
-    const tusk2 = part(new THREE.ConeGeometry(0.07, 0.32, 6), tuskColor, 1.08, 1.12, z * 1.18);
-    tusk2.rotation.x = z > 0 ? 0.55 : -0.55;
-    tusk2.rotation.z = -0.15;
-    g.add(tusk2);
-
-    blob(g, crestColor, 0.17, [0.65, 1.25, 0.35], 0.68, 1.74, z, [0, z > 0 ? 0.35 : -0.35, -0.32]);
+  // Hai lỗ mũi đen rõ nét
+  for (const nz of [-0.09, 0.09]) {
+    blob(g, 0x111111, 0.055, [1, 1.4, 1], 1.63, 1.18, nz);
   }
 
-  addEyes(g, 0.98, 1.50, 0.23, 0.068);
-  const legs = addLegs(g, legsColor, [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]], 0.64, 0.13, 0x14100e);
+  // 4. Cặp răng nanh khổng lồ cong vút ngược lên trời (Massive upward-curving razor tusks)
+  // Hai nanh dưới siêu to sắc nhọn chĩa vút lên trên
+  for (const z of [-0.30, 0.30]) {
+    const tusk = part(new THREE.ConeGeometry(0.12, 0.72, 8), tuskColor, 1.36, 1.35, z);
+    tusk.rotation.x = z > 0 ? 0.38 : -0.38;
+    tusk.rotation.z = -0.85; // Cong vút lên trên cực kỳ dũng mãnh
+    g.add(tusk);
+
+    // Nanh trên khoằm khóa hàm (Upper secondary whetstone fangs)
+    const tusk2 = part(new THREE.ConeGeometry(0.08, 0.38, 6), tuskColor, 1.22, 1.12, z * 1.18);
+    tusk2.rotation.x = z > 0 ? 0.60 : -0.60;
+    tusk2.rotation.z = -0.15;
+    g.add(tusk2);
+  }
+
+  // 5. Đôi tai nhọn dựng đứng cảnh giác (Pointed alert boar ears)
+  for (const z of [-0.36, 0.36]) {
+    const ear = part(new THREE.ConeGeometry(0.12, 0.42, 6), crestColor, 0.68, 1.84, z);
+    ear.rotation.x = z > 0 ? 0.42 : -0.42;
+    ear.rotation.z = -0.35;
+    g.add(ear);
+    // Vệt lông má xù dã thú
+    blob(g, crestColor, 0.18, [0.75, 1.30, 0.38], 0.70, 1.62, z, [0, z > 0 ? 0.35 : -0.35, -0.30]);
+  }
+
+  // Gờ mày gồ hung tợn (Menacing brow ridges)
+  for (const z of [-0.28, 0.28]) {
+    blob(g, crestColor, 0.13, [1.4, 0.5, 0.7], 1.04, 1.60, z, [0, 0, -0.30]);
+  }
+  addEyes(g, 1.04, 1.50, 0.28, 0.075);
+
+  // Đuôi heo rừng nhỏ ngắn vểnh có chùm lông (Tufted Boar Tail)
+  const tailStem = part(new THREE.CylinderGeometry(0.04, 0.05, 0.38, 6), bodyColor, -0.92, 1.20, 0);
+  tailStem.rotation.z = 0.55;
+  g.add(tailStem);
+  const tailBrush = part(new THREE.ConeGeometry(0.08, 0.22, 6), crestColor, -1.08, 1.32, 0);
+  tailBrush.rotation.z = 1.6;
+  g.add(tailBrush);
+
+  // Chân heo rừng to khỏe, móng guốc đôi xẻ rãnh (Cloven Hooves)
+  const legs = addLegs(g, legsColor, [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]], 0.72, 0.14, 0x14100e);
   for (const [lx, lz] of [[0.38, 0.32], [0.38, -0.32], [-0.38, 0.30], [-0.38, -0.30]]) {
-    const cuff = part(new THREE.CylinderGeometry(0.15, 0.14, 0.18, 8), plateColor, lx, 0.28, lz);
+    const cuff = part(new THREE.CylinderGeometry(0.16, 0.15, 0.20, 8), plateColor, lx, 0.30, lz);
     g.add(cuff);
   }
   return legs;
@@ -1921,72 +2078,120 @@ function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   const maneColor = s.mane ?? 0xffd700;
   const hoofColor = s.hoof ?? 0xffd700;
   const featherTipColor = s.featherTip ?? 0xfff59d;
-  const harnessColor = s.harness ?? 0x4fc3f7;
 
-  // 1. Noble steed body with celestial breastplate
-  const bodyGeo = new THREE.CapsuleGeometry(0.42, 1.00, 8, 16);
+  // 1. Thân hình Thiên Mã Kỳ Lân uy dũng, thanh thoát (Noble celestial steed torso)
+  const bodyGeo = new THREE.CapsuleGeometry(0.38, 0.92, 8, 16);
   bodyGeo.rotateZ(Math.PI / 2);
-  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.52, 0, undefined, true);
+  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.45, 0, undefined, true);
+  bodyMesh.scale.set(1.0, 1.05, 0.92);
   g.add(bodyMesh);
 
-  // Celestial Archangel breastplate
-  const breastplate = part(new THREE.CylinderGeometry(0.44, 0.42, 0.36, 12), harnessColor, 0.48, 1.54, 0);
-  breastplate.rotation.z = Math.PI / 2;
-  g.add(breastplate);
-  const gem = part(new THREE.OctahedronGeometry(0.10), 0xffffff, 0.72, 1.54, 0);
-  g.add(gem);
-
-  // Arched neck & head
-  const neckGeo = new THREE.CapsuleGeometry(0.20, 0.68, 8, 14);
-  const neck = part(neckGeo, bodyColor, 0.84, 2.02, 0);
-  neck.rotation.z = -0.55;
-  g.add(neck);
-
-  const headGeo = new THREE.CapsuleGeometry(0.19, 0.50, 8, 14);
-  headGeo.rotateZ(Math.PI / 2);
-  const head = part(headGeo, bodyColor, 1.28, 2.42, 0);
-  head.rotation.z = -0.28;
-  g.add(head);
-
-  // Flowing mane (5 golden cascading waves)
-  for (let i = 0; i < 5; i++) {
-    blob(g, maneColor, 0.16, [1.8, 0.55, 0.35], 0.75 - i * 0.16, 2.45 - i * 0.18, 0, [0, 0, -0.50 - i * 0.08]);
+  // Khớp háng cơ bắp nối liền thân vào 4 chân, triệt tiêu hoàn toàn khe hở
+  for (const [hx, hz] of [[0.50, 0.24], [0.50, -0.24], [-0.50, 0.24], [-0.50, -0.24]]) {
+    const haunch = part(new THREE.SphereGeometry(0.16, 8, 8), bodyColor, hx, 1.28, hz);
+    haunch.scale.set(0.95, 1.35, 0.90);
+    g.add(haunch);
   }
 
-  // Spiral celestial alicorn horn
-  const horn = part(new THREE.ConeGeometry(0.09, 0.55, 8), maneColor, 1.42, 2.75, 0);
+  // Cổ ngựa thần cao vút kiêu hãnh (Arched majestic neck)
+  const neckGeo = new THREE.CapsuleGeometry(0.18, 0.62, 8, 14);
+  const neck = part(neckGeo, bodyColor, 0.78, 1.95, 0);
+  neck.rotation.z = -0.52;
+  g.add(neck);
+
+  // Đầu ngựa thần quý phái (Noble celestial head)
+  const headGeo = new THREE.CapsuleGeometry(0.16, 0.46, 8, 14);
+  headGeo.rotateZ(Math.PI / 2);
+  const head = part(headGeo, bodyColor, 1.22, 2.36, 0);
+  head.rotation.z = -0.26;
+  g.add(head);
+
+  // 2. Sừng kỳ lân xoắn ốc hoàng kim phát sáng lộng lẫy (Spiral Luminous Alicorn Horn)
+  const hornMat: Partial<THREE.MeshStandardMaterialParameters> = {
+    emissive: 0xffd700,
+    emissiveIntensity: 0.65,
+    roughness: 0.22,
+    metalness: 0.85
+  };
+  const horn = part(new THREE.ConeGeometry(0.075, 0.72, 10), maneColor, 1.46, 2.76, 0, hornMat);
   horn.rotation.z = -0.72;
   g.add(horn);
   for (let r = 0; r < 3; r++) {
-    const ring = part(new THREE.TorusGeometry(0.06 - r * 0.015, 0.02, 6, 12), 0xffffff, 1.36 + r * 0.09, 2.65 + r * 0.08, 0);
+    const ring = part(new THREE.TorusGeometry(0.055 - r * 0.012, 0.018, 6, 12), 0xffffff, 1.38 + r * 0.10, 2.64 + r * 0.09, 0, { emissive: 0xffffff, emissiveIntensity: 0.8 });
     ring.rotation.y = Math.PI / 2;
+    ring.rotation.x = -0.72;
     g.add(ring);
   }
 
-  // Flowing majestic tail (3 tiered streamers)
-  blob(g, maneColor, 0.22, [0.55, 2.4, 0.40], -0.88, 1.28, 0, [0, 0, 0.38]);
-  blob(g, featherTipColor, 0.16, [0.45, 1.9, 0.30], -0.92, 1.15, 0.12, [0.20, 0, 0.45]);
-  blob(g, featherTipColor, 0.16, [0.45, 1.9, 0.30], -0.92, 1.15, -0.12, [-0.20, 0, 0.45]);
+  // 3. Bờm suôn mượt hoàng kim quét từ trán qua đỉnh đầu phủ dọc cổ (Flowing Silken Mane & Forelock)
+  // Bờm trán vươn dài (forelock)
+  const forelock = part(new THREE.ConeGeometry(0.065, 0.30, 6), maneColor, 1.28, 2.52, 0);
+  forelock.rotation.z = -1.15;
+  g.add(forelock);
+  // Bờm đỉnh đầu giữa 2 tai
+  const pollMane = part(new THREE.CapsuleGeometry(0.06, 0.28, 4, 8), maneColor, 1.05, 2.50, 0);
+  pollMane.rotation.z = -0.35;
+  g.add(pollMane);
+  // 5 tầng bờm cổ uốn lượn như suối vàng
+  for (let i = 0; i < 5; i++) {
+    blob(g, maneColor, 0.15, [1.7, 0.52, 0.32], 0.75 - i * 0.15, 2.30 - i * 0.16, 0, [0, 0, -0.48 - i * 0.06]);
+  }
 
-  // 2. Grand 6-blade Archangel Wings with layered feathers
-  for (const z of [-0.50, 0.50]) {
+  // Đôi tai tuấn mã thanh mảnh
+  for (const z of [-0.12, 0.12]) {
+    const ear = part(new THREE.ConeGeometry(0.06, 0.22, 8), bodyColor, 1.05, 2.58, z);
+    ear.rotation.z = -0.22;
+    ear.rotation.x = z > 0 ? 0.20 : -0.20;
+    g.add(ear);
+  }
+
+  // 4. Đôi cánh thiên thần sải rộng tuyệt đẹp (Grand Archangel Wings với nhiều lớp lông vũ mềm mại)
+  for (const z of [-0.48, 0.48]) {
     const wingGroup = new THREE.Group();
-    wingGroup.position.set(0.12, 1.88, z);
-    wingGroup.rotation.y = z > 0 ? 0.25 : -0.25;
+    wingGroup.position.set(0.10, 1.82, z);
+    wingGroup.rotation.y = z > 0 ? 0.28 : -0.28;
 
-    const spar = part(new THREE.CapsuleGeometry(0.13, 1.25, 6, 10), wingColor, 0, 0.52, 0);
-    spar.rotation.z = -0.68;
+    // Xương cánh uốn cong thanh thoát
+    const spar = part(new THREE.CapsuleGeometry(0.09, 1.05, 6, 10), wingColor, 0, 0.45, 0);
+    spar.rotation.z = -0.55;
     wingGroup.add(spar);
 
-    for (let i = 0; i < 6; i++) {
-      const fTip = (i % 2 === 0) ? featherTipColor : wingColor;
-      blob(wingGroup, fTip, 0.15, [0.42, 1.95 - i * 0.10, 0.20], -0.16 - i * 0.12, 0.95 - i * 0.14, 0, [0, 0, 0.35 + i * 0.12]);
+    // Lớp lông vũ chính (Primary flight feathers dài vuốt ngược về sau)
+    for (let f = 0; f < 5; f++) {
+      const pColor = f % 2 === 0 ? wingColor : featherTipColor;
+      const fBlade = part(new THREE.ConeGeometry(0.075 - f * 0.008, 0.85 - f * 0.08, 6), pColor, -0.25 - f * 0.14, 0.75 - f * 0.10, 0);
+      fBlade.rotation.z = 1.15 + f * 0.18;
+      fBlade.rotation.y = z > 0 ? 0.15 : -0.15;
+      wingGroup.add(fBlade);
     }
+
+    // Lớp lông vũ đệm thứ cấp (Secondary covert feathers)
+    for (let sIdx = 0; sIdx < 4; sIdx++) {
+      blob(wingGroup, wingColor, 0.18, [0.45, 1.25 - sIdx * 0.10, 0.22], -0.12 - sIdx * 0.12, 0.65 - sIdx * 0.08, (z > 0 ? 0.08 : -0.08), [0, 0, 0.42 + sIdx * 0.15]);
+    }
+
+    // Ốp gốc cánh ngọc phát sáng nhẹ
+    blob(wingGroup, featherTipColor, 0.14, [1.3, 0.7, 0.35], 0.05, 0.42, 0);
+
     g.add(wingGroup);
   }
 
-  addEyes(g, 1.38, 2.48, 0.19, 0.082);
-  return addLegs(g, bodyColor, [[0.46, 0.28], [0.46, -0.28], [-0.46, 0.28], [-0.46, -0.28]], 0.92, 0.12, hoofColor);
+  // 5. Đuôi thiên mã dài thướt tha chạm đất uốn lượn (Flowing majestic celestial tail streamers)
+  blob(g, maneColor, 0.20, [0.55, 2.6, 0.36], -0.92, 1.24, 0, [0, 0, 0.42]);
+  blob(g, featherTipColor, 0.16, [0.45, 2.2, 0.30], -0.98, 1.12, 0.12, [0.18, 0, 0.48]);
+  blob(g, featherTipColor, 0.16, [0.45, 2.2, 0.30], -0.98, 1.12, -0.12, [-0.18, 0, 0.48]);
+
+  // Mắt thiên mã to tròn tinh anh
+  addEyes(g, 1.32, 2.45, 0.18, 0.082);
+
+  // 6. Chân thiên mã liền khít thân, móng vàng hoàng kim có lông phủ cổ chân (Feathered Fetlocks)
+  const legs = addLegs(g, bodyColor, [[0.50, 0.24], [0.50, -0.24], [-0.50, 0.24], [-0.50, -0.24]], 1.22, 0.11, hoofColor);
+  for (const [lx, lz] of [[0.50, 0.24], [0.50, -0.24], [-0.50, 0.24], [-0.50, -0.24]]) {
+    const fetlock = part(new THREE.SphereGeometry(0.12, 8, 8), featherTipColor, lx, 0.22, lz);
+    fetlock.scale.set(1.1, 0.7, 1.1);
+    g.add(fetlock);
+  }
+  return legs;
 }
 
 function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
@@ -2219,25 +2424,11 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       break;
     }
     case 'phoenix': {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.035, 8, 24), mat);
-      band.position.set(0.55, 1.55, 0);
-      band.rotation.y = Math.PI / 2;
-      band.rotation.x = 0.45;
-      g.add(band);
-      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), goldMat);
-      medal.position.set(0.68, 1.45, 0);
-      g.add(medal);
+      // Phượng Hoàng Lửa thần thoại không đeo vòng collar thú cưng
       break;
     }
     case 'swan': {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.034, 8, 24), mat);
-      band.position.set(0.54, 1.35, 0);
-      band.rotation.y = Math.PI / 2;
-      band.rotation.x = 0.40;
-      g.add(band);
-      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), goldMat);
-      medal.position.set(0.66, 1.25, 0);
-      g.add(medal);
+      // Thiên Nga quý phái không đeo vòng collar thú cưng (yêu cầu người dùng)
       break;
     }
     case 'ram': {
@@ -2252,25 +2443,11 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       break;
     }
     case 'boar': {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.40, 0.046, 8, 24), mat);
-      band.position.set(0.62, 1.30, 0);
-      band.rotation.y = Math.PI / 2;
-      band.rotation.x = 0.35;
-      g.add(band);
-      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
-      medal.position.set(0.78, 1.18, 0);
-      g.add(medal);
+      // Heo Rừng dũng mãnh đã có giáp cổ sắt với gai nhọn riêng, không đeo vòng collar thú cưng
       break;
     }
     case 'pegasus': {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.038, 8, 24), mat);
-      band.position.set(0.92, 2.10, 0);
-      band.rotation.y = Math.PI / 2;
-      band.rotation.x = 0.55;
-      g.add(band);
-      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), goldMat);
-      medal.position.set(1.08, 1.95, 0);
-      g.add(medal);
+      // Thiên Mã Kỳ Lân không đeo vòng collar thú cưng
       break;
     }
     case 'bull': {
@@ -4050,11 +4227,12 @@ export class AnimalRenderer {
       // Powerful sonic wave shockwave ripples when dashing or flying
       if (isDashing || isFlying) {
         vis.shockwaveTimer = (vis.shockwaveTimer || 0) + dt;
-        if (vis.shockwaveTimer >= 0.065) {
+        if (vis.shockwaveTimer >= 0.048) {
           vis.shockwaveTimer = 0;
-          const swColor = Math.random() < 0.5 ? 0x64d8cb : 0xe0f7fa;
+          const RAINBOW_SHOCK_COLORS = [0xff1744, 0xff9100, 0xffea00, 0x00e676, 0x00b0ff, 0xd500f9];
+          const swColor = RAINBOW_SHOCK_COLORS[Math.floor(Math.random() * RAINBOW_SHOCK_COLORS.length)];
           // Khi đang nhảy (Khỉ/Gorilla) không vẽ vòng sóng dưới đất mà để sóng âm bám theo thân
-          if (!isMonkeyLeap) this.spawnShockwave(x, y + 0.1, z, r * 1.15, swColor);
+          if (!isMonkeyLeap) this.spawnShockwave(x, y + 0.08, z, r * 1.55, swColor);
           this.onSonicWave?.(x, bodyY + 0.3, z, r);
         }
       }
@@ -4164,18 +4342,24 @@ export class AnimalRenderer {
       }
     }
 
-    // Ground indicator ring: Hiệu ứng vòng hào quang tụ lực dưới chân rực rỡ
+    // Ground indicator ring: Hiệu ứng vòng hào quang tụ lực dưới chân rực rỡ & rung chấn max charge
     vis.ring.position.set(x, smoothBaseY + 0.06, z);
     if (isCharging) {
       vis.ring.visible = !isWater;
-      vis.ring.scale.setScalar(r * (1.15 + lvl * 0.65));
+      const isMax = lvl >= 0.98;
+      vis.ring.scale.setScalar(r * (1.15 + lvl * (isMax ? 0.95 : 0.65) + (isMax ? Math.sin(now * 0.035) * 0.12 : 0)));
       if (isSuper) {
-        // Cycling rainbow aura
-        vis.ringMat.color.setHSL((now * 0.0015) % 1, 1.0, 0.6);
-        vis.ringMat.opacity = 0.85 + Math.sin(now / (lvl >= 1 ? 20 : 45)) * 0.15;
+        // Cycling rainbow aura - siêu tốc độ nhịp đập khi gồng MAX
+        vis.ringMat.color.setHSL((now * (isMax ? 0.005 : 0.0015)) % 1, 1.0, isMax ? 0.75 : 0.6);
+        vis.ringMat.opacity = isMax ? (0.92 + Math.sin(now / 15) * 0.08) : (0.85 + Math.sin(now / 45) * 0.15);
       } else {
-        vis.ringMat.color.set(lvl >= 1 ? 0xff1744 : 0xffea00);
-        vis.ringMat.opacity = 0.7 + Math.sin(now / (lvl >= 1 ? 25 : 55)) * 0.3;
+        vis.ringMat.color.set(isMax ? 0xff1744 : (lvl >= 0.7 ? 0xff9100 : 0xffea00));
+        vis.ringMat.opacity = isMax ? (0.88 + Math.sin(now / 18) * 0.12) : (0.7 + Math.sin(now / 55) * 0.3);
+      }
+      // Rung chấn cơ bắp linh thú khi gồng MAX
+      if (isMax) {
+        vis.body.position.x += (Math.random() - 0.5) * 0.045 * sc;
+        vis.body.position.z += (Math.random() - 0.5) * 0.045 * sc;
       }
     } else {
       vis.ring.visible = false;

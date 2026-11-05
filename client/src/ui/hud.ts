@@ -97,6 +97,12 @@ export class HudManager {
   private readonly againBtn: HTMLButtonElement;
   private readonly changeBtn: HTMLButtonElement;
 
+  private readonly lobbyLoadingBox: HTMLElement | null;
+  private readonly lobbyLoadingText: HTMLElement | null;
+  private readonly lobbyLoadingPercent: HTMLElement | null;
+  private readonly lobbyLoadingFill: HTMLElement | null;
+  private loadingFadeTimeout: any = null;
+
   private readonly choiceEl: HTMLElement | null;
   private readonly choiceLeftEl: HTMLElement | null;
   private readonly choiceCardsEl: HTMLElement | null;
@@ -296,6 +302,11 @@ export class HudManager {
     this.playBtn = document.getElementById('play') as HTMLButtonElement;
     this.againBtn = document.getElementById('again') as HTMLButtonElement;
     this.changeBtn = document.getElementById('change') as HTMLButtonElement;
+
+    this.lobbyLoadingBox = document.getElementById('lobbyLoadingBox');
+    this.lobbyLoadingText = document.getElementById('lobbyLoadingText');
+    this.lobbyLoadingPercent = document.getElementById('lobbyLoadingPercent');
+    this.lobbyLoadingFill = document.getElementById('lobbyLoadingFill');
 
     this.choiceEl = document.getElementById('choice');
     this.choiceLeftEl = document.getElementById('choiceLeft');
@@ -858,6 +869,7 @@ export class HudManager {
         }
       }
       this.previewRenderer?.stop();
+      this.setPlayLoading(true, t('enteringGame'), 35);
       this.onStartPlay(name, chosenSpecies, this.selectedMode, chosenSkin, this.currentFriendCode);
     };
 
@@ -869,13 +881,14 @@ export class HudManager {
         clearInterval(playCountdownTimer);
         playCountdownTimer = null;
       }
-      if (this.playBtn) {
+      if (this.playBtn && !this.playBtn.classList.contains('is-loading')) {
         this.playBtn.disabled = false;
         this.playBtn.innerHTML = t('play');
       }
     };
 
     const handlePlayClick = () => {
+      if (this.playBtn?.classList.contains('is-loading')) return;
       if (this.selectedMode === 'team') {
         const myTeam = this.selectedTeam;
         const otherTeam = myTeam === 0 ? 1 : 0;
@@ -1754,6 +1767,7 @@ export class HudManager {
   }
 
   showInGame(): void {
+    this.setPlayLoading(false);
     this.startScreen.hidden = true;
     this.deathScreen.hidden = true;
     if (this.disclaimerModal) this.disclaimerModal.hidden = true;
@@ -1776,6 +1790,7 @@ export class HudManager {
   }
 
   returnToLobby(): void {
+    this.setPlayLoading(false);
     if (this.deathCountdownTimer) {
       clearInterval(this.deathCountdownTimer);
       this.deathCountdownTimer = null;
@@ -1813,6 +1828,83 @@ export class HudManager {
     this.updateSpeciesUI?.();
     this.updateCarousel();
     requestAnimationFrame(() => this.updateCarousel());
+  }
+
+  public setPlayLoading(loading: boolean, text?: string, progress?: number): void {
+    if (this.playBtn) {
+      if (loading) {
+        this.playBtn.classList.add('is-loading');
+        this.playBtn.disabled = true;
+        this.playBtn.innerHTML = `<span class="play-spinner"></span><span>${text || t('enteringGame')}</span>`;
+      } else {
+        this.playBtn.classList.remove('is-loading');
+        this.playBtn.disabled = false;
+        this.playBtn.innerHTML = t('play');
+      }
+    }
+
+    if (this.lobbyLoadingBox) {
+      if (loading) {
+        if (this.loadingFadeTimeout) {
+          clearTimeout(this.loadingFadeTimeout);
+          this.loadingFadeTimeout = null;
+        }
+        this.lobbyLoadingBox.hidden = false;
+        this.lobbyLoadingBox.classList.remove('is-success', 'is-error');
+        if (text && this.lobbyLoadingText) {
+          this.lobbyLoadingText.textContent = text;
+        }
+        const pct = Math.min(100, Math.max(0, progress ?? 50));
+        if (this.lobbyLoadingPercent) {
+          this.lobbyLoadingPercent.textContent = `${Math.round(pct)}%`;
+        }
+        if (this.lobbyLoadingFill) {
+          this.lobbyLoadingFill.style.width = `${pct}%`;
+        }
+      } else {
+        if (progress === 100) {
+          if (this.lobbyLoadingPercent) this.lobbyLoadingPercent.textContent = '100%';
+          if (this.lobbyLoadingFill) this.lobbyLoadingFill.style.width = '100%';
+          this.lobbyLoadingBox.classList.add('is-success');
+        }
+        this.loadingFadeTimeout = setTimeout(() => {
+          if (this.lobbyLoadingBox) this.lobbyLoadingBox.hidden = true;
+        }, progress === 100 ? 500 : 200);
+      }
+    }
+  }
+
+  public setConnectionStatus(status: 'connecting' | 'open' | 'reconnected' | 'closed' | 'error'): void {
+    if (!this.lobbyLoadingBox) return;
+    if (this.loadingFadeTimeout) {
+      clearTimeout(this.loadingFadeTimeout);
+      this.loadingFadeTimeout = null;
+    }
+
+    if (status === 'connecting') {
+      this.lobbyLoadingBox.hidden = false;
+      this.lobbyLoadingBox.classList.remove('is-success', 'is-error');
+      if (this.lobbyLoadingText) this.lobbyLoadingText.textContent = t('connectingServer');
+      if (this.lobbyLoadingPercent) this.lobbyLoadingPercent.textContent = '40%';
+      if (this.lobbyLoadingFill) this.lobbyLoadingFill.style.width = '40%';
+    } else if (status === 'open' || status === 'reconnected') {
+      this.lobbyLoadingBox.hidden = false;
+      this.lobbyLoadingBox.classList.remove('is-error');
+      this.lobbyLoadingBox.classList.add('is-success');
+      if (this.lobbyLoadingText) this.lobbyLoadingText.textContent = t('serverConnected');
+      if (this.lobbyLoadingPercent) this.lobbyLoadingPercent.textContent = '100%';
+      if (this.lobbyLoadingFill) this.lobbyLoadingFill.style.width = '100%';
+      this.loadingFadeTimeout = setTimeout(() => {
+        if (this.lobbyLoadingBox) this.lobbyLoadingBox.hidden = true;
+      }, 1200);
+    } else if (status === 'closed' || status === 'error') {
+      this.lobbyLoadingBox.hidden = false;
+      this.lobbyLoadingBox.classList.remove('is-success');
+      this.lobbyLoadingBox.classList.add('is-error');
+      if (this.lobbyLoadingText) this.lobbyLoadingText.textContent = t('connectionError');
+      if (this.lobbyLoadingPercent) this.lobbyLoadingPercent.textContent = '!';
+      if (this.lobbyLoadingFill) this.lobbyLoadingFill.style.width = '100%';
+    }
   }
 
   showDeath(ev: Extract<GameEvent, { k: 'die' }>, killerName?: string): void {

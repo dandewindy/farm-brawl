@@ -10,6 +10,7 @@ let ambBus: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
 let held = false; // paused on purpose (offline / hidden tab)
 let chargeNode: { o: OscillatorNode; g: GainNode; f: BiquadFilterNode } | null = null;
+let chargeMaxNode: { o: OscillatorNode; lfo: OscillatorNode; g: GainNode } | null = null;
 let ambienceTimer: number | null = null;
 
 export type AudioMode = 0 | 1 | 2; // 0: All On, 1: SFX Only (BGM Off), 2: All Muted
@@ -296,26 +297,59 @@ export function sfxWolfBite(vol = 1, rainbow = false): void {
   }
 }
 
-export function sfxEvolveFanfare(_species: Species, vol = 1): void {
-  if (!ready() || vol < 0.03) return;
-  // Grand mythical brass fanfare on evolution
-  tone('triangle', 330, 440, 0.22, 0.50 * vol, { attack: 0.02 });
-  tone('sawtooth', 440, 660, 0.35, 0.45 * vol, { delay: 0.10, attack: 0.03 });
-  tone('triangle', 660, 880, 0.55, 0.60 * vol, { delay: 0.22, attack: 0.04 });
-  tone('sine', 110, 55, 0.70, 0.70 * vol, { delay: 0.22, attack: 0.05 });
-  noise('bandpass', 1200, 400, 2.5, 0.45, 0.30 * vol, { delay: 0.22, attack: 0.02 });
+export function playSpeciesCry(species: Species, vol = 1): void {
+  switch (species) {
+    case 'phoenix': sfxPhoenixCry(vol); break;
+    case 'swan': sfxSwanCall(vol); break;
+    case 'boar': sfxBoarGrunt(vol); break;
+    case 'pegasus': sfxPegasusNeigh(vol); break;
+    case 'ram': sfxRamBash(vol); break;
+    case 'bull': sfxBullRoar(vol); break;
+    case 'gorilla': sfxGorillaRoar(vol); break;
+    case 'mammoth': sfxMammothRoar(vol); break;
+    case 'wolf': sfxWolfHowl(vol); break;
+    default: yelp(species, vol); break;
+  }
 }
 
-export function sfxRainbowSuperSkill(_species: Species, vol = 1): void {
+export function sfxEvolveFanfare(species: Species, vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Shimmering celestial harmonic chord + explosive sub-bass
-  tone('sawtooth', 523.25, 1046.5, 0.45, 0.45 * vol, { attack: 0.01 });
-  tone('triangle', 659.25, 1318.5, 0.48, 0.40 * vol, { delay: 0.04, attack: 0.01 });
-  tone('sine', 783.99, 1567.98, 0.52, 0.38 * vol, { delay: 0.08, attack: 0.01 });
-  tone('sawtooth', 1046.5, 2093.0, 0.58, 0.35 * vol, { delay: 0.12, attack: 0.02 });
-  // Deep ground-shaking impact
-  tone('sine', 85, 28, 0.95, 0.85 * vol, { delay: 0.05, attack: 0.02 });
-  noise('bandpass', 2400, 800, 2.0, 0.60, 0.45 * vol, { delay: 0.05, attack: 0.02 });
+  // Grand mythical brass fanfare on evolution (Hợp âm C Major 9th khải hoàn hoàng kim)
+  const notes = [261.63, 329.63, 392.00, 493.88, 587.33, 783.99];
+  notes.forEach((freq, idx) => {
+    tone('triangle', freq, freq * 1.01, 0.45 + idx * 0.04, 0.28 * vol, { delay: idx * 0.045, attack: 0.02 });
+  });
+  tone('sine', 110, 55, 0.85, 0.75 * vol, { delay: 0.18, attack: 0.04 });
+  noise('bandpass', 1400, 400, 2.5, 0.60, 0.35 * vol, { delay: 0.20, attack: 0.02 });
+
+  // Tiếng kêu / tiếng gầm đặc trưng uy phong riêng của linh thú
+  playSpeciesCry(species, 1.15 * vol);
+}
+
+export function sfxRainbowSuperSkill(species: Species, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // 1. Shimmering celestial rainbow scale arpeggio (7-color rainbow frequencies)
+  const rainbowNotes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1318.51];
+  rainbowNotes.forEach((freq, i) => {
+    tone('triangle', freq, freq * 1.25, 0.28, 0.24 * vol, { delay: i * 0.024, attack: 0.008 });
+  });
+  // 2. Deep ground-shaking supersonic shockwave & sub-bass boom
+  tone('sine', 95, 26, 0.95, 0.90 * vol, { delay: 0.04, attack: 0.01 });
+  noise('bandpass', 2800, 600, 2.2, 0.65, 0.50 * vol, { delay: 0.04, attack: 0.01 });
+
+  // 3. Tiếng thét xung trận dũng mãnh vang dội của chính linh thú
+  playSpeciesCry(species, 1.25 * vol);
+}
+
+function stopChargeMax(): void {
+  if (!chargeMaxNode || !ctx) return;
+  const { o, lfo, g } = chargeMaxNode;
+  chargeMaxNode = null;
+  try {
+    g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03);
+    o.stop(ctx.currentTime + 0.08);
+    lfo.stop(ctx.currentTime + 0.08);
+  } catch (_) {}
 }
 
 // Rising whine while a charged ram is winding up; level 0..1
@@ -342,14 +376,46 @@ export function chargeUpdate(level: number): void {
   chargeNode.o.frequency.setTargetAtTime(110 + 330 * level, t, 0.05);
   chargeNode.f.frequency.setTargetAtTime(600 + 2200 * level, t, 0.05);
   chargeNode.g.gain.setTargetAtTime(0.05 + 0.1 * level, t, 0.04);
+
+  // Khi gồng max (level >= 0.98): kích hoạt thêm xung dao động tần số cao nén năng lượng (high-frequency energetic hum)
+  if (level >= 0.98 && !chargeMaxNode) {
+    const o2 = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoG = ctx.createGain();
+    const g2 = ctx.createGain();
+
+    o2.type = 'sine';
+    o2.frequency.setValueAtTime(680, t);
+
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(18, t);
+    lfoG.gain.setValueAtTime(45, t);
+
+    g2.gain.setValueAtTime(0.001, t);
+    g2.gain.linearRampToValueAtTime(0.14, t + 0.05);
+
+    lfo.connect(lfoG);
+    lfoG.connect(o2.frequency);
+    o2.connect(g2);
+    g2.connect(sfxBus!);
+
+    o2.start();
+    lfo.start();
+    chargeMaxNode = { o: o2, lfo, g: g2 };
+  } else if (level < 0.98 && chargeMaxNode) {
+    stopChargeMax();
+  }
 }
 
 export function chargeStop(): void {
+  stopChargeMax();
   if (!chargeNode || !ctx) return;
   const { o, g } = chargeNode;
   chargeNode = null;
-  g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03);
-  o.stop(ctx.currentTime + 0.2);
+  try {
+    g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03);
+    o.stop(ctx.currentTime + 0.2);
+  } catch (_) {}
 }
 
 export function zap(vol = 1): void {
