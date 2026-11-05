@@ -207,6 +207,18 @@ export type ServerMsg =
   | { t: 'match_duration'; duration: number }
   | Snapshot;
 
+export type AdminAction =
+  | { act: 'mass'; val: number }
+  | { act: 'species'; val: Species }
+  | { act: 'spawn'; item: string; count: number }
+  | { act: 'god'; val: boolean }
+  | { act: 'rainbow'; val: boolean }
+  | { act: 'speed'; val: number }
+  | { act: 'till' }
+  | { act: 'clear_bots' }
+  | { act: 'clear_food' }
+  | { act: 'add_bots'; count: number };
+
 export type ClientMsg =
   | { t: 'join'; name: string; species: Species; skin?: number; team?: number; token?: string; matchDuration?: number; theme?: string }
   | { t: 'leave' }
@@ -214,4 +226,5 @@ export type ClientMsg =
   | { t: 'rule'; id: string }
   | { t: 'team_select'; team: number }
   | { t: 'set_match_duration'; duration: number }
+  | { t: 'admin'; cmd: AdminAction }
   | ({ t: 'input' } & Input);

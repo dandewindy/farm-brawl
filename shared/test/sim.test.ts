@@ -3331,6 +3331,80 @@ describe('fruit trees', () => {
       }
     });
   });
+
+  describe('admin sandbox commands', () => {
+    it('only allows player named Admin9112267 to execute commands', () => {
+      const w = new World();
+      const normalId = w.addPlayer('NormalPlayer', 'pig', false);
+      const adminId = w.addPlayer('Admin9112267', 'pig', false);
+
+      const normalP = w.players.get(normalId)!;
+      const adminP = w.players.get(adminId)!;
+
+      // Normal player cannot execute admin command
+      const initialMass = normalP.mass;
+      w.executeAdminCommand(normalId, { act: 'mass', val: 5000 });
+      expect(normalP.mass).toBe(initialMass); // Unchanged
+
+      // Admin player can execute
+      w.executeAdminCommand(adminId, { act: 'mass', val: 3500 });
+      expect(adminP.mass).toBe(3500);
+      expect(adminP.species).toBe('boar'); // Auto evolved!
+    });
+
+    it('switches species and evolves appropriately', () => {
+      const w = new World();
+      const adminId = w.addPlayer('Admin9112267', 'chicken', false);
+      const adminP = w.players.get(adminId)!;
+
+      // At low mass, morphs to base species
+      w.executeAdminCommand(adminId, { act: 'species', val: 'duck' });
+      expect(adminP.species).toBe('duck');
+
+      // Set mass >= 3000kg -> evolves to swan
+      w.executeAdminCommand(adminId, { act: 'mass', val: 3200 });
+      expect(adminP.species).toBe('swan');
+
+      // Change species while >= 3000kg -> directly becomes evolved beast
+      w.executeAdminCommand(adminId, { act: 'species', val: 'horse' });
+      expect(adminP.species).toBe('pegasus');
+    });
+
+    it('supports god mode and perma rainbow', () => {
+      const w = new World();
+      const adminId = w.addPlayer('Admin9112267', 'pig', false);
+      const adminP = w.players.get(adminId)!;
+
+      w.executeAdminCommand(adminId, { act: 'god', val: true });
+      expect(adminP.adminGod).toBe(true);
+
+      // In god mode, cannot be killed
+      (w as any).kill(adminP, 'fence');
+      expect(adminP.alive).toBe(true);
+
+      w.executeAdminCommand(adminId, { act: 'rainbow', val: true });
+      expect(adminP.adminPermaRainbow).toBe(true);
+      expect(adminP.superT).toBeGreaterThan(0);
+    });
+
+    it('spawns items, clears bots and food', () => {
+      const w = new World();
+      const adminId = w.addPlayer('Admin9112267', 'pig', false);
+
+      const foodCountBefore = w.food.size;
+      w.executeAdminCommand(adminId, { act: 'spawn', item: 'rainbow_candy', count: 5 });
+      expect(w.food.size).toBe(foodCountBefore + 5);
+
+      w.executeAdminCommand(adminId, { act: 'clear_food' });
+      expect(w.food.size).toBe(0);
+      expect(w.tools.size).toBe(0);
+
+      w.executeAdminCommand(adminId, { act: 'clear_bots' });
+      for (const p of w.players.values()) {
+        expect(p.bot).toBe(false);
+      }
+    });
+  });
 });
 
 

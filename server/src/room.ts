@@ -623,6 +623,11 @@ export class GameRoom extends DurableObject {
       if (playerId) {
         this.world.chooseRule(playerId, msg.id);
       }
+    } else if (msg.t === 'admin') {
+      const playerId = this.sockets.get(ws);
+      if (playerId) {
+        this.world.executeAdminCommand(playerId, msg.cmd);
+      }
     }
   }
 

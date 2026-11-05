@@ -11,7 +11,7 @@ import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
-  FLAG, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type MinionWire, type PlayerMeta,
+  FLAG, type AdminAction, type DeathCause, type FoodWire, type GameEvent, type Input, type LeaderRow, type MinionWire, type PlayerMeta,
   type PlayerWire, type ServerMsg, type Snapshot, type ToolKind, type TreeSyncWire,
 } from '../protocol';
 
@@ -22,6 +22,9 @@ export interface Player extends Body {
   skin: number;
   bot: boolean;
   alive: boolean;
+  adminGod?: boolean;
+  adminPermaRainbow?: boolean;
+  adminSpeedMult?: number;
   input: Input;
   /** a press seen since the last tick (so taps shorter than a tick still count) */
   btnLatch: boolean;
@@ -732,6 +735,15 @@ export class World {
         continue;
       }
       if (p.ai && p.bot) thinkBot(this, p, DT);
+      if (p.adminGod) {
+        p.stunT = 0;
+        p.slowT = 0;
+        p.squishT = 0;
+        p.inWaterT = 0;
+      }
+      if (p.adminPermaRainbow) {
+        p.superT = 10;
+      }
       this.handleButton(p);
     }
 
@@ -794,7 +806,8 @@ export class World {
           const speedBoost = p.speedT > 5 ? 3.0 : (p.speedT > 0 ? (1.0 + (p.speedT / 5.0) * 2.0) : 1.0);
           const slowMult = (p.slowT > 0 && !isShielded) ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
           const effectiveTerrain = isShielded ? 0 : p.terrain;
-          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost;
+          const adminSpeedMult = (p.adminSpeedMult && p.adminSpeedMult > 1) ? p.adminSpeedMult : 1.0;
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost * adminSpeedMult;
           stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult);
         }
         if (!isLeaping) {
@@ -3659,7 +3672,9 @@ export class World {
 
       const ma = att.mass, mv = vic.mass * TRAITS[vic.species].weight;
       let loss = 0;
-      if (att.hasDynamite) {
+      if (vic.adminGod) {
+        // God mode: immune to damage
+      } else if (att.hasDynamite) {
         att.hasDynamite = false;
         const boomX = r2((att.x + vic.x) / 2);
         const boomZ = r2((att.z + vic.z) / 2);
@@ -3881,8 +3896,10 @@ export class World {
         s: Math.round(k),
         loss: 0,
       });
-      this.kill(vic, 'crush');
-      return;
+      if (!vic.adminGod) {
+        this.kill(vic, 'crush');
+        return;
+      }
     }
 
     if (isDynamite) {
@@ -3890,6 +3907,10 @@ export class World {
       vic.lastHitT = this.time;
       att.lastAttackedId = vic.id;
       att.lastAttackedT = this.time;
+      if (vic.adminGod) {
+        // God mode: immune to dynamite damage
+        return;
+      }
       // Animals under 100kg immediately explode and die
       if (vic.mass < 100) {
         this.kill(vic, 'dynamite');
@@ -3918,7 +3939,7 @@ export class World {
       return;
     }
 
-    let loss = Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
+    let loss = vic.adminGod ? 0 : Math.min(vic.mass - CFG.MIN_MASS, vic.mass * CFG.HIT_LOSS * att.power * clamp(ma / mv, 0.5, 1.5));
     // Pitchfork (10s duration, max 3 hits: hit 1 = 30%, hit 2 = 20%, hit 3 = 10%)
     if (att.pitchforkT > 0 && (att.pitchforkHits ?? 3) > 0) {
       const hitsLeft = att.pitchforkHits ?? 3;
@@ -3956,6 +3977,7 @@ export class World {
   }
 
   private kill(p: Player, cause: DeathCause): void {
+    if (p.adminGod) return;
     if (p.hasHeart) {
       p.hasHeart = false;
       p.heartReviving = true;
@@ -4712,6 +4734,107 @@ export class World {
       tools: [...this.tools.values()].map((t) => [t.id, t.kind, t.x, t.z]),
       transition: true,
     });
+  }
+
+  public executeAdminCommand(playerId: number, cmd: AdminAction): void {
+    const p = this.players.get(playerId);
+    if (!p || !p.alive) return;
+    if (p.name !== 'Admin9112267') return;
+
+    switch (cmd.act) {
+      case 'mass': {
+        const num = Number(cmd.val);
+        if (!Number.isFinite(num)) return;
+        p.mass = Math.max(50, Math.min(50000, Math.floor(num)));
+        if (p.mass >= 3000 && EVOLVED_PAIRS[p.species]) {
+          p.species = EVOLVED_PAIRS[p.species]!;
+          this.events.push({ k: 'morph', id: p.id, species: p.species, dur: 0.8 });
+        } else if (p.mass < 1000 && DEVOLVED_PAIRS[p.species]) {
+          p.species = DEVOLVED_PAIRS[p.species]!;
+          this.events.push({ k: 'morph', id: p.id, species: p.species, dur: 0.8 });
+        }
+        this.events.push({ k: 'superFood', x: r2(p.x), z: r2(p.z) });
+        break;
+      }
+      case 'species': {
+        const validSpecies: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey'];
+        if (validSpecies.includes(cmd.val)) {
+          let targetSpecies = cmd.val;
+          if (p.mass >= 3000 && EVOLVED_PAIRS[targetSpecies]) {
+            targetSpecies = EVOLVED_PAIRS[targetSpecies]!;
+          }
+          p.species = targetSpecies;
+          this.events.push({ k: 'morph', id: p.id, species: p.species, dur: 0.8 });
+        }
+        break;
+      }
+      case 'spawn': {
+        const count = Math.max(1, Math.min(30, Math.floor(Number(cmd.count) || 1)));
+        for (let i = 0; i < count; i++) {
+          const a = (Math.PI * 2 * i) / count + (this.rnd() - 0.5) * 0.4;
+          const d = 2.5 + this.rnd() * 3.5;
+          let [fx, fz] = [p.x + Math.cos(a) * d, p.z + Math.sin(a) * d];
+          [fx, fz] = this.pushOutsideObstacles(fx, fz, 1.4);
+
+          if (cmd.item === 'rainbow_candy') {
+            this.addFood(fx, fz, 6, 3);
+            this.events.push({ k: 'superFood', x: r2(fx), z: r2(fz) });
+          } else if (cmd.item === 'apple') {
+            this.addFood(fx, fz, 1, FOOD_KG[1]);
+          } else if (cmd.item === 'carrot') {
+            this.addFood(fx, fz, 3, FOOD_KG[3]);
+          } else if (cmd.item === 'corn') {
+            this.addFood(fx, fz, 0, FOOD_KG[0]);
+          } else if (cmd.item === 'pumpkin') {
+            this.addFood(fx, fz, 4, FOOD_KG[4]);
+          } else if (cmd.item === 'watermelon') {
+            this.addFood(fx, fz, 7, FOOD_KG[7]);
+          } else if (['pitchfork', 'dynamite', 'wheel', 'star', 'banana', 'speed', 'shield', 'heart', 'song'].includes(cmd.item)) {
+            const id = this.nextTool++;
+            this.tools.set(id, { id, kind: cmd.item as ToolKind, x: r2(fx), z: r2(fz), age: 0 });
+          }
+        }
+        break;
+      }
+      case 'god': {
+        p.adminGod = Boolean(cmd.val);
+        break;
+      }
+      case 'rainbow': {
+        p.adminPermaRainbow = Boolean(cmd.val);
+        if (p.adminPermaRainbow) p.superT = 10;
+        else p.superT = 0;
+        break;
+      }
+      case 'speed': {
+        p.adminSpeedMult = Math.max(1, Math.min(3, Number(cmd.val) || 1));
+        break;
+      }
+      case 'till': {
+        this.applyRule('till');
+        break;
+      }
+      case 'clear_bots': {
+        for (const [id, pl] of this.players.entries()) {
+          if (pl.bot) this.removePlayer(id);
+        }
+        break;
+      }
+      case 'clear_food': {
+        this.food.clear();
+        this.tools.clear();
+        break;
+      }
+      case 'add_bots': {
+        const count = Math.max(1, Math.min(10, Math.floor(Number(cmd.count) || 5)));
+        const speciesList: Species[] = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey'];
+        for (let i = 0; i < count; i++) {
+          const sp = speciesList[Math.floor(this.rnd() * speciesList.length)];
+          this.addPlayer('Bot_' + Math.floor(100 + this.rnd() * 900), sp, true);
+        }
+        break;
+      }
+    }
   }
 
   /** call once per tick after every recipient got its snapshot */

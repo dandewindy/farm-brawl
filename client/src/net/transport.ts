@@ -93,6 +93,8 @@ export class LocalServer implements Transport {
       this.world.setInput(this.myId, m);
     } else if (m.t === 'rule') {
       this.world.chooseRule(this.myId, m.id);
+    } else if (m.t === 'admin') {
+      this.world.executeAdminCommand(this.myId, m.cmd);
     }
   }
 

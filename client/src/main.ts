@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { CFG, radiusOf, type Species } from '@shared/constants';
+import { CFG, radiusOf, isEvolvedSpecies, type Species } from '@shared/constants';
 import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite,
   sfxPhoenixCry, sfxSwanCall, sfxRamBash, sfxBoarGrunt, sfxPegasusNeigh, sfxBullRoar,
-  sfxEvolveFanfare, sfxRainbowSuperSkill,
+  sfxEvolveFanfare, sfxRainbowSuperSkill, sfxMaxChargeReady,
   sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
@@ -32,10 +32,12 @@ import { HudManager } from './ui/hud';
 import { getArenaTheme, onThemeChange } from './theme';
 import { KidsPlayManager } from './features/kidsMode';
 import { KidsUiController } from './ui/kidsUi';
+import { AdminPanel } from './ui/admin';
 import { voiceAnnouncer } from './audio/voiceAnnouncer';
 
 // Initialize Kids UI Controller & Voice Announcer (Decoupled)
 KidsUiController.init();
+let adminPanel: AdminPanel | null = null;
 voiceAnnouncer.init();
 
 // Apply translations to static HTML tags
@@ -101,6 +103,7 @@ let localStunTimer = 0;
 let lockedAimA = 0;
 let wasStunnedLastFrame = false;
 let wasInWater = false;
+let wasMaxCharged = false;
 let lastUnder20Toast = 0;
 
 const predictor = new ClientPredictor();
@@ -365,8 +368,13 @@ input.onReleaseRam = (held: number) => {
 
   if (canDash) {
     predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
-    if (isSuper) {
-      sfxRainbowSuperSkill(myMeta.species, 1.0);
+    const isEvolved = isEvolvedSpecies(myMeta.species) || curMass >= 3000;
+    if (isSuper || isEvolved) {
+      sfxRainbowSuperSkill(myMeta.species, 1.15);
+      shake = Math.max(shake, 1.25);
+      const shockColor = isSuper ? 0xffea00 : (myMeta.species === 'phoenix' ? 0xff3d00 : (myMeta.species === 'swan' ? 0x00e5ff : (myMeta.species === 'pegasus' ? 0xffd700 : (myMeta.species === 'boar' ? 0xd84315 : 0x76ff03))));
+      animals.spawnShockwave(curX, 0.08, curZ, Math.max(3.6, radiusOf(curMass) * 1.5), shockColor);
+      foodParts.burst(curX, 1.2, curZ, shockColor, 28, 12, 12, 1.1);
     } else {
       sfxDash(1);
     }
@@ -565,6 +573,9 @@ hud.onExitLobby = () => {
   tools.clear();
   corpses.clear();
   gameState.food.clear();
+  if (adminPanel) {
+    adminPanel.hide();
+  }
   hud.returnToLobby();
   hud.showToast(t('exitLobbyToast'));
 };
@@ -1469,6 +1480,14 @@ const gameState = new GameState({
     input.cancelRam();
     hud.isPlayerAlive = true;
     hud.showInGame();
+    if (hud.getPlayerName() === 'Admin9112267') {
+      if (!adminPanel) {
+        adminPanel = new AdminPanel(() => transport, isTouchDevice);
+      }
+      adminPanel.show();
+    } else if (adminPanel) {
+      adminPanel.hide();
+    }
     if (!gameState.metas.has(gameState.myId)) {
       gameState.metas.set(gameState.myId, {
         id: gameState.myId,
@@ -1563,8 +1582,10 @@ const gameState = new GameState({
         const isSuper = (flags & FLAG.SUPER) !== 0;
         const isDashing = (flags & 1) !== 0;
         if (isDashing && !wasDashing) {
-          if (isSuper) {
-            sfxRainbowSuperSkill(gameState.metas.get(gameState.myId)?.species ?? 'pig', 1.0);
+          const mySpecies = gameState.metas.get(gameState.myId)?.species ?? 'pig';
+          const isEvolved = isEvolvedSpecies(mySpecies) || mass >= 3000;
+          if (isSuper || isEvolved) {
+            sfxRainbowSuperSkill(mySpecies, 1.15);
           } else {
             sfxDash(1);
           }
@@ -3194,9 +3215,26 @@ function animate(now: number): void {
     const isCharging = !isStunned && !inWater && canCharge && held >= CFG.CHARGE_MIN;
     const chargeLevel = isCharging ? Math.min(1, Math.max(0, (held - CFG.CHARGE_MIN) / (CFG.CHARGE_MAX - CFG.CHARGE_MIN))) : 0;
     hud.updateRamMeter(gameState.me.cd, isCharging, chargeLevel, canCharge);
+    const isEvolved = myMeta ? (isEvolvedSpecies(myMeta.species) || myMass >= 3000) : false;
     if (isCharging) {
       chargeUpdate(chargeLevel);
+      if (chargeLevel >= 0.95) {
+        if (!wasMaxCharged) {
+          wasMaxCharged = true;
+          sfxMaxChargeReady(myMeta?.species ?? 'pig', 1.0);
+          shake = Math.max(shake, isEvolved ? 0.65 : 0.35);
+          if (isEvolved) {
+            const curX = predictor.on ? predictor.x : (gameState.ents.get(gameState.myId)?.x ?? 0);
+            const curZ = predictor.on ? predictor.z : (gameState.ents.get(gameState.myId)?.z ?? 0);
+            animals.spawnShockwave(curX, 0.06, curZ, radiusOf(myMass) * 1.4, 0xffd700);
+            foodParts.burst(curX, 0.8, curZ, 0xffea00, 18, 8, 8, 0.9);
+          }
+        }
+      } else {
+        wasMaxCharged = false;
+      }
     } else {
+      wasMaxCharged = false;
       chargeStop();
     }
 

@@ -314,31 +314,54 @@ export function playSpeciesCry(species: Species, vol = 1): void {
 
 export function sfxEvolveFanfare(species: Species, vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Grand mythical brass fanfare on evolution (Hợp âm C Major 9th khải hoàn hoàng kim)
-  const notes = [261.63, 329.63, 392.00, 493.88, 587.33, 783.99];
-  notes.forEach((freq, idx) => {
-    tone('triangle', freq, freq * 1.01, 0.45 + idx * 0.04, 0.28 * vol, { delay: idx * 0.045, attack: 0.02 });
+  // 1. Tầng âm 1: Hợp âm Đồng thau Thần thoại Hoàng kim C Major Khải Hoàn (Majestic Celestial Brass Fanfare)
+  // C4, E4, G4, C5, E5, G5, B5, C6 vút cao vang dội
+  const brassNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 987.77, 1046.50];
+  brassNotes.forEach((freq, idx) => {
+    // Sawtooth kết hợp lowpass tạo chất âm kèn đồng hoành tráng
+    tone('sawtooth', freq, freq * 1.005, 1.25 + idx * 0.05, 0.35 * vol, { delay: idx * 0.055, attack: 0.02 });
+    tone('triangle', freq, freq, 1.40 + idx * 0.05, 0.25 * vol, { delay: idx * 0.055, attack: 0.01 });
   });
-  tone('sine', 110, 55, 0.85, 0.75 * vol, { delay: 0.18, attack: 0.04 });
-  noise('bandpass', 1400, 400, 2.5, 0.60, 0.35 * vol, { delay: 0.20, attack: 0.02 });
 
-  // Tiếng kêu / tiếng gầm đặc trưng uy phong riêng của linh thú
-  playSpeciesCry(species, 1.15 * vol);
+  // 2. Tầng âm 2: Sóng chấn động Sub-bass cực sâu làm rung chuyển mặt đất (Deep Sub-bass Ground Rupture)
+  tone('sine', 130, 32, 1.5, 0.95 * vol, { delay: 0.02, attack: 0.005 });
+  noise('bandpass', 1800, 350, 2.5, 0.85, 0.65 * vol, { delay: 0.05, attack: 0.01 });
+
+  // 3. Tầng âm 3: Tiếng chuông pha lê thiên hà lấp lánh (Shimmering Celestial Crystal Harp)
+  const crystalChimes = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02];
+  crystalChimes.forEach((f, i) => {
+    tone('sine', f, f * 1.02, 0.8, 0.22 * vol, { delay: 0.25 + i * 0.06, attack: 0.005 });
+  });
+
+  // 4. Tầng âm 4: Tiếng gầm / Tiếng hót uy linh dũng mãnh vang dội của thần thú
+  playSpeciesCry(species, 1.45 * vol);
 }
 
 export function sfxRainbowSuperSkill(species: Species, vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // 1. Shimmering celestial rainbow scale arpeggio (7-color rainbow frequencies)
-  const rainbowNotes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1318.51];
+  // 1. Shimmering celestial rainbow scale arpeggio (7 sắc cầu vồng tần số ma thuật rực rỡ)
+  const rainbowNotes = [523.25, 659.25, 783.99, 987.77, 1046.50, 1318.51, 1567.98];
   rainbowNotes.forEach((freq, i) => {
-    tone('triangle', freq, freq * 1.25, 0.28, 0.24 * vol, { delay: i * 0.024, attack: 0.008 });
+    tone('triangle', freq, freq * 1.35, 0.45, 0.35 * vol, { delay: i * 0.022, attack: 0.005 });
+    tone('sine', freq * 1.5, freq * 1.8, 0.35, 0.20 * vol, { delay: i * 0.022, attack: 0.005 });
   });
-  // 2. Deep ground-shaking supersonic shockwave & sub-bass boom
-  tone('sine', 95, 26, 0.95, 0.90 * vol, { delay: 0.04, attack: 0.01 });
-  noise('bandpass', 2800, 600, 2.2, 0.65, 0.50 * vol, { delay: 0.04, attack: 0.01 });
 
-  // 3. Tiếng thét xung trận dũng mãnh vang dội của chính linh thú
-  playSpeciesCry(species, 1.25 * vol);
+  // 2. Supersonic Sonic-Boom: Luồng xung kích xé gió siêu thanh uy lực
+  tone('sine', 140, 28, 1.1, 1.0 * vol, { delay: 0.01, attack: 0.005 });
+  noise('bandpass', 3200, 500, 2.0, 0.75, 0.65 * vol, { delay: 0.02, attack: 0.008 });
+
+  // 3. Tiếng xung trận rền vang sấm sét của thần thú
+  playSpeciesCry(species, 1.35 * vol);
+}
+
+export function sfxMaxChargeReady(species: Species, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Xung âm năng lượng cực đại khi nén gồng max (Energy Overload Shockwave Pulse)
+  tone('triangle', 440, 880, 0.35, 0.45 * vol, { attack: 0.005 });
+  tone('sine', 160, 40, 0.65, 0.75 * vol, { attack: 0.005 });
+  tone('sawtooth', 880, 1760, 0.25, 0.25 * vol, { attack: 0.01 });
+  noise('highpass', 2400, 1200, 1.5, 0.30, 0.35 * vol, { attack: 0.005 });
+  playSpeciesCry(species, 0.45 * vol);
 }
 
 function stopChargeMax(): void {
@@ -377,22 +400,23 @@ export function chargeUpdate(level: number): void {
   chargeNode.f.frequency.setTargetAtTime(600 + 2200 * level, t, 0.05);
   chargeNode.g.gain.setTargetAtTime(0.05 + 0.1 * level, t, 0.04);
 
-  // Khi gồng max (level >= 0.98): kích hoạt thêm xung dao động tần số cao nén năng lượng (high-frequency energetic hum)
-  if (level >= 0.98 && !chargeMaxNode) {
+  // Khi gồng max (level >= 0.95): kích hoạt dao động tụ khí cực đại nén năng lượng rung chuyển trời đất
+  if (level >= 0.95 && !chargeMaxNode) {
     const o2 = ctx.createOscillator();
     const lfo = ctx.createOscillator();
     const lfoG = ctx.createGain();
     const g2 = ctx.createGain();
 
-    o2.type = 'sine';
-    o2.frequency.setValueAtTime(680, t);
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(440, t);
+    o2.frequency.exponentialRampToValueAtTime(880, t + 0.3);
 
     lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(18, t);
-    lfoG.gain.setValueAtTime(45, t);
+    lfo.frequency.setValueAtTime(24, t);
+    lfoG.gain.setValueAtTime(65, t);
 
     g2.gain.setValueAtTime(0.001, t);
-    g2.gain.linearRampToValueAtTime(0.14, t + 0.05);
+    g2.gain.linearRampToValueAtTime(0.28, t + 0.04);
 
     lfo.connect(lfoG);
     lfoG.connect(o2.frequency);
@@ -402,7 +426,7 @@ export function chargeUpdate(level: number): void {
     o2.start();
     lfo.start();
     chargeMaxNode = { o: o2, lfo, g: g2 };
-  } else if (level < 0.98 && chargeMaxNode) {
+  } else if (level < 0.95 && chargeMaxNode) {
     stopChargeMax();
   }
 }
