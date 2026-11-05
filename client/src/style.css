@@ -2611,11 +2611,24 @@ body.mobile-phone #teamBar {
     font-size: 14px !important;
     min-width: 18px !important;
   }
+  .sbm-info {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
   .sbm-name {
-    font-size: 11px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
   }
   .sbm-val {
-    font-size: 9px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: var(--gold) !important;
+    white-space: nowrap !important;
+    margin-top: 0 !important;
   }
   .start-header-row {
     display: flex !important;
@@ -6103,7 +6116,53 @@ body:not(.is-pc) .kids-top-timer {
 
 @media (max-width: 900px), (pointer: coarse) {
   .admin-panel {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(94vw, 360px) !important;
+    max-height: min(86vh, 86dvh) !important;
+    z-index: 1000 !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.5) !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+  .admin-panel.is-hidden {
     display: none !important;
+  }
+  .admin-panel .ap-body {
+    max-height: calc(86vh - 46px) !important;
+    max-height: calc(86dvh - 46px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px !important;
+  }
+  .admin-panel .ap-btn {
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+    min-height: 36px !important;
+    touch-action: manipulation;
+  }
+  .admin-panel .ap-badge {
+    display: none;
+  }
+  .drawer-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .drawer-btn {
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    border-radius: 8px !important;
+  }
+  .drawer-btn .lbl {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -6294,4 +6353,51 @@ body:not(.is-pc) .kids-top-timer {
 .ap-input:focus, .ap-select:focus {
   outline: none;
   border-color: #ffd54f;
+}
+
+.btn-admin-game {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #4a148c 0%, #311b92 100%);
+  border: 2px solid #b388ff;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+.btn-admin-game:hover, .btn-admin-game:active {
+  transform: scale(1.08);
+  border-color: #ffd700;
+  box-shadow: 0 0 12px rgba(179, 136, 255, 0.7);
+}
+.ap-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ap-btn-close {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffd54f;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ap-btn-close:hover {
+  background: #c62828;
+  color: #fff;
+  border-color: #ff5252;
 }

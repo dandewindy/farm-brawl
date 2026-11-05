@@ -576,6 +576,9 @@ hud.onExitLobby = () => {
   if (adminPanel) {
     adminPanel.hide();
   }
+  if (adminToggleBtn) {
+    adminToggleBtn.hidden = true;
+  }
   hud.returnToLobby();
   hud.showToast(t('exitLobbyToast'));
 };
@@ -782,6 +785,7 @@ window.addEventListener('touchstart', () => unlockAudio(), { once: true, passive
 
 // Fullscreen & anti-zoom management for desktop, mobile & iPad Chrome/Safari
 const fsBtn = document.getElementById('fsBtn') as HTMLButtonElement | null;
+const adminToggleBtn = document.getElementById('adminToggleBtn') as HTMLButtonElement | null;
 const startFsBtn = document.getElementById('startFsBtn') as HTMLButtonElement | null;
 const muteInGameBtn = document.getElementById('muteInGame') as HTMLButtonElement | null;
 let isPseudoFs = false;
@@ -1039,6 +1043,15 @@ if (fsBtn) {
     e.preventDefault();
     e.stopPropagation();
     toggleFs();
+  });
+}
+if (adminToggleBtn) {
+  adminToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (adminPanel) {
+      adminPanel.toggle();
+    }
   });
 }
 if (startFsBtn) {
@@ -1484,9 +1497,21 @@ const gameState = new GameState({
       if (!adminPanel) {
         adminPanel = new AdminPanel(() => transport, isTouchDevice);
       }
-      adminPanel.show();
-    } else if (adminPanel) {
-      adminPanel.hide();
+      if (adminToggleBtn) {
+        adminToggleBtn.hidden = false;
+      }
+      if (!isTouchDevice && window.innerWidth >= 900) {
+        adminPanel.show();
+      } else {
+        adminPanel.hide();
+      }
+    } else {
+      if (adminToggleBtn) {
+        adminToggleBtn.hidden = true;
+      }
+      if (adminPanel) {
+        adminPanel.hide();
+      }
     }
     if (!gameState.metas.has(gameState.myId)) {
       gameState.metas.set(gameState.myId, {

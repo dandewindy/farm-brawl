@@ -18,13 +18,12 @@ export class AdminPanel {
   }
 
   private init(): void {
-    // Only show on PC (non-touch and wide enough screen)
-    if (this.isTouchDevice || window.innerWidth < 900) {
-      return;
-    }
-
     this.createUI();
     this.bindGlobalKeys();
+    // Default to hidden on touch / mobile devices
+    if (this.isTouchDevice || window.innerWidth < 900) {
+      this.hide();
+    }
   }
 
   private send(cmd: AdminAction): void {
@@ -47,7 +46,10 @@ export class AdminPanel {
           <span>ADMIN SANDBOX</span>
           <span class="ap-badge">F2</span>
         </div>
-        <button type="button" class="ap-btn-toggle" id="apToggleBtn" title="Thu gọn/Mở rộng (F2)">−</button>
+        <div class="ap-header-actions">
+          <button type="button" class="ap-btn-toggle" id="apToggleBtn" title="Thu gọn/Mở rộng (F2)">−</button>
+          <button type="button" class="ap-btn-close" id="apCloseBtn" title="Đóng">✕</button>
+        </div>
       </div>
 
       <div class="ap-body" id="apBody">
@@ -142,6 +144,12 @@ export class AdminPanel {
     const header = this.panelEl.querySelector('#apHeader') as HTMLElement;
     const body = this.panelEl.querySelector('#apBody') as HTMLElement;
     const toggleBtn = this.panelEl.querySelector('#apToggleBtn') as HTMLButtonElement;
+    const closeBtn = this.panelEl.querySelector('#apCloseBtn') as HTMLButtonElement;
+
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hide();
+    });
 
     const toggleCollapse = () => {
       this.isCollapsed = !this.isCollapsed;
@@ -249,15 +257,27 @@ export class AdminPanel {
     window.addEventListener('keydown', this.keydownHandler);
   }
 
+  public toggle(): void {
+    if (!this.panelEl) return;
+    const isHidden = this.panelEl.style.display === 'none' || this.panelEl.classList.contains('is-hidden');
+    if (isHidden) {
+      this.show();
+    } else {
+      this.hide();
+    }
+  }
+
   public show(): void {
     if (this.panelEl) {
       this.panelEl.style.display = 'block';
+      this.panelEl.classList.remove('is-hidden');
     }
   }
 
   public hide(): void {
     if (this.panelEl) {
       this.panelEl.style.display = 'none';
+      this.panelEl.classList.add('is-hidden');
     }
   }
 

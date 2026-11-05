@@ -715,8 +715,29 @@ export class HudManager {
 
     updateAllButtons();
 
-    // Name input & pencil
+    // Name input & pencil (No browser saved account / autofill prompt)
     this.nameInput.placeholder = t('namePh');
+    this.nameInput.setAttribute('autocomplete', 'one-time-code');
+    this.nameInput.setAttribute('name', 'game_player_nickname');
+    this.nameInput.setAttribute('data-lpignore', 'true');
+    this.nameInput.setAttribute('data-1p-ignore', 'true');
+    this.nameInput.setAttribute('data-form-type', 'other');
+    this.nameInput.setAttribute('aria-autocomplete', 'none');
+    this.nameInput.readOnly = true;
+
+    const unlockNameInput = () => {
+      if (this.nameInput.readOnly) {
+        this.nameInput.readOnly = false;
+      }
+    };
+    this.nameInput.addEventListener('pointerdown', unlockNameInput);
+    this.nameInput.addEventListener('touchstart', unlockNameInput, { passive: true });
+    this.nameInput.addEventListener('mousedown', unlockNameInput);
+    this.nameInput.addEventListener('focus', unlockNameInput);
+    this.nameInput.addEventListener('blur', () => {
+      this.nameInput.readOnly = true;
+    });
+
     const savedName = localStorage.getItem('fb_name') || '';
     if (savedName === 'Nông dân' || savedName === 'Farmer' || savedName === "mgm'y ngôk ngêk") {
       this.nameInput.value = '';
@@ -727,6 +748,7 @@ export class HudManager {
 
     if (this.nameEditBtn) {
       this.nameEditBtn.addEventListener('click', () => {
+        this.nameInput.readOnly = false;
         this.nameInput.focus();
         this.nameInput.select();
       });
