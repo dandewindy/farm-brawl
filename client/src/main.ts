@@ -4,7 +4,9 @@ import { distToSegmentSq, insideBlob, wrapAngle } from '@shared/math';
 import { FLAG, type GameEvent, type Snapshot } from '@shared/protocol';
 import {
   chargeStop, chargeUpdate, repaint, setMood,
-  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite, sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
+  sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite,
+  sfxPhoenixCry, sfxSwanCall, sfxRamBash, sfxBoarGrunt, sfxPegasusNeigh, sfxBullRoar,
+  sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
   cycleAudioMode, getAudioMode, type AudioMode,
@@ -1643,6 +1645,7 @@ function handleGameEvent(ev: GameEvent): void {
           }
           const FLUFF_COLORS: Record<Species, number> = {
             chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28, wolf: 0x546e7a,
+            phoenix: 0xff3d00, swan: 0xffffff, ram: 0xd7ccc8, boar: 0x4e342e, pegasus: 0xffffff, bull: 0x1b1c1e,
           };
           foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 6);
         }
@@ -1669,6 +1672,7 @@ function handleGameEvent(ev: GameEvent): void {
       }
       const FLUFF_COLORS: Record<Species, number> = {
         chicken: 0xfaf6ee, duck: 0xffd23f, sheep: 0xf3f1ea, pig: 0xf6a5b5, cow: 0xffffff, horse: 0x8b5a2b, dog: 0xd9822b, elephant: 0x828892, monkey: 0x8d5b38, gorilla: 0x3a3c42, mammoth: 0x5a3d28, wolf: 0x546e7a,
+            phoenix: 0xff3d00, swan: 0xffffff, ram: 0xd7ccc8, boar: 0x4e342e, pegasus: 0xffffff, bull: 0x1b1c1e,
       };
       if (vm) {
         foodParts.fluff(ev.x, ev.z, FLUFF_COLORS[vm.species] ?? 0xffffff, 8);
@@ -2467,6 +2471,96 @@ function handleGameEvent(ev: GameEvent): void {
           hud.showBanner('🦣 ' + t('name_mammoth'), '✨ TIẾN HOÁ THÀNH VOI MA MÚT (MAMMOTH)! ✨');
           const myPos = animals.getPosition(myId) || { x: mx, z: mz };
           hud.floatText('🦣 TIẾN HOÁ MAMMOTH! 🦣', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'phoenix') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.5, 0xff3d00);
+        animals.spawnShockwave(mx, 0.12, mz, 4.0, 0xff9100);
+        animals.spawnShockwave(mx, 0.16, mz, 2.5, 0xffd600);
+        foodParts.burst(mx, 1.5, mz, 0xff3d00, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffea00, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
+        sfxPhoenixCry(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🦅 ' + t('name_phoenix'), '🔥 TIẾN HOÁ THÀNH PHƯỢNG HOÀNG LỬA! 🔥');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🦅 TIẾN HOÁ PHƯỢNG HOÀNG! 🦅', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'swan') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.2, 0x80deea);
+        animals.spawnShockwave(mx, 0.12, mz, 3.8, 0x00e5ff);
+        animals.spawnShockwave(mx, 0.16, mz, 2.4, 0xffffff);
+        foodParts.burst(mx, 1.5, mz, 0x80deea, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
+        sfxSwanCall(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🦢 ' + t('name_swan'), '❄️ TIẾN HOÁ THÀNH THIÊN NGA BĂNG GIÁ! ❄️');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🦢 TIẾN HOÁ THIÊN NGA! 🦢', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'ram') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.4, 0x8d6e63);
+        animals.spawnShockwave(mx, 0.12, mz, 3.8, 0xd7ccc8);
+        animals.spawnShockwave(mx, 0.16, mz, 2.4, 0xffd700);
+        foodParts.burst(mx, 1.5, mz, 0x8d6e63, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xd7ccc8, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.6, mz, 3.4, 52);
+        sfxRamBash(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🐏 ' + t('name_ram'), '💥 TIẾN HOÁ THÀNH SƠN DƯƠNG THIẾT GIÁP! 💥');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🐏 TIẾN HOÁ SƠN DƯƠNG! 🐏', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'boar') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.2, 0xd84315);
+        animals.spawnShockwave(mx, 0.12, mz, 3.8, 0x795548);
+        animals.spawnShockwave(mx, 0.16, mz, 2.4, 0xff7043);
+        foodParts.burst(mx, 1.5, mz, 0xd84315, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0x795548, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
+        sfxBoarGrunt(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🐗 ' + t('name_boar'), '🐗 TIẾN HOÁ THÀNH CHIẾN TƯỚNG HEO RỪNG! 🐗');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🐗 TIẾN HOÁ HEO RỪNG! 🐗', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'pegasus') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.5, 0xffd700);
+        animals.spawnShockwave(mx, 0.12, mz, 4.0, 0x00e5ff);
+        animals.spawnShockwave(mx, 0.16, mz, 2.5, 0xffffff);
+        foodParts.burst(mx, 1.5, mz, 0xffd700, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
+        sfxPegasusNeigh(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🦄 ' + t('name_pegasus'), '✨ TIẾN HOÁ THÀNH THIÊN MÃ PEGASUS! ✨');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🦄 TIẾN HOÁ THIÊN MÃ! 🦄', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
+        }
+      } else if (ev.species === 'bull') {
+        animals.spawnShockwave(mx, 0.08, mz, 5.6, 0xff3d00);
+        animals.spawnShockwave(mx, 0.12, mz, 4.2, 0xffd700);
+        animals.spawnShockwave(mx, 0.16, mz, 2.6, 0x1b1c1e);
+        foodParts.burst(mx, 1.5, mz, 0xff3d00, 36, 12, 12, 1.2);
+        foodParts.burst(mx, 1.8, mz, 0xffd700, 24, 10, 10, 0.9);
+        foodParts.smokePoof(mx, 1.6, mz, 3.6, 55);
+        sfxBullRoar(ev.id === myId ? 1.0 : 0.7);
+        sfxReward();
+        if (ev.id === myId) {
+          shake = Math.max(shake, 1.8);
+          hud.showBanner('🐂 ' + t('name_bull'), '🔥 TIẾN HOÁ THÀNH NGƯU VƯƠNG ĐẤU TRƯỜNG! 🔥');
+          const myPos = animals.getPosition(myId) || { x: mx, z: mz };
+          hud.floatText('🐂 TIẾN HOÁ NGƯU VƯƠNG! 🐂', 'big', myId, { x: myPos.x, z: myPos.z, mass: 3000 });
         }
       } else {
         foodParts.smokePoof(mx, 1.2, mz, Math.max(1.6, r * 1.3), 40);

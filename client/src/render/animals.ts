@@ -160,6 +160,12 @@ const SPECIES_RING_COLOR: Record<Species, number> = {
   gorilla: 0xff6d00,
   mammoth: 0x8d6e63,
   wolf: 0x78909c,
+  phoenix: 0xff3d00,
+  swan: 0x80deea,
+  ram: 0x8d6e63,
+  boar: 0xd84315,
+  pegasus: 0xffd700,
+  bull: 0xff3d00,
 };
 
 // Detailed color palettes per species (4 skins per animal matching original game)
@@ -235,6 +241,42 @@ const SKINS: Record<Species, Record<string, number>[]> = {
     { body: 0x212529, mane: 0x111315, chest: 0x495057, snout: 0x343a40, ear: 0x16191d, innerEar: 0x6c757d, eye: 0xff3d00, legs: 0x1b1e22, paws: 0x343a40, tailTip: 0x0b0d0e }, // Sói Đen Hắc Ám (Dire Black Wolf)
     { body: 0xeceff1, mane: 0xb0bec5, chest: 0xffffff, snout: 0xfafafa, ear: 0xcfd8dc, innerEar: 0xf8bbd0, eye: 0x00e5ff, legs: 0xdce1e5, paws: 0xffffff, tailTip: 0x90a4ae }, // Sói Trắng Tuyết (Arctic White Wolf)
     { body: 0x7f3822, mane: 0x3e190e, chest: 0xd7ccc8, snout: 0xbcaaa4, ear: 0x4e2012, innerEar: 0xa1887f, eye: 0xffab00, legs: 0x5d2716, paws: 0xd7ccc8, tailTip: 0x271008 }, // Sói Đỏ Huyết Nguyệt (Blood Moon Wolf)
+  ],
+  phoenix: [
+    { body: 0xff3d00, wing: 0xff9100, chest: 0xffea00, tail: 0xd50000, crest: 0xffd600, beak: 0xffab00 }, // Kim Kê Thần (Lửa đỏ vàng)
+    { body: 0x00e5ff, wing: 0x80d8ff, chest: 0xe0f7fa, tail: 0x0091ea, crest: 0x00b0ff, beak: 0xffd54f }, // Băng Phượng Tuyết Sơn
+    { body: 0x212121, wing: 0x424242, chest: 0x757575, tail: 0xb71c1c, crest: 0xd50000, beak: 0xffa000 }, // Hắc Hỏa Dạ Điểu
+    { body: 0xaa00ff, wing: 0xe040fb, chest: 0xf3e5f5, tail: 0x6200ea, crest: 0x00e5ff, beak: 0xffd700 }, // Tử Quang Thiên Điểu
+  ],
+  swan: [
+    { body: 0xffffff, neck: 0xfafafa, wing: 0xf5f5f5, bill: 0xff6d00, knob: 0x212121, crown: 0xffd700 }, // Bạch Nga Hoàng Gia
+    { body: 0x212121, neck: 0x1a1a1a, wing: 0x37474f, bill: 0xd50000, knob: 0x000000, crown: 0xc0c0c0 }, // Hắc Nga Huyền Bí
+    { body: 0xe0f7fa, neck: 0xb2ebf2, wing: 0x80deea, bill: 0x00b0ff, knob: 0x006064, crown: 0x00e5ff }, // Băng Tuyết Bắc Cực
+    { body: 0xf8bbd0, neck: 0xf48fb1, wing: 0xf06292, bill: 0xffab00, knob: 0x880e4f, crown: 0xffd54f }, // Hồng Hạc Ánh Dương
+  ],
+  ram: [
+    { wool: 0xd7ccc8, face: 0x4e342e, horn: 0x3e2723, hornRing: 0x8d6e63, legs: 0x3e2723 }, // Sơn Dương Thiết Giáp
+    { wool: 0x263238, face: 0x1a237e, horn: 0xffd700, hornRing: 0xffa000, legs: 0x212121 }, // Hắc Sơn Dương Thạch
+    { wool: 0xffffff, face: 0x90a4ae, horn: 0xb0bec5, hornRing: 0xcfd8dc, legs: 0x78909c }, // Tuyết Dương Đỉnh Núi
+    { wool: 0xffecb3, face: 0xff8f00, horn: 0xc62828, hornRing: 0xe53935, legs: 0xb26a00 }, // Kim Dương Thần Thoại
+  ],
+  boar: [
+    { body: 0x4e342e, crest: 0x271c19, snout: 0x795548, tusk: 0xf5f5f5, belly: 0x6d4c41, legs: 0x271c19 }, // Heo Rừng Rậm Chiến Tướng
+    { body: 0x212121, crest: 0x000000, snout: 0x424242, tusk: 0xb0bec5, belly: 0x37474f, legs: 0x1b1b1b }, // Hắc Nanh Độc Giác
+    { body: 0xd84315, crest: 0xbf360c, snout: 0xff7043, tusk: 0xffd700, belly: 0xff8a65, legs: 0x870000 }, // Lôi Đình Bão Bùn
+    { body: 0xefebe9, crest: 0xbcaaa4, snout: 0xd7ccc8, tusk: 0x80deea, belly: 0xffffff, legs: 0x8d6e63 }, // Bạch Nanh Tuyết Sơn
+  ],
+  pegasus: [
+    { body: 0xffffff, wing: 0xffffff, mane: 0xffd700, hoof: 0xffd700, eye: 0x00b0ff, featherTip: 0xfff59d }, // Bạch Mã Thiên Thần
+    { body: 0x1a1a24, wing: 0x2c2c3d, mane: 0xaa00ff, hoof: 0x7c4dff, eye: 0xff1744, featherTip: 0xe040fb }, // Dạ Mã Hắc Ám
+    { body: 0xe1f5fe, wing: 0xb3e5fc, mane: 0x00b0ff, hoof: 0x0091ea, eye: 0x00e5ff, featherTip: 0x80d8ff }, // Băng Thiên Tinh Vân
+    { body: 0xb71c1c, wing: 0xd32f2f, mane: 0xffab00, hoof: 0xff6d00, eye: 0xffea00, featherTip: 0xffd600 }, // Xích Huyết Thần Mã
+  ],
+  bull: [
+    { body: 0x1b1c1e, shoulder: 0x111213, horn: 0xffd700, snout: 0x3e2723, ring: 0xffd700, eye: 0xff3d00 }, // Ngưu Vương Đấu Trường
+    { body: 0x871010, shoulder: 0x5b0808, horn: 0xf5f5f5, snout: 0x3e1818, ring: 0xffab00, eye: 0xffea00 }, // Bò Tót Đỏ Lửa
+    { body: 0x455a64, shoulder: 0x263238, horn: 0x1a1a1a, snout: 0x37474f, ring: 0xc0c0c0, eye: 0x00e5ff }, // Thiết Ngưu Giáp Đá
+    { body: 0x6d4c41, shoulder: 0x4e342e, horn: 0x00e676, snout: 0x8d6e63, ring: 0xffd700, eye: 0xffd600 }, // Kim Ngưu Hoàng Gia
   ],
 };
 
@@ -1569,6 +1611,317 @@ function buildGorilla(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   return legs;
 }
 
+function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0xff3d00;
+  const wingColor = s.wing ?? 0xff9100;
+  const chestColor = s.chest ?? 0xffea00;
+  const tailColor = s.tail ?? 0xd50000;
+  const crestColor = s.crest ?? 0xffd600;
+  const beakColor = s.beak ?? 0xffab00;
+
+  // 1. Athletic fiery torso
+  blob(g, bodyColor, 0.70, [1.25, 0.95, 0.92], 0, 1.05, 0, undefined, true);
+  // Fiery chest plumage
+  blob(g, chestColor, 0.40, [1.10, 0.95, 0.75], 0.42, 1.15, 0, [0, 0, -0.22]);
+
+  // 2. Arched neck & head
+  blob(g, bodyColor, 0.28, [0.85, 1.35, 0.85], 0.48, 1.55, 0, [0, 0, -0.32]);
+  g.add(part(new THREE.SphereGeometry(0.38, 18, 12), bodyColor, 0.70, 1.90, 0));
+
+  // Curved raptor golden beak
+  const beak = part(new THREE.ConeGeometry(0.12, 0.38, 8), beakColor, 1.12, 1.84, 0);
+  beak.rotation.z = -Math.PI / 2 - 0.2;
+  g.add(beak);
+
+  // Triple royal crown phoenix crest plumes
+  blob(g, crestColor, 0.12, [2.4, 0.6, 0.4], 0.50, 2.30, 0, [0, 0, -0.55]);
+  blob(g, wingColor, 0.10, [2.1, 0.5, 0.35], 0.44, 2.18, 0.08, [0.15, 0, -0.45]);
+  blob(g, wingColor, 0.10, [2.1, 0.5, 0.35], 0.44, 2.18, -0.08, [-0.15, 0, -0.45]);
+
+  // 3. Wide flame wings
+  for (const z of [-0.62, 0.62]) {
+    blob(g, wingColor, 0.42, [1.4, 0.65, 0.25], 0.0, 1.15, z, [0, 0, 0.2]);
+    const f1 = part(new THREE.ConeGeometry(0.12, 0.60, 6), crestColor, -0.32, 1.25, z);
+    f1.rotation.z = 0.95;
+    g.add(f1);
+    const f2 = part(new THREE.ConeGeometry(0.10, 0.50, 6), tailColor, -0.48, 1.15, z * 0.95);
+    f2.rotation.z = 1.15;
+    g.add(f2);
+  }
+
+  // 4. Triple streaming phoenix tail plumes
+  blob(g, tailColor, 0.22, [0.7, 2.4, 0.4], -0.95, 1.60, 0, [0, 0, 0.65]);
+  blob(g, tailColor, 0.18, [0.65, 2.0, 0.35], -0.90, 1.48, 0.20, [0.35, 0, 0.60]);
+  blob(g, tailColor, 0.18, [0.65, 2.0, 0.35], -0.90, 1.48, -0.20, [-0.35, 0, 0.60]);
+
+  // Gem tips on tail plumes
+  g.add(part(new THREE.SphereGeometry(0.08, 8, 8), crestColor, -1.35, 2.25, 0));
+  g.add(part(new THREE.SphereGeometry(0.07, 8, 8), crestColor, -1.25, 2.05, 0.26));
+  g.add(part(new THREE.SphereGeometry(0.07, 8, 8), crestColor, -1.25, 2.05, -0.26));
+
+  addEyes(g, 0.95, 1.96, 0.18, 0.085);
+  return addLegs(g, beakColor, [[0.05, 0.22], [0.05, -0.22]], 0.58, 0.075);
+}
+
+function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0xffffff;
+  const neckColor = s.neck ?? 0xfafafa;
+  const wingColor = s.wing ?? 0xf5f5f5;
+  const billColor = s.bill ?? 0xff6d00;
+  const knobColor = s.knob ?? 0x212121;
+  const crownColor = s.crown ?? 0xffd700;
+
+  // 1. Buoyant sleek hull
+  blob(g, bodyColor, 0.68, [1.45, 0.85, 0.95], -0.05, 0.92, 0, undefined, true);
+  // Upturned elegant tail fan
+  blob(g, wingColor, 0.28, [1.2, 0.6, 0.7], -0.85, 1.18, 0, [0, 0, 0.55]);
+
+  // 2. Majestic S-curved neck
+  blob(g, neckColor, 0.22, [0.85, 1.5, 0.85], 0.52, 1.30, 0, [0, 0, -0.45]);
+  blob(g, neckColor, 0.19, [0.85, 1.4, 0.85], 0.60, 1.82, 0, [0, 0, 0.28]);
+  g.add(part(new THREE.SphereGeometry(0.28, 18, 12), neckColor, 0.68, 2.15, 0));
+
+  // Regal ice crown
+  const crown = part(new THREE.ConeGeometry(0.09, 0.24, 7), crownColor, 0.66, 2.42, 0);
+  g.add(crown);
+
+  // Basal knob above bill
+  blob(g, knobColor, 0.08, [1.2, 1.0, 1.1], 0.88, 2.18, 0);
+
+  // Elegant tapered bill
+  const bill = part(new THREE.ConeGeometry(0.10, 0.34, 6), billColor, 1.08, 2.06, 0);
+  bill.rotation.z = -Math.PI / 2 - 0.25;
+  g.add(bill);
+
+  // 3. Layered folded wings
+  for (const z of [-0.52, 0.52]) {
+    blob(g, wingColor, 0.40, [1.5, 0.72, 0.25], -0.05, 1.05, z, [0, 0, 0.15]);
+    blob(g, wingColor, 0.22, [1.6, 0.45, 0.15], -0.55, 1.18, z * 0.95, [0, 0, 0.35]);
+  }
+
+  addEyes(g, 0.80, 2.20, 0.15, 0.065);
+  return addLegs(g, knobColor, [[0.05, 0.24], [0.05, -0.24]], 0.48, 0.07);
+}
+
+function buildRam(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const woolColor = s.wool ?? 0xd7ccc8;
+  const faceColor = s.face ?? 0x4e342e;
+  const hornColor = s.horn ?? 0x3e2723;
+  const hornRingColor = s.hornRing ?? 0x8d6e63;
+  const legsColor = s.legs ?? 0x3e2723;
+
+  // 1. Armored thick wool coat
+  g.add(part(new THREE.IcosahedronGeometry(0.55, 1), woolColor, 0, 1.18, 0, undefined, true));
+  const woolPuffs: [number, number, number][] = [
+    [0.42, 1.25, 0.28], [0.42, 1.25, -0.28],
+    [-0.42, 1.25, 0.28], [-0.42, 1.25, -0.28],
+    [0, 1.55, 0], [0.05, 1.18, 0.45], [0.05, 1.18, -0.45],
+    [-0.15, 1.50, 0.22], [-0.15, 1.50, -0.22],
+  ];
+  for (const [x, y, z] of woolPuffs) {
+    g.add(part(new THREE.IcosahedronGeometry(0.40, 1), woolColor, x, y, z));
+  }
+  // Chest wool mantle
+  g.add(part(new THREE.IcosahedronGeometry(0.44, 1), woolColor, 0.46, 1.25, 0));
+
+  // 2. Chiseled Ram Head
+  g.add(part(new THREE.BoxGeometry(0.56, 0.52, 0.46), faceColor, 0.82, 1.44, 0));
+  blob(g, faceColor, 0.24, [1.2, 0.85, 0.9], 1.08, 1.34, 0);
+  g.add(part(new THREE.IcosahedronGeometry(0.24, 1), woolColor, 0.72, 1.76, 0));
+
+  // 3. Colossal Spiral Horns (Curving back, down, and around cheeks)
+  for (const z of [-0.34, 0.34]) {
+    const hornGroup = new THREE.Group();
+    hornGroup.position.set(0.78, 1.62, z);
+
+    // Segment 1: base arches up and back
+    const s1 = part(new THREE.CylinderGeometry(0.14, 0.19, 0.36, 8), hornColor, -0.10, 0.16, z * 0.12);
+    s1.rotation.z = -1.15;
+    s1.rotation.y = z > 0 ? 0.35 : -0.35;
+    hornGroup.add(s1);
+
+    // Horn Ring accent
+    const r1 = part(new THREE.TorusGeometry(0.18, 0.035, 8, 16), hornRingColor, -0.05, 0.12, z * 0.08);
+    r1.rotation.y = Math.PI / 2;
+    hornGroup.add(r1);
+
+    // Segment 2: curls down around cheek
+    const s2 = part(new THREE.CylinderGeometry(0.10, 0.14, 0.36, 8), hornColor, -0.24, -0.04, z * 0.22);
+    s2.rotation.z = 0.55;
+    s2.rotation.x = z > 0 ? -0.45 : 0.45;
+    hornGroup.add(s2);
+
+    // Segment 3: tapered tip curves forward
+    const tip = part(new THREE.ConeGeometry(0.10, 0.34, 8), hornColor, -0.12, -0.22, z * 0.26);
+    tip.rotation.z = 2.10;
+    tip.rotation.y = z > 0 ? -0.35 : 0.35;
+    hornGroup.add(tip);
+
+    g.add(hornGroup);
+  }
+
+  // Floppy side ears
+  for (const z of [-0.36, 0.36]) {
+    blob(g, faceColor, 0.14, [1.1, 0.45, 1.5], 0.75, 1.48, z, [z > 0 ? 0.3 : -0.3, 0, 0]);
+  }
+
+  addEyes(g, 1.08, 1.54, 0.18, 0.075);
+  return addLegs(g, legsColor, [[0.38, 0.26], [0.38, -0.26], [-0.38, 0.26], [-0.38, -0.26]], 0.70, 0.11, 0x1f1b18);
+}
+
+function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0x4e342e;
+  const crestColor = s.crest ?? 0x271c19;
+  const snoutColor = s.snout ?? 0x795548;
+  const tuskColor = s.tusk ?? 0xf5f5f5;
+  const bellyColor = s.belly ?? 0x6d4c41;
+  const legsColor = s.legs ?? 0x271c19;
+
+  // 1. Muscular barrel torso
+  blob(g, bodyColor, 0.62, [1.32, 1.15, 1.08], 0.24, 1.25, 0, undefined, true);
+  blob(g, bodyColor, 0.52, [1.25, 0.98, 0.95], -0.32, 1.15, 0);
+  blob(g, bellyColor, 0.44, [1.35, 0.65, 0.88], -0.05, 0.95, 0);
+
+  // 2. Spine bristles (Dorsal crest)
+  for (let i = 0; i < 7; i++) {
+    const bristle = part(new THREE.ConeGeometry(0.08, 0.32, 5), crestColor, -0.45 + i * 0.16, 1.65 - Math.abs(i - 2) * 0.06, 0);
+    bristle.rotation.z = -0.25;
+    g.add(bristle);
+  }
+
+  // 3. Heavy armored head & snout
+  blob(g, bodyColor, 0.42, [1.2, 1.0, 0.95], 0.78, 1.35, 0);
+  const snout = part(new THREE.CylinderGeometry(0.24, 0.26, 0.40, 10), snoutColor, 1.12, 1.22, 0);
+  snout.rotation.z = Math.PI / 2;
+  g.add(snout);
+
+  const disk = part(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 12), crestColor, 1.33, 1.22, 0);
+  disk.rotation.z = Math.PI / 2;
+  g.add(disk);
+
+  // 4. Wicked upward-curving razor tusks
+  for (const z of [-0.24, 0.24]) {
+    const tusk = part(new THREE.ConeGeometry(0.09, 0.48, 8), tuskColor, 1.16, 1.38, z);
+    tusk.rotation.x = z > 0 ? 0.35 : -0.35;
+    tusk.rotation.z = -0.45;
+    g.add(tusk);
+
+    const tusk2 = part(new THREE.ConeGeometry(0.06, 0.24, 6), tuskColor, 1.05, 1.40, z * 1.15);
+    tusk2.rotation.z = -0.8;
+    g.add(tusk2);
+
+    // Boar bristled ears
+    blob(g, crestColor, 0.16, [0.6, 1.2, 0.3], 0.65, 1.70, z, [0, z > 0 ? 0.3 : -0.3, -0.3]);
+  }
+
+  addEyes(g, 0.95, 1.48, 0.22, 0.065);
+  return addLegs(g, legsColor, [[0.36, 0.30], [0.36, -0.30], [-0.36, 0.28], [-0.36, -0.28]], 0.62, 0.12, 0x14100e);
+}
+
+function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0xffffff;
+  const wingColor = s.wing ?? 0xffffff;
+  const maneColor = s.mane ?? 0xffd700;
+  const hoofColor = s.hoof ?? 0xffd700;
+  const featherTipColor = s.featherTip ?? 0xfff59d;
+
+  // 1. Noble steed body
+  const bodyGeo = new THREE.CapsuleGeometry(0.40, 0.95, 8, 16);
+  bodyGeo.rotateZ(Math.PI / 2);
+  const bodyMesh = part(bodyGeo, bodyColor, 0, 1.50, 0, undefined, true);
+  g.add(bodyMesh);
+
+  // Arched neck & head
+  const neckGeo = new THREE.CapsuleGeometry(0.19, 0.65, 8, 14);
+  const neck = part(neckGeo, bodyColor, 0.82, 1.98, 0);
+  neck.rotation.z = -0.55;
+  g.add(neck);
+
+  const headGeo = new THREE.CapsuleGeometry(0.18, 0.48, 8, 14);
+  headGeo.rotateZ(Math.PI / 2);
+  const head = part(headGeo, bodyColor, 1.26, 2.38, 0);
+  head.rotation.z = -0.28;
+  g.add(head);
+
+  // Flowing golden mane
+  blob(g, maneColor, 0.22, [2.5, 0.65, 0.4], 0.60, 2.22, 0, [0, 0, -0.55]);
+
+  // Celestial horn
+  const horn = part(new THREE.ConeGeometry(0.08, 0.45, 8), maneColor, 1.38, 2.68, 0);
+  horn.rotation.z = -0.7;
+  g.add(horn);
+
+  // Flowing tail
+  blob(g, maneColor, 0.20, [0.55, 2.2, 0.4], -0.85, 1.25, 0, [0, 0, 0.35]);
+
+  // 2. Grand Angelic Wings
+  for (const z of [-0.48, 0.48]) {
+    const wingGroup = new THREE.Group();
+    wingGroup.position.set(0.10, 1.85, z);
+    wingGroup.rotation.y = z > 0 ? 0.22 : -0.22;
+
+    // Main wing spar
+    const spar = part(new THREE.CapsuleGeometry(0.12, 1.10, 6, 10), wingColor, 0, 0.45, 0);
+    spar.rotation.z = -0.65;
+    wingGroup.add(spar);
+
+    // 5 Feather blades along trailing edge
+    for (let i = 0; i < 5; i++) {
+      blob(wingGroup, featherTipColor, 0.14, [0.4, 1.8, 0.2], -0.18 - i * 0.12, 0.85 - i * 0.14, 0, [0, 0, 0.35 + i * 0.12]);
+    }
+    g.add(wingGroup);
+  }
+
+  addEyes(g, 1.35, 2.45, 0.18, 0.08);
+  return addLegs(g, bodyColor, [[0.45, 0.26], [0.45, -0.26], [-0.45, 0.26], [-0.45, -0.26]], 0.90, 0.11, hoofColor);
+}
+
+function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
+  const bodyColor = s.body ?? 0x1b1c1e;
+  const shoulderColor = s.shoulder ?? 0x111213;
+  const hornColor = s.horn ?? 0xffd700;
+  const snoutColor = s.snout ?? 0x3e2723;
+  const ringColor = s.ring ?? 0xffd700;
+
+  // 1. Massive Colossal Torso
+  blob(g, shoulderColor, 0.58, [1.25, 1.10, 1.15], 0.35, 1.62, 0, undefined, true);
+  blob(g, bodyColor, 0.65, [1.40, 1.05, 1.12], -0.05, 1.35, 0);
+  blob(g, bodyColor, 0.55, [1.15, 0.98, 1.02], -0.48, 1.30, 0);
+
+  // 2. Heavy Neck & Head
+  blob(g, shoulderColor, 0.44, [1.15, 1.15, 1.05], 0.72, 1.48, 0);
+  g.add(part(new THREE.BoxGeometry(0.65, 0.60, 0.55), bodyColor, 1.05, 1.55, 0));
+  g.add(part(new THREE.BoxGeometry(0.35, 0.36, 0.48), snoutColor, 1.38, 1.40, 0));
+
+  // Golden nose ring
+  const noseRing = part(new THREE.TorusGeometry(0.12, 0.035, 8, 20), ringColor, 1.52, 1.32, 0);
+  noseRing.rotation.y = Math.PI / 2;
+  g.add(noseRing);
+
+  // 3. Long forward-sweeping sharp bull horns
+  for (const z of [-0.38, 0.38]) {
+    const hornBase = part(new THREE.CylinderGeometry(0.13, 0.16, 0.42, 8), hornColor, 1.02, 1.88, z);
+    hornBase.rotation.x = z > 0 ? 0.75 : -0.75;
+    g.add(hornBase);
+
+    const tip = part(new THREE.ConeGeometry(0.13, 0.55, 8), hornColor, 1.25, 1.98, z * 1.25);
+    tip.rotation.z = -0.85;
+    tip.rotation.x = z > 0 ? 0.35 : -0.35;
+    g.add(tip);
+
+    blob(g, bodyColor, 0.18, [1.4, 0.5, 0.7], 0.95, 1.70, z * 1.3, [0, z > 0 ? 0.3 : -0.3, 0]);
+  }
+
+  // Tail with tassel
+  const tail = part(new THREE.CylinderGeometry(0.04, 0.05, 0.75, 6), bodyColor, -0.78, 1.05, 0);
+  tail.rotation.z = 0.25;
+  g.add(tail);
+  blob(g, shoulderColor, 0.12, [0.8, 1.8, 0.8], -0.88, 0.65, 0);
+
+  addEyes(g, 1.25, 1.62, 0.24, 0.08);
+  return addLegs(g, bodyColor, [[0.44, 0.32], [0.44, -0.32], [-0.42, 0.30], [-0.42, -0.30]], 0.78, 0.14, 0x111111);
+}
+
 const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => THREE.Group[]> = {
   chicken: buildChicken,
   sheep: buildSheep,
@@ -1582,6 +1935,12 @@ const BUILDERS: Record<Species, (g: THREE.Group, s: Record<string, number>) => T
   gorilla: buildGorilla,
   mammoth: buildMammoth,
   wolf: buildWolf,
+  phoenix: buildPhoenix,
+  swan: buildSwan,
+  ram: buildRam,
+  boar: buildBoar,
+  pegasus: buildPegasus,
+  bull: buildBull,
 };
 
 export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -1717,6 +2076,72 @@ export function buildCollar(species: Species, mat: THREE.MeshStandardMaterial): 
       g.add(medal);
       break;
     }
+    case 'phoenix': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.035, 8, 24), mat);
+      band.position.set(0.55, 1.55, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.45;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), goldMat);
+      medal.position.set(0.68, 1.45, 0);
+      g.add(medal);
+      break;
+    }
+    case 'swan': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.034, 8, 24), mat);
+      band.position.set(0.54, 1.35, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.40;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), goldMat);
+      medal.position.set(0.66, 1.25, 0);
+      g.add(medal);
+      break;
+    }
+    case 'ram': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.045, 8, 24), mat);
+      band.position.set(0.62, 1.35, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.25;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
+      medal.position.set(0.78, 1.25, 0);
+      g.add(medal);
+      break;
+    }
+    case 'boar': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.40, 0.046, 8, 24), mat);
+      band.position.set(0.62, 1.30, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.35;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), goldMat);
+      medal.position.set(0.78, 1.18, 0);
+      g.add(medal);
+      break;
+    }
+    case 'pegasus': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.038, 8, 24), mat);
+      band.position.set(0.92, 2.10, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.55;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), goldMat);
+      medal.position.set(1.08, 1.95, 0);
+      g.add(medal);
+      break;
+    }
+    case 'bull': {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.052, 8, 24), mat);
+      band.position.set(0.75, 1.48, 0);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.x = 0.38;
+      g.add(band);
+      const medal = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), goldMat);
+      medal.position.set(0.95, 1.35, 0);
+      g.add(medal);
+      break;
+    }
   }
   return g;
 }
@@ -1735,6 +2160,12 @@ const HEAD: Record<Species, [number, number]> = {
   gorilla: [0.58, 2.15],
   mammoth: [1.02, 2.30],
   wolf: [0.80, 1.98],
+  phoenix: [0.70, 2.30],
+  swan: [0.68, 2.45],
+  ram: [0.82, 1.85],
+  boar: [0.85, 1.80],
+  pegasus: [1.26, 2.75],
+  bull: [1.05, 2.10],
 };
 
 // Back of each species for the cape
@@ -1751,6 +2182,12 @@ const BACK: Record<Species, [number, number, number, number, number]> = {
   gorilla: [-0.15, 1.45, 0.65, 0.65, 1.35],
   mammoth: [-0.15, 1.55, 0.70, 0.70, 1.45],
   wolf: [-0.15, 1.25, 0.62, 0.62, 1.22],
+  phoenix: [-0.20, 1.10, 0.65, 0.65, 1.05],
+  swan: [-0.20, 1.05, 0.65, 0.65, 1.15],
+  ram: [-0.15, 1.25, 0.70, 0.70, 1.20],
+  boar: [-0.20, 1.30, 0.75, 0.75, 1.35],
+  pegasus: [-0.20, 1.55, 0.50, 0.50, 1.35],
+  bull: [-0.15, 1.45, 0.75, 0.75, 1.45],
 };
 
 function buildRegalia(species: Species): THREE.Group {
@@ -1826,6 +2263,12 @@ export function buildFlowerHat(species: Species): THREE.Group {
     gorilla: 0.22,
     mammoth: 0.28,
     wolf: 0.22,
+    phoenix: 0.18,
+    swan: 0.16,
+    ram: 0.22,
+    boar: 0.22,
+    pegasus: 0.18,
+    bull: 0.26,
   };
   const yOffsets: Record<Species, number> = {
     chicken: 0.08,
@@ -1840,6 +2283,12 @@ export function buildFlowerHat(species: Species): THREE.Group {
     gorilla: 0.08,
     mammoth: 0.10,
     wolf: 0.08,
+    phoenix: 0.08,
+    swan: 0.08,
+    ram: 0.08,
+    boar: 0.08,
+    pegasus: 0.10,
+    bull: 0.10,
   };
   const hz = zOffsets[species] ?? 0.18;
   const hyOffset = yOffsets[species] ?? 0.06;
@@ -2145,6 +2594,12 @@ const LABEL_Y: Record<Species, number> = {
   gorilla: 2.6,
   mammoth: 2.8,
   wolf: 2.4,
+  phoenix: 2.5,
+  swan: 2.6,
+  ram: 2.3,
+  boar: 2.3,
+  pegasus: 2.9,
+  bull: 2.6,
 };
 
 export function createLabel(text: string, crowned = false, traitor = false, isMe = false): THREE.Sprite {
@@ -2771,14 +3226,17 @@ export class AnimalRenderer {
     const sinkProgress = Math.min(1, (vis.waterT || 0) / 1.5);
 
     // Visual sinking effect reduced by 25%
-    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf'
+    const inWaterShrink = isWater && !isSuper && vis.species !== 'duck' && vis.species !== 'swan' && vis.species !== 'dog' && vis.species !== 'wolf' && vis.species !== 'pegasus'
       ? Math.max(0.72, 1 - sinkProgress * 0.28)
       : 1;
 
     if (isWater && !isSuper) {
-      if (vis.species === 'duck') {
-        // Ducks float peacefully on the surface with subtle bobbing
+      if (vis.species === 'duck' || vis.species === 'swan') {
+        // Ducks & Swans float peacefully on the surface with subtle bobbing
         y = -0.20 * sc + Math.sin(now / 300) * 0.035;
+      } else if (vis.species === 'pegasus') {
+        // Pegasus glides gracefully over water
+        y = 0.25 * sc + Math.sin(now / 250) * 0.04;
       } else if (vis.species === 'dog' || vis.species === 'wolf') {
         // Dogs & Wolves can swim, half body submerged under water with paddling bob
         y = -0.90 * sc + Math.sin(now / 220) * 0.022;
@@ -2870,9 +3328,9 @@ export class AnimalRenderer {
       ? (vis.species === 'mammoth' ? 0 : -0.25)
       : isDrowning
       ? Math.sin(now / 180) * 0.3
-      : isWater && vis.species === 'duck'
+      : isWater && (vis.species === 'duck' || vis.species === 'swan')
       ? Math.sin(vis.phase * 0.7) * 0.08
-      : isWater && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf'
+      : isWater && vis.species !== 'duck' && vis.species !== 'swan' && vis.species !== 'dog' && vis.species !== 'wolf' && vis.species !== 'pegasus'
       ? Math.sin(now / 120) * 0.15
       : isCharging
       ? (vis.species === 'mammoth' ? 0 : 0.15 + lvl * 0.15)
@@ -3017,7 +3475,7 @@ export class AnimalRenderer {
         leg.rotation.z = (Math.PI / 2.2) * (idx % 2 === 0 ? 1 : -1);
         leg.rotation.x = 0;
         leg.position.y = leg.userData.origY;
-      } else if (isDrowning || (isWater && vis.species !== 'duck')) {
+      } else if (isDrowning || (isWater && vis.species !== 'duck' && vis.species !== 'swan')) {
         // Slow paddling motion, slowing as it sinks deeper
         const paddleSpeed = Math.max(0.15, 1 - sinkProgress * 0.75);
         leg.rotation.z = baseSwing * 0.4 * paddleSpeed;
@@ -3309,7 +3767,7 @@ export class AnimalRenderer {
           isGorilla ? 0.38 : 0.28,
           0.02
         );
-      } else if (isWater && vis.species !== 'duck') {
+      } else if (isWater && vis.species !== 'duck' && vis.species !== 'swan') {
         vis.dust = 0.32; // 25% less frequent
         this.onPuff?.(x - Math.cos(angle) * r, 0.12, z - Math.sin(angle) * r, 0xbfe3ff, 0.55 * r, 0.5, 0.8);
       } else if (isCharging) {
@@ -3460,7 +3918,7 @@ export class AnimalRenderer {
     }
 
     if (vis.label) {
-      const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'dog' && vis.species !== 'wolf' && sinkProgress >= 0.85;
+      const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'swan' && vis.species !== 'dog' && vis.species !== 'wolf' && vis.species !== 'pegasus' && sinkProgress >= 0.85;
       vis.label.visible = !isHiddenInWater;
       if (!isHiddenInWater) {
         const lh = 1.3 + r * 0.25;

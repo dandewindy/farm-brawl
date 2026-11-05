@@ -197,6 +197,12 @@ export class HudManager {
     gorilla: 0,
     mammoth: 0,
     wolf: 0,
+    phoenix: 0,
+    swan: 0,
+    ram: 0,
+    boar: 0,
+    pegasus: 0,
+    bull: 0,
   };
 
   private readonly friendPanel: HTMLElement | null;
@@ -438,6 +444,12 @@ export class HudManager {
       gorilla: [0x242528, 0x332822, 0x18191c, 0x4a4d52],
       mammoth: [0x5a3d28, 0xedeae4, 0x422616, 0x8c5b36],
       wolf: [0x546e7a, 0x212529, 0xeceff1, 0x7f3822],
+      phoenix: [0xff3d00, 0x00e5ff, 0x212121, 0xaa00ff],
+      swan: [0xffffff, 0x212121, 0xe0f7fa, 0xf8bbd0],
+      ram: [0xd7ccc8, 0x263238, 0xffffff, 0xffecb3],
+      boar: [0x4e342e, 0x212121, 0xd84315, 0xefebe9],
+      pegasus: [0xffffff, 0x1a1a24, 0xe1f5fe, 0xb71c1c],
+      bull: [0x1b1c1e, 0x871010, 0x455a64, 0x6d4c41],
     };
 
     SPECIES.forEach((sp) => {
@@ -2212,6 +2224,7 @@ export class HudManager {
   updateHof(hof: HofRow[]): void {
     const emojis: Record<Species, string> = {
       chicken: '🐔', sheep: '🐑', horse: '🐴', cow: '🐄', duck: '🦆', pig: '🐷', dog: '🐶', elephant: '🐘', monkey: '🐒', gorilla: '🦍', mammoth: '🦣', wolf: '🐺',
+      phoenix: '🦅', swan: '🦢', ram: '🐏', boar: '🐗', pegasus: '🦄', bull: '🐂',
     };
     if (this.hofList) this.hofList.innerHTML = '';
     if (this.drawerHofList) this.drawerHofList.innerHTML = '';

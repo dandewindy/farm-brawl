@@ -79,8 +79,45 @@ export const radiusOf = (m: number): number => {
   return r3000 + Math.log1p(extraKg / 1200) * 0.42;
 };
 
-export const SPECIES = ['chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey', 'gorilla', 'mammoth', 'wolf'] as const;
+export const SPECIES = [
+  'chicken', 'sheep', 'horse', 'cow', 'duck', 'pig', 'dog', 'elephant', 'monkey',
+  'gorilla', 'mammoth', 'wolf',
+  'phoenix', 'swan', 'ram', 'boar', 'pegasus', 'bull',
+] as const;
 export type Species = (typeof SPECIES)[number];
+
+export const EVOLVED_PAIRS: Record<string, Species> = {
+  monkey: 'gorilla',
+  elephant: 'mammoth',
+  dog: 'wolf',
+  chicken: 'phoenix',
+  duck: 'swan',
+  sheep: 'ram',
+  pig: 'boar',
+  horse: 'pegasus',
+  cow: 'bull',
+};
+
+export const DEVOLVED_PAIRS: Record<string, Species> = {
+  gorilla: 'monkey',
+  mammoth: 'elephant',
+  wolf: 'dog',
+  phoenix: 'chicken',
+  swan: 'duck',
+  ram: 'sheep',
+  boar: 'pig',
+  pegasus: 'horse',
+  bull: 'cow',
+};
+
+export const EVOLVED_SPECIES = new Set<Species>([
+  'gorilla', 'mammoth', 'wolf',
+  'phoenix', 'swan', 'ram', 'boar', 'pegasus', 'bull',
+]);
+
+export function isEvolvedSpecies(s: Species): boolean {
+  return EVOLVED_SPECIES.has(s);
+}
 
 export interface SpeciesTraits {
   /** walking speed multiplier */
@@ -110,6 +147,12 @@ export const TRAITS: Record<Species, SpeciesTraits> = {
   gorilla: { speed: 1.02, dash: 1.15, weight: 1.5, water: 0.45, mud: 0.50, ram: 1.4 },
   mammoth: { speed: 0.95, dash: 1.0, weight: 1.6, water: 0.45, mud: 0.45, ram: 1.6 },
   wolf: { speed: 1.30, dash: 1.15, weight: 1.45, water: 0.35, mud: 0.50, ram: 1.45 },
+  phoenix: { speed: 1.15, dash: 1.40, weight: 1.10, water: 0.50, mud: 0.50, ram: 1.25 },
+  swan: { speed: 0.98, dash: 1.15, weight: 1.35, water: 1.45, mud: 0.50, ram: 1.30 },
+  ram: { speed: 1.05, dash: 1.20, weight: 1.55, water: 0.45, mud: 0.45, ram: 1.65 },
+  boar: { speed: 1.10, dash: 1.20, weight: 1.50, water: 0.45, mud: 1.35, ram: 1.45 },
+  pegasus: { speed: 1.32, dash: 1.25, weight: 1.35, water: 0.85, mud: 0.85, ram: 1.35 },
+  bull: { speed: 1.05, dash: 1.15, weight: 1.70, water: 0.45, mud: 0.45, ram: 1.65 },
 };
 
 export const SKIN_COUNT = 4;

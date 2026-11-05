@@ -3,6 +3,7 @@
 import { thinkBot, newBrain, SPECIES_BOT_NAMES, SPECIES_NAMES_VI, type BotBrain } from './bots';
 import {
   CFG, DT, FOOD_KG, FOOD_WEIGHT, SKIN_COUNT, SUBSTEPS, TRAITS, radiusOf, pickRandomSpecies,
+  EVOLVED_PAIRS, DEVOLVED_PAIRS, isEvolvedSpecies,
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type Blob, type MapData, type TreeData, type TreeSize } from '../map';
@@ -325,7 +326,7 @@ export class World {
       species = pickRandomSpecies(name, this.rnd);
     }
     const id = this.nextId++;
-    const startMass = species === 'elephant' ? 1000 : species === 'cow' ? 100 : CFG.START_MASS;
+    const startMass = (species === 'elephant' || species === 'mammoth') ? 1000 : (species === 'cow' || species === 'bull') ? 100 : (isEvolvedSpecies(species) ? 3000 : CFG.START_MASS);
     const p: Player = {
       id, name: name.slice(0, 16), species,
       skin: skin !== undefined ? (skin % SKIN_COUNT) : Math.floor(this.rnd() * SKIN_COUNT),
@@ -349,6 +350,7 @@ export class World {
       species = pickRandomSpecies(p.name, this.rnd);
     }
     if (species) p.species = species;
+    else if (DEVOLVED_PAIRS[p.species]) p.species = DEVOLVED_PAIRS[p.species];
     if (skin !== undefined) p.skin = skin % SKIN_COUNT;
     if (team !== undefined) p.team = team;
     this.spawn(p);
@@ -437,14 +439,8 @@ export class World {
     if (this.currentRule === 'poultry') {
       if (!p.origSpecies) p.origSpecies = p.species;
       p.species = this.rnd() < 0.5 ? 'chicken' : 'duck';
-    } else if (p.species === 'gorilla') {
-      p.species = 'monkey';
-    } else if (p.species === 'mammoth') {
-      p.species = 'elephant';
-    } else if (p.species === 'wolf') {
-      p.species = 'dog';
     }
-    let spawnMass = p.species === 'elephant' ? 1000 : p.species === 'cow' ? 100 : CFG.START_MASS;
+    let spawnMass = (p.species === 'elephant' || p.species === 'mammoth') ? 1000 : (p.species === 'cow' || p.species === 'bull') ? 100 : (isEvolvedSpecies(p.species) ? 3000 : CFG.START_MASS);
     if (this.currentRule === 'titan') {
       spawnMass = 1000;
     } else if (this.currentRule === 'equal') {
@@ -987,8 +983,8 @@ export class World {
       }
       if (!p.alive) continue;
 
-      // 4. Pond drowning (ducks, dogs & wolves swim freely; other animals struggle for 1.5s before drowning)
-      if (p.species !== 'duck' && p.species !== 'dog' && p.species !== 'wolf') {
+      // 4. Pond drowning (ducks, swans, dogs, wolves & pegasus swim/fly freely; other animals struggle for 1.5s before drowning)
+      if (p.species !== 'duck' && p.species !== 'swan' && p.species !== 'dog' && p.species !== 'wolf' && p.species !== 'pegasus') {
         let inPond = false;
         for (const b of (this.map.pond || [])) {
           if (insideBlob(b, p.x, p.z, -0.7)) {
@@ -1385,80 +1381,30 @@ export class World {
         }
       }
 
-      // Monkey Evolution into Gorilla when reaching 3 tons (3000 kg)
-      if (p.alive && p.species === 'monkey' && p.mass >= 3000) {
-        p.species = 'gorilla';
+      // Animal Evolution into Evolved form when reaching 3 tons (3000 kg)
+      const evolvedTarget = EVOLVED_PAIRS[p.species];
+      if (p.alive && evolvedTarget && p.mass >= 3000) {
+        p.species = evolvedTarget;
         delete p.morphT; // Permanent evolution while alive
         delete p.morphOrigSpecies;
         this.events.push({
           k: 'morph',
           id: p.id,
-          species: 'gorilla',
+          species: evolvedTarget,
           dur: 0,
         });
       }
 
-      // Gorilla De-evolution into Monkey when dropping below 1 ton (1000 kg)
-      if (p.alive && p.species === 'gorilla' && p.mass < 1000) {
-        p.species = 'monkey';
+      // Animal De-evolution into Base form when dropping below 1 ton (1000 kg)
+      const devolvedTarget = DEVOLVED_PAIRS[p.species];
+      if (p.alive && devolvedTarget && p.mass < 1000) {
+        p.species = devolvedTarget;
         delete p.morphT;
         delete p.morphOrigSpecies;
         this.events.push({
           k: 'morph',
           id: p.id,
-          species: 'monkey',
-          dur: 0,
-        });
-      }
-
-      // Elephant Evolution into Mammoth when reaching 3 tons (3000 kg)
-      if (p.alive && p.species === 'elephant' && p.mass >= 3000) {
-        p.species = 'mammoth';
-        delete p.morphT; // Permanent evolution while alive
-        delete p.morphOrigSpecies;
-        this.events.push({
-          k: 'morph',
-          id: p.id,
-          species: 'mammoth',
-          dur: 0,
-        });
-      }
-
-      // Mammoth De-evolution into Elephant when dropping below 1 ton (1000 kg)
-      if (p.alive && p.species === 'mammoth' && p.mass < 1000) {
-        p.species = 'elephant';
-        delete p.morphT;
-        delete p.morphOrigSpecies;
-        this.events.push({
-          k: 'morph',
-          id: p.id,
-          species: 'elephant',
-          dur: 0,
-        });
-      }
-
-      // Dog Evolution into Wolf when reaching 3 tons (3000 kg)
-      if (p.alive && p.species === 'dog' && p.mass >= 3000) {
-        p.species = 'wolf';
-        delete p.morphT; // Permanent evolution while alive
-        delete p.morphOrigSpecies;
-        this.events.push({
-          k: 'morph',
-          id: p.id,
-          species: 'wolf',
-          dur: 0,
-        });
-      }
-
-      // Wolf De-evolution into Dog when dropping below 1 ton (1000 kg)
-      if (p.alive && p.species === 'wolf' && p.mass < 1000) {
-        p.species = 'dog';
-        delete p.morphT;
-        delete p.morphOrigSpecies;
-        this.events.push({
-          k: 'morph',
-          id: p.id,
-          species: 'dog',
+          species: devolvedTarget,
           dur: 0,
         });
       }
@@ -2045,7 +1991,7 @@ export class World {
   }
 
   private dash(p: Player): void {
-    if (p.terrain === 1) return;
+    if (p.terrain === 1 && p.species !== 'swan' && p.species !== 'pegasus') return;
     if (p.superT > 0) {
       if (p.species === 'monkey' || p.species === 'gorilla') {
         if (p.holdT <= 0.15) {
@@ -2110,6 +2056,20 @@ export class World {
       }
       if (p.species === 'wolf' && p.holdT > 0.15) {
         this.startWolfChargedSkill(p, true);
+        return;
+      }
+      if (p.species === 'pegasus' || p.species === 'phoenix') {
+        p.a = p.input.a;
+        const flySpeed = p.species === 'phoenix' ? 68 : 65;
+        p.vx = Math.cos(p.a) * flySpeed;
+        p.vz = Math.sin(p.a) * flySpeed;
+        p.dashT = 0.55;
+        p.flyT = 0.55;
+        p.plow = true;
+        p.power = 5.0;
+        p.cd = p.species === 'phoenix' ? CFG.DASH_CD * 0.5 : CFG.DASH_CD * 0.7;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
       p.a = p.input.a;
@@ -2234,6 +2194,74 @@ export class World {
       return;
     }
 
+    if (p.species === 'pegasus' && p.holdT > 0.15) {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      p.a = p.input.a;
+      const flySpeed = 44 * (1 + 0.3 * c);
+      p.vx = Math.cos(p.a) * flySpeed;
+      p.vz = Math.sin(p.a) * flySpeed;
+      p.dashT = 0.55;
+      p.flyT = 0.55;
+      p.plow = true;
+      p.power = 2.4;
+      p.cd = CFG.DASH_CD;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      return;
+    }
+
+    if (p.species === 'bull' && p.holdT > 0.15) {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      // Bull ground stomp tremor in 10m radius
+      const stompR = 10;
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id) continue;
+        if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
+          if (!isEvolvedSpecies(other.species) && other.shieldT <= 0) {
+            other.stunT = Math.max(other.stunT, 0.4);
+          }
+        }
+      }
+      p.a = p.input.a;
+      const speed = 40 * (1 + 0.45 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.36 + 0.22 * c;
+      p.plow = true;
+      p.power = 2.6;
+      p.cd = CFG.DASH_CD + 0.2;
+      p.dashHit.clear();
+      return;
+    }
+
+    if (p.species === 'ram' && p.holdT > 0.15) {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      p.a = p.input.a;
+      const speed = 42 * (1 + 0.45 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.35 + 0.25 * c;
+      p.plow = true;
+      p.power = 2.8;
+      p.cd = CFG.DASH_CD + 0.1;
+      p.dashHit.clear();
+      return;
+    }
+
+    if (p.species === 'boar' && p.holdT > 0.15) {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      p.a = p.input.a;
+      const speed = 40 * (1 + 0.4 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.32 + 0.22 * c;
+      p.plow = true;
+      p.power = 2.3;
+      p.cd = CFG.DASH_CD;
+      p.dashHit.clear();
+      return;
+    }
+
     const d = dashParams(p.species, p.holdT, p.terrain);
     p.a = p.input.a;
     p.vx = Math.cos(p.a) * d.speed;
@@ -2241,8 +2269,10 @@ export class World {
     p.dashT = d.time;
     p.plow = d.plow;
     p.power = d.power;
-    const baseCd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
-    p.cd = baseCd + (d.plow ? CFG.PLOW_CD * (p.species === 'chicken' ? 0.65 : 1) : 0);
+    const isPhoenix = p.species === 'phoenix';
+    const isChicken = p.species === 'chicken';
+    const baseCd = isPhoenix ? CFG.DASH_CD * 0.5 : isChicken ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
+    p.cd = baseCd + (d.plow ? CFG.PLOW_CD * (isPhoenix ? 0.5 : isChicken ? 0.65 : 1) : 0);
     p.dashHit.clear();
   }
 
@@ -2822,8 +2852,8 @@ export class World {
           hit = true;
           const att = this.players.get(proj.ownerId);
 
-          // Shield immunity & Gorilla/Mammoth passive immunity: immune to stun, flinch, knockback, and loss
-          if (target.shieldT > 0 || ((target.species === 'gorilla' || target.species === 'mammoth') && (!att || att.mass < 1000))) {
+          // Shield immunity & Evolved passive immunity: immune to stun, flinch, knockback, and loss
+          if (target.shieldT > 0 || (isEvolvedSpecies(target.species) && (!att || att.mass < 1000))) {
             this.events.push({
               k: 'bananaHit',
               id: target.id,
@@ -2968,7 +2998,7 @@ export class World {
           this.scatter(target.x, target.z, massLoss, radiusOf(target.mass) + 2.0, proj.vx, proj.vz);
 
           let knockback = proj.giant ? 44.0 : proj.tier === 2 ? 34.0 : proj.tier === 1 ? 26.0 : 18.0;
-          if (proj.giant && (target.species === 'gorilla' || target.species === 'mammoth')) {
+          if (proj.giant && isEvolvedSpecies(target.species)) {
             knockback *= 0.5;
           }
           target.vx += Math.cos(hitAngle) * knockback;
@@ -3026,11 +3056,11 @@ export class World {
         const nx = dx / d, nz = dz / d;
         const ma = a.mass * TRAITS[a.species].weight, mb = b.mass * TRAITS[b.species].weight;
 
-        // separate, the lighter one moves more; Gorilla, Mammoth & Wolf are unyielding against < 1 ton animals or animals they just slammed/squished; Shield is unyielding against all
+        // separate, the lighter one moves more; Evolved forms (Gorilla, Mammoth, Wolf, Phoenix, Swan, Ram, Boar, Pegasus, Bull) are unyielding against < 1 ton animals or animals they just slammed/squished; Shield is unyielding against all
         const aJustHitB = b.lastHitBy === a.id && (this.time - b.lastHitT) < 0.6;
         const bJustHitA = a.lastHitBy === b.id && (this.time - a.lastHitT) < 0.6;
-        const aImmune = ((a.species === 'gorilla' || a.species === 'mammoth' || a.species === 'wolf') && (b.mass < 1000 || aJustHitB || b.squishT > 0)) || a.shieldT > 0 || (a.species === 'monkey' && aJustHitB);
-        const bImmune = ((b.species === 'gorilla' || b.species === 'mammoth' || b.species === 'wolf') && (a.mass < 1000 || bJustHitA || a.squishT > 0)) || b.shieldT > 0 || (b.species === 'monkey' && bJustHitA);
+        const aImmune = (isEvolvedSpecies(a.species) && (b.mass < 1000 || aJustHitB || b.squishT > 0)) || a.shieldT > 0 || (a.species === 'monkey' && aJustHitB);
+        const bImmune = (isEvolvedSpecies(b.species) && (a.mass < 1000 || bJustHitA || a.squishT > 0)) || b.shieldT > 0 || (b.species === 'monkey' && bJustHitA);
         let wa = mb / (ma + mb);
         if (aImmune) wa = 0;
         else if (bImmune) wa = 1;
@@ -3241,8 +3271,8 @@ export class World {
           const hitDist = radiusOf(m.mass) + radiusOf(target.mass) + 0.4;
           if (dist < hitDist && m.cd <= 0) {
             m.cd = 0.8;
-            if (target.species === 'gorilla' || target.species === 'mammoth' || target.shieldT > 0) {
-              // Gorilla, Mammoth and Shielded targets: immune to minion stun and knockback (target moves freely!)
+            if (isEvolvedSpecies(target.species) || target.shieldT > 0) {
+              // Evolved and Shielded targets: immune to minion stun and knockback (target moves freely!)
               m.vx = -Math.cos(aimA) * 12;
               m.vz = -Math.sin(aimA) * 12;
               const loss = target.shieldT > 0 ? Math.min(target.mass - 10, 8) : 0;
@@ -3610,8 +3640,8 @@ export class World {
       return;
     }
 
-    // Gorilla, Mammoth & Wolf immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
-    if ((vic.species === 'gorilla' || vic.species === 'mammoth' || vic.species === 'wolf') && att.mass < 1000 && !(att.superT > 0)) {
+    // Evolved species immunity: immune to stun, flinch, knockback, and loss from animals < 1 ton (unless rainbow powered!)
+    if (isEvolvedSpecies(vic.species) && att.mass < 1000 && !(att.superT > 0)) {
       att.vx = -nx * 18;
       att.vz = -nz * 18;
       att.dashT = 0;
@@ -3667,8 +3697,8 @@ export class World {
     // Super Rainbow Dash: violent massive knockback launching victim across arena into fence (doubled power)
     if (att.superT > 0) {
       k = Math.max(k * 4.4, 150);
-      // Giảm 1/2 uy lực bị húc văng bởi cầu vồng đối với Voi mammoth và Gorilla
-      if (vic.species === 'gorilla' || vic.species === 'mammoth') {
+      // Giảm 1/2 uy lực bị húc văng bởi cầu vồng đối với các loài thú khổng lồ
+      if (vic.species === 'gorilla' || vic.species === 'mammoth' || vic.species === 'bull' || vic.species === 'ram' || vic.species === 'boar') {
         k *= 0.5;
       }
     }
@@ -3680,6 +3710,44 @@ export class World {
     att.dashHit.add(vic.id);
     if (att.plow || (att.species === 'mammoth' && vic.mass < 100)) { att.vx *= 0.8; att.vz *= 0.8; }
     else { att.dashT = 0; att.vx *= 0.25; att.vz *= 0.25; }
+
+    // Boar: mud blast slows target 50% for 2s
+    if (att.species === 'boar' && att.plow) {
+      vic.slowT = Math.max(vic.slowT, 2.0);
+    }
+
+    // Ram: battering ram stun
+    if (att.species === 'ram') {
+      vic.stunT = Math.max(vic.stunT, 0.8);
+      if (outsideFence(vic)) {
+        vic.stunT = Math.max(vic.stunT, 1.2);
+      }
+    }
+
+    // Bull: ferocious gore and mass siphon
+    if (att.species === 'bull') {
+      vic.stunT = Math.max(vic.stunT, 0.45);
+      const stolen = Math.min(vic.mass - 10, Math.round(vic.mass * 0.05));
+      if (stolen > 0) {
+        vic.mass -= stolen;
+        att.mass += stolen;
+      }
+    }
+
+    // Swan: ice wave surges and slides victim
+    if (att.species === 'swan') {
+      vic.vx += nx * 12;
+      vic.vz += nz * 12;
+    }
+
+    // Phoenix: fiery blaze singes victim and scatters food
+    if (att.species === 'phoenix') {
+      const burnDrop = Math.min(vic.mass - 10, Math.round(vic.mass * 0.05));
+      if (burnDrop > 0) {
+        vic.mass -= burnDrop;
+        this.scatter(vic.x, vic.z, burnDrop, radiusOf(vic.mass) + 1.5, nx * 8, nz * 8);
+      }
+    }
 
     // Elephant passive: when mass >= 1000kg, ramming instantly squashes & kills rivals under 50kg (like Farmer Till's tractor)
     if (att.species === 'elephant' && att.mass >= 1000 && vic.mass < 50) {
@@ -3915,12 +3983,8 @@ export class World {
     p.wolfBitesLeft = 0;
     p.wolfTargetId = undefined;
     p.wolfChainTargets = undefined;
-    if (p.species === 'gorilla') {
-      p.species = 'monkey';
-    } else if (p.species === 'mammoth') {
-      p.species = 'elephant';
-    } else if (p.species === 'wolf') {
-      p.species = 'dog';
+    if (DEVOLVED_PAIRS[p.species]) {
+      p.species = DEVOLVED_PAIRS[p.species];
     }
     if (p.morphOrigSpecies) {
       p.species = p.morphOrigSpecies;
@@ -4351,7 +4415,7 @@ export class World {
       if (!o.alive) continue;
       const flags = (o.dashT > 0 ? FLAG.DASH : 0) | (o.plow ? FLAG.PLOW : 0) | (o.charging ? FLAG.CHARGING : 0)
         | (o.stunT > 0 ? FLAG.STUN : 0) | (o.terrain === 1 ? FLAG.WATER : 0) | (o.terrain === 2 ? FLAG.MUD : 0)
-        | (o.species !== 'duck' && o.species !== 'dog' && o.species !== 'wolf' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
+        | (o.species !== 'duck' && o.species !== 'swan' && o.species !== 'dog' && o.species !== 'wolf' && o.species !== 'pegasus' && o.inWaterT > 0 ? FLAG.DROWNING : 0)
         | (o.slowT > 0 ? FLAG.SONG : 0)
         | (o.pitchforkT > 0 ? FLAG.PITCHFORK : 0)
         | (o.hasDynamite ? FLAG.DYNAMITE : 0)

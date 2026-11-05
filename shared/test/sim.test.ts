@@ -3126,6 +3126,179 @@ describe('fruit trees', () => {
       expect(wolf.mass).toBeGreaterThan(3000);
     });
   });
+
+  describe('six new evolved animals mechanics and balance', () => {
+    it('evolves all 6 base animals to their evolved form at 3000kg and devolves below 1000kg', () => {
+      const pairs: [Species, Species][] = [
+        ['chicken', 'phoenix'],
+        ['duck', 'swan'],
+        ['sheep', 'ram'],
+        ['pig', 'boar'],
+        ['horse', 'pegasus'],
+        ['cow', 'bull'],
+      ];
+
+      for (const [base, evolved] of pairs) {
+        const w = emptyWorld();
+        const pId = w.addPlayer('TestBeast', base, false);
+        const p = place(w, pId, 0, 0, 2999);
+        w.step();
+        expect(p.species).toBe(base);
+
+        p.mass = 3000;
+        w.step();
+        expect(p.species).toBe(evolved);
+        expect(w.events.some((e) => e.k === 'morph' && e.id === pId && e.species === evolved)).toBe(true);
+
+        p.mass = 999;
+        w.step();
+        expect(p.species).toBe(base);
+        expect(w.events.some((e) => e.k === 'morph' && e.id === pId && e.species === base)).toBe(true);
+      }
+    });
+
+    it('phoenix has rapid dash, 0.5x cooldown, and sheds burning food on hit', () => {
+      const w = emptyWorld();
+      const pId = w.addPlayer('Phoenix', 'phoenix', false);
+      const vId = w.addPlayer('Victim', 'sheep', false);
+      const p = place(w, pId, 0, 0, 3000);
+      const vic = place(w, vId, 3, 0, 500);
+
+      // Cooldown test
+      p.holdT = 0.05;
+      p.input.a = 0;
+      (w as any).dash(p);
+      expect(p.cd).toBeCloseTo(CFG.DASH_CD * 0.5, 1);
+
+      // Hit test: phoenix singes victim and scatters food
+      const initialFoods = w.food.size;
+      w.hit(p, vic, 25, 1, 0);
+      expect(w.food.size).toBeGreaterThan(initialFoods);
+    });
+
+    it('swan swims freely without drowning, moves faster in water, and creates sliding ice waves', () => {
+      const w = emptyWorld();
+      w.map.pond = [[0, 0, 10, 10, 0, 1, 1, 1, 1, 1, 1, 1, 1]];
+      const sId = w.addPlayer('Swan', 'swan', false);
+      const vId = w.addPlayer('Victim', 'cow', false);
+      const swan = place(w, sId, 0, 0, 3000);
+      const vic = place(w, vId, 3, 0, 500);
+
+      for (let i = 0; i < 40; i++) {
+        w.step();
+      }
+      expect(swan.alive).toBe(true);
+      expect(swan.inWaterT).toBe(0);
+      expect(TRAITS.swan.water).toBe(1.45);
+
+      // Hit test: swan pushes victim with extra slide velocity
+      w.hit(swan, vic, 20, 1, 0);
+      expect(vic.vx).toBeGreaterThan(10);
+    });
+
+    it('ram has colossal ram power, heavy weight, and stuns victims on impact', () => {
+      const w = emptyWorld();
+      const rId = w.addPlayer('Ram', 'ram', false);
+      const vId = w.addPlayer('Victim', 'pig', false);
+      const ram = place(w, rId, 0, 0, 3000);
+      const vic = place(w, vId, 3, 0, 500);
+
+      expect(TRAITS.ram.ram).toBe(1.65);
+      expect(TRAITS.ram.weight).toBe(1.55);
+
+      // Regular impact stuns victim for 0.8s
+      w.hit(ram, vic, 25, 1, 0);
+      expect(vic.stunT).toBeGreaterThanOrEqual(0.8);
+    });
+
+    it('boar speeds up in mud and its charged mud plow slows victims by 50% for 2s', () => {
+      const w = emptyWorld();
+      const bId = w.addPlayer('Boar', 'boar', false);
+      const vId = w.addPlayer('Victim', 'sheep', false);
+      const boar = place(w, bId, 0, 0, 3000);
+      const vic = place(w, vId, 3, 0, 500);
+
+      expect(TRAITS.boar.mud).toBe(1.35);
+
+      boar.plow = true;
+      w.hit(boar, vic, 25, 1, 0);
+      expect(vic.slowT).toBe(2.0);
+    });
+
+    it('pegasus moves at 1.32x speed, does not drown, and takes flight on charged dash', () => {
+      const w = emptyWorld();
+      w.map.pond = [[0, 0, 10, 10, 0, 1, 1, 1, 1, 1, 1, 1, 1]];
+      const pegId = w.addPlayer('Pegasus', 'pegasus', false);
+      const peg = place(w, pegId, 0, 0, 3000);
+
+      expect(TRAITS.pegasus.speed).toBe(1.32);
+
+      for (let i = 0; i < 35; i++) {
+        w.step();
+      }
+      expect(peg.alive).toBe(true);
+      expect(peg.inWaterT).toBe(0);
+
+      // Charged dash takes flight
+      peg.holdT = 0.8;
+      peg.input.a = 0;
+      (w as any).dash(peg);
+      expect(peg.flyT).toBeGreaterThan(0);
+      expect(w.events.some((e) => e.k === 'fly' && e.id === pegId)).toBe(true);
+    });
+
+    it('bull has 1.70x weight, charged stomp flinches nearby rivals, and horns siphon mass', () => {
+      const w = emptyWorld();
+      const bullId = w.addPlayer('Bull', 'bull', false);
+      const v1Id = w.addPlayer('NearVictim', 'chicken', false);
+      const v2Id = w.addPlayer('FarVictim', 'duck', false);
+      const bull = place(w, bullId, 0, 0, 3000);
+      const v1 = place(w, v1Id, 5, 0, 100);
+      const v2 = place(w, v2Id, 25, 0, 100);
+
+      expect(TRAITS.bull.weight).toBe(1.70);
+      expect(TRAITS.bull.ram).toBe(1.65);
+
+      // Charged stomp
+      bull.holdT = 0.5;
+      bull.input.a = 0;
+      (w as any).dash(bull);
+
+      // Nearby victim stunned by tremor; far victim untouched
+      expect(v1.stunT).toBeGreaterThan(0);
+      expect(v2.stunT).toBe(0);
+
+      // Horn gore siphons mass
+      const v1MassBefore = v1.mass;
+      const bullMassBefore = bull.mass;
+      w.hit(bull, v1, 25, 1, 0);
+      expect(v1.mass).toBeLessThan(v1MassBefore);
+      expect(bull.mass).toBeGreaterThan(bullMassBefore);
+    });
+
+    it('all 6 new evolved beasts are immune to knockback, stun, and loss from rivals under 1000kg', () => {
+      const evolvedList: Species[] = ['phoenix', 'swan', 'ram', 'boar', 'pegasus', 'bull'];
+
+      for (const sp of evolvedList) {
+        const w = emptyWorld();
+        const evId = w.addPlayer('EvolvedTitan', sp, false);
+        const attId = w.addPlayer('SmallAttacker', 'pig', false);
+        const titan = place(w, evId, 0, 0, 3000);
+        const attacker = place(w, attId, 2, 0, 50);
+
+        const titanMassBefore = titan.mass;
+        w.hit(attacker, titan, 25, 1, 0);
+
+        // Titan unyielding: zero stun, zero mass loss
+        expect(titan.stunT).toBe(0);
+        expect(titan.mass).toBe(titanMassBefore);
+
+        // Attacker is rebuffed and stunned
+        expect(attacker.stunT).toBeGreaterThan(0);
+        expect(attacker.vx).toBeLessThan(0);
+      }
+    });
+  });
 });
 
 

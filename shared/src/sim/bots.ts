@@ -83,6 +83,24 @@ export const SPECIES_BOT_NAMES: Record<Species, string[]> = {
   wolf: [
     'Sói Đầu Đàn', 'Sói Bạc', 'Hắc Lang', 'Bạch Lang Vương', 'Sói Bắc Cực',
   ],
+  phoenix: [
+    'Phượng Hoàng Lửa', 'Kim Kê Thần', 'Hoàng Kim Điểu', 'Phượng Hoàng Băng', 'Hỏa Điểu',
+  ],
+  swan: [
+    'Thiên Nga Tuyết', 'Bạch Nga Vương', 'Thiên Nga Băng', 'Nga Hoàng', 'Thiên Nga Thần',
+  ],
+  ram: [
+    'Sơn Dương Sắt', 'Thiết Sừng Dương', 'Dương Vương', 'Kim Giác Dương', 'Thần Cừu Chiến',
+  ],
+  boar: [
+    'Chiến Tướng Heo Rừng', 'Trư Ma Vương', 'Độc Giác Bão Bùn', 'Nanh Thép', 'Hung Hãn Thần Trư',
+  ],
+  pegasus: [
+    'Thiên Mã Pegasus', 'Thần Mã Tung Hoành', 'Bạch Mã Có Cánh', 'Quang Minh Thiên Mã', 'Chiến Mã Tinh Vân',
+  ],
+  bull: [
+    'Ngưu Vương Chiến Trường', 'Bò Tót Cuồng Nộ', 'Đại Lực Ngưu Ma', 'Kim Ngưu Bất Bại', 'Hắc Bò Đấu Trường',
+  ],
 };
 
 export const SPECIES_NAMES_VI: Record<Species, string> = {
@@ -98,7 +116,16 @@ export const SPECIES_NAMES_VI: Record<Species, string> = {
   gorilla: 'Gorilla',
   mammoth: 'Voi Ma Mút',
   wolf: 'Chó Sói',
+  phoenix: 'Phượng Hoàng',
+  swan: 'Thiên Nga',
+  ram: 'Sơn Dương',
+  boar: 'Heo Rừng',
+  pegasus: 'Thiên Mã',
+  bull: 'Bò Tót',
 };
+
+export const canSafelyTraverseWater = (s: Species): boolean =>
+  s === 'duck' || s === 'swan' || s === 'dog' || s === 'wolf' || s === 'pegasus';
 
 export const BOT_NAMES = Object.values(SPECIES_BOT_NAMES).flat();
 
@@ -133,8 +160,8 @@ export function isHazardAt(map: MapData, x: number, z: number, species: Species,
     if (Math.hypot(x - fx, z - fz) < fr + margin + 1.2) return true;
   }
 
-  // 4. Pond (dangerous for non-ducks & non-dogs/wolves)
-  if (species !== 'duck' && species !== 'dog' && species !== 'wolf') {
+  // 4. Pond (dangerous for non-swimmers)
+  if (!canSafelyTraverseWater(species)) {
     for (const b of map.pond || []) {
       if (insideBlob(b, x, z, margin * 0.6)) return true;
       if (Math.hypot(x - b[0], z - b[1]) < b[2] * 1.4 + margin + 1.5) return true;
@@ -166,7 +193,7 @@ function rayCrossesHazard(map: MapData, x1: number, z1: number, x2: number, z2: 
   for (const [fx, fz, fr] of map.fire || []) {
     if (hits(fx, fz, fr + 3.2)) return true;
   }
-  if (species !== 'duck' && species !== 'dog' && species !== 'wolf') {
+  if (!canSafelyTraverseWater(species)) {
     for (const b of map.pond || []) {
       if (hits(b[0], b[1], b[2] * 1.35 + 3.0)) return true;
     }
@@ -236,8 +263,8 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     b.goalT = 8.0 + w.rand() * 8.0; // Roam towards this waypoint for 8-16 seconds across the map
   }
 
-  // 2. CRITICAL SURVIVAL: Emergency water escape for non-ducks and non-dogs/wolves
-  if (p.species !== 'duck' && p.species !== 'dog' && p.species !== 'wolf' && p.inWaterT > 0) {
+  // 2. CRITICAL SURVIVAL: Emergency water escape for non-swimmers
+  if (!canSafelyTraverseWater(p.species) && p.inWaterT > 0) {
     let bestLandAngle = Math.atan2(-p.z, -p.x);
     for (const bnd of w.map.pond || []) {
       if (insideBlob(bnd, p.x, p.z, 0)) {
@@ -334,7 +361,7 @@ export function thinkBot(w: World, p: Player, dt: number): void {
         break;
       }
     }
-    if (o.species !== 'duck' && o.species !== 'dog' && o.species !== 'wolf') {
+    if (!canSafelyTraverseWater(o.species)) {
       for (const [px, pz, pr] of w.map.pond || []) {
         if (Math.hypot(o.x - px, o.z - pz) < pr + 5) {
           hazardBonus += 1.3;
@@ -461,8 +488,8 @@ export function thinkBot(w: World, p: Player, dt: number): void {
     }
   }
 
-  // Ponds for non-ducks and non-dogs/wolves: strong outward vector
-  if (p.species !== 'duck' && p.species !== 'dog' && p.species !== 'wolf') {
+  // Ponds for non-swimmers: strong outward vector
+  if (!canSafelyTraverseWater(p.species)) {
     for (const bnd of w.map.pond || []) {
       const d = Math.hypot(p.x - bnd[0], p.z - bnd[1]);
       const safeDist = bnd[2] * 1.35 + r + 5.0;

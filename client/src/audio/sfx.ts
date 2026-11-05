@@ -198,12 +198,66 @@ const SQUEAK: Record<Species, number> = {
   gorilla: 140,
   mammoth: 120,
   wolf: 210,
+  phoenix: 1200,
+  swan: 750,
+  ram: 450,
+  boar: 320,
+  pegasus: 420,
+  bull: 160,
 };
 
 export function yelp(species: Species, vol = 1): void {
   if (!ready() || vol < 0.05) return;
   const f = SQUEAK[species] || 700;
-  tone(species === 'cow' ? 'sawtooth' : 'square', f, f * 0.7, 0.16, 0.08 * vol, { attack: 0.02 });
+  tone(species === 'cow' || species === 'bull' ? 'sawtooth' : 'square', f, f * 0.7, 0.16, 0.08 * vol, { attack: 0.02 });
+}
+
+export function sfxPhoenixCry(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Majestic bird cry + shimmering fire screech
+  tone('triangle', 880, 1760, 0.45, 0.45 * vol, { attack: 0.04 });
+  tone('sawtooth', 1200, 650, 0.55, 0.35 * vol, { delay: 0.08, attack: 0.03 });
+  noise('bandpass', 1800, 600, 2.5, 0.50, 0.25 * vol, { attack: 0.05 });
+}
+
+export function sfxSwanCall(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Resonant royal swan trumpet / bugle
+  tone('sawtooth', 380, 520, 0.65, 0.40 * vol, { attack: 0.06 });
+  tone('triangle', 520, 440, 0.55, 0.35 * vol, { delay: 0.15, attack: 0.04 });
+  noise('bandpass', 850, 350, 2.0, 0.45, 0.20 * vol, { attack: 0.05 });
+}
+
+export function sfxRamBash(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Heavy bone-cracking anvil clash
+  tone('square', 240, 80, 0.25, 0.60 * vol, { attack: 0.005 });
+  tone('sawtooth', 360, 110, 0.20, 0.45 * vol, { attack: 0.003 });
+  noise('bandpass', 1200, 300, 3.0, 0.25, 0.65 * vol, { attack: 0.003 });
+}
+
+export function sfxBoarGrunt(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Low aggressive guttural boar grunt
+  tone('sawtooth', 160, 70, 0.35, 0.55 * vol, { attack: 0.02 });
+  tone('square', 110, 45, 0.40, 0.40 * vol, { delay: 0.05, attack: 0.03 });
+  noise('bandpass', 450, 150, 3.5, 0.35, 0.45 * vol, { attack: 0.02 });
+}
+
+export function sfxPegasusNeigh(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Heroic celestial horse whinny
+  tone('sawtooth', 550, 880, 0.40, 0.45 * vol, { attack: 0.03 });
+  tone('triangle', 880, 660, 0.50, 0.35 * vol, { delay: 0.18, attack: 0.04 });
+  tone('sine', 1100, 1650, 0.35, 0.25 * vol, { delay: 0.05, attack: 0.02 });
+}
+
+export function sfxBullRoar(vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  // Deep ferocious arena bull bellow & earth stomp
+  tone('sawtooth', 120, 45, 0.85, 0.65 * vol, { attack: 0.05 });
+  tone('sine', 55, 30, 0.95, 0.80 * vol, { attack: 0.06 });
+  noise('bandpass', 280, 90, 4.0, 0.75, 0.50 * vol, { attack: 0.04 });
 }
 
 export function sfxGorillaRoar(vol = 1): void {

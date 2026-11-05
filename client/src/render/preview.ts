@@ -226,12 +226,18 @@ export class AnimalPreviewRenderer {
       gorilla: 0.95,
       mammoth: 0.80,
       wolf: 0.96,
+      phoenix: 0.95,
+      swan: 0.95,
+      ram: 0.96,
+      boar: 0.95,
+      pegasus: 0.88,
+      bull: 0.88,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
 
-    // Center pig / elephant / gorilla pivot so their protruding parts stay nicely inside the frame
-    if (species === 'pig' || species === 'elephant' || species === 'gorilla' || species === 'wolf') {
+    // Center pivot so protruding parts stay nicely inside the frame
+    if (species === 'pig' || species === 'elephant' || species === 'gorilla' || species === 'wolf' || species === 'boar' || species === 'bull' || species === 'ram') {
       root.position.x = -0.12;
     } else {
       root.position.x = 0;
@@ -363,10 +369,16 @@ export class AnimalPreviewRenderer {
       gorilla: 0.95,
       mammoth: 0.80,
       wolf: 0.96,
+      phoenix: 0.95,
+      swan: 0.95,
+      ram: 0.96,
+      boar: 0.95,
+      pegasus: 0.88,
+      bull: 0.88,
     };
     const s = scales[species] || 1.05;
     root.scale.set(s, s, s);
-    if (species === 'pig' || species === 'elephant' || species === 'wolf') {
+    if (species === 'pig' || species === 'elephant' || species === 'gorilla' || species === 'wolf' || species === 'boar' || species === 'bull' || species === 'ram') {
       root.position.x = -0.12;
     }
 
