@@ -1631,6 +1631,38 @@ describe('fruit trees', () => {
       }
     });
 
+    it('minion attack inflicts reduced stun of 0.2s (reduced by half)', () => {
+      const w = emptyWorld();
+      const ownerId = w.addPlayer('Leader', 'pig');
+      const victimId = w.addPlayer('Victim', 'sheep');
+      const leader = place(w, ownerId, 0, 0, 100);
+      const victim = place(w, victimId, 1, 0, 100);
+
+      leader.lastAttackedId = victimId;
+      leader.lastAttackedT = w.time;
+      victim.lastHitBy = leader.id;
+      victim.lastHitT = w.time;
+
+      w.minions.set(1001, {
+        id: 1001,
+        ownerId: leader.id,
+        x: 0.8,
+        z: 0,
+        vx: 0,
+        vz: 0,
+        a: 0,
+        mass: 25,
+        species: 'pig',
+        skin: 0,
+        cd: 0,
+        targetId: victimId,
+        alive: true,
+      });
+
+      w.step();
+      expect(victim.stunT).toBeCloseTo(0.2, 2);
+    });
+
     it('minions maintain separation and do not overlap', () => {
       const w = emptyWorld();
       const ownerId = w.addPlayer('Boss', 'pig');

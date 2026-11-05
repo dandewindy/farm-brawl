@@ -3293,7 +3293,7 @@ export class World {
             } else {
               target.vx += Math.cos(aimA) * 18;
               target.vz += Math.sin(aimA) * 18;
-              target.stunT = 0.4;
+              target.stunT = 0.2; // Minion stun reduced by 50% (from 0.4s to 0.2s)
               target.lastHitBy = owner.id;
               target.lastHitT = this.time;
               const loss = Math.min(target.mass - 10, 8);
