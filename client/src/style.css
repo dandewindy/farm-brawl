@@ -6092,13 +6092,13 @@ body:not(.is-pc) .kids-top-timer {
 }
 
 /* ==========================================================================
-   Admin Dev Sandbox Panel (PC Only)
+   Admin Dev Sandbox Panel
    ========================================================================== */
 .admin-panel {
   position: absolute;
   top: 76px;
   left: 12px;
-  width: 284px;
+  width: 290px;
   background: rgba(31, 24, 20, 0.94);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -6120,28 +6120,61 @@ body:not(.is-pc) .kids-top-timer {
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
-    width: min(94vw, 360px) !important;
-    max-height: min(86vh, 86dvh) !important;
+    width: min(88vw, 280px) !important;
+    max-height: min(84vh, 84dvh) !important;
     z-index: 1000 !important;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.5) !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     overflow: hidden !important;
   }
   .admin-panel.is-hidden {
     display: none !important;
   }
+  .admin-panel .ap-header {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
   .admin-panel .ap-body {
-    max-height: calc(86vh - 46px) !important;
-    max-height: calc(86dvh - 46px) !important;
+    max-height: calc(84vh - 38px) !important;
+    max-height: calc(84dvh - 38px) !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
-    padding: 10px !important;
+    padding: 6px 8px !important;
+    gap: 5px !important;
+  }
+  .admin-panel .ap-section {
+    padding-bottom: 4px !important;
+    gap: 3px !important;
+  }
+  .admin-panel .ap-sec-title {
+    font-size: 9.5px !important;
+    letter-spacing: 0.2px !important;
+  }
+  .admin-panel .ap-hint {
+    font-size: 8.5px !important;
+    margin-top: 1px !important;
   }
   .admin-panel .ap-btn {
-    padding: 8px 6px !important;
-    font-size: 12px !important;
-    min-height: 36px !important;
+    padding: 4px 3px !important;
+    font-size: 10px !important;
+    min-height: 27px !important;
+    border-radius: 5px !important;
     touch-action: manipulation;
+  }
+  .admin-panel .ap-input, .admin-panel .ap-select {
+    padding: 3px 4px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
+  }
+  .admin-panel .ap-input-count {
+    width: 32px !important;
+    padding: 3px 1px !important;
+  }
+  .admin-panel #apSpawnBtn {
+    padding: 3px 6px !important;
+    min-width: 38px !important;
+    font-size: 10px !important;
   }
   .admin-panel .ap-badge {
     display: none;
@@ -6211,9 +6244,10 @@ body:not(.is-pc) .kids-top-timer {
   padding: 8px 10px;
   max-height: 80vh;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .ap-body.is-collapsed {
@@ -6340,14 +6374,33 @@ body:not(.is-pc) .kids-top-timer {
   border: 1px solid #6d4c41;
   border-radius: 6px;
   padding: 4px 6px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-family: var(--f-body);
   font-weight: 700;
   box-sizing: border-box;
 }
 
 .ap-select {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ap-input-count {
+  width: 38px !important;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 4px 2px !important;
+}
+
+#apSpawnBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  min-width: 44px;
 }
 
 .ap-input:focus, .ap-select:focus {

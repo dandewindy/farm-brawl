@@ -90,20 +90,20 @@ export class AdminPanel {
           <div class="ap-sec-title">🎁 THẢ ITEM / QUẢ LÊN SÂN</div>
           <div class="ap-row">
             <select id="apItemType" class="ap-select">
-              <option value="rainbow_candy">🌈 Kẹo Cầu Vồng (Super)</option>
-              <option value="apple">🍎 Quả Táo (+2.5kg)</option>
-              <option value="carrot">🥕 Cà Rốt (+1.6kg)</option>
-              <option value="corn">🌽 Bắp Ngô (+1kg)</option>
-              <option value="pumpkin">🎃 Quả Bí Đỏ (+7kg)</option>
-              <option value="watermelon">🍉 Quả Dưa Hấu (+11kg)</option>
-              <option value="pitchfork">🍴 Chĩa Ba Sắt (Húc x2)</option>
-              <option value="dynamite">🧨 Thuốc Nổ Đỏ (Nổ 25%)</option>
-              <option value="speed">⚡ Giày Tăng Tốc</option>
-              <option value="shield">🛡️ Khiên Bất Hoại</option>
-              <option value="heart">❤️ Tim Hồi Sinh</option>
-              <option value="banana">🍌 Chuối Trơn</option>
+              <option value="rainbow_candy">🌈 Kẹo Super</option>
+              <option value="apple">🍎 Táo (+2.5kg)</option>
+              <option value="carrot">🥕 Cà rốt (+1.6kg)</option>
+              <option value="corn">🌽 Ngô (+1kg)</option>
+              <option value="pumpkin">🎃 Bí đỏ (+7kg)</option>
+              <option value="watermelon">🍉 Dưa hấu (+11kg)</option>
+              <option value="pitchfork">🍴 Chĩa ba (x2)</option>
+              <option value="dynamite">🧨 Thuốc nổ (-25%)</option>
+              <option value="speed">⚡ Tăng tốc</option>
+              <option value="shield">🛡️ Khiên</option>
+              <option value="heart">❤️ Tim</option>
+              <option value="banana">🍌 Chuối</option>
             </select>
-            <input type="number" id="apItemCount" class="ap-input" style="width: 48px; text-align: center;" value="5" min="1" max="30" />
+            <input type="number" id="apItemCount" class="ap-input ap-input-count" value="5" min="1" max="30" title="Số lượng" />
             <button type="button" id="apSpawnBtn" class="ap-btn ap-btn-action">Thả</button>
           </div>
         </div>
