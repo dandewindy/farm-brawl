@@ -938,38 +938,38 @@ function buildWolf(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
 
   // Đôi mắt sói hung dữ sắc lạnh hình quả hạnh nhân xếch ngược + Gờ chân mày cau có gầm gừ (Fierce Predator Wolf Eyes)
   const fierceEyeColor = eyeColor || 0xff9100; // Hổ phách rực lửa săn mồi
-  const eyeGlowMat = animalMat(fierceEyeColor, { roughness: 0.15, emissive: 0xff3d00, emissiveIntensity: 0.95 });
+  const eyeGlowMat = animalMat(fierceEyeColor, { roughness: 0.1, emissive: 0xff3d00, emissiveIntensity: 1.2 });
   const pupilMat = animalMat(0x050505, { roughness: 0.1 });
   const browMat = animalMat(maneColor, { roughness: 0.7 });
 
   // Nếp nhăn cau có giận dữ trên sống mũi giữa 2 mắt (Snarl wrinkles)
-  blob(headGroup, maneColor, 0.09, [1.45, 0.38, 0.82], 0.28, 0.15, 0, [0, 0, -0.15]);
+  blob(headGroup, maneColor, 0.10, [1.45, 0.38, 0.82], 0.28, 0.18, 0, [0, 0, -0.15]);
 
   for (const side of [-1, 1]) {
     // 1. Mắt sói xếch quả hạnh nhân (Almond-shaped slanted predator eye)
     const eyeGroup = new THREE.Group();
-    eyeGroup.position.set(0.24, 0.12, side * 0.205);
-    eyeGroup.rotation.set(side * 0.26, side * 0.36, -0.32);
+    eyeGroup.position.set(0.28, 0.18, side * 0.22);
+    eyeGroup.rotation.set(side * 0.28, side * 0.38, -0.36);
 
     // Lòng mắt quả hạnh nhân xếch phát sáng rực lửa hổ phách
-    const eyeSclera = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 10), eyeGlowMat);
-    eyeSclera.scale.set(1.42, 0.68, 0.42);
+    const eyeSclera = new THREE.Mesh(new THREE.SphereGeometry(0.092, 12, 10), eyeGlowMat);
+    eyeSclera.scale.set(1.5, 0.75, 0.45);
     eyeSclera.userData.eye = true;
     eyeGroup.add(eyeSclera);
 
     // Đồng tử mắt dựng đứng hình khe sắc nhọn (Demonic vertical slit predator pupil)
-    const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.10, 0.045), pupilMat);
-    pupil.position.set(0.028, 0, 0);
+    const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.12, 0.05), pupilMat);
+    pupil.position.set(0.032, 0, 0);
     pupil.userData.eye = true;
     eyeGroup.add(pupil);
 
     headGroup.add(eyeGroup);
 
     // 2. Gờ chân mày sói đậm dày, xếch chéo đè lên mắt tạo ánh nhìn gầm gừ hung dữ (Aggressive Furrowed Brow)
-    const browGeo = new THREE.BoxGeometry(0.18, 0.052, 0.075);
+    const browGeo = new THREE.BoxGeometry(0.22, 0.065, 0.085);
     const brow = new THREE.Mesh(browGeo, browMat);
-    brow.position.set(0.25, 0.18, side * 0.195);
-    brow.rotation.set(side * 0.35, side * 0.32, -0.42);
+    brow.position.set(0.28, 0.24, side * 0.21);
+    brow.rotation.set(side * 0.40, side * 0.35, -0.45);
     headGroup.add(brow);
   }
 
@@ -3723,6 +3723,8 @@ export class AnimalRenderer {
     const isWheel = (flags & FLAG.WHEEL) !== 0;
     const isTreeShake = (flags & FLAG.TREE_SHAKE) !== 0;
     const isMammothRoar = (flags & FLAG.MAMMOTH_ROAR) !== 0;
+    const isTossed = (flags & FLAG.TOSSED) !== 0;
+    const isBurning = (flags & FLAG.BURNING) !== 0;
     const lvl = (charge || 0) / 10;
     const isEvolved = isEvolvedSpecies(vis.species);
 
@@ -3880,10 +3882,25 @@ export class AnimalRenderer {
       const peakH = vis.leapHeight || (vis.species === 'gorilla' ? 5.5 + 2.5 * r : 4.0 + 2.0 * r);
       bodyY += arc * peakH;
     }
-    if (isFlying) bodyY += 1.1 * r;
+    if (isFlying) {
+      const flyH = (vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (2.2 * r + 0.6) : (1.1 * r);
+      bodyY += flyH;
+    }
+    if (isTossed) {
+      bodyY += 4.5 * sc + Math.sin(now * 0.01) * 0.4 * sc;
+    }
     if (sq > 0) bodyY = (y + 0.05) * sq + bodyY * (1 - sq);
     vis.root.position.set(x, bodyY, z);
     vis.root.rotation.y = -angle + (isStunned && sq <= 0.4 ? Math.sin(now / 50) * 0.5 : 0);
+    if (isTossed) {
+      vis.root.rotation.x = Math.sin(now * 0.012) * 2.2;
+      vis.root.rotation.z = Math.cos(now * 0.01) * 1.5;
+    } else {
+      vis.root.rotation.x = 0;
+    }
+    if (isBurning && Math.random() < 0.35) {
+      this.onPuff?.(x + (Math.random() - 0.5) * r, bodyY + Math.random() * r, z + (Math.random() - 0.5) * r, 0xff3d00, 1.2, 0.4);
+    }
 
     const isThrowing = (vis.throwTimer !== undefined && vis.throwTimer > 0);
 
@@ -3901,9 +3918,9 @@ export class AnimalRenderer {
       : isFlying
       ? -0.5
       : isPlowing
-      ? (vis.species === 'mammoth' ? 0 : -0.4)
+      ? (vis.species === 'mammoth' ? 0 : vis.species === 'bull' ? (Math.sin(now / 70) * 0.35 + 0.15) : -0.4)
       : isDashing
-      ? (vis.species === 'mammoth' ? 0 : -0.25)
+      ? (vis.species === 'mammoth' ? 0 : vis.species === 'bull' ? (Math.sin(now / 70) * 0.35 + 0.15) : -0.25)
       : isWater && isSafeSwimmer
       ? 0 // Khóa cứng nằm yên trên mặt nước, không chao đảo tới lui
       : isDrowning

@@ -3425,7 +3425,7 @@ function animate(now: number): void {
           pFlags &= ~FLAG.DASH;
           pFlags &= ~FLAG.PLOW;
         }
-        if (predictor.flyT > 0) {
+        if (predictor.flyT > 0 || (ent.flags & FLAG.FLYING) !== 0) {
           pFlags |= FLAG.FLYING;
         } else {
           pFlags &= ~FLAG.FLYING;

@@ -22,6 +22,7 @@ export class ClientPredictor {
   a = 0;
   dashT = 0;
   flyT = 0;
+  flightT = 0;
   leapT = 0;
   isLeaping = false;
   ex = 0;
@@ -46,6 +47,7 @@ export class ClientPredictor {
     this.vz = 0;
     this.dashT = 0;
     this.flyT = 0;
+    this.flightT = 0;
     this.leapT = 0;
     this.isLeaping = false;
     this.ex = 0;
@@ -68,6 +70,7 @@ export class ClientPredictor {
     this.stunT = Math.max(this.stunT, duration);
     this.dashT = 0;
     this.flyT = 0;
+    this.flightT = 0;
     this.plow = false;
   }
 
@@ -143,6 +146,7 @@ export class ClientPredictor {
           this.vz = ((z - this.sz) / (TICK_MS / 1000)) * decay;
           this.dashT = 0;
           this.flyT = 0;
+    this.flightT = 0;
         }
       }
     } else if (!isServerStun) {
@@ -164,6 +168,7 @@ export class ClientPredictor {
     this.vz = 0;
     this.dashT = 0;
     this.flyT = 0;
+    this.flightT = 0;
     this.plow = false;
     if (targetX !== undefined && targetZ !== undefined) {
       this.a = Math.atan2(targetZ - z, targetX - x);
@@ -259,23 +264,31 @@ export class ClientPredictor {
         return;
       }
       if (species === 'swan') {
+        if (held >= 0.75) {
+          this.flightT = 10.0;
+          this.flyT = 10.0;
+        }
         const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
         const speed = (inWater ? 48 : 42) * (1 + 0.3 * c);
         this.vx = Math.cos(aimA) * speed;
         this.vz = Math.sin(aimA) * speed;
         this.a = aimA;
         this.dashT = 0.50;
-        this.flyT = 0.50;
+        this.flyT = Math.max(this.flyT, 0.50);
         this.plow = true;
         return;
       }
       if (species === 'pegasus') {
+        if (held >= 0.75) {
+          this.flightT = 10.0;
+          this.flyT = 10.0;
+        }
         const flySpeed = 48 * (1 + 0.35 * c);
         this.vx = Math.cos(aimA) * flySpeed;
         this.vz = Math.sin(aimA) * flySpeed;
         this.a = aimA;
         this.dashT = 0.65;
-        this.flyT = 0.65;
+        this.flyT = Math.max(this.flyT, 0.65);
         this.plow = true;
         return;
       }
@@ -384,11 +397,16 @@ export class ClientPredictor {
       const h = Math.min(left, 0.025);
       left -= h;
       this.dashT = Math.max(0, this.dashT - h);
-      this.flyT = Math.max(0, this.flyT - h);
       this.stunT = Math.max(0, this.stunT - h);
+      if (this.flightT > 0) {
+        this.flightT = Math.max(0, this.flightT - h);
+        this.flyT = Math.max(this.flyT, this.flightT);
+      } else {
+        this.flyT = Math.max(0, this.flyT - h);
+      }
       if (this.dashT <= 0) {
         this.plow = false;
-        this.flyT = 0;
+        if (this.flightT <= 0) this.flyT = 0;
       }
       if (this.stunT <= 0 && (flags & 8) === 0) {
         this.stunned = false;
@@ -537,6 +555,7 @@ export class ClientPredictor {
           this.vx *= -0.2;
           this.vz *= -0.2;
           this.flyT = 0;
+    this.flightT = 0;
           this.dashT = 0;
         } else {
           this.vx *= 0.5;

@@ -60,6 +60,8 @@ export const FLAG = {
   TREE_SHAKE: 524288,
   MAMMOTH_ROAR: 1048576,
   WOLF_FRENZY: 2097152,
+  TOSSED: 4194304,
+  BURNING: 8388608,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';

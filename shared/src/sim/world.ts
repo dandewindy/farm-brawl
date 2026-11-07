@@ -982,8 +982,8 @@ export class World {
         }
       }
 
-      // Monkey leaping, Wolf frenzy, or Shield immunity over terrain hazards (well, fire, water, etc.)
-      if ((p.monkeyLeapT && p.monkeyLeapT > 0) || (p.wolfFrenzyT && p.wolfFrenzyT > 0) || p.shieldT > 0) {
+      // Flying, leaping, tossed in air, wolf frenzy, or shield immunity over terrain hazards (well, fire, water, etc.)
+      if ((p.monkeyLeapT && p.monkeyLeapT > 0) || (p.wolfFrenzyT && p.wolfFrenzyT > 0) || p.shieldT > 0 || (p.flightT && p.flightT > 0) || (p.tossT && p.tossT > 0) || p.flyT > 0) {
         p.inWaterT = 0;
         continue;
       }
@@ -1154,7 +1154,9 @@ export class World {
             for (const other of this.players.values()) {
               if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
               if (Math.hypot(other.x - p.x, other.z - p.z) <= iceR + radiusOf(other.mass)) {
-                other.stunT = Math.max(other.stunT, 2.5);
+                other.stunT = Math.max(other.stunT, 3.0);
+                other.vx = 0;
+                other.vz = 0;
               }
             }
             this.events.push({ k: 'swanIce', id: p.id, x: r2(p.x), z: r2(p.z), r: iceR, rainbow: true });
@@ -2128,27 +2130,27 @@ export class World {
         return;
       }
       if (p.species === 'phoenix') {
-        this.executePhoenixSkill(p, true, p.holdT >= 0.95);
+        this.executePhoenixSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'pegasus') {
-        this.executePegasusSkill(p, true, p.holdT >= 0.95);
+        this.executePegasusSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'swan') {
-        this.executeSwanSkill(p, true, p.holdT >= 0.95);
+        this.executeSwanSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'ram') {
-        this.executeRamSkill(p, true, p.holdT >= 0.95);
+        this.executeRamSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'boar') {
-        this.executeBoarSkill(p, true, p.holdT >= 0.95);
+        this.executeBoarSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'bull') {
-        this.executeBullSkill(p, true, p.holdT >= 0.95);
+        this.executeBullSkill(p, true, p.holdT >= 0.75);
         return;
       }
       if (p.species === 'chicken') {
@@ -2391,32 +2393,32 @@ export class World {
     }
 
     if (p.species === 'phoenix' && p.holdT > 0.15) {
-      this.executePhoenixSkill(p, false, p.holdT >= 0.95);
+      this.executePhoenixSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
     if (p.species === 'swan' && p.holdT > 0.15) {
-      this.executeSwanSkill(p, false, p.holdT >= 0.95);
+      this.executeSwanSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
     if (p.species === 'pegasus' && p.holdT > 0.15) {
-      this.executePegasusSkill(p, false, p.holdT >= 0.95);
+      this.executePegasusSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
     if (p.species === 'bull' && p.holdT > 0.15) {
-      this.executeBullSkill(p, false, p.holdT >= 0.95);
+      this.executeBullSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
     if (p.species === 'ram' && p.holdT > 0.15) {
-      this.executeRamSkill(p, false, p.holdT >= 0.95);
+      this.executeRamSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
     if (p.species === 'boar' && p.holdT > 0.15) {
-      this.executeBoarSkill(p, false, p.holdT >= 0.95);
+      this.executeBoarSkill(p, false, p.holdT >= 0.75);
       return;
     }
 
@@ -4305,25 +4307,29 @@ export class World {
     // Ram: battering ram stun & double knockback on max charge, rainbow slams into fence
     if (att.species === 'ram') {
       if (att.power >= 5.5) {
-        k *= 2.0;
+        k *= 2.2;
+        vic.tossT = 1.0;
+        vic.flyT = 1.0;
         vic.vx = nx * k + vic.vx * 0.15;
         vic.vz = nz * k + vic.vz * 0.15;
         this.events.push({ k: 'ramKnockback', id: att.id, targetId: vic.id, x: r2(vic.x), z: r2(vic.z), rainbow: att.superT > 0 });
       }
       if (att.superT > 0) {
-        k = Math.max(k * 2.2, 220);
+        k = Math.max(k * 2.5, 260);
+        vic.tossT = 1.8;
+        vic.flyT = 1.8;
         vic.vx = nx * k;
         vic.vz = nz * k;
         const fenceDist = CFG.R - 1.5;
-        const projX = vic.x + nx * (k * 0.2);
-        const projZ = vic.z + nz * (k * 0.2);
+        const projX = vic.x + nx * (k * 0.25);
+        const projZ = vic.z + nz * (k * 0.25);
         if (Math.hypot(projX, projZ) >= fenceDist) {
           vic.x = (projX / Math.hypot(projX, projZ)) * fenceDist;
           vic.z = (projZ / Math.hypot(projX, projZ)) * fenceDist;
           this.kill(vic, 'fence');
         }
       }
-      const ramStun = att.superT > 0 ? 2.0 : 0.8;
+      const ramStun = att.superT > 0 ? 2.5 : 1.0;
       vic.stunT = Math.max(vic.stunT, ramStun);
     }
 
@@ -5078,7 +5084,9 @@ export class World {
         | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
         | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0)
         | (o.mammothRoarT && o.mammothRoarT > 0 ? FLAG.MAMMOTH_ROAR : 0)
-        | (o.wolfFrenzyT && o.wolfFrenzyT > 0 ? FLAG.WOLF_FRENZY : 0);
+        | (o.wolfFrenzyT && o.wolfFrenzyT > 0 ? FLAG.WOLF_FRENZY : 0)
+        | (o.tossT && o.tossT > 0 ? FLAG.TOSSED : 0)
+        | (o.burnT && o.burnT > 0 ? FLAG.BURNING : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;

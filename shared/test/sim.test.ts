@@ -3640,6 +3640,45 @@ describe('fruit trees', () => {
         expect(vic.tossT).toBe(0);
         expect(vic.squishT).toBeGreaterThan(0);
       });
+
+      it('All 6 evolved animals trigger their special max skills at holdT = 0.75 threshold', () => {
+        const w = emptyWorld();
+        // Phoenix
+        const p = place(w, w.addPlayer('P', 'phoenix', false), 0, 0, 3200);
+        p.holdT = 0.75;
+        (w as any).dash(p);
+        expect(w.events.some(e => e.k === 'phoenixFire')).toBe(true);
+
+        // Swan
+        const s = place(w, w.addPlayer('S', 'swan', false), 0, 0, 3200);
+        s.holdT = 0.75;
+        (w as any).dash(s);
+        expect(s.flightT).toBe(10.0);
+
+        // Pegasus
+        const pg = place(w, w.addPlayer('Pg', 'pegasus', false), 0, 0, 3200);
+        pg.holdT = 0.75;
+        (w as any).dash(pg);
+        expect(pg.flightT).toBe(10.0);
+
+        // Boar
+        const b = place(w, w.addPlayer('B', 'boar', false), 0, 0, 3200);
+        b.holdT = 0.75;
+        (w as any).dash(b);
+        expect(w.events.some(e => e.k === 'boarMud')).toBe(true);
+
+        // Bull
+        const bl = place(w, w.addPlayer('Bl', 'bull', false), 0, 0, 3200);
+        bl.holdT = 0.75;
+        (w as any).dash(bl);
+        expect(w.events.some(e => e.k === 'bullToss')).toBe(true);
+
+        // Ram
+        const r = place(w, w.addPlayer('R', 'ram', false), 0, 0, 3200);
+        r.holdT = 0.75;
+        (w as any).dash(r);
+        expect(r.power).toBe(6.0);
+      });
     });
   });
 });
