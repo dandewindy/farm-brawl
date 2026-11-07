@@ -42,6 +42,7 @@ interface AnimalVisual {
   tailSegments?: (THREE.Mesh | THREE.Group)[];
   trunk?: THREE.Group;
   head?: THREE.Group;
+  wings?: THREE.Group[];
   shieldAura?: THREE.Mesh;
   heartAura?: THREE.Group;
   windWhirlMesh?: THREE.Group;
@@ -1760,7 +1761,12 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
 
   // 2. CỔ & ĐẦU CHIM ƯNG THẦN THOẠI SẮC SẢO VƯƠN CAO
   blob(g, bodyColor, 0.24, [0.85, 1.45, 0.82], 0.46, 1.74, 0, [0, 0, -0.36]);
-  g.add(part(new THREE.SphereGeometry(0.34, 18, 12), bodyColor, 0.70, 2.12, 0));
+
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0.70, 2.12, 0);
+
+  // Đầu
+  headGroup.add(part(new THREE.SphereGeometry(0.34, 18, 12), bodyColor, 0, 0, 0));
 
   // Mỏ chim ưng vàng kim cong sắc nhọn (Hooked golden raptor beak)
   const beakMat = new THREE.MeshLambertMaterial({
@@ -1769,21 +1775,21 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     emissiveIntensity: 0.30,
   });
   const beak = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.48, 8), beakMat);
-  beak.position.set(1.12, 2.05, 0);
+  beak.position.set(0.42, -0.07, 0);
   beak.rotation.z = -Math.PI / 2 - 0.28;
-  g.add(beak);
+  headGroup.add(beak);
 
-  const jaw = part(new THREE.ConeGeometry(0.075, 0.35, 6), beakColor, 1.05, 1.96, 0);
+  const jaw = part(new THREE.ConeGeometry(0.075, 0.35, 6), beakColor, 0.35, -0.16, 0);
   jaw.rotation.z = -Math.PI / 2 - 0.12;
-  g.add(jaw);
+  headGroup.add(jaw);
 
   // MÀO LỬA 5 CHÓP MẶT TRỜI BỐC CHÁY VƯƠN CAO UY NGHI (Solar Crown Crest Plumes)
   const crestPlumes: [number, number, number, number, number][] = [
-    [0, 2.70, 0.90, -0.62, 0xffd600],       // Giữa cao nhất vươn trời
-    [0.12, 2.56, 0.75, -0.50, 0xff9100],    // Phải tầng 1
-    [-0.12, 2.56, 0.75, -0.50, 0xff9100],   // Trái tầng 1
-    [0.22, 2.40, 0.60, -0.38, 0xd50000],    // Phải ngoài
-    [-0.22, 2.40, 0.60, -0.38, 0xd50000],   // Trái ngoài
+    [0, 0.58, 0.90, -0.62, 0xffd600],       // Giữa cao nhất vươn trời
+    [0.12, 0.44, 0.75, -0.50, 0xff9100],    // Phải tầng 1
+    [-0.12, 0.44, 0.75, -0.50, 0xff9100],   // Trái tầng 1
+    [0.22, 0.28, 0.60, -0.38, 0xd50000],    // Phải ngoài
+    [-0.22, 0.28, 0.60, -0.38, 0xd50000],   // Trái ngoài
   ];
   for (const [zOff, yPos, length, rotZ, clr] of crestPlumes) {
     const crestMat = new THREE.MeshLambertMaterial({
@@ -1792,19 +1798,30 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
       emissiveIntensity: 0.45,
     });
     const cMesh = new THREE.Mesh(new THREE.ConeGeometry(0.075, length, 5), crestMat);
-    cMesh.position.set(0.46, yPos, zOff);
+    cMesh.position.set(-0.24, yPos, zOff);
     cMesh.rotation.z = rotZ;
     cMesh.rotation.x = zOff * 0.32;
-    g.add(cMesh);
+    headGroup.add(cMesh);
   }
 
+  // Đôi mắt đại bàng vàng rực sắc sảo gắn trên đầu
+  addEyes(headGroup, 0.26, 0.06, 0.22, 0.085);
+  g.add(headGroup);
+  g.userData.head = headGroup;
+
   // 3. ĐÔI CÁNH LỬA 3 TẦNG SẢI RỘNG RỰC RỠ (Triple-tiered wide sweeping flame wings)
+  const phoenixWings: THREE.Group[] = [];
   for (const z of [-0.62, 0.62]) {
     const side = z > 0 ? 1 : -1;
+    const wingPivot = new THREE.Group();
+    wingPivot.position.set(0.05, 1.30, z);
+    wingPivot.userData.origZ = z;
+    wingPivot.userData.side = side;
+
     // Tầng cánh gốc
-    blob(g, wingColor, 0.42, [1.60, 0.68, 0.22], 0.05, 1.30, z, [0, 0, 0.20]);
+    blob(wingPivot, wingColor, 0.42, [1.60, 0.68, 0.22], 0, 0, 0, [0, 0, 0.20]);
     // Tầng lông vũ thứ 2
-    blob(g, chestColor, 0.32, [1.50, 0.50, 0.18], -0.22, 1.38, z * 0.98, [0, 0, 0.30]);
+    blob(wingPivot, chestColor, 0.32, [1.50, 0.50, 0.18], -0.27, 0.08, z * -0.02, [0, 0, 0.30]);
 
     // 6 lưỡi kiếm lông lửa xòe rộng vuốt nhọn về sau phát sáng rực rỡ
     for (let f = 0; f < 6; f++) {
@@ -1818,13 +1835,16 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
         new THREE.ConeGeometry(0.095 - f * 0.010, 0.82 - f * 0.08, 6),
         bladeMat
       );
-      blade.position.set(-0.20 - f * 0.15, 1.42 - f * 0.05, z * (0.95 + f * 0.07));
+      blade.position.set(-0.25 - f * 0.15, 0.12 - f * 0.05, (z > 0 ? 1 : -1) * (f * 0.04));
       blade.rotation.z = 0.85 + f * 0.16;
       blade.rotation.y = side * (0.24 + f * 0.05);
       blade.rotation.x = side * -0.15;
-      g.add(blade);
+      wingPivot.add(blade);
     }
+    g.add(wingPivot);
+    phoenixWings.push(wingPivot);
   }
+  g.userData.wings = phoenixWings;
 
   // 4. BỘ ĐUÔI PHƯỢNG HOÀNG LỬA HUYỀN THOẠI NGẮN GỌN & THIẾT KẾ TINH TẾ
   // 5 dải lông lửa uốn lượn gọn gàng, thon thả phía sau hông, không dài quá khổ
@@ -1891,9 +1911,6 @@ function buildPhoenix(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
       }
     }
   }
-
-  // 5. Đôi mắt đại bàng vàng rực sắc sảo lộ rõ trên bề mặt đầu
-  addEyes(g, 0.98, 2.18, 0.22, 0.085);
 
   // 6. Chân móng vuốt đại bàng hoàng kim vững chắc
   const legs = addLegs(g, beakColor, [[0.05, 0.22], [0.05, -0.22]], 0.62, 0.085);
@@ -1974,54 +1991,67 @@ function buildSwan(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   blob(g, neckColor, 0.19, [0.88, 1.35, 0.88], 0.58, 1.94, 0, [0, 0, 0.25]);
   
   // Đầu thiên nga thon gọn thanh tú
-  const head = part(new THREE.SphereGeometry(0.26, 18, 14), neckColor, 0.68, 2.22, 0);
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0.68, 2.22, 0);
+
+  const head = part(new THREE.SphereGeometry(0.26, 18, 14), neckColor, 0, 0, 0);
   head.scale.set(1.10, 1.0, 0.90);
-  g.add(head);
+  headGroup.add(head);
 
   // Vương miện hoàng gia 5 chóp lấp lánh trên đỉnh đầu thiên nga
-  const crownBase = part(new THREE.CylinderGeometry(0.12, 0.10, 0.05, 10), crownColor, 0.66, 2.42, 0);
-  g.add(crownBase);
+  const crownBase = part(new THREE.CylinderGeometry(0.12, 0.10, 0.05, 10), crownColor, -0.02, 0.20, 0);
+  headGroup.add(crownBase);
   for (let i = 0; i < 5; i++) {
     const ang = (i / 4 - 0.5) * 1.2;
-    const spike = part(new THREE.ConeGeometry(0.035, 0.18 + (i === 2 ? 0.08 : 0), 5), crownColor, 0.66 + Math.cos(ang) * 0.08, 2.50, Math.sin(ang) * 0.10);
-    g.add(spike);
+    const spike = part(new THREE.ConeGeometry(0.035, 0.18 + (i === 2 ? 0.08 : 0), 5), crownColor, -0.02 + Math.cos(ang) * 0.08, 0.28, Math.sin(ang) * 0.10);
+    headGroup.add(spike);
   }
 
   // Mấu sừng đen đặc trưng của loài thiên nga (Regal basal knob)
-  blob(g, knobColor, 0.075, [1.1, 0.85, 0.95], 0.86, 2.26, 0);
+  blob(headGroup, knobColor, 0.075, [1.1, 0.85, 0.95], 0.18, 0.04, 0);
 
   // Mỏ thiên nga cong thon nhọn quý phái màu cam rực rỡ, chóp mỏ đen viền tinh tế
-  const bill = part(new THREE.ConeGeometry(0.10, 0.38, 8), billColor, 1.06, 2.14, 0);
+  const bill = part(new THREE.ConeGeometry(0.10, 0.38, 8), billColor, 0.38, -0.08, 0);
   bill.rotation.z = -Math.PI / 2 - 0.20;
-  g.add(bill);
-  const billTip = part(new THREE.ConeGeometry(0.055, 0.12, 6), knobColor, 1.22, 2.08, 0);
+  headGroup.add(bill);
+  const billTip = part(new THREE.ConeGeometry(0.055, 0.12, 6), knobColor, 0.54, -0.14, 0);
   billTip.rotation.z = -Math.PI / 2 - 0.20;
-  g.add(billTip);
+  headGroup.add(billTip);
+
+  // Đôi mắt thiên nga
+  for (const z of [-0.22, 0.22]) {
+    const eyeRing = part(new THREE.TorusGeometry(0.082, 0.018, 6, 14), 0xffd700, 0.10, 0.03, z);
+    eyeRing.rotation.y = Math.PI / 2;
+    headGroup.add(eyeRing);
+  }
+  addEyes(headGroup, 0.10, 0.03, 0.22, 0.078);
+  g.add(headGroup);
+  g.userData.head = headGroup;
 
   // 3. ĐÔI CÁNH THIÊN NGA XẾP TẦNG LÔNG TUYẾT ÔM SÁT HAI BÊN MẠN SƯỜN
+  const swanWings: THREE.Group[] = [];
   for (const z of [-0.46, 0.46]) {
     const side = z > 0 ? 1 : -1;
+    const wingPivot = new THREE.Group();
+    wingPivot.position.set(-0.05, 1.15, z);
+    wingPivot.userData.origZ = z;
+    wingPivot.userData.side = side;
+
     // Tầng cánh chính
-    blob(g, wingColor, 0.40, [1.60, 0.70, 0.22], -0.05, 1.15, z, [0, 0, 0.15]);
+    blob(wingPivot, wingColor, 0.40, [1.60, 0.70, 0.22], 0, 0, 0, [0, 0, 0.15]);
     // Tầng lông vũ tơ thứ 2
-    blob(g, bodyColor, 0.28, [1.50, 0.50, 0.16], -0.40, 1.24, z * 0.95, [0, 0, 0.30]);
+    blob(wingPivot, bodyColor, 0.28, [1.50, 0.50, 0.16], -0.35, 0.09, z * -0.05, [0, 0, 0.30]);
     // 3 phiến lông bay uốn cong vểnh nhẹ
     for (let f = 0; f < 4; f++) {
-      const quill = part(new THREE.ConeGeometry(0.070 - f * 0.010, 0.45 - f * 0.04, 6), wingColor, -0.60 - f * 0.12, 1.30 - f * 0.06, z * (0.94 + f * 0.04));
+      const quill = part(new THREE.ConeGeometry(0.070 - f * 0.010, 0.45 - f * 0.04, 6), wingColor, -0.55 - f * 0.12, 0.15 - f * 0.06, (z > 0 ? 1 : -1) * (f * 0.02));
       quill.rotation.z = 1.05 + f * 0.14;
       quill.rotation.y = side * (0.12 + f * 0.04);
-      g.add(quill);
+      wingPivot.add(quill);
     }
+    g.add(wingPivot);
+    swanWings.push(wingPivot);
   }
-
-  // 4. ĐÔI MẮT THIÊN NGA TO TRÒN LONG LANH TINH ANH (Có viền sáng nổi bật, không bao giờ bị chìm kể cả skin đen)
-  // Viền mắt vàng kim hoàng gia (eyelid ring) giúp mắt luôn tỏa sáng trên nền lông đen/trắng
-  for (const z of [-0.22, 0.22]) {
-    const eyeRing = part(new THREE.TorusGeometry(0.082, 0.018, 6, 14), 0xffd700, 0.78, 2.25, z);
-    eyeRing.rotation.y = Math.PI / 2;
-    g.add(eyeRing);
-  }
-  addEyes(g, 0.78, 2.25, 0.22, 0.078);
+  g.userData.wings = swanWings;
 
   // Chân màng thiên nga màu đen/xám thuôn gọn dạng dẹt bơi lội
   const swanLegs = addLegs(g, knobColor, [[0.05, 0.22], [0.05, -0.22]], 0.48, 0.075);
@@ -2365,6 +2395,7 @@ function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
   // 4. ĐÔI CÁNH THIÊN THẦN ARCHANGEL XÒE RỘNG LỘNG LẪY (Grand Feathered Archangel Wings)
   // Gắn liền khít vào khớp vai lưng thân ngựa (x: 0.08, y: 1.48, z: ±0.34), triệt tiêu hoàn toàn 2 cây cột capsule to thô
   const wingMatGlow = { emissive: 0xfff9c4, emissiveIntensity: 0.22 };
+  const pegasusWings: THREE.Group[] = [];
   for (const z of [-0.34, 0.34]) {
     const side = z > 0 ? 1 : -1;
     const wingGroup = new THREE.Group();
@@ -2372,6 +2403,8 @@ function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     wingGroup.position.set(0.08, 1.48, z);
     wingGroup.rotation.y = side * 0.18;
     wingGroup.rotation.x = side * -0.08;
+    wingGroup.userData.origZ = z;
+    wingGroup.userData.side = side;
 
     // Khớp vai cánh cơ bắp nối liền mượt mà từ lưng
     blob(wingGroup, wingColor, 0.22, [1.35, 0.85, 0.45], 0, 0, 0, [0, 0, 0.25]);
@@ -2396,7 +2429,9 @@ function buildPegasus(g: THREE.Group, s: Record<string, number>): THREE.Group[] 
     // Gốc khớp cánh đính ngọc hoàng kim bảo hộ
     blob(wingGroup, featherTipColor, 0.11, [1.2, 0.65, 0.35], 0.05, 0.06, 0, undefined);
     g.add(wingGroup);
+    pegasusWings.push(wingGroup);
   }
+  g.userData.wings = pegasusWings;
 
   // 5. ĐUÔI THIÊN MÃ HOÀNG KIM DÀI THƯỚT THA UỐN LƯỢN CHẠM ĐẤT
   blob(g, maneColor, 0.18, [0.60, 2.9, 0.35], -0.90, 1.22, 0, [0, 0, 0.42]);
@@ -3883,7 +3918,7 @@ export class AnimalRenderer {
       bodyY += arc * peakH;
     }
     if (isFlying) {
-      const flyH = (vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (2.2 * r + 0.6) : (1.1 * r);
+      const flyH = (vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (3.5 * r + 1.2) : (1.2 * r);
       bodyY += flyH;
     }
     if (isTossed) {
@@ -3916,7 +3951,7 @@ export class AnimalRenderer {
       : isTreeShake
       ? 0.25
       : isFlying
-      ? -0.5
+      ? 0.02
       : isPlowing
       ? (vis.species === 'mammoth' ? 0 : vis.species === 'bull' ? (Math.sin(now / 70) * 0.35 + 0.15) : -0.4)
       : isDashing
@@ -4095,6 +4130,11 @@ export class AnimalRenderer {
         leg.rotation.z = 0.35;
         leg.rotation.x = idx % 2 === 0 ? 0.15 : -0.15;
         leg.position.y = leg.userData.origY;
+      } else if (isFlying) {
+        // Legs tucked backwards neatly against underbelly during flight glide
+        leg.rotation.z = 0.55;
+        leg.rotation.x = idx % 2 === 0 ? 0.08 : -0.08;
+        leg.position.y = leg.userData.origY + 0.04 * sc;
       } else if (vis.species === 'gorilla') {
         // Gorilla hind legs step in diagonal synchronization with knuckle arms
         leg.rotation.z = (idx === 0 ? -gorillaCycle : gorillaCycle) * 0.55;
@@ -4201,6 +4241,37 @@ export class AnimalRenderer {
           armL.rotation.x = 0.12;
           armR.rotation.x = -0.12;
         }
+      }
+    }
+
+    // Wing flapping and soaring animation for flying animals (Phoenix, Swan, Pegasus)
+    if (vis.wings && vis.wings.length === 2) {
+      const [leftWing, rightWing] = vis.wings;
+      if (isFlying) {
+        const flapRate = vis.species === 'phoenix' ? 0.016 : vis.species === 'swan' ? 0.012 : 0.014;
+        const flapCycle = Math.sin(now * flapRate);
+        const soarAngle = 0.45;
+        const flapAmp = 0.55;
+        leftWing.rotation.x = soarAngle + flapCycle * flapAmp;
+        rightWing.rotation.x = -soarAngle - flapCycle * flapAmp;
+        const pitchFlap = Math.cos(now * flapRate) * 0.14;
+        leftWing.rotation.z = 0.10 + pitchFlap;
+        rightWing.rotation.z = 0.10 + pitchFlap;
+        leftWing.rotation.y = Math.sin(now * flapRate) * 0.08;
+        rightWing.rotation.y = -Math.sin(now * flapRate) * 0.08;
+      } else if (speed > 0.05 || isDashing) {
+        const runFlap = Math.sin(vis.phase * 1.2) * 0.22;
+        leftWing.rotation.x = THREE.MathUtils.lerp(leftWing.rotation.x, 0.12 + runFlap, 12 * dt);
+        rightWing.rotation.x = THREE.MathUtils.lerp(rightWing.rotation.x, -0.12 - runFlap, 12 * dt);
+        leftWing.rotation.z = THREE.MathUtils.lerp(leftWing.rotation.z, 0, 10 * dt);
+        rightWing.rotation.z = THREE.MathUtils.lerp(rightWing.rotation.z, 0, 10 * dt);
+      } else {
+        leftWing.rotation.x = THREE.MathUtils.lerp(leftWing.rotation.x, 0, 8 * dt);
+        rightWing.rotation.x = THREE.MathUtils.lerp(rightWing.rotation.x, 0, 8 * dt);
+        leftWing.rotation.z = THREE.MathUtils.lerp(leftWing.rotation.z, 0, 8 * dt);
+        rightWing.rotation.z = THREE.MathUtils.lerp(rightWing.rotation.z, 0, 8 * dt);
+        leftWing.rotation.y = THREE.MathUtils.lerp(leftWing.rotation.y, 0, 8 * dt);
+        rightWing.rotation.y = THREE.MathUtils.lerp(rightWing.rotation.y, 0, 8 * dt);
       }
     }
 
@@ -4369,6 +4440,12 @@ export class AnimalRenderer {
     }
     // Đảm bảo tuyệt đối vis.body.position.z luôn luôn bằng 0, không bao giờ bị lệch tâm gốc
     vis.body.position.z = 0;
+
+    // Head leveling for flying animals: counter-rotates body pitch so head remains upright and looking forward
+    if (vis.head && isFlying) {
+      vis.head.rotation.z = -vis.root.rotation.z;
+      vis.head.rotation.x = 0;
+    }
 
     // Under-foot dark mud patches (prominent black mud pools on ground under each foot)
     if (vis.mudSplats && vis.mudSplats.length > 0) {
@@ -4846,6 +4923,7 @@ export class AnimalRenderer {
       tailSegments: body.userData.tail,
       trunk: body.userData.trunk,
       head: body.userData.head,
+      wings: body.userData.wings,
       label,
       labelKey: meta.name,
       regalia,

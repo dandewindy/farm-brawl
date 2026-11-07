@@ -3679,6 +3679,33 @@ describe('fruit trees', () => {
         (w as any).dash(r);
         expect(r.power).toBe(6.0);
       });
+
+      it('Flying animals soar high: cannot eat food, cannot pickup tools, cannot collide with ground players, and bypass hay', () => {
+        const w = emptyWorld();
+        const p1 = place(w, w.addPlayer('Phoenix', 'phoenix', false), 0, 0, 3200);
+        p1.holdT = 0.75;
+        (w as any).dash(p1);
+        expect(p1.flightT).toBeGreaterThan(0);
+
+        // Ground food cannot be eaten while flying
+        w.food.set(999, { id: 999, x: 0, z: 0, val: 50, kind: 1 });
+        const initMass = p1.mass;
+        (w as any).eat([p1]);
+        expect(p1.mass).toBe(initMass);
+
+        // Ground tools cannot be picked up while flying
+        w.tools.set(888, { id: 888, type: 'shield', x: 0, z: 0, active: true } as any);
+        (w as any).step(0.05);
+        expect(p1.hasShield).toBeFalsy();
+        expect(w.tools.has(888)).toBe(true);
+
+        // Ground players cannot be rammed or collided with while flying
+        const p2 = place(w, w.addPlayer('GroundPig', 'pig', false), 0, 0, 200);
+        (w as any).collidePlayers([p1, p2]);
+        // Neither knocked back nor stunned
+        expect(p2.hitT).toBeFalsy();
+        expect(p1.hitT).toBeFalsy();
+      });
     });
   });
 });

@@ -820,7 +820,8 @@ export class World {
           const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost * adminSpeedMult;
           stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult);
         }
-        if (!isLeaping) {
+        const isFlying = (p.flightT !== undefined && p.flightT > 0);
+        if (!isLeaping && !isFlying) {
           const wasStunned = p.stunT >= 1.4;
           const hayHit = collideHay(p, this.map.hay);
           if (hayHit && !wasStunned && !(p.shieldT > 0)) {
@@ -834,7 +835,7 @@ export class World {
         }
 
         // Podium protective shield barrier: blocks all animals from entering the podium area
-        if (!isLeaping && this.podiumShield) {
+        if (!isLeaping && !isFlying && this.podiumShield) {
           const [podX, podZ] = this.map.podium;
           const dx = p.x - podX, dz = p.z - podZ;
           const d = Math.hypot(dx, dz);
@@ -858,7 +859,7 @@ export class World {
         }
 
         // 3 Fruit Trees: solid cylindrical obstacle collision + ramming shaking / fruit drop / 3s stun
-        if (!isLeaping && this.treeSims.length > 0) {
+        if (!isLeaping && !isFlying && this.treeSims.length > 0) {
           for (const tree of this.treeSims) {
             const dx = p.x - tree.x, dz = p.z - tree.z;
             const d = Math.hypot(dx, dz);
@@ -1491,6 +1492,9 @@ export class World {
           this.events.push({ k: 'morph', id: p.id, species: orig, dur: 0 });
         }
       }
+
+      // Cannot pickup ground tools/items while flying high in the air, leaping, or tossed
+      if ((p.flightT !== undefined && p.flightT > 0) || (p.tossT !== undefined && p.tossT > 0) || (p.monkeyLeapT !== undefined && p.monkeyLeapT > 0)) continue;
 
       const pr = radiusOf(p.mass) + 1.2;
       for (const t of this.tools.values()) {
@@ -2608,6 +2612,7 @@ export class World {
     if (isMax) {
       const len = isRainbow ? 38 : 24;
       const w = isRainbow ? 14 : 8;
+      p.flightT = 1.2;
       p.flyT = 1.2;
       p.dashT = 0.8;
       p.plow = true;
@@ -3630,9 +3635,12 @@ export class World {
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j];
         if (!b.alive) continue;
-        const aFlying = (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0) || (a.flightT !== undefined && a.flightT > 0);
-        const bFlying = (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0) || (b.flightT !== undefined && b.flightT > 0);
-        if (aFlying !== bFlying) continue;
+        // Flying animals are soaring high in the air: they do not collide with or ram ground animals, nor do they body-ram each other
+        if ((a.flightT !== undefined && a.flightT > 0) || (b.flightT !== undefined && b.flightT > 0)) continue;
+        if ((a.tossT !== undefined && a.tossT > 0) || (b.tossT !== undefined && b.tossT > 0)) continue;
+        const aLeap = (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0);
+        const bLeap = (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0);
+        if (aLeap !== bLeap) continue;
         let dx = b.x - a.x, dz = b.z - a.z;
         const ra = radiusOf(a.mass), rb = radiusOf(b.mass), minD = ra + rb;
         if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
@@ -4758,6 +4766,8 @@ export class World {
 
     for (const p of list) {
       if (!p.alive) continue;
+      // Cannot eat ground food while flying high in the air, leaping, or tossed
+      if ((p.flightT !== undefined && p.flightT > 0) || (p.tossT !== undefined && p.tossT > 0) || (p.monkeyLeapT !== undefined && p.monkeyLeapT > 0)) continue;
       // Cannot eat food for 0.3s right after being rammed (prevents instantly re-eating dropped food while flying)
       if (this.time - p.lastHitT < 0.3) continue;
 

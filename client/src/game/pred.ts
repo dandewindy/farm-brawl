@@ -476,11 +476,11 @@ export class ClientPredictor {
       this.x += this.vx * h;
       this.z += this.vz * h;
 
-      if (this.dashT > 0 && !plowing && !this.isLeaping) {
+      if (this.dashT > 0 && !plowing && !this.isLeaping && this.flightT <= 0) {
         this.ramContact(myMass, rtt, ents, myId, snapTick);
       }
 
-      if (!this.isLeaping) {
+      if (!this.isLeaping && this.flightT <= 0) {
         // Hay collision
         const r = radiusOf(myMass);
         for (const [hx, hz, hr] of map.hay) {
