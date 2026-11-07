@@ -2554,6 +2554,21 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(cx, 0.6, cz, col, ev.rainbow ? 12 : 8, 5, 5, 0.6);
         foodParts.smokePoof(cx, 0.8, cz, ev.w * 0.4, 6);
       }
+      if (ev.dur && ev.dur > 0) {
+        // Persistent flame carpet on the ground for 5.0s
+        const dur = ev.dur;
+        const interval = setInterval(() => {
+          for (let i = 1; i <= steps; i++) {
+            const dist = i * 2.5;
+            const cx = ev.x + cosA * dist + (Math.random() - 0.5) * ev.w * 0.8;
+            const cz = ev.z + sinA * dist + (Math.random() - 0.5) * ev.w * 0.8;
+            const col = Math.random() < 0.5 ? 0xff1744 : 0xffea00;
+            foodParts.burst(cx, 0.4, cz, col, 3, 2, 2, 0.4);
+            if (Math.random() < 0.2) foodParts.smokePoof(cx, 0.6, cz, 1.2, 2);
+          }
+        }, 180);
+        setTimeout(() => clearInterval(interval), dur * 1000);
+      }
       break;
     }
     case 'ramKnockback': {
@@ -2601,6 +2616,11 @@ function handleGameEvent(ev: GameEvent): void {
       animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.5, 0xffeb3b);
       foodParts.burst(ev.x, 1.2, ev.z, 0xff5722, 24, 8, 8, 0.8);
       foodParts.smokePoof(ev.x, 1.2, ev.z, ev.r * 0.5, 20);
+      if (ev.rainbow) {
+        foodParts.burst(ev.x, 1.4, ev.z, 0x795548, 48, 12, 12, 1.2);
+        foodParts.burst(ev.x, 1.2, ev.z, 0xff1744, 24, 8, 8, 0.9);
+        foodParts.smokePoof(ev.x, 1.4, ev.z, ev.r * 0.8, 36);
+      }
       if (isMine) shake = Math.max(shake, ev.rainbow ? 1.6 : 1.2);
       break;
     }

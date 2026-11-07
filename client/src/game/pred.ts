@@ -218,6 +218,16 @@ export class ClientPredictor {
       return;
     }
 
+    // Mid-air rainbow dash when flying: dash at high speed in air
+    if (this.flightT > 0 && isSuper) {
+      this.dashT = 0.55;
+      this.plow = true;
+      this.vx = Math.cos(aimA) * 58;
+      this.vz = Math.sin(aimA) * 58;
+      this.a = aimA;
+      return;
+    }
+
     if (species === 'wolf' && held > 0.15) {
       const clampedHold = Math.max(0.2, Math.min(1.2, held));
       const ratio = (clampedHold - 0.2) / 1.0;
@@ -422,7 +432,8 @@ export class ClientPredictor {
         : species === 'duck' ? 0.87 : 1;
 
       const spMult = TRAITS[species]?.speed ?? 1.0;
-      const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult;
+      const pegasusFlightMult = (species === 'pegasus' && (flags & FLAG.SUPER) !== 0 && this.flightT > 0) ? 1.45 : 1.0;
+      const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult * pegasusFlightMult;
 
       if (this.leapT > 0) {
         this.leapT = Math.max(0, this.leapT - h);

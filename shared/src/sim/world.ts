@@ -95,6 +95,8 @@ export interface Player extends Body {
   flightT?: number;
   burnT?: number;
   burnDmgTimer?: number;
+  burnSafeFromDeath?: boolean;
+  airDashT?: number;
   tossT?: number;
   pegasusCandyCount?: number;
   pegasusCandyTimer?: number;
@@ -233,6 +235,16 @@ export class TreeSimState {
   }
 }
 
+export interface ActiveFireCarpet {
+  ownerId: number;
+  x: number;
+  z: number;
+  a: number;
+  len: number;
+  w: number;
+  timer: number;
+}
+
 export class World {
   map: MapData;
   readonly players = new Map<number, Player>();
@@ -240,6 +252,7 @@ export class World {
   readonly tools = new Map<number, ToolItem>();
   readonly treeSims: TreeSimState[] = [];
   readonly bananaProjectiles: BananaProjectile[] = [];
+  readonly fireCarpets: ActiveFireCarpet[] = [];
   tick = 0;
   time = 0;
   /** alive animals, heaviest first (refreshed every tick) */
@@ -817,7 +830,8 @@ export class World {
           const slowMult = (p.slowT > 0 && !isShielded) ? Math.max(0.4, 1.0 - 0.6 * Math.min(1, p.slowT)) : 1.0;
           const effectiveTerrain = isShielded ? 0 : p.terrain;
           const adminSpeedMult = (p.adminSpeedMult && p.adminSpeedMult > 1) ? p.adminSpeedMult : 1.0;
-          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost * adminSpeedMult;
+          const pegasusFlightMult = (p.species === 'pegasus' && p.superT > 0 && (p.flightT ?? 0) > 0) ? 1.45 : 1.0;
+          const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost * adminSpeedMult * pegasusFlightMult;
           stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult);
         }
         const isFlying = (p.flightT !== undefined && p.flightT > 0);
@@ -1170,11 +1184,18 @@ export class World {
         if (p.burnDmgTimer <= 0) {
           p.burnDmgTimer = 0.5;
           const loss = Math.max(2, Math.round(p.mass * 0.03));
-          if (p.mass - loss >= 20) {
+          const minSafeMass = p.burnSafeFromDeath ? 101 : 20;
+          if (p.mass - loss >= minSafeMass) {
             p.mass -= loss;
             this.scatter(p.x, p.z, loss, radiusOf(p.mass) + 0.5);
           }
         }
+        if (p.burnT <= 0) {
+          p.burnSafeFromDeath = false;
+        }
+      }
+      if (p.airDashT && p.airDashT > 0) {
+        p.airDashT = Math.max(0, p.airDashT - DT);
       }
       if (p.tossT && p.tossT > 0) {
         p.tossT = Math.max(0, p.tossT - DT);
@@ -1575,6 +1596,47 @@ export class World {
     }
 
     this.updateMinions(DT, alive);
+
+    // Process active Phoenix fire carpets (persists for 5s on ground)
+    for (let i = this.fireCarpets.length - 1; i >= 0; i--) {
+      const carpet = this.fireCarpets[i];
+      carpet.timer -= DT;
+      const cosA = Math.cos(carpet.a);
+      const sinA = Math.sin(carpet.a);
+
+      for (const other of alive) {
+        if (!other.alive || other.id === carpet.ownerId || other.shieldT > 0 || other.adminGod) continue;
+        if (other.flightT && other.flightT > 0) continue;
+        if (other.tossT && other.tossT > 0) continue;
+        if (other.monkeyLeapT && other.monkeyLeapT > 0) continue;
+
+        const dx = other.x - carpet.x;
+        const dz = other.z - carpet.z;
+        const forwardDist = dx * cosA + dz * sinA;
+        const lateralDist = Math.abs(-dx * sinA + dz * cosA);
+        const rOther = radiusOf(other.mass);
+
+        if (forwardDist >= -1 && forwardDist <= carpet.len + rOther && lateralDist <= carpet.w / 2 + rOther) {
+          if (other.mass <= 100) {
+            other.lastHitBy = carpet.ownerId;
+            other.lastHitT = this.time;
+            this.kill(other, 'fire');
+          } else {
+            other.burnT = 1.5;
+            if (other.burnDmgTimer === undefined || other.burnDmgTimer <= 0) {
+              other.burnDmgTimer = 0.5;
+            }
+            other.burnSafeFromDeath = true;
+            other.slowT = Math.max(other.slowT, 1.5);
+            this.events.push({ k: 'burn', id: other.id, dur: 1.5 });
+          }
+        }
+      }
+
+      if (carpet.timer <= 0) {
+        this.fireCarpets.splice(i, 1);
+      }
+    }
 
     // Podium shield & cyclical battle logic
     const [podX, podZ] = this.map.podium;
@@ -2067,6 +2129,19 @@ export class World {
 
   private dash(p: Player): void {
     if (p.terrain === 1 && p.species !== 'swan' && p.species !== 'pegasus') return;
+    if (p.flightT !== undefined && p.flightT > 0 && p.superT > 0) {
+      p.a = p.input.a;
+      p.vx = Math.cos(p.a) * 58;
+      p.vz = Math.sin(p.a) * 58;
+      p.dashT = 0.55;
+      p.airDashT = 0.55;
+      p.plow = true;
+      p.power = 7.0;
+      p.cd = 0.4;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      return;
+    }
     if (p.superT > 0) {
       if (p.species === 'monkey' || p.species === 'gorilla') {
         if (p.holdT <= 0.15) {
@@ -2636,14 +2711,32 @@ export class World {
 
         if (forwardDist >= -1 && forwardDist <= len + rOther && lateralDist <= w / 2 + rOther) {
           if (other.mass <= 100) {
+            other.lastHitBy = p.id;
+            other.lastHitT = this.time;
             this.kill(other, 'fire');
           } else {
-            other.burnT = 3.0;
-            other.burnDmgTimer = 0.5;
-            other.slowT = Math.max(other.slowT, 1.5);
-            this.events.push({ k: 'burn', id: other.id, dur: 3.0 });
+            const burnDur = isRainbow ? 1.5 : 3.0;
+            other.burnT = burnDur;
+            if (other.burnDmgTimer === undefined || other.burnDmgTimer <= 0) {
+              other.burnDmgTimer = 0.5;
+            }
+            other.burnSafeFromDeath = isRainbow ? true : false;
+            other.slowT = Math.max(other.slowT, burnDur);
+            this.events.push({ k: 'burn', id: other.id, dur: burnDur });
           }
         }
+      }
+
+      if (isRainbow) {
+        this.fireCarpets.push({
+          ownerId: p.id,
+          x: p.x,
+          z: p.z,
+          a: p.a,
+          len,
+          w,
+          timer: 5.0,
+        });
       }
 
       this.events.push({
@@ -2655,6 +2748,7 @@ export class World {
         len,
         w,
         rainbow: isRainbow,
+        dur: isRainbow ? 5.0 : undefined,
       });
     } else {
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
@@ -2822,11 +2916,12 @@ export class World {
       p.cd = 0.5;
       p.pegasusCandyCount = 0;
       p.pegasusCandyTimer = isRainbow ? 1.0 : 0;
-      p.vx = Math.cos(p.a) * 40;
-      p.vz = Math.sin(p.a) * 40;
+      const flySp = isRainbow ? 64 : 40;
+      p.vx = Math.cos(p.a) * flySp;
+      p.vz = Math.sin(p.a) * flySp;
       p.dashT = 0.6;
       p.plow = true;
-      p.power = isRainbow ? 6.0 : 3.8;
+      p.power = isRainbow ? 6.5 : 3.8;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
     } else {
@@ -2861,10 +2956,24 @@ export class World {
           const angleToEnemy = Math.atan2(dz, dx);
           const angleDiff = Math.abs(wrapAngle(angleToEnemy - p.a));
           if (angleDiff <= tossAngleMax) {
-            other.tossT = 1.2;
-            other.stunT = Math.max(other.stunT, 1.8);
-            other.vx = Math.cos(angleToEnemy) * (isRainbow ? 28 : 16);
-            other.vz = Math.sin(angleToEnemy) * (isRainbow ? 28 : 16);
+            if (isRainbow) {
+              if (other.mass <= 100) {
+                other.lastHitBy = p.id;
+                other.lastHitT = this.time;
+                this.kill(other, 'crush');
+              } else {
+                other.tossT = 1.4;
+                other.squishT = 1.5;
+                other.stunT = Math.max(other.stunT, 2.5);
+                other.vx = Math.cos(angleToEnemy) * 36;
+                other.vz = Math.sin(angleToEnemy) * 36;
+              }
+            } else {
+              other.tossT = 1.2;
+              other.stunT = Math.max(other.stunT, 1.8);
+              other.vx = Math.cos(angleToEnemy) * 16;
+              other.vz = Math.sin(angleToEnemy) * 16;
+            }
             hitIds.push(other.id);
             if (!isRainbow) break;
           }
@@ -3635,8 +3744,52 @@ export class World {
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j];
         if (!b.alive) continue;
-        // Flying animals are soaring high in the air: they do not collide with or ram ground animals, nor do they body-ram each other
-        if ((a.flightT !== undefined && a.flightT > 0) || (b.flightT !== undefined && b.flightT > 0)) continue;
+        // Flying animals are soaring high in the air: they do not collide with or ram ground animals
+        const aFlying = (a.flightT !== undefined && a.flightT > 0);
+        const bFlying = (b.flightT !== undefined && b.flightT > 0);
+        if (aFlying !== bFlying) continue;
+
+        if (aFlying && bFlying) {
+          // Both are flying: check if either is doing an air-dash with rainbow power
+          const aAir = (a.dashT > 0 || (a.airDashT !== undefined && a.airDashT > 0)) && a.superT > 0;
+          const bAir = (b.dashT > 0 || (b.airDashT !== undefined && b.airDashT > 0)) && b.superT > 0;
+          if (!aAir && !bAir) continue;
+
+          let dx = b.x - a.x, dz = b.z - a.z;
+          const ra = radiusOf(a.mass), rb = radiusOf(b.mass), minD = ra + rb;
+          const dist = Math.hypot(dx, dz);
+          if (dist >= minD) continue;
+
+          if (aAir && !a.dashHit.has(b.id) && b.shieldT <= 0) {
+            a.dashHit.add(b.id);
+            b.flightT = 0;
+            b.flyT = 0;
+            b.tossT = 1.2;
+            b.squishT = 1.2;
+            b.stunT = Math.max(b.stunT, 1.8);
+            const ramAngle = Math.atan2(dz, dx);
+            b.vx = Math.cos(ramAngle) * 36;
+            b.vz = Math.sin(ramAngle) * 36;
+            b.lastHitBy = a.id;
+            b.lastHitT = this.time;
+            this.events.push({ k: 'hit', a: a.id, v: b.id, x: r2(b.x), z: r2(b.z), s: 36 });
+          }
+          if (bAir && !b.dashHit.has(a.id) && a.shieldT <= 0) {
+            b.dashHit.add(a.id);
+            a.flightT = 0;
+            a.flyT = 0;
+            a.tossT = 1.2;
+            a.squishT = 1.2;
+            a.stunT = Math.max(a.stunT, 1.8);
+            const ramAngle = Math.atan2(-dz, -dx);
+            a.vx = Math.cos(ramAngle) * 36;
+            a.vz = Math.sin(ramAngle) * 36;
+            a.lastHitBy = b.id;
+            a.lastHitT = this.time;
+            this.events.push({ k: 'hit', a: b.id, v: a.id, x: r2(a.x), z: r2(a.z), s: 36 });
+          }
+          continue;
+        }
         if ((a.tossT !== undefined && a.tossT > 0) || (b.tossT !== undefined && b.tossT > 0)) continue;
         const aLeap = (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0);
         const bLeap = (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0);

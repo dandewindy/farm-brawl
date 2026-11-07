@@ -3706,6 +3706,71 @@ describe('fruit trees', () => {
         expect(p2.hitT).toBeFalsy();
         expect(p1.hitT).toBeFalsy();
       });
+
+      it('Phoenix rainbow max charge creates 5s fire carpet killing <= 100kg and burning > 100kg safely', () => {
+        const w = emptyWorld();
+        const p1 = place(w, w.addPlayer('Phoenix', 'phoenix', false), 0, 0, 3200);
+        p1.superT = 10;
+        p1.holdT = 1.0;
+        (w as any).executePhoenixSkill(p1, true, true);
+        expect(w.fireCarpets.length).toBe(1);
+        expect(w.fireCarpets[0].timer).toBe(5.0);
+
+        // Small animal <= 100kg in carpet
+        const small = place(w, w.addPlayer('SmallPig', 'pig', false), 5, 0, 80);
+        // Big animal > 100kg in carpet
+        const big = place(w, w.addPlayer('BigPig', 'pig', false), 10, 0, 500);
+
+        w.step(0.1);
+        expect(small.alive).toBe(false);
+        expect(big.alive).toBe(true);
+        expect(big.burnT).toBeGreaterThan(0);
+        expect(big.burnSafeFromDeath).toBe(true);
+      });
+
+      it('Bull rainbow max charge tosses enemies, killing <= 100kg and flattening > 100kg', () => {
+        const w = emptyWorld();
+        const bull = place(w, w.addPlayer('Bull', 'bull', false), 0, 0, 3200);
+        bull.superT = 10;
+        bull.holdT = 1.0;
+        bull.a = 0; // facing +x
+
+        const small = place(w, w.addPlayer('SmallCow', 'cow', false), 4, 0, 80);
+        const big = place(w, w.addPlayer('BigCow', 'cow', false), 5, 0, 400);
+
+        (w as any).executeBullSkill(bull, true, true);
+        expect(small.alive).toBe(false);
+        expect(big.alive).toBe(true);
+        expect(big.tossT).toBe(1.4);
+        expect(big.squishT).toBe(1.5);
+      });
+
+      it('Aerial combat: rainbow flying animal air-dashing knocks flying enemy down without touching ground players', () => {
+        const w = emptyWorld();
+        const p1 = place(w, w.addPlayer('PegasusAir', 'pegasus', false), 0, 0, 3200);
+        p1.flightT = 10.0;
+        p1.superT = 10.0;
+        (w as any).dash(p1);
+        expect(p1.airDashT).toBeGreaterThan(0);
+
+        const p2 = place(w, w.addPlayer('SwanAir', 'swan', false), 2, 0, 3200);
+        p2.flightT = 10.0;
+
+        const groundPig = place(w, w.addPlayer('GroundPig', 'pig', false), 1, 0, 200);
+        groundPig.flightT = 0;
+
+        (w as any).collidePlayers([p1, p2, groundPig]);
+
+        // p2 is knocked down
+        expect(p2.flightT).toBe(0);
+        expect(p2.tossT).toBe(1.2);
+        expect(p2.squishT).toBe(1.2);
+
+        // groundPig is untouched
+        expect(groundPig.hitT).toBeFalsy();
+        expect(groundPig.tossT).toBeFalsy();
+      });
+
     });
   });
 });

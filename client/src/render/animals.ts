@@ -56,6 +56,7 @@ interface AnimalVisual {
   morphTimer?: number;
   throwTimer?: number;
   wolfBiteTimer?: number;
+  bullSmokeTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -2496,7 +2497,7 @@ function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   noseRing.rotation.y = Math.PI / 2;
   g.add(noseRing);
 
-  // 3. Colossal forward-sweeping arena gladiator horns (Đồng trục 100%, mũi sừng và chóp thép ăn khớp khít khao)
+  // 3. Colossal inward-curved arena gladiator horns (Sừng bò cong vào trong uy mãnh, đồng trục khít khao)
   for (const z of [-0.42, 0.42]) {
     const side = z > 0 ? 1 : -1;
     const hornGroup = new THREE.Group();
@@ -2504,7 +2505,7 @@ function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
     hornGroup.rotation.z = -0.92;
     hornGroup.rotation.x = side * 0.45;
 
-    // Đốt 1: Gốc sừng chắc khỏe
+    // Đốt 1: Gốc sừng vươn ra ngoài và hơi chúc về phía trước
     const hornBase = part(new THREE.CylinderGeometry(0.14, 0.18, 0.42, 8), hornColor, 0, 0.21, 0);
     hornGroup.add(hornBase);
 
@@ -2513,21 +2514,39 @@ function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
     hRing.rotation.x = Math.PI / 2;
     hornGroup.add(hRing);
 
-    // Đốt 2: Thân sừng thon dần về phía trước đồng trục tuyệt đối
-    const hornMid = part(new THREE.CylinderGeometry(0.065, 0.138, 0.42, 8), hornColor, 0, 0.63, 0);
-    hornGroup.add(hornMid);
+    // Đốt 2: Khớp uốn cong hướng vào trong tâm trán
+    const midPivot = new THREE.Group();
+    midPivot.position.set(0, 0.42, 0);
+    midPivot.rotation.x = -side * 0.45; // Cong vào trong
+    midPivot.rotation.z = -0.18; // Uốn cong về phía trước
+
+    const hornMid = part(new THREE.CylinderGeometry(0.075, 0.14, 0.42, 8), hornColor, 0, 0.21, 0);
+    midPivot.add(hornMid);
 
     // Vòng thép nẹp chóp sừng
-    const cRing = part(new THREE.TorusGeometry(0.075, 0.02, 8, 16), plateColor, 0, 0.84, 0);
+    const cRing = part(new THREE.TorusGeometry(0.082, 0.02, 8, 16), plateColor, 0, 0.42, 0);
     cRing.rotation.x = Math.PI / 2;
-    hornGroup.add(cRing);
+    midPivot.add(cRing);
 
-    // Đốt 3: Chóp thép bọc đỉnh sừng đồng trục khít khao 100%, vuốt nhọn sắc bén không lệch góc
-    const cap = part(new THREE.ConeGeometry(0.066, 0.26, 8), plateColor, 0, 0.97, 0);
-    hornGroup.add(cap);
+    // Đốt 3: Chóp thép bọc đỉnh sừng uốn cong vút nhọn vào trong đối diện nhau
+    const tipPivot = new THREE.Group();
+    tipPivot.position.set(0, 0.42, 0);
+    tipPivot.rotation.x = -side * 0.42; // Cong quặp mạnh vào trong
+    tipPivot.rotation.z = -0.12;
+
+    const cap = part(new THREE.ConeGeometry(0.072, 0.32, 8), plateColor, 0, 0.16, 0);
+    tipPivot.add(cap);
+
+    midPivot.add(tipPivot);
+    hornGroup.add(midPivot);
 
     g.add(hornGroup);
     blob(g, bodyColor, 0.20, [1.4, 0.5, 0.7], 0.98, 1.72, z * 1.25, [0, side * 0.3, 0]);
+  }
+
+  // 2 Lỗ mũi to khỏe thở ra khói
+  for (const nz of [-0.12, 0.12]) {
+    blob(g, 0x1a0f0d, 0.055, [1.1, 0.85, 0.85], 1.58, 1.36, nz);
   }
 
   // Tail with thick tuft
@@ -2536,7 +2555,22 @@ function buildBull(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   g.add(tail);
   blob(g, shoulderColor, 0.15, [0.85, 2.1, 0.85], -0.92, 0.62, 0);
 
-  addEyes(g, 1.28, 1.65, 0.25, 0.085);
+  // Tròng mắt màu đỏ rực lửa săn mồi uy nghiêm
+  const eyeScleraMat = animalMat(0xd50000, { emissive: 0xff1744, emissiveIntensity: 1.25, roughness: 0.1 });
+  const eyeIrisMat = animalMat(0xffea00, { emissive: 0xffd600, emissiveIntensity: 0.85, roughness: 0.1 });
+  for (const z of [-0.25, 0.25]) {
+    const eyeSclera = new THREE.Mesh(new THREE.SphereGeometry(0.088, 12, 10), eyeScleraMat);
+    eyeSclera.position.set(1.28, 1.65, z);
+    eyeSclera.scale.set(1.3, 0.8, 0.55);
+    eyeSclera.userData.eye = true;
+    g.add(eyeSclera);
+
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 8), eyeIrisMat);
+    pupil.position.set(1.34, 1.65, z);
+    pupil.scale.set(0.6, 1.2, 0.55);
+    pupil.userData.eye = true;
+    g.add(pupil);
+  }
   // Chân bò dũng mãnh, vòng giáp chân được gắn trực tiếp vào pivot chân đồng bộ khi chạy (không lơ lửng dưới bụng)
   const legs = addLegs(g, bodyColor, [[0.46, 0.34], [0.46, -0.34], [-0.44, 0.32], [-0.44, -0.32]], 0.82, 0.15, 0x111111);
   for (const pivot of legs) {
@@ -4429,6 +4463,23 @@ export class AnimalRenderer {
         vis.body.position.y = 0;
         vis.body.rotation.z = 0;
       }
+      // Lỗ mũi bò thở ra khói (Snorting smoke puffs from nostrils)
+      vis.bullSmokeTimer = (vis.bullSmokeTimer || 0) + dt;
+      const smokeInterval = (isCharging || isDashing || isSuper) ? 0.08 : 0.22;
+      if (vis.bullSmokeTimer >= smokeInterval) {
+        vis.bullSmokeTimer = 0;
+        const cosA = Math.cos(-angle);
+        const sinA = Math.sin(-angle);
+        for (const nz of [-0.12, 0.12]) {
+          const nx = 1.58 * sc;
+          const ny = 1.36 * sc;
+          const wx = x + (nx * cosA - nz * sc * sinA);
+          const wy = bodyY + ny;
+          const wz = z + (nx * sinA + nz * sc * cosA);
+          const puffCol = isSuper ? (Math.random() < 0.5 ? 0xff80ab : 0x80d8ff) : (Math.random() < 0.4 ? 0xf5f5f5 : 0xe0e0e0);
+          this.onPuff?.(wx, wy, wz, puffCol, (isCharging ? 0.55 : 0.38) * r, 0.45, 1.2);
+        }
+      }
     } else {
       vis.body.position.x = 0;
       vis.body.position.y = 0;
@@ -4489,7 +4540,7 @@ export class AnimalRenderer {
         this.scene.add(vis.stars);
       }
       vis.stars.visible = true;
-      const starY = sq > 0.3 ? y + 0.45 : y + sc * 2.3;
+      const starY = (sq > 0.3 ? y + 0.45 : y + sc * 2.3) + (isFlying ? (bodyY - y) : 0);
       vis.stars.position.set(x, starY, z);
       vis.stars.rotation.y = now / 150;
     } else if (vis.stars) {
@@ -4694,20 +4745,22 @@ export class AnimalRenderer {
       vis.isCrowned = showCrown;
     }
 
+    const elevationOffset = isFlying ? (bodyY - y) : 0;
     if (vis.label) {
       const isHiddenInWater = isWater && vis.species !== 'duck' && vis.species !== 'swan' && vis.species !== 'dog' && vis.species !== 'wolf' && vis.species !== 'pegasus' && sinkProgress >= 0.85;
       vis.label.visible = !isHiddenInWater;
       if (!isHiddenInWater) {
         const lh = 1.3 + r * 0.25;
         const labelY = (LABEL_Y[vis.species] || 2.1) + 0.6;
-        const targetLabelY = sq > 0.3 ? y + 0.65 : y + labelY * sc * inWaterShrink;
+        const targetLabelY = (sq > 0.3 ? y + 0.65 : y + labelY * sc * inWaterShrink) + elevationOffset;
         vis.label.position.set(x, targetLabelY, z);
         vis.label.scale.set(lh * vis.label.userData.aspect, lh, 1);
       }
     }
 
-    // Ground indicator ring: Hiệu ứng vòng hào quang tụ lực dưới chân rực rỡ & rung chấn max charge
-    vis.ring.position.set(x, smoothBaseY + 0.06, z);
+    // Ground indicator ring: Hiệu ứng vòng hào quang tụ lực dưới chân rực rỡ & rung chấn max charge (bay thì bay theo dưới chân)
+    const ringBaseY = (smoothBaseY + 0.06) + elevationOffset;
+    vis.ring.position.set(x, ringBaseY, z);
     if (isCharging) {
       vis.ring.visible = !isWater;
       const isMax = lvl >= 0.98;
@@ -4739,7 +4792,7 @@ export class AnimalRenderer {
             wolf: 0x78909c,
           };
           const swCol = EVOLVED_SHOCK_COLORS[vis.species] || 0xffea00;
-          this.spawnShockwave(x, smoothBaseY + 0.08, z, r * (1.2 + Math.random() * 0.5), swCol);
+          this.spawnShockwave(x, ringBaseY + 0.02, z, r * (1.2 + Math.random() * 0.5), swCol);
         }
       }
       // Khóa cứng vis.body.position.z luôn luôn bằng 0

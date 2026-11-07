@@ -141,7 +141,7 @@ export type GameEvent =
   | { k: 'heartRevived'; id: number; x: number; z: number; mass: number }
   | { k: 'heartCollect'; id: number; name: string }
   | { k: 'dolphinDeliver'; x: number; z: number }
-  | { k: 'phoenixFire'; id: number; x: number; z: number; a: number; len: number; w: number; rainbow?: boolean }
+  | { k: 'phoenixFire'; id: number; x: number; z: number; a: number; len: number; w: number; rainbow?: boolean; dur?: number }
   | { k: 'ramKnockback'; id: number; targetId: number; x: number; z: number; rainbow?: boolean }
   | { k: 'swanIce'; id: number; x: number; z: number; r: number; rainbow?: boolean }
   | { k: 'boarMud'; id: number; x: number; z: number; a: number; giant: boolean; r?: number; rainbow?: boolean }
