@@ -84,6 +84,7 @@ export function unlock(): void {
     } catch (_) {}
     startAmbience();
     startMusic();
+    preloadAnimalAudioBuffers();
   }
   if (ctx && ctx.state === 'suspended' && !held) {
     ctx.resume().catch(() => {});
@@ -213,82 +214,252 @@ export function yelp(species: Species, vol = 1): void {
   tone(species === 'cow' || species === 'bull' ? 'sawtooth' : 'square', f, f * 0.7, 0.16, 0.08 * vol, { attack: 0.02 });
 }
 
+
+const ANIMAL_AUDIO_FILES: Partial<Record<Species, string>> = {
+  chicken: '/audio/animals/chicken.mp3',
+  phoenix: '/audio/animals/phoenix.mp3',
+  duck: '/audio/animals/duck.mp3',
+  swan: '/audio/animals/swan.mp3',
+  pig: '/audio/animals/pig.mp3',
+  boar: '/audio/animals/boar.mp3',
+  sheep: '/audio/animals/sheep.mp3',
+  ram: '/audio/animals/ram.mp3',
+  cow: '/audio/animals/cow.mp3',
+  bull: '/audio/animals/bull.mp3',
+  horse: '/audio/animals/horse.mp3',
+  pegasus: '/audio/animals/pegasus.mp3',
+  dog: '/audio/animals/dog.mp3',
+  wolf: '/audio/animals/wolf.mp3',
+  elephant: '/audio/animals/elephant.mp3',
+  mammoth: '/audio/animals/mammoth.mp3',
+  monkey: '/audio/animals/monkey.mp3',
+  gorilla: '/audio/animals/gorilla.mp3',
+};
+
+let listenerX = 0;
+let listenerZ = 0;
+
+export function updateAudioListener(x: number, z: number): void {
+  listenerX = x;
+  listenerZ = z;
+}
+
+export function computeSpatialVolume(sourceX?: number, sourceZ?: number, baseVol = 1.0): number {
+  if (sourceX === undefined || sourceZ === undefined) return baseVol;
+  const dx = sourceX - listenerX;
+  const dz = sourceZ - listenerZ;
+  const dist = Math.hypot(dx, dz);
+  // Ngoài bán kính 70m: triệt tiêu âm lượng hoàn toàn để tránh spam âm thanh
+  if (dist > 70) return 0;
+  // Bán kính gần <= 12m: nghe rõ 100% âm lượng
+  if (dist <= 12) return baseVol;
+  // Giảm âm lượng tuyến tính êm ái từ 12m -> 70m
+  const falloff = Math.max(0, 1 - (dist - 12) / 58);
+  return baseVol * falloff;
+}
+
+const lastCryTime: Partial<Record<Species, number>> = {};
+
+const animalBufferCache = new Map<Species, AudioBuffer>();
+let isPreloadingAnimals = false;
+
+function preloadAnimalAudioBuffers(): void {
+  if (!ctx || isPreloadingAnimals) return;
+  isPreloadingAnimals = true;
+  for (const [sp, url] of Object.entries(ANIMAL_AUDIO_FILES)) {
+    if (!url) continue;
+    fetch(url)
+      .then((res) => (res.ok ? res.arrayBuffer() : null))
+      .then((arr) => {
+        if (!arr || !ctx) return;
+        return ctx.decodeAudioData(arr);
+      })
+      .then((buf) => {
+        if (buf) animalBufferCache.set(sp as Species, buf);
+      })
+      .catch(() => {});
+  }
+}
+
+export function sfxCountdownTick(sec: number): void {
+  if (!ready() || muted) return;
+  const isFinal = sec <= 3;
+  const freq = isFinal ? 1046.5 : (sec <= 5 ? 880 : 740);
+  tone('sine', freq, freq * 1.05, 0.08, 0.35, { attack: 0.005 });
+  tone('triangle', freq * 1.5, freq * 0.9, 0.06, 0.22, { attack: 0.005, delay: 0.01 });
+}
+
+export function playSpeciesAudio(species: Species, vol = 1, x?: number, z?: number): void {
+  if (muted) return;
+  const effectiveVol = (x !== undefined && z !== undefined) ? computeSpatialVolume(x, z, vol) : vol;
+  if (effectiveVol < 0.04) return;
+  const src = ANIMAL_AUDIO_FILES[species];
+  if (!src) return;
+
+  // Rate-limiter chống đè âm / echo: cùng một loài không phát liên tiếp trong 350ms
+  const now = performance.now();
+  if (now - (lastCryTime[species] || 0) < 350) return;
+  lastCryTime[species] = now;
+
+  // 1. Phát qua Web Audio buffer (100% không bị chính sách autoplay của iPad / Safari chặn)
+  if (ctx && animalBufferCache.has(species)) {
+    try {
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const buf = animalBufferCache.get(species)!;
+      const source = ctx.createBufferSource();
+      source.buffer = buf;
+      const gain = ctx.createGain();
+      const targetGain = Math.min(1.0, Math.max(0, effectiveVol * 0.9));
+      gain.gain.setValueAtTime(targetGain, ctx.currentTime);
+      source.connect(gain);
+      gain.connect(sfxBus || master || ctx.destination);
+      source.start(0);
+
+      // Tự động fade out sau 2.8s cho Web Audio đối với các file dài
+      const fadeStartTime = ctx.currentTime + 2.8;
+      gain.gain.setValueAtTime(targetGain, fadeStartTime);
+      gain.gain.linearRampToValueAtTime(0.001, fadeStartTime + 0.4);
+      setTimeout(() => {
+        try {
+          source.stop();
+          source.disconnect();
+          gain.disconnect();
+        } catch (_) {}
+      }, 3400);
+      return;
+    } catch (_) {}
+  }
+
+  // 2. Fallback sang HTML5 Audio nếu buffer chưa kịp decode xong
+  try {
+    const audio = new Audio(src);
+    audio.volume = Math.min(1.0, Math.max(0, effectiveVol * 0.9));
+    audio.play().catch(() => {});
+    // Tự động fade out sau 2.8s đối với các file dài để giữ nhịp độ trận đấu luôn dồn dập, gãy gọn
+    setTimeout(() => {
+      try {
+        if (!audio.paused) {
+          const fade = setInterval(() => {
+            if (audio.volume > 0.08) {
+              audio.volume = Math.max(0, audio.volume - 0.08);
+            } else {
+              clearInterval(fade);
+              audio.pause();
+            }
+          }, 50);
+        }
+      } catch (_) {}
+    }, 2800);
+  } catch (_) {}
+}
+
 export function sfxPhoenixCry(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Majestic bird cry + shimmering fire screech
-  tone('triangle', 880, 1760, 0.45, 0.45 * vol, { attack: 0.04 });
-  tone('sawtooth', 1200, 650, 0.55, 0.35 * vol, { delay: 0.08, attack: 0.03 });
-  noise('bandpass', 1800, 600, 2.5, 0.50, 0.25 * vol, { attack: 0.05 });
+  // Phượng Hoàng Lửa hót réo rắt thiên đình ngân vang đa tầng
+  tone('triangle', 880, 2400, 0.75, 0.55 * vol, { attack: 0.03 });
+  tone('sawtooth', 1400, 850, 0.95, 0.45 * vol, { delay: 0.12, attack: 0.04 });
+  tone('sine', 1760, 2640, 1.20, 0.35 * vol, { delay: 0.25, attack: 0.05 });
+  // Tiếng ngọn lửa thần thoại bốc cháy cuồn cuộn
+  noise('bandpass', 1600, 480, 2.2, 0.95, 0.45 * vol, { attack: 0.02 });
+  // Chuỗi âm chuông vàng thiêng liêng rực rỡ
+  [1318, 1760, 2093, 2637].forEach((f, i) => {
+    tone('sine', f, f * 1.02, 0.6, 0.22 * vol, { delay: 0.15 + i * 0.08, attack: 0.01 });
+  });
 }
 
 export function sfxSwanCall(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Resonant royal swan trumpet / bugle
-  tone('sawtooth', 380, 520, 0.65, 0.40 * vol, { attack: 0.06 });
-  tone('triangle', 520, 440, 0.55, 0.35 * vol, { delay: 0.15, attack: 0.04 });
-  noise('bandpass', 850, 350, 2.0, 0.45, 0.20 * vol, { attack: 0.05 });
+  // Tiếng kèn hoàng gia thiên nga thánh thót ngân nga vang vọng mặt hồ
+  tone('sawtooth', 440, 660, 0.65, 0.55 * vol, { attack: 0.05 });
+  tone('triangle', 660, 587, 0.75, 0.48 * vol, { delay: 0.20, attack: 0.04 });
+  tone('sawtooth', 587, 880, 0.95, 0.50 * vol, { delay: 0.45, attack: 0.05 });
+  // Tiếng sóng nước dâng trào và tiếng vỗ cánh lướt sóng dạt dào
+  noise('bandpass', 750, 320, 2.0, 1.25, 0.38 * vol, { attack: 0.04 });
+  // Chuỗi âm giọt nước pha lê thánh khiết
+  [880, 1174, 1318, 1760].forEach((f, i) => {
+    tone('sine', f, f, 0.7, 0.25 * vol, { delay: 0.30 + i * 0.09, attack: 0.01 });
+  });
 }
 
 export function sfxRamBash(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Heavy bone-cracking anvil clash
-  tone('square', 240, 80, 0.25, 0.60 * vol, { attack: 0.005 });
-  tone('sawtooth', 360, 110, 0.20, 0.45 * vol, { attack: 0.003 });
-  noise('bandpass', 1200, 300, 3.0, 0.25, 0.65 * vol, { attack: 0.003 });
+  // Tiếng tù và chiến trận cừu thần sừng kim cương rền vang
+  tone('sawtooth', 175, 350, 0.85, 0.65 * vol, { attack: 0.04 });
+  tone('triangle', 350, 262, 0.95, 0.55 * vol, { delay: 0.25, attack: 0.05 });
+  // Tiếng va chạm sừng kim cương cực đại tạo sóng xung kích nổ sét
+  tone('square', 280, 60, 0.45, 0.75 * vol, { delay: 0.05, attack: 0.003 });
+  noise('highpass', 2400, 1200, 1.2, 0.55, 0.60 * vol, { delay: 0.05, attack: 0.003 });
+  tone('sine', 95, 40, 1.2, 0.85 * vol, { delay: 0.06, attack: 0.01 });
 }
 
 export function sfxBoarGrunt(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Low aggressive guttural boar grunt
-  tone('sawtooth', 160, 70, 0.35, 0.55 * vol, { attack: 0.02 });
-  tone('square', 110, 45, 0.40, 0.40 * vol, { delay: 0.05, attack: 0.03 });
-  noise('bandpass', 450, 150, 3.5, 0.35, 0.45 * vol, { attack: 0.02 });
+  // Tiếng gầm gừ hung tợn sâu thẳm trong cuống họng của heo rừng
+  tone('sawtooth', 140, 65, 0.75, 0.70 * vol, { attack: 0.03 });
+  tone('square', 95, 40, 0.85, 0.60 * vol, { delay: 0.08, attack: 0.04 });
+  // Sub-bass rung lồng ngực
+  tone('sine', 55, 28, 1.10, 0.95 * vol, { attack: 0.02 });
+  // Tiếng nanh sắt cọ xát ken két và tiếng khịt mũi thở phì phò cày đất
+  noise('bandpass', 550, 180, 3.2, 0.85, 0.55 * vol, { attack: 0.02 });
 }
 
 export function sfxPegasusNeigh(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Heroic celestial horse whinny
-  tone('sawtooth', 550, 880, 0.40, 0.45 * vol, { attack: 0.03 });
-  tone('triangle', 880, 660, 0.50, 0.35 * vol, { delay: 0.18, attack: 0.04 });
-  tone('sine', 1100, 1650, 0.35, 0.25 * vol, { delay: 0.05, attack: 0.02 });
+  // Tiếng ngựa thần Pegasus hí vang trời sấm sét rền vang
+  tone('sawtooth', 620, 1650, 0.75, 0.60 * vol, { attack: 0.03 });
+  tone('triangle', 1650, 1100, 0.85, 0.50 * vol, { delay: 0.22, attack: 0.04 });
+  tone('sine', 1100, 1760, 0.95, 0.40 * vol, { delay: 0.45, attack: 0.03 });
+  // Tiếng sấm sét sải cánh xuyên tầng mây
+  tone('sine', 120, 35, 1.4, 0.85 * vol, { attack: 0.02 });
+  noise('lowpass', 650, 280, 2.0, 0.75, 0.35 * vol, { attack: 0.03 });
+  // Chuỗi âm sao băng lấp lánh
+  [1046, 1318, 1568, 2093].forEach((f, i) => {
+    tone('sine', f, f * 1.05, 0.55, 0.25 * vol, { delay: 0.35 + i * 0.07, attack: 0.01 });
+  });
 }
 
 export function sfxBullRoar(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // Deep ferocious arena bull bellow & earth stomp
-  tone('sawtooth', 120, 45, 0.85, 0.65 * vol, { attack: 0.05 });
-  tone('sine', 55, 30, 0.95, 0.80 * vol, { attack: 0.06 });
-  noise('bandpass', 280, 90, 4.0, 0.75, 0.50 * vol, { attack: 0.04 });
+  // Tiếng rống sấm sét địa chấn rung chuyển mặt đất của bò mộng đấu trường
+  tone('sawtooth', 110, 42, 1.35, 0.80 * vol, { attack: 0.06 });
+  tone('triangle', 75, 38, 1.45, 0.65 * vol, { delay: 0.15, attack: 0.08 });
+  tone('sine', 48, 22, 1.65, 1.00 * vol, { attack: 0.05 });
+  // Tiếng móng guốc dậm đất rung chuyển cực mạnh và tiếng thở nộ khí
+  noise('bandpass', 320, 110, 3.8, 1.20, 0.65 * vol, { attack: 0.04 });
 }
 
 export function sfxGorillaRoar(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  tone('sawtooth', 95, 45, 0.65, 0.45 * vol, { attack: 0.04 });
-  tone('sawtooth', 140, 60, 0.55, 0.3 * vol, { delay: 0.03, attack: 0.05 });
-  noise('bandpass', 350, 180, 2.5, 0.45, 0.35 * vol, { delay: 0.02 });
-  tone('sine', 60, 30, 0.7, 0.6 * vol, { attack: 0.05 });
+  // Tiếng đấm ngực thùm thụp liên hoàn của Vua Khỉ Đột King Kong
+  [0.0, 0.14, 0.28, 0.42].forEach((delay) => {
+    tone('sine', 120, 38, 0.22, 0.85 * vol, { delay, attack: 0.005 });
+    noise('lowpass', 350, 120, 2.0, 0.18, 0.55 * vol, { delay, attack: 0.005 });
+  });
+  // Tiếng gầm King Kong vang dội núi rừng
+  tone('sawtooth', 110, 48, 1.10, 0.75 * vol, { delay: 0.25, attack: 0.05 });
+  tone('sine', 65, 32, 1.30, 0.90 * vol, { delay: 0.25, attack: 0.04 });
 }
 
 export function sfxMammothRoar(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // 1 single powerful, continuous, reverberating mammoth trumpet blast (1.4s sustained)
-  tone('sawtooth', 140, 310, 1.35, 0.55 * vol, { attack: 0.10 });
-  tone('sawtooth', 210, 460, 1.20, 0.40 * vol, { attack: 0.12 });
-  tone('sine', 72, 38, 1.50, 0.85 * vol, { attack: 0.08 });
-  noise('bandpass', 520, 240, 4.2, 1.25, 0.42 * vol, { attack: 0.08 });
+  // Tiếng tù và vòi voi khổng lồ rền vang 1.8s xé rách không gian
+  tone('sawtooth', 140, 340, 1.65, 0.75 * vol, { attack: 0.08 });
+  tone('sawtooth', 210, 480, 1.45, 0.60 * vol, { attack: 0.10 });
+  tone('sine', 68, 32, 1.80, 1.05 * vol, { attack: 0.06 });
+  noise('bandpass', 520, 220, 4.0, 1.50, 0.55 * vol, { attack: 0.06 });
 }
 
 export function sfxWolfHowl(vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  tone('sawtooth', 190, 440, 0.45, 0.42 * vol, { attack: 0.08 });
-  tone('triangle', 440, 380, 0.65, 0.48 * vol, { delay: 0.35, attack: 0.06 });
-  tone('sine', 220, 140, 0.55, 0.38 * vol, { delay: 0.75, attack: 0.05 });
-  noise('bandpass', 650, 320, 3.0, 0.85, 0.25 * vol, { attack: 0.06 });
+  // Tiếng sói thần đầu đàn hú vang trăng sao cô độc và dũng mãnh ngân dài 2.0s
+  tone('sawtooth', 220, 520, 0.65, 0.60 * vol, { attack: 0.08 });
+  tone('triangle', 520, 440, 0.95, 0.65 * vol, { delay: 0.35, attack: 0.06 });
+  tone('sine', 330, 180, 0.85, 0.50 * vol, { delay: 0.85, attack: 0.05 });
+  noise('bandpass', 650, 280, 3.2, 1.40, 0.40 * vol, { attack: 0.06 });
 }
 
 export function sfxWolfBite(vol = 1, rainbow = false): void {
   if (!ready() || vol < 0.03) return;
-  // Fierce fang snap + slash crunch
   tone('sawtooth', rainbow ? 480 : 320, 95, 0.14, 0.55 * vol, { attack: 0.004 });
   tone('square', rainbow ? 720 : 540, 140, 0.09, 0.32 * vol, { attack: 0.003 });
   noise('bandpass', 2400, 680, 2.2, 0.11, 0.55 * vol, { attack: 0.003 });
@@ -297,7 +468,9 @@ export function sfxWolfBite(vol = 1, rainbow = false): void {
   }
 }
 
-export function playSpeciesCry(species: Species, vol = 1): void {
+export function playSpeciesCry(species: Species, vol = 1, x?: number, z?: number): void {
+  playSpeciesAudio(species, vol, x, z);
+  playSpeciesAudio(species, vol);
   switch (species) {
     case 'phoenix': sfxPhoenixCry(vol); break;
     case 'swan': sfxSwanCall(vol); break;
@@ -312,32 +485,74 @@ export function playSpeciesCry(species: Species, vol = 1): void {
   }
 }
 
-export function sfxEvolveFanfare(species: Species, vol = 1): void {
+// SFX KỸ NĂNG ĐẶC BIỆT CỦA 6 THẦN THÚ
+export function sfxPhoenixInferno(superSkill = false, vol = 1): void {
   if (!ready() || vol < 0.03) return;
-  // 1. Tầng âm 1: Hợp âm Đồng thau Thần thoại Hoàng kim C Major Khải Hoàn (Majestic Celestial Brass Fanfare)
-  // C4, E4, G4, C5, E5, G5, B5, C6 vút cao vang dội
-  const brassNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 987.77, 1046.50];
-  brassNotes.forEach((freq, idx) => {
-    // Sawtooth kết hợp lowpass tạo chất âm kèn đồng hoành tráng
-    tone('sawtooth', freq, freq * 1.005, 1.25 + idx * 0.05, 0.35 * vol, { delay: idx * 0.055, attack: 0.02 });
-    tone('triangle', freq, freq, 1.40 + idx * 0.05, 0.25 * vol, { delay: idx * 0.055, attack: 0.01 });
-  });
-
-  // 2. Tầng âm 2: Sóng chấn động Sub-bass cực sâu làm rung chuyển mặt đất (Deep Sub-bass Ground Rupture)
-  tone('sine', 130, 32, 1.5, 0.95 * vol, { delay: 0.02, attack: 0.005 });
-  noise('bandpass', 1800, 350, 2.5, 0.85, 0.65 * vol, { delay: 0.05, attack: 0.01 });
-
-  // 3. Tầng âm 3: Tiếng chuông pha lê thiên hà lấp lánh (Shimmering Celestial Crystal Harp)
-  const crystalChimes = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02];
-  crystalChimes.forEach((f, i) => {
-    tone('sine', f, f * 1.02, 0.8, 0.22 * vol, { delay: 0.25 + i * 0.06, attack: 0.005 });
-  });
-
-  // 4. Tầng âm 4: Tiếng gầm / Tiếng hót uy linh dũng mãnh vang dội của thần thú
-  playSpeciesCry(species, 1.45 * vol);
+  tone('triangle', superSkill ? 980 : 740, superSkill ? 2800 : 1800, 0.65, 0.65 * vol, { attack: 0.02 });
+  noise('bandpass', superSkill ? 2200 : 1400, 450, 2.5, 0.85, 0.70 * vol, { attack: 0.01 });
+  tone('sine', 140, 35, 0.9, 0.85 * vol, { attack: 0.01 });
 }
 
-export function sfxRainbowSuperSkill(species: Species, vol = 1): void {
+export function sfxSwanTidalWave(superSkill = false, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  noise('bandpass', superSkill ? 950 : 650, 280, 3.0, 1.2, 0.75 * vol, { attack: 0.03 });
+  tone('sawtooth', superSkill ? 520 : 380, superSkill ? 220 : 160, 0.85, 0.60 * vol, { attack: 0.04 });
+  tone('sine', 85, 30, 1.1, 0.90 * vol, { attack: 0.02 });
+}
+
+export function sfxBoarBulldozer(superSkill = false, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('square', superSkill ? 180 : 140, 45, 0.65, 0.75 * vol, { attack: 0.01 });
+  noise('lowpass', 550, 180, 3.5, 0.95, 0.85 * vol, { attack: 0.01 });
+  tone('sine', 48, 20, 1.3, 1.05 * vol, { attack: 0.01 });
+}
+
+export function sfxRamDiamondClash(superSkill = false, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('square', superSkill ? 420 : 320, 80, 0.45, 0.85 * vol, { attack: 0.003 });
+  noise('highpass', superSkill ? 3200 : 2200, 800, 2.0, 0.65, 0.75 * vol, { attack: 0.003 });
+  tone('sine', 110, 30, 1.2, 0.95 * vol, { attack: 0.01 });
+}
+
+export function sfxBullEarthStomp(superSkill = false, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('sawtooth', superSkill ? 140 : 95, 30, 1.2, 0.85 * vol, { attack: 0.02 });
+  tone('sine', 42, 18, 1.6, 1.15 * vol, { attack: 0.01 });
+  noise('bandpass', 240, 80, 4.5, 1.4, 0.80 * vol, { attack: 0.02 });
+}
+
+export function sfxPegasusSkyFlight(superSkill = false, vol = 1): void {
+  if (!ready() || vol < 0.03) return;
+  tone('triangle', superSkill ? 880 : 660, superSkill ? 1760 : 1320, 0.75, 0.55 * vol, { attack: 0.03 });
+  noise('bandpass', superSkill ? 1600 : 1100, 380, 2.2, 0.85, 0.50 * vol, { attack: 0.02 });
+  tone('sine', 160, 45, 0.85, 0.70 * vol, { attack: 0.02 });
+}
+
+export function sfxEvolveFanfare(species: Species, vol = 1, x?: number, z?: number): void {
+  if (!ready() || vol < 0.03) return;
+  // 1. Dạo đầu bùng nổ năng lượng hoàng kim khải hoàn (C Major Celestial Chord)
+  const brassNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+  brassNotes.forEach((freq, idx) => {
+    tone('sawtooth', freq, freq * 1.005, 1.2 + idx * 0.04, 0.28 * vol, { delay: idx * 0.045, attack: 0.015 });
+    tone('triangle', freq, freq, 1.3 + idx * 0.04, 0.20 * vol, { delay: idx * 0.045, attack: 0.01 });
+  });
+
+  // 2. Chấn động địa bàn Sub-bass rung chuyển không gian
+  tone('sine', 120, 28, 1.6, 1.05 * vol, { delay: 0.02, attack: 0.005 });
+  noise('bandpass', 1600, 300, 2.2, 0.95, 0.70 * vol, { delay: 0.03, attack: 0.01 });
+
+  // 3. Chuỗi âm pha lê thần thánh lấp lánh
+  [1046.5, 1318.5, 1567.9, 2093.0, 2637.0].forEach((f, i) => {
+    tone('sine', f, f * 1.02, 0.8, 0.22 * vol, { delay: 0.18 + i * 0.05, attack: 0.005 });
+  });
+
+  // 4. TIẾNG KÊU ĐẶC TRƯNG CỦA CHÍNH LOÀI ĐÓ VANG LÊN HÙNG TRÁNG RÕ RỆT NHẤT (Ngay sau 0.12s, âm lượng 1.65x)
+  setTimeout(() => {
+    playSpeciesCry(species, 1.65 * vol, x, z);
+  }, 120);
+}
+
+export function sfxRainbowSuperSkill(species: Species, vol = 1, x?: number, z?: number): void {
   if (!ready() || vol < 0.03) return;
   // 1. Shimmering celestial rainbow scale arpeggio (7 sắc cầu vồng tần số ma thuật rực rỡ)
   const rainbowNotes = [523.25, 659.25, 783.99, 987.77, 1046.50, 1318.51, 1567.98];
@@ -351,17 +566,17 @@ export function sfxRainbowSuperSkill(species: Species, vol = 1): void {
   noise('bandpass', 3200, 500, 2.0, 0.75, 0.65 * vol, { delay: 0.02, attack: 0.008 });
 
   // 3. Tiếng xung trận rền vang sấm sét của thần thú
-  playSpeciesCry(species, 1.35 * vol);
+  playSpeciesCry(species, 1.35 * vol, x, z);
 }
 
-export function sfxMaxChargeReady(species: Species, vol = 1): void {
+export function sfxMaxChargeReady(species: Species, vol = 1, x?: number, z?: number): void {
   if (!ready() || vol < 0.03) return;
   // Xung âm năng lượng cực đại khi nén gồng max (Energy Overload Shockwave Pulse)
   tone('triangle', 440, 880, 0.35, 0.45 * vol, { attack: 0.005 });
   tone('sine', 160, 40, 0.65, 0.75 * vol, { attack: 0.005 });
   tone('sawtooth', 880, 1760, 0.25, 0.25 * vol, { attack: 0.01 });
   noise('highpass', 2400, 1200, 1.5, 0.30, 0.35 * vol, { attack: 0.005 });
-  playSpeciesCry(species, 0.45 * vol);
+  playSpeciesCry(species, 0.85 * vol, x, z);
 }
 
 function stopChargeMax(): void {

@@ -6,11 +6,12 @@ import {
   chargeStop, chargeUpdate, repaint, setMood,
   sfxBoom, sfxBurn, sfxCrown, sfxDash, sfxDethrone, sfxDrown, sfxEat, sfxFall, sfxGorillaRoar, sfxMammothRoar, sfxWolfHowl, sfxWolfBite,
   sfxPhoenixCry, sfxSwanCall, sfxRamBash, sfxBoarGrunt, sfxPegasusNeigh, sfxBullRoar,
+  sfxPhoenixInferno, sfxSwanTidalWave, sfxBoarBulldozer, sfxRamDiamondClash, sfxBullEarthStomp, sfxPegasusSkyFlight,
   sfxEvolveFanfare, sfxRainbowSuperSkill, sfxMaxChargeReady,
   sfxHit, sfxPodBlast, sfxPodWarning, sfxReward, sfxSong, sfxSplash,
   sfxSuperFly, sfxSuperFood, sfxSuperUp, sfxZap,
   unlockAudio, yelp, setMuted,
-  cycleAudioMode, getAudioMode, type AudioMode,
+  cycleAudioMode, getAudioMode, type AudioMode, updateAudioListener, computeSpatialVolume, playSpeciesCry,
 } from './audio/sfx';
 import { ClientPredictor } from './game/pred';
 import { GameState, type FoodItem } from './game/state';
@@ -366,11 +367,27 @@ input.onReleaseRam = (held: number) => {
   const triggeredDashSeq = canDash ? inputSeq : undefined;
   predictor.currentSeq = inputSeq;
 
+  const isMonkeySpecies = myMeta && (myMeta.species === 'monkey' || myMeta.species === 'gorilla');
+  const isMonkeyTap = isMonkeySpecies && validHeld <= 0.15;
+  if (isMonkeyTap) {
+    // Tap Khỉ & Gorilla: Chỉ quăng chuối (thường 1 quả, cầu vồng 5 quả), KHÔNG có hiệu ứng húc, không shockwave, không rung lắc
+    gameState.me.cd = 0.35;
+    return;
+  }
+
   if (canDash) {
     predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
     const isEvolved = isEvolvedSpecies(myMeta.species) || curMass >= 3000;
-    if (isSuper || isEvolved) {
-      sfxRainbowSuperSkill(myMeta.species, 1.15);
+    const isChargedRam = validHeld > 0.15;
+    // Kỹ năng đặc biệt của Thần thú: Chỉ kích hoạt khi Siêu cấp (isSuper) HOẶC khi GỒNG LỰC (isChargedRam)!
+    if (isSuper || (isEvolved && isChargedRam)) {
+      if (myMeta.species === 'phoenix') sfxPhoenixInferno(isSuper, 1.25);
+      else if (myMeta.species === 'swan') sfxSwanTidalWave(isSuper, 1.25);
+      else if (myMeta.species === 'boar') sfxBoarBulldozer(isSuper, 1.25);
+      else if (myMeta.species === 'ram') sfxRamDiamondClash(isSuper, 1.25);
+      else if (myMeta.species === 'bull') sfxBullEarthStomp(isSuper, 1.25);
+      else if (myMeta.species === 'pegasus') sfxPegasusSkyFlight(isSuper, 1.25);
+      else sfxRainbowSuperSkill(myMeta.species, 1.15);
       shake = Math.max(shake, 1.25);
       const shockColor = isSuper ? 0xffea00 : (myMeta.species === 'phoenix' ? 0xff3d00 : (myMeta.species === 'swan' ? 0x00e5ff : (myMeta.species === 'pegasus' ? 0xffd700 : (myMeta.species === 'boar' ? 0xd84315 : 0x76ff03))));
       animals.spawnShockwave(curX, 0.08, curZ, Math.max(3.6, radiusOf(curMass) * 1.5), shockColor);
@@ -769,7 +786,7 @@ function syncAudioUi(): void {
   const sbmMuteIcon = document.getElementById('sbmMuteIcon');
   if (sbmMuteIcon) sbmMuteIcon.textContent = ico;
   const sbmMuteVal = document.getElementById('sbmMuteVal');
-  if (sbmMuteVal) sbmMuteVal.textContent = txt;
+  if (sbmMuteVal) sbmMuteVal.textContent = txt.replace(/^(Âm thanh|Audio):\s*/i, '');
 }
 
 function handleAudioToggle(): void {
@@ -1046,12 +1063,18 @@ if (fsBtn) {
   });
 }
 if (adminToggleBtn) {
-  adminToggleBtn.addEventListener('click', (e) => {
+  const handleAdminToggle = (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
-    if (adminPanel) {
-      adminPanel.toggle();
+    if (!adminPanel) {
+      adminPanel = new AdminPanel(() => transport, isTouchDevice);
     }
+    adminPanel.toggle();
+  };
+  adminToggleBtn.addEventListener('click', handleAdminToggle);
+  adminToggleBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    handleAdminToggle(e);
   });
 }
 if (startFsBtn) {
@@ -1560,6 +1583,10 @@ const gameState = new GameState({
           firstSpawn = false;
           predictor.reset(x, z);
           world.snapCamera(x, z, mass);
+          const meMeta = gameState.metas.get(gameState.myId);
+          if (meMeta) {
+            playSpeciesCry(meMeta.species, 1.0);
+          }
         }
         const stableBaseRtt = (transport as any)?.rttMin ?? (transport ? transport.rtt : 48);
         predictor.onServerSnapshot(
@@ -1607,12 +1634,22 @@ const gameState = new GameState({
         const isSuper = (flags & FLAG.SUPER) !== 0;
         const isDashing = (flags & 1) !== 0;
         if (isDashing && !wasDashing) {
-          const mySpecies = gameState.metas.get(gameState.myId)?.species ?? 'pig';
-          const isEvolved = isEvolvedSpecies(mySpecies) || mass >= 3000;
-          if (isSuper || isEvolved) {
-            sfxRainbowSuperSkill(mySpecies, 1.15);
-          } else {
-            sfxDash(1);
+          // Nếu dùng predictor (client đã phát sfx lúc bấm), không phát lại từ snapshot để tránh âm thanh nổ đúp 2 lần
+          if (!predictor.on) {
+            const mySpecies = gameState.metas.get(gameState.myId)?.species ?? 'pig';
+            const isEvolved = isEvolvedSpecies(mySpecies) || mass >= 3000;
+            const isPlowing = (flags & FLAG.PLOW) !== 0;
+            if (isSuper || (isEvolved && isPlowing)) {
+              if (mySpecies === 'phoenix') sfxPhoenixInferno(isSuper, 1.1);
+              else if (mySpecies === 'swan') sfxSwanTidalWave(isSuper, 1.1);
+              else if (mySpecies === 'boar') sfxBoarBulldozer(isSuper, 1.1);
+              else if (mySpecies === 'ram') sfxRamDiamondClash(isSuper, 1.1);
+              else if (mySpecies === 'bull') sfxBullEarthStomp(isSuper, 1.1);
+              else if (mySpecies === 'pegasus') sfxPegasusSkyFlight(isSuper, 1.1);
+              else sfxRainbowSuperSkill(mySpecies, 1.15);
+            } else {
+              sfxDash(1);
+            }
           }
         }
         wasDashing = isDashing;
@@ -2439,15 +2476,14 @@ function handleGameEvent(ev: GameEvent): void {
         }
         shake = Math.max(shake, ev.rainbow ? 0.85 : 0.55);
 
-        // Lock camera firmly on the initial victim so camera does not jerk during multi-target blitz
+        // Khóa chặt camera vào tâm con vật đầu tiên (anchor) trong suốt 6 nhát cắn
+        const ax = ev.anchorX !== undefined ? ev.anchorX : (ev.fromX !== undefined ? ev.fromX : ev.x);
+        const az = ev.anchorZ !== undefined ? ev.anchorZ : (ev.fromZ !== undefined ? ev.fromZ : ev.z);
         if (ev.step === 1 || !wolfCamLockPos) {
-          const tx = targetEnt ? targetEnt.x : ev.x;
-          const tz = targetEnt ? targetEnt.z : ev.z;
-          const tMass = targetEnt ? targetEnt.mass : 1000;
-          wolfCamLockPos = { x: tx, z: tz, mass: tMass };
+          wolfCamLockPos = { x: ax, z: az, mass: targetEnt ? targetEnt.mass : 1000 };
         }
-        const biteDur = ev.rainbow ? 0.32 : 0.16;
-        const totalDuration = ((ev.total || 4) - (ev.step || 1) + 1) * biteDur + 0.35;
+        const biteDur = ev.rainbow ? 0.30 : 0.15;
+        const totalDuration = ((ev.total || 6) - (ev.step || 1) + 1) * biteDur + 0.40;
         wolfCamLockTimer = Math.max(wolfCamLockTimer, totalDuration);
       } else if (ev.targetId === myId) {
         shake = Math.max(shake, 0.55);
@@ -2501,6 +2537,81 @@ function handleGameEvent(ev: GameEvent): void {
       }
       break;
     }
+    case 'phoenixFire': {
+      const isMine = ev.id === myId;
+      sfxPhoenixInferno(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
+      sfxPhoenixCry(isMine ? 0.9 : computeSpatialVolume(ev.x, ev.z, 0.6));
+      if (isMine) shake = Math.max(shake, ev.rainbow ? 1.5 : 1.0);
+      const steps = Math.floor(ev.len / 2.5);
+      const cosA = Math.cos(ev.a);
+      const sinA = Math.sin(ev.a);
+      for (let i = 1; i <= steps; i++) {
+        const dist = i * 2.5;
+        const cx = ev.x + cosA * dist;
+        const cz = ev.z + sinA * dist;
+        const col = ev.rainbow ? (i % 2 === 0 ? 0xff1744 : 0xffea00) : (i % 2 === 0 ? 0xff3d00 : 0xff9100);
+        animals.spawnShockwave(cx, 0.08, cz, (ev.w / 2) * 1.1, col);
+        foodParts.burst(cx, 0.6, cz, col, ev.rainbow ? 12 : 8, 5, 5, 0.6);
+        foodParts.smokePoof(cx, 0.8, cz, ev.w * 0.4, 6);
+      }
+      break;
+    }
+    case 'ramKnockback': {
+      const isMine = ev.id === myId;
+      sfxRamDiamondClash(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
+      sfxRamBash(isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.6));
+      animals.spawnShockwave(ev.x, 0.08, ev.z, ev.rainbow ? 5.5 : 3.5, ev.rainbow ? 0xffeb3b : 0xffd54f);
+      foodParts.burst(ev.x, 1.2, ev.z, ev.rainbow ? 0xffeb3b : 0xffffff, 20, 8, 8, 0.8);
+      if (isMine) shake = Math.max(shake, ev.rainbow ? 1.6 : 1.1);
+      break;
+    }
+    case 'swanIce': {
+      const isMine = ev.id === myId;
+      sfxSwanTidalWave(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
+      animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r, 0x80deea);
+      animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.65, 0x00e5ff);
+      foodParts.burst(ev.x, 0.8, ev.z, 0xe0f7fa, 22, 6, 6, 0.7);
+      foodParts.smokePoof(ev.x, 0.9, ev.z, ev.r * 0.6, 15);
+      if (isMine) shake = Math.max(shake, 0.8);
+      break;
+    }
+    case 'boarMud': {
+      const isMine = ev.id === myId;
+      sfxBoarBulldozer(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
+      sfxBoarGrunt(isMine ? 0.9 : computeSpatialVolume(ev.x, ev.z, 0.6));
+      const cosA = Math.cos(ev.a);
+      const sinA = Math.sin(ev.a);
+      const dist = ev.giant ? 22 : 16;
+      const boulderCol = ev.rainbow ? 0xff4081 : 0x5d4037;
+      for (let d = 3; d <= dist; d += 4) {
+        const mx = ev.x + cosA * d;
+        const mz = ev.z + sinA * d;
+        animals.spawnShockwave(mx, 0.08, mz, ev.giant ? 4.5 : 2.8, boulderCol);
+        foodParts.burst(mx, 0.8, mz, boulderCol, 14, 6, 6, 0.6);
+      }
+      foodParts.smokePoof(ev.x + cosA * dist, 1.0, ev.z + sinA * dist, ev.giant ? 4.5 : 3.0, 20);
+      if (isMine) shake = Math.max(shake, ev.giant ? 1.4 : 0.9);
+      break;
+    }
+    case 'bullToss': {
+      const isMine = ev.id === myId;
+      sfxBullEarthStomp(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
+      sfxBullRoar(isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.6));
+      animals.spawnShockwave(ev.x, 0.08, ev.z, ev.r, ev.rainbow ? 0xff6d00 : 0xff9800);
+      animals.spawnShockwave(ev.x, 0.12, ev.z, ev.r * 0.5, 0xffeb3b);
+      foodParts.burst(ev.x, 1.2, ev.z, 0xff5722, 24, 8, 8, 0.8);
+      foodParts.smokePoof(ev.x, 1.2, ev.z, ev.r * 0.5, 20);
+      if (isMine) shake = Math.max(shake, ev.rainbow ? 1.6 : 1.2);
+      break;
+    }
+    case 'burn': {
+      const ent = gameState.ents.get(ev.id);
+      if (ent) {
+        foodParts.burst(ent.x, 1.2, ent.z, 0xff3d00, 16, 5, 5, 0.6);
+        foodParts.smokePoof(ent.x, 1.4, ent.z, 1.5, 10);
+      }
+      break;
+    }
     case 'morph': {
       const targetMeta = gameState.metas.get(ev.id);
       if (targetMeta) {
@@ -2528,7 +2639,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xff6d00, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
         sfxGorillaRoar(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2544,7 +2655,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffca28, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxWolfHowl(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2561,7 +2672,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffd54f, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
         sfxMammothRoar(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2577,7 +2688,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffea00, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxPhoenixCry(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2593,7 +2704,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.2, 50);
         sfxSwanCall(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2609,7 +2720,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xd7ccc8, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.4, 52);
         sfxRamBash(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2625,7 +2736,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0x795548, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.5, mz, 3.4, 52);
         sfxBoarGrunt(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2641,7 +2752,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffffff, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.5, 55);
         sfxPegasusNeigh(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2657,7 +2768,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(mx, 1.8, mz, 0xffd700, 24, 10, 10, 0.9);
         foodParts.smokePoof(mx, 1.6, mz, 3.6, 55);
         sfxBullRoar(ev.id === myId ? 1.0 : 0.7);
-        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : 0.7);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         sfxReward();
         if (ev.id === myId) {
           shake = Math.max(shake, 1.8);
@@ -2667,6 +2778,7 @@ function handleGameEvent(ev: GameEvent): void {
         }
       } else {
         foodParts.smokePoof(mx, 1.2, mz, Math.max(1.6, r * 1.3), 40);
+        sfxEvolveFanfare(ev.species, ev.id === myId ? 1.0 : computeSpatialVolume(mx, mz, 0.75), mx, mz);
         if (ev.id === myId) {
           sfxReward();
           const isMonkey = ev.species === 'monkey';
@@ -3246,13 +3358,16 @@ function animate(now: number): void {
       if (chargeLevel >= 0.95) {
         if (!wasMaxCharged) {
           wasMaxCharged = true;
-          sfxMaxChargeReady(myMeta?.species ?? 'pig', 1.0);
-          shake = Math.max(shake, isEvolved ? 0.65 : 0.35);
+          // Gồng max skill cho dù là còn nhỏ hay lớn đều phát tiếng kêu/gầm đặc trưng
+          sfxMaxChargeReady(myMeta?.species ?? 'pig', isEvolved ? 1.0 : 0.85);
           if (isEvolved) {
+            shake = Math.max(shake, 0.65);
             const curX = predictor.on ? predictor.x : (gameState.ents.get(gameState.myId)?.x ?? 0);
             const curZ = predictor.on ? predictor.z : (gameState.ents.get(gameState.myId)?.z ?? 0);
             animals.spawnShockwave(curX, 0.06, curZ, radiusOf(myMass) * 1.4, 0xffd700);
             foodParts.burst(curX, 0.8, curZ, 0xffea00, 18, 8, 8, 0.9);
+          } else {
+            shake = Math.max(shake, 0.22);
           }
         }
       } else {
@@ -3299,7 +3414,8 @@ function animate(now: number): void {
       let pFlags = (isMe && isStunned) ? (ent.flags | FLAG.STUN) : ent.flags;
       if (isMe && wasInWater) {
         pFlags |= FLAG.WATER;
-        if (meta.species !== 'duck') pFlags |= FLAG.DROWNING;
+        const isSafeSwimmer = meta.species === 'duck' || meta.species === 'swan' || meta.species === 'dog' || meta.species === 'wolf' || meta.species === 'pegasus';
+        if (!isSafeSwimmer) pFlags |= FLAG.DROWNING;
       }
       if (isMe) {
         if (predictor.dashT > 0) {
@@ -3392,6 +3508,8 @@ function animate(now: number): void {
     }
     targetMass = me ? me.mass : CFG.START_MASS;
   }
+  updateAudioListener(targetX, targetZ);
+  updateAudioListener(targetX, targetZ);
   world.updateCamera(targetX, targetZ, targetMass, dt, shake);
   shake = Math.max(0, shake - dt * 2.5);
   if (wolfCamLockTimer > 0) {

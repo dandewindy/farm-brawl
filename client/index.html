@@ -22,10 +22,10 @@
 <body class="menu">
   <canvas id="c"></canvas>
 
-  <!-- Top Timer for Kids Mode (Chỉ hiện thời gian, highlight khi còn <= 30s) -->
-  <div id="kidsTopTimer" class="kids-top-timer" hidden>
-    <span class="kids-timer-ico">⏳</span>
-    <span id="kidsTopTimerVal">20:00</span>
+  <!-- Big 3D Countdown Alert for Kids Mode (Hiển thị to đẹp 3D giữa màn hình khi còn <= 10s) -->
+  <div id="kidsCountdown3D" class="kids-countdown-3d" hidden>
+    <div class="kcd-sub">⏰ SẮP HẾT GIỜ CHƠI BÉ ƠI!</div>
+    <div class="kcd-num" id="kidsCountdownNum">10</div>
   </div>
 
   <!-- Team mode: reign time per farm and match clock -->
@@ -88,6 +88,11 @@
       </div>
     </aside>
     <div id="gameControls">
+      <!-- Top Timer for Kids Mode (Hiển thị to đẹp, nằm bên trái các nút trên PC, không bao giờ che nút) -->
+      <div id="kidsTopTimer" class="kids-top-timer" hidden>
+        <span class="kids-timer-ico">⏳</span>
+        <span id="kidsTopTimerVal">20:00</span>
+      </div>
       <button id="adminToggleBtn" type="button" class="btn-admin-game" title="Admin Sandbox (F2)" hidden>🛠️</button>
       <button id="fsBtn" type="button" title="Toàn màn hình">
         <span class="fs-icon-enter">

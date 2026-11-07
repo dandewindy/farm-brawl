@@ -1,5 +1,7 @@
 import { KidsPlayManager, type KidsModeConfig, type KidsModeState } from '../features/kidsMode';
 import { t } from '../i18n';
+import { voiceAnnouncer } from '../audio/voiceAnnouncer';
+import { sfxCountdownTick } from '../audio/sfx';
 
 export class KidsUiController {
   private static instance: KidsUiController;
@@ -13,7 +15,15 @@ export class KidsUiController {
   private hudLivesEl!: HTMLElement | null;
   private topTimerEl!: HTMLElement | null;
   private topTimerValEl!: HTMLElement | null;
+  private countdown3DEl!: HTMLElement | null;
+  private countdownNumEl!: HTMLElement | null;
   private autoUnlockTextEl!: HTMLElement | null;
+
+  // Countdown voice & beep tracking
+  private announced1min = false;
+  private announced30s = false;
+  private announced10s = false;
+  private lastTickedSec = -1;
 
   // PIN Verify View
   private pinVerifyView!: HTMLElement | null;
@@ -78,6 +88,8 @@ export class KidsUiController {
     this.hudLivesEl = document.getElementById('hudKidsLivesText');
     this.topTimerEl = document.getElementById('kidsTopTimer');
     this.topTimerValEl = document.getElementById('kidsTopTimerVal');
+    this.countdown3DEl = document.getElementById('kidsCountdown3D');
+    this.countdownNumEl = document.getElementById('kidsCountdownNum');
     this.autoUnlockTextEl = document.getElementById('kidsAutoUnlockText');
 
     this.pinVerifyView = document.getElementById('kidsPinVerifyView');
@@ -585,17 +597,67 @@ export class KidsUiController {
   }
 
   private onStateChange(state: KidsModeState, config: KidsModeConfig): void {
+    const isPlayingWithTimer = config.enabled && config.timeLimitEnabled && !state.isLocked;
+
     // 1. Update Top Bar Timer Widget (Chỉ hiện thời gian, highlight khi còn <= 30s)
     if (this.topTimerEl) {
-      const showTopTimer = config.enabled && config.timeLimitEnabled && !state.isLocked;
-      this.topTimerEl.hidden = !showTopTimer;
-      if (showTopTimer && this.topTimerValEl) {
+      this.topTimerEl.hidden = !isPlayingWithTimer;
+      if (isPlayingWithTimer && this.topTimerValEl) {
         const mins = Math.floor(state.timeRemainingSec / 60);
         const secs = Math.floor(state.timeRemainingSec % 60);
         this.topTimerValEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         // Highlight đỏ cam nhấp nháy khi còn 30 giây
         this.topTimerEl.classList.toggle('urgent', state.timeRemainingSec <= 30);
       }
+    }
+
+    // 1b. Big 3D Countdown Banner & Voice Announcements (Còn 1 phút, Còn 30s, Còn 10s + Beep)
+    if (isPlayingWithTimer) {
+      if (state.timeRemainingSec > 65) this.announced1min = false;
+      if (state.timeRemainingSec > 35) this.announced30s = false;
+      if (state.timeRemainingSec > 12) {
+        this.announced10s = false;
+        this.lastTickedSec = -1;
+      }
+
+      // Thông báo âm thanh Còn 1 phút
+      if (state.timeRemainingSec <= 60 && state.timeRemainingSec > 50 && !this.announced1min) {
+        this.announced1min = true;
+        voiceAnnouncer.play('time_1min', 1);
+      }
+
+      // Thông báo âm thanh Còn 30 giây
+      if (state.timeRemainingSec <= 30 && state.timeRemainingSec > 20 && !this.announced30s) {
+        this.announced30s = true;
+        voiceAnnouncer.play('time_30s', 1);
+      }
+
+      // Còn <= 10s: Hiện countdown 3D to đẹp giữa màn hình + Âm thanh cảnh báo + Tiếng tích tắc mỗi giây
+      if (state.timeRemainingSec <= 10 && state.timeRemainingSec > 0) {
+        if (!this.announced10s) {
+          this.announced10s = true;
+          voiceAnnouncer.play('time_10s', 1);
+        }
+        const curSec = Math.max(1, Math.ceil(state.timeRemainingSec));
+        if (curSec !== this.lastTickedSec && curSec <= 10) {
+          this.lastTickedSec = curSec;
+          sfxCountdownTick(curSec);
+        }
+        if (this.countdown3DEl) {
+          this.countdown3DEl.hidden = false;
+          if (this.countdownNumEl) {
+            this.countdownNumEl.textContent = String(curSec);
+          }
+        }
+      } else {
+        if (this.countdown3DEl) this.countdown3DEl.hidden = true;
+      }
+    } else {
+      this.announced1min = false;
+      this.announced30s = false;
+      this.announced10s = false;
+      this.lastTickedSec = -1;
+      if (this.countdown3DEl) this.countdown3DEl.hidden = true;
     }
 
     // 2. Update In-Game Floating Badge

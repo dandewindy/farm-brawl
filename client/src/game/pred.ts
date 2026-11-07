@@ -228,13 +228,86 @@ export class ClientPredictor {
 
     if (isSuper) {
       this.plow = true;
-      this.vx = Math.cos(aimA) * 62;
-      this.vz = Math.sin(aimA) * 62;
+      let sp = 62;
+      let dashT = 0.55;
+      let flyT = 0.55;
+      if (species === 'phoenix') { sp = 76; dashT = 0.70; flyT = 0.70; }
+      else if (species === 'pegasus') { sp = 75; dashT = 0.85; flyT = 0.85; }
+      else if (species === 'swan') { sp = 70; dashT = 0.70; flyT = 0.70; }
+      else if (species === 'boar') { sp = 68; dashT = 0.65; flyT = 0; }
+      else if (species === 'ram') { sp = 72; dashT = 0.65; flyT = 0; }
+      else if (species === 'bull') { sp = 70; dashT = 0.65; flyT = 0; }
+      this.vx = Math.cos(aimA) * sp;
+      this.vz = Math.sin(aimA) * sp;
       this.a = aimA;
-      this.dashT = 0.55;
-      this.flyT = 0.55;
+      this.dashT = dashT;
+      this.flyT = flyT;
       return;
     }
+
+    // Charged Evolved Skills (khi gồng lực held > 0.15s)
+    if (held > 0.15) {
+      const c = Math.min(1, Math.max(0, (held - 0.2) / 1.0));
+      if (species === 'phoenix') {
+        const flySpeed = 46 * (1 + 0.35 * c);
+        this.vx = Math.cos(aimA) * flySpeed;
+        this.vz = Math.sin(aimA) * flySpeed;
+        this.a = aimA;
+        this.dashT = 0.55;
+        this.flyT = 0.55;
+        this.plow = true;
+        return;
+      }
+      if (species === 'swan') {
+        const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
+        const speed = (inWater ? 48 : 42) * (1 + 0.3 * c);
+        this.vx = Math.cos(aimA) * speed;
+        this.vz = Math.sin(aimA) * speed;
+        this.a = aimA;
+        this.dashT = 0.50;
+        this.flyT = 0.50;
+        this.plow = true;
+        return;
+      }
+      if (species === 'pegasus') {
+        const flySpeed = 48 * (1 + 0.35 * c);
+        this.vx = Math.cos(aimA) * flySpeed;
+        this.vz = Math.sin(aimA) * flySpeed;
+        this.a = aimA;
+        this.dashT = 0.65;
+        this.flyT = 0.65;
+        this.plow = true;
+        return;
+      }
+      if (species === 'bull') {
+        const speed = 44 * (1 + 0.45 * c);
+        this.vx = Math.cos(aimA) * speed;
+        this.vz = Math.sin(aimA) * speed;
+        this.a = aimA;
+        this.dashT = 0.42 + 0.2 * c;
+        this.plow = true;
+        return;
+      }
+      if (species === 'ram') {
+        const speed = 45 * (1 + 0.45 * c);
+        this.vx = Math.cos(aimA) * speed;
+        this.vz = Math.sin(aimA) * speed;
+        this.a = aimA;
+        this.dashT = 0.40 + 0.22 * c;
+        this.plow = true;
+        return;
+      }
+      if (species === 'boar') {
+        const speed = 44 * (1 + 0.4 * c);
+        this.vx = Math.cos(aimA) * speed;
+        this.vz = Math.sin(aimA) * speed;
+        this.a = aimA;
+        this.dashT = 0.42 + 0.2 * c;
+        this.plow = true;
+        return;
+      }
+    }
+
     const inMud = map ? map.mud.some((b) => insideBlob(b, this.x, this.z)) : false;
     const mud = inMud && species !== 'pig' ? 0.55 : 1;
     const mudT = inMud && species !== 'pig' ? 0.6 : 1;
@@ -325,7 +398,7 @@ export class ClientPredictor {
       const mud = map.mud.some((b) => insideBlob(b, this.x, this.z));
 
       let terrain = water
-        ? species === 'duck' ? 1.25 : (species === 'dog' || species === 'wolf') ? 0.35 : 0.45
+        ? (species === 'duck' || species === 'swan') ? 1.25 : (species === 'dog' || species === 'wolf') ? 0.35 : (species === 'pegasus' ? 1.0 : 0.45)
         : mud
         ? species === 'pig' ? 1.1 : species === 'wolf' ? 0.50 : 0.45
         : species === 'duck' ? 0.87 : 1;
@@ -372,7 +445,7 @@ export class ClientPredictor {
         }
       }
 
-      if (water && species !== 'duck' && species !== 'dog' && species !== 'wolf' && this.dashT <= 0 && !this.isLeaping) {
+      if (water && species !== 'duck' && species !== 'swan' && species !== 'dog' && species !== 'wolf' && species !== 'pegasus' && this.dashT <= 0 && !this.isLeaping) {
         const d = Math.exp(-2 * h);
         this.vx *= d;
         this.vz *= d;

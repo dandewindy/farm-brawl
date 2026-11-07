@@ -7,7 +7,7 @@ import {
   type FoodKind, type Species,
 } from '../constants';
 import { generateMap, type Blob, type MapData, type TreeData, type TreeSize } from '../map';
-import { clamp, insideBlob, mulberry32, distToSegmentSq } from '../math';
+import { clamp, insideBlob, mulberry32, distToSegmentSq, wrapAngle } from '../math';
 export { distToSegmentSq } from '../math';
 import { type Body, type Terrain, collideHay, dashParams, chargeLevel, outsideFence, stepMove, terrainAt } from '../physics';
 import {
@@ -90,6 +90,15 @@ export interface Player extends Body {
   wolfBiteTimer?: number;
   wolfChainTargets?: number[];
   wolfChainRainbow?: boolean;
+  wolfAnchorX?: number;
+  wolfAnchorZ?: number;
+  flightT?: number;
+  burnT?: number;
+  burnDmgTimer?: number;
+  tossT?: number;
+  pegasusCandyCount?: number;
+  pegasusCandyTimer?: number;
+  swanIceTimer?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
   hasHeart?: boolean;
@@ -459,6 +468,7 @@ export class World {
       hasHeart: false, heartReviving: false, heartReviveTimer: undefined,
       monkeyLeapT: 0, monkeyBounced: false, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
       wolfFrenzyT: 0, wolfLungeT: 0, wolfTargetId: undefined, wolfBitesLeft: 0, wolfChainTargets: undefined, wolfChainRainbow: false,
+      flightT: 0, burnT: 0, burnDmgTimer: 0, tossT: 0, pegasusCandyCount: 0, pegasusCandyTimer: 0, swanIceTimer: 0,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -950,7 +960,7 @@ export class World {
     for (const p of alive) {
       if (p.dashT <= 0) {
         p.plow = false;
-        p.flyT = 0;
+        if (!p.flightT || p.flightT <= 0) p.flyT = 0;
       }
       if (!p.alive) continue;
 
@@ -1123,6 +1133,52 @@ export class World {
         }
       }
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
+      if (p.flightT && p.flightT > 0) {
+        p.flightT = Math.max(0, p.flightT - DT);
+        p.flyT = p.flightT;
+        p.inWaterT = 0;
+        if (p.species === 'pegasus' && p.superT > 0 && (p.pegasusCandyCount ?? 0) < 5) {
+          p.pegasusCandyTimer = (p.pegasusCandyTimer ?? 1.2) - DT;
+          if (p.pegasusCandyTimer <= 0) {
+            p.pegasusCandyTimer = 1.8;
+            p.pegasusCandyCount = (p.pegasusCandyCount ?? 0) + 1;
+            this.addFood(p.x, p.z, 6, 3);
+            this.events.push({ k: 'superFood', x: r2(p.x), z: r2(p.z) });
+          }
+        }
+        if (p.species === 'swan' && p.superT > 0) {
+          p.swanIceTimer = (p.swanIceTimer ?? 1.2) - DT;
+          if (p.swanIceTimer <= 0) {
+            p.swanIceTimer = 1.6;
+            const iceR = 6.0;
+            for (const other of this.players.values()) {
+              if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+              if (Math.hypot(other.x - p.x, other.z - p.z) <= iceR + radiusOf(other.mass)) {
+                other.stunT = Math.max(other.stunT, 2.5);
+              }
+            }
+            this.events.push({ k: 'swanIce', id: p.id, x: r2(p.x), z: r2(p.z), r: iceR, rainbow: true });
+          }
+        }
+      }
+      if (p.burnT && p.burnT > 0) {
+        p.burnT = Math.max(0, p.burnT - DT);
+        p.burnDmgTimer = (p.burnDmgTimer ?? 0.5) - DT;
+        if (p.burnDmgTimer <= 0) {
+          p.burnDmgTimer = 0.5;
+          const loss = Math.max(2, Math.round(p.mass * 0.03));
+          if (p.mass - loss >= 20) {
+            p.mass -= loss;
+            this.scatter(p.x, p.z, loss, radiusOf(p.mass) + 0.5);
+          }
+        }
+      }
+      if (p.tossT && p.tossT > 0) {
+        p.tossT = Math.max(0, p.tossT - DT);
+        if (p.tossT <= 0) {
+          p.squishT = 3.0;
+        }
+      }
       if (p.squishT > 0) p.squishT = Math.max(0, p.squishT - DT);
       if (p.wheelT > 0) p.wheelT = Math.max(0, p.wheelT - DT);
       if (p.speedT > 0) p.speedT = Math.max(0, p.speedT - DT);
@@ -2072,91 +2128,144 @@ export class World {
         return;
       }
       if (p.species === 'phoenix') {
+        this.executePhoenixSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'pegasus') {
+        this.executePegasusSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'swan') {
+        this.executeSwanSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'ram') {
+        this.executeRamSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'boar') {
+        this.executeBoarSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'bull') {
+        this.executeBullSkill(p, true, p.holdT >= 0.95);
+        return;
+      }
+      if (p.species === 'chicken') {
+        // Gà Cầu Vồng: Phóng như tên lửa siêu tốc, bay lướt xuyên thấu, cooldown cực nhanh 0.25s
         p.a = p.input.a;
-        p.vx = Math.cos(p.a) * 72;
-        p.vz = Math.sin(p.a) * 72;
-        p.dashT = 0.58;
-        p.flyT = 0.58;
+        p.vx = Math.cos(p.a) * 74;
+        p.vz = Math.sin(p.a) * 74;
+        p.dashT = 0.65;
+        p.flyT = 0.65;
         p.plow = true;
-        p.power = 6.0;
+        p.power = 6.2;
+        p.cd = 0.25;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
+      }
+      if (p.species === 'duck') {
+        // Vịt Cầu Vồng: Lốc Xoáy Nước Cầu Vồng bán kính 16m đẩy lùi và quét sạch thức ăn
+        const waveR = 16;
+        for (const other of this.players.values()) {
+          if (!other.alive || other.id === p.id) continue;
+          if (Math.hypot(other.x - p.x, other.z - p.z) <= waveR + radiusOf(other.mass)) {
+            const pushA = Math.atan2(other.z - p.z, other.x - p.x);
+            other.vx += Math.cos(pushA) * 28;
+            other.vz += Math.sin(pushA) * 28;
+            if (other.shieldT <= 0) other.slowT = Math.max(other.slowT, 1.5);
+          }
+        }
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 68;
+        p.vz = Math.sin(p.a) * 68;
+        p.dashT = 0.65;
+        p.plow = true;
+        p.power = 6.5;
         p.cd = CFG.DASH_CD * 0.4;
         p.dashHit.clear();
         this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
-      if (p.species === 'pegasus') {
-        p.a = p.input.a;
-        p.vx = Math.cos(p.a) * 70;
-        p.vz = Math.sin(p.a) * 70;
-        p.dashT = 0.60;
-        p.flyT = 0.60;
-        p.plow = true;
-        p.power = 5.8;
-        p.cd = CFG.DASH_CD * 0.5;
-        p.dashHit.clear();
-        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
-        return;
-      }
-      if (p.species === 'swan') {
-        p.a = p.input.a;
-        p.vx = Math.cos(p.a) * 66;
-        p.vz = Math.sin(p.a) * 66;
-        p.dashT = 0.58;
-        p.flyT = 0.58;
-        p.plow = true;
-        p.power = 5.5;
-        p.cd = CFG.DASH_CD * 0.5;
-        p.dashHit.clear();
-        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
-        return;
-      }
-      if (p.species === 'ram') {
+      if (p.species === 'pig') {
+        // Heo Cầu Vồng: Cỗ Máy Ủi Kim Cương Mini ủi xuyên qua mọi đối thủ và cướp 10% mass
         p.a = p.input.a;
         p.vx = Math.cos(p.a) * 68;
         p.vz = Math.sin(p.a) * 68;
-        p.dashT = 0.56;
+        p.dashT = 0.65;
+        p.flyT = 0.65;
         p.plow = true;
-        p.power = 6.8;
-        p.cd = CFG.DASH_CD * 0.6;
+        p.power = 7.0;
+        p.cd = CFG.DASH_CD * 0.45;
         p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
-      if (p.species === 'boar') {
+      if (p.species === 'sheep') {
+        // Cừu Cầu Vồng: Sóng Xung Kích Bông Lông Vàng bán kính 14m choáng 1.0s
+        const shockR = 14;
+        for (const other of this.players.values()) {
+          if (!other.alive || other.id === p.id) continue;
+          if (Math.hypot(other.x - p.x, other.z - p.z) <= shockR + radiusOf(other.mass)) {
+            const shockA = Math.atan2(other.z - p.z, other.x - p.x);
+            other.vx += Math.cos(shockA) * 26;
+            other.vz += Math.sin(shockA) * 26;
+            if (other.shieldT <= 0) other.stunT = Math.max(other.stunT, 1.0);
+          }
+        }
         p.a = p.input.a;
-        p.vx = Math.cos(p.a) * 65;
-        p.vz = Math.sin(p.a) * 65;
-        p.dashT = 0.58;
+        p.vx = Math.cos(p.a) * 68;
+        p.vz = Math.sin(p.a) * 68;
+        p.dashT = 0.62;
+        p.flyT = 0.62;
         p.plow = true;
-        p.power = 5.6;
+        p.power = 7.0;
         p.cd = CFG.DASH_CD * 0.5;
         p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
-      if (p.species === 'bull') {
-        if (p.holdT > 0.15) {
-          const stompR = 16;
-          for (const other of this.players.values()) {
-            if (!other.alive || other.id === p.id) continue;
-            if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
-              if (!isEvolvedSpecies(other.species) && other.shieldT <= 0) {
-                other.stunT = Math.max(other.stunT, 0.8);
-                const siphon = Math.min(other.mass - 10, Math.round(other.mass * 0.08));
-                if (siphon > 0) {
-                  other.mass -= siphon;
-                  p.mass += siphon;
-                }
+      if (p.species === 'horse') {
+        // Ngựa Cầu Vồng: Chiến Mã Thần Tốc phi nước đại x2 cự ly, tốc độ 74 m/s
+        p.a = p.input.a;
+        p.vx = Math.cos(p.a) * 74;
+        p.vz = Math.sin(p.a) * 74;
+        p.dashT = 0.75;
+        p.flyT = 0.75;
+        p.plow = true;
+        p.power = 7.0;
+        p.cd = CFG.DASH_CD * 0.45;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+        return;
+      }
+      if (p.species === 'cow') {
+        // Bò Cầu Vồng: Đại Địa Chấn bán kính 16m choáng 1.2s và hút 10% mass
+        const stompR = 16;
+        for (const other of this.players.values()) {
+          if (!other.alive || other.id === p.id) continue;
+          if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
+            if (other.shieldT <= 0) {
+              other.stunT = Math.max(other.stunT, 1.2);
+              const siphon = Math.min(other.mass - 10, Math.round(other.mass * 0.10));
+              if (siphon > 0) {
+                other.mass -= siphon;
+                p.mass += siphon;
               }
             }
           }
         }
         p.a = p.input.a;
-        p.vx = Math.cos(p.a) * 66;
-        p.vz = Math.sin(p.a) * 66;
-        p.dashT = 0.58;
+        p.vx = Math.cos(p.a) * 68;
+        p.vz = Math.sin(p.a) * 68;
+        p.dashT = 0.65;
+        p.flyT = 0.65;
         p.plow = true;
-        p.power = 6.2;
-        p.cd = CFG.DASH_CD * 0.6;
+        p.power = 7.2;
+        p.cd = CFG.DASH_CD * 0.5;
         p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
         return;
       }
       p.a = p.input.a;
@@ -2166,7 +2275,7 @@ export class World {
       p.flyT = 0.55;
       p.plow = true;
       p.power = 5.0;
-      p.cd = p.species === 'chicken' ? CFG.DASH_CD * 0.65 : CFG.DASH_CD;
+      p.cd = CFG.DASH_CD;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
       return;
@@ -2281,70 +2390,136 @@ export class World {
       return;
     }
 
+    if (p.species === 'phoenix' && p.holdT > 0.15) {
+      this.executePhoenixSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
+    if (p.species === 'swan' && p.holdT > 0.15) {
+      this.executeSwanSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
     if (p.species === 'pegasus' && p.holdT > 0.15) {
+      this.executePegasusSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
+    if (p.species === 'bull' && p.holdT > 0.15) {
+      this.executeBullSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
+    if (p.species === 'ram' && p.holdT > 0.15) {
+      this.executeRamSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
+    if (p.species === 'boar' && p.holdT > 0.15) {
+      this.executeBoarSkill(p, false, p.holdT >= 0.95);
+      return;
+    }
+
+    if (p.species === 'chicken' && p.holdT > 0.15) {
+      // Gà Gồng: Vỗ Cánh Lướt Gió - Cooldown siêu ngắn 0.45x, lướt nhanh dứt khoát
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
       p.a = p.input.a;
-      const flySpeed = 44 * (1 + 0.3 * c);
+      const flySpeed = 44 * (1 + 0.35 * c);
       p.vx = Math.cos(p.a) * flySpeed;
       p.vz = Math.sin(p.a) * flySpeed;
-      p.dashT = 0.55;
-      p.flyT = 0.55;
+      p.dashT = 0.38 + 0.12 * c;
+      p.flyT = p.dashT;
       p.plow = true;
       p.power = 2.4;
-      p.cd = CFG.DASH_CD;
+      p.cd = CFG.DASH_CD * 0.45;
       p.dashHit.clear();
       this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
       return;
     }
 
-    if (p.species === 'bull' && p.holdT > 0.15) {
+    if (p.species === 'duck' && p.holdT > 0.15) {
+      // Vịt Gồng: Lướt Sóng Nước - Tạo sóng đẩy lùi 8m và miễn nhiễm bùn
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
-      // Bull ground stomp tremor in 10m radius
-      const stompR = 10;
+      p.a = p.input.a;
+      const waveR = 8 + c * 4;
       for (const other of this.players.values()) {
         if (!other.alive || other.id === p.id) continue;
-        if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
-          if (!isEvolvedSpecies(other.species) && other.shieldT <= 0) {
-            other.stunT = Math.max(other.stunT, 0.4);
-          }
+        const d = Math.hypot(other.x - p.x, other.z - p.z);
+        if (d <= waveR + radiusOf(other.mass)) {
+          const pushA = Math.atan2(other.z - p.z, other.x - p.x);
+          other.vx += Math.cos(pushA) * 16;
+          other.vz += Math.sin(pushA) * 16;
         }
       }
-      p.a = p.input.a;
-      const speed = 40 * (1 + 0.45 * c);
+      const speed = 40 * (1 + 0.32 * c);
       p.vx = Math.cos(p.a) * speed;
       p.vz = Math.sin(p.a) * speed;
-      p.dashT = 0.36 + 0.22 * c;
+      p.dashT = 0.42 + 0.15 * c;
       p.plow = true;
       p.power = 2.6;
-      p.cd = CFG.DASH_CD + 0.2;
+      p.cd = CFG.DASH_CD * 0.55;
       p.dashHit.clear();
       return;
     }
 
-    if (p.species === 'ram' && p.holdT > 0.15) {
+    if (p.species === 'pig' && p.holdT > 0.15) {
+      // Heo Gồng: Heo Ủi Bùn Đất - Knockback cực nặng, cướp thêm thức ăn
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
       p.a = p.input.a;
-      const speed = 42 * (1 + 0.45 * c);
+      const speed = 40 * (1 + 0.35 * c);
       p.vx = Math.cos(p.a) * speed;
       p.vz = Math.sin(p.a) * speed;
-      p.dashT = 0.35 + 0.25 * c;
+      p.dashT = 0.42 + 0.18 * c;
       p.plow = true;
-      p.power = 2.8;
-      p.cd = CFG.DASH_CD + 0.1;
+      p.power = 3.6;
+      p.cd = CFG.DASH_CD * 0.65;
       p.dashHit.clear();
       return;
     }
 
-    if (p.species === 'boar' && p.holdT > 0.15) {
+    if (p.species === 'sheep' && p.holdT > 0.15) {
+      // Cừu Gồng: Thiết Đầu Công Lông Xù - Khiên phản chấn và hất văng
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
       p.a = p.input.a;
-      const speed = 40 * (1 + 0.4 * c);
+      const speed = 41 * (1 + 0.35 * c);
       p.vx = Math.cos(p.a) * speed;
       p.vz = Math.sin(p.a) * speed;
-      p.dashT = 0.32 + 0.22 * c;
+      p.dashT = 0.40 + 0.18 * c;
       p.plow = true;
-      p.power = 2.3;
-      p.cd = CFG.DASH_CD;
+      p.power = 3.8;
+      p.cd = CFG.DASH_CD * 0.60;
+      p.dashHit.clear();
+      return;
+    }
+
+    if (p.species === 'horse' && p.holdT > 0.15) {
+      // Ngựa Gồng: Vó Ngựa Phi Nước Đại - Cự ly lướt dài hơn 35%, bứt tốc đạp văng đối thủ
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      p.a = p.input.a;
+      const speed = 44 * (1 + 0.40 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.52 + 0.20 * c;
+      p.flyT = p.dashT * 0.6;
+      p.plow = true;
+      p.power = 3.2;
+      p.cd = CFG.DASH_CD * 0.60;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      return;
+    }
+
+    if (p.species === 'cow' && p.holdT > 0.15) {
+      // Bò Gồng: Sừng Bò Hất Tung - Gây choáng nhẹ và hất văng
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      p.a = p.input.a;
+      const speed = 41 * (1 + 0.38 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.42 + 0.18 * c;
+      p.plow = true;
+      p.power = 3.8;
+      p.cd = CFG.DASH_CD * 0.70;
       p.dashHit.clear();
       return;
     }
@@ -2426,6 +2601,313 @@ export class World {
     }
   }
 
+  private executePhoenixSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      const len = isRainbow ? 38 : 24;
+      const w = isRainbow ? 14 : 8;
+      p.flyT = 1.2;
+      p.dashT = 0.8;
+      p.plow = true;
+      p.power = isRainbow ? 6.5 : 4.5;
+      const flySpeed = isRainbow ? 60 : 48;
+      p.vx = Math.cos(p.a) * flySpeed;
+      p.vz = Math.sin(p.a) * flySpeed;
+      p.cd = CFG.DASH_CD * 0.5;
+      p.dashHit.clear();
+
+      const cosA = Math.cos(p.a);
+      const sinA = Math.sin(p.a);
+
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        const dx = other.x - p.x;
+        const dz = other.z - p.z;
+        const forwardDist = dx * cosA + dz * sinA;
+        const lateralDist = Math.abs(-dx * sinA + dz * cosA);
+        const rOther = radiusOf(other.mass);
+
+        if (forwardDist >= -1 && forwardDist <= len + rOther && lateralDist <= w / 2 + rOther) {
+          if (other.mass <= 100) {
+            this.kill(other, 'fire');
+          } else {
+            other.burnT = 3.0;
+            other.burnDmgTimer = 0.5;
+            other.slowT = Math.max(other.slowT, 1.5);
+            this.events.push({ k: 'burn', id: other.id, dur: 3.0 });
+          }
+        }
+      }
+
+      this.events.push({
+        k: 'phoenixFire',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        a: r2(p.a),
+        len,
+        w,
+        rainbow: isRainbow,
+      });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const flySpeed = (isRainbow ? 72 : 46) * (1 + 0.35 * c);
+      p.vx = Math.cos(p.a) * flySpeed;
+      p.vz = Math.sin(p.a) * flySpeed;
+      p.dashT = isRainbow ? 0.70 : 0.55;
+      p.flyT = isRainbow ? 0.70 : 0.55;
+      p.plow = true;
+      p.power = isRainbow ? 7.5 : 3.6;
+      p.cd = CFG.DASH_CD * 0.5;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+    }
+  }
+
+  private executeRamSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const speed = (isRainbow ? 76 : 52) * (1 + 0.35 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = isRainbow ? 0.70 : 0.50;
+      p.plow = true;
+      p.power = isRainbow ? 9.5 : 6.0;
+      p.cd = CFG.DASH_CD * 0.5;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const speed = (isRainbow ? 68 : 45) * (1 + 0.45 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.40 + 0.22 * c;
+      p.plow = true;
+      p.power = isRainbow ? 7.0 : 4.6;
+      p.cd = CFG.DASH_CD * 0.6;
+      p.dashHit.clear();
+    }
+  }
+
+  private executeSwanSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      p.flightT = 10.0;
+      p.flyT = 10.0;
+      p.cd = 0.5;
+      p.swanIceTimer = isRainbow ? 1.0 : 0;
+      p.vx = Math.cos(p.a) * 36;
+      p.vz = Math.sin(p.a) * 36;
+      p.dashT = 0.6;
+      p.plow = true;
+      p.power = isRainbow ? 5.5 : 3.5;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const inWater = p.terrain === 1;
+      const speed = (inWater ? 48 : 42) * (1 + 0.3 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.50;
+      p.flyT = 0.50;
+      p.plow = true;
+      p.power = isRainbow ? 6.5 : 3.2;
+      p.cd = CFG.DASH_CD * 0.5;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+
+      // Swan tidal wave in front pushes and slows rivals
+      const waveR = 12;
+      const cosA = Math.cos(p.a);
+      const sinA = Math.sin(p.a);
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        const dx = other.x - p.x;
+        const dz = other.z - p.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist <= waveR + radiusOf(other.mass)) {
+          const forwardDist = dx * cosA + dz * sinA;
+          if (forwardDist > 0) {
+            other.vx += cosA * 18;
+            other.vz += sinA * 18;
+            other.slowT = Math.max(other.slowT, 1.5);
+          }
+        }
+      }
+    }
+  }
+
+  private executeBoarSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      const range = isRainbow ? 24 : 18;
+      const boulderR = isRainbow ? 6.0 : 3.5;
+      const cosA = Math.cos(p.a);
+      const sinA = Math.sin(p.a);
+
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        const dx = other.x - p.x;
+        const dz = other.z - p.z;
+        const forwardDist = dx * cosA + dz * sinA;
+        const lateralDist = Math.abs(-dx * sinA + dz * cosA);
+        const rOther = radiusOf(other.mass);
+
+        if (forwardDist >= 0 && forwardDist <= range + rOther && lateralDist <= boulderR + rOther) {
+          if (isRainbow) {
+            other.stunT = Math.max(other.stunT, 3.0);
+            other.vx = 0;
+            other.vz = 0;
+            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.12));
+            if (loss > 0) {
+              other.mass -= loss;
+              this.scatter(other.x, other.z, loss, rOther + 0.5);
+            }
+          } else {
+            other.slowT = Math.max(other.slowT, 2.5);
+            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.08));
+            if (loss > 0) {
+              other.mass -= loss;
+              this.scatter(other.x, other.z, loss, rOther + 0.5);
+            }
+          }
+        }
+      }
+
+      p.vx = Math.cos(p.a) * (isRainbow ? 55 : 42);
+      p.vz = Math.sin(p.a) * (isRainbow ? 55 : 42);
+      p.dashT = 0.45;
+      p.plow = true;
+      p.power = isRainbow ? 6.5 : 4.2;
+      p.cd = CFG.DASH_CD * 0.6;
+      p.dashHit.clear();
+
+      this.events.push({
+        k: 'boarMud',
+        id: p.id,
+        x: r2(p.x),
+        z: r2(p.z),
+        a: r2(p.a),
+        r: boulderR,
+        giant: isRainbow,
+        rainbow: isRainbow,
+      });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const speed = (isRainbow ? 65 : 44) * (1 + 0.4 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.42 + 0.2 * c;
+      p.plow = true;
+      p.power = isRainbow ? 7.0 : 4.2;
+      p.cd = CFG.DASH_CD * 0.6;
+      p.dashHit.clear();
+    }
+  }
+
+  private executePegasusSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      p.flightT = 10.0;
+      p.flyT = 10.0;
+      p.cd = 0.5;
+      p.pegasusCandyCount = 0;
+      p.pegasusCandyTimer = isRainbow ? 1.0 : 0;
+      p.vx = Math.cos(p.a) * 40;
+      p.vz = Math.sin(p.a) * 40;
+      p.dashT = 0.6;
+      p.plow = true;
+      p.power = isRainbow ? 6.0 : 3.8;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const flySpeed = (isRainbow ? 72 : 48) * (1 + 0.35 * c);
+      p.vx = Math.cos(p.a) * flySpeed;
+      p.vz = Math.sin(p.a) * flySpeed;
+      p.dashT = 0.65;
+      p.flyT = 0.65;
+      p.plow = true;
+      p.power = isRainbow ? 7.0 : 3.4;
+      p.cd = CFG.DASH_CD * 0.5;
+      p.dashHit.clear();
+      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+    }
+  }
+
+  private executeBullSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
+    p.a = p.input.a;
+    if (isMax) {
+      const tossR = isRainbow ? 16 : 10;
+      const tossAngleMax = isRainbow ? Math.PI * 0.55 : Math.PI * 0.28;
+      const hitIds: number[] = [];
+
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        const dx = other.x - p.x;
+        const dz = other.z - p.z;
+        const dist = Math.hypot(dx, dz);
+        const rOther = radiusOf(other.mass);
+        if (dist <= tossR + rOther) {
+          const angleToEnemy = Math.atan2(dz, dx);
+          const angleDiff = Math.abs(wrapAngle(angleToEnemy - p.a));
+          if (angleDiff <= tossAngleMax) {
+            other.tossT = 1.2;
+            other.stunT = Math.max(other.stunT, 1.8);
+            other.vx = Math.cos(angleToEnemy) * (isRainbow ? 28 : 16);
+            other.vz = Math.sin(angleToEnemy) * (isRainbow ? 28 : 16);
+            hitIds.push(other.id);
+            if (!isRainbow) break;
+          }
+        }
+      }
+
+      p.vx = Math.cos(p.a) * (isRainbow ? 60 : 45);
+      p.vz = Math.sin(p.a) * (isRainbow ? 60 : 45);
+      p.dashT = 0.50;
+      p.plow = true;
+      p.power = isRainbow ? 7.5 : 4.5;
+      p.cd = CFG.DASH_CD * 0.6;
+      p.dashHit.clear();
+
+      this.events.push({
+        k: 'bullToss',
+        id: p.id,
+        targetIds: hitIds,
+        x: r2(p.x),
+        z: r2(p.z),
+        r: tossR,
+        rainbow: isRainbow,
+      });
+    } else {
+      const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
+      const speed = (isRainbow ? 68 : 44) * (1 + 0.45 * c);
+      p.vx = Math.cos(p.a) * speed;
+      p.vz = Math.sin(p.a) * speed;
+      p.dashT = 0.42 + 0.2 * c;
+      p.plow = true;
+      p.power = isRainbow ? 7.0 : 3.8;
+      p.cd = CFG.DASH_CD + 0.2;
+      p.dashHit.clear();
+
+      // Bull ground stomp tremor in 10m radius: stuns and siphons mass
+      const stompR = 10;
+      for (const other of this.players.values()) {
+        if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        if (Math.hypot(other.x - p.x, other.z - p.z) <= stompR + radiusOf(other.mass)) {
+          other.stunT = Math.max(other.stunT, 1.0);
+          const siphon = Math.min(other.mass - 10, Math.round(other.mass * 0.05));
+          if (siphon > 0) {
+            other.mass -= siphon;
+            p.mass += siphon;
+          }
+        }
+      }
+    }
+  }
+
   private clampSafeArenaPos(x: number, z: number, r: number): [number, number] {
     let nx = x;
     let nz = z;
@@ -2469,7 +2951,6 @@ export class World {
     if (isRainbow) {
       // Rainbow Charged Skill:
       // Phải có ít nhất 1 mục tiêu nằm trong vùng húc phía trước (tính theo kích thước con vật) mới kích hoạt chuỗi tốc biến
-      const maxTargets = Math.max(1, Math.min(6, Math.round(1 + ratio * 5)));
       let primaryTarget: Player | null = null;
       let primaryScore = Infinity;
 
@@ -2496,33 +2977,35 @@ export class World {
       }
 
       if (primaryTarget) {
-        const targets: number[] = [primaryTarget.id];
-        const visited = new Set<number>([primaryTarget.id]);
-        let currX = primaryTarget.x;
-        let currZ = primaryTarget.z;
+        const anchorX = primaryTarget.x;
+        const anchorZ = primaryTarget.z;
+        p.wolfAnchorX = anchorX;
+        p.wolfAnchorZ = anchorZ;
 
-        while (targets.length < maxTargets) {
-          let nextTarget: Player | null = null;
-          let nextMinDist = Infinity;
-          for (const other of this.players.values()) {
-            if (!other.alive || other.id === p.id || visited.has(other.id)) continue;
-            if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
-            const rOther = radiusOf(other.mass);
-            const chainR = (rWolf + rOther) * 2.5 + 16.0 + ratio * 14.0;
-            const d = Math.hypot(other.x - currX, other.z - currZ);
-            if (d <= chainR && d < nextMinDist) {
-              nextMinDist = d;
-              nextTarget = other;
-            }
+        // Vùng cắn giới hạn chuẩn xác 1/8 bản đồ tính từ tâm con vật đầu tiên (bản đồ đường kính 210, 1/8 = 26.25m)
+        const ZONE_R = 30.0; // Bán kính 1/8 bản đồ quanh tâm con vật đầu tiên
+
+        // Lọc tất cả mục tiêu hợp lệ nằm trong vùng bán kính 1/8 bản đồ quanh mục tiêu đầu tiên
+        const inZoneTargets: Player[] = [];
+        for (const other of this.players.values()) {
+          if (!other.alive || other.id === p.id) continue;
+          if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
+          const d = Math.hypot(other.x - anchorX, other.z - anchorZ);
+          if (d <= ZONE_R) {
+            inZoneTargets.push(other);
           }
-          if (nextTarget) {
-            targets.push(nextTarget.id);
-            visited.add(nextTarget.id);
-            currX = nextTarget.x;
-            currZ = nextTarget.z;
-          } else {
-            break;
-          }
+        }
+        if (!inZoneTargets.some((t) => t.id === primaryTarget!.id)) {
+          inZoneTargets.unshift(primaryTarget);
+        }
+        // Sắp xếp các mục tiêu theo khoảng cách tới anchor
+        inZoneTargets.sort((a, b) => Math.hypot(a.x - anchorX, a.z - anchorZ) - Math.hypot(b.x - anchorX, b.z - anchorZ));
+
+        // Cắn liên tiếp 6 nhát: nếu không đủ 6 con hoặc mục tiêu quá xa thì cắn luân phiên các mục tiêu trong vùng
+        const totalBites = 6;
+        const targets: number[] = [];
+        for (let i = 0; i < totalBites; i++) {
+          targets.push(inZoneTargets[i % inZoneTargets.length].id);
         }
 
         p.wolfChainTargets = targets;
@@ -2763,6 +3246,8 @@ export class World {
         z: r2(p.z),
         fromX: r2(fromX),
         fromZ: r2(fromZ),
+        anchorX: p.wolfAnchorX !== undefined ? r2(p.wolfAnchorX) : undefined,
+        anchorZ: p.wolfAnchorZ !== undefined ? r2(p.wolfAnchorZ) : undefined,
         stolen,
         loss,
         rainbow: true,
@@ -2780,7 +3265,16 @@ export class World {
       });
 
       if ((p.wolfBiteStep ?? 0) >= p.wolfChainTargets.length) {
+        // Sau khi hoàn thành 6 nhát cắn, Sói lập tức xuất hiện tại chính vị trí con vật đầu tiên bị cắn (anchor)
+        if (p.wolfAnchorX !== undefined && p.wolfAnchorZ !== undefined) {
+          const [fx, fz] = this.clampSafeArenaPos(p.wolfAnchorX, p.wolfAnchorZ, rWolf);
+          p.x = fx;
+          p.z = fz;
+          p.vx = 0;
+          p.vz = 0;
+        }
         p.wolfChainTargets = undefined;
+        p.wolfFrenzyT = 0;
       }
       return;
     }
@@ -3130,10 +3624,13 @@ export class World {
   private collidePlayers(list: Player[]): void {
     for (let i = 0; i < list.length; i++) {
       const a = list[i];
-      if (!a.alive || (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0)) continue;
+      if (!a.alive) continue;
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j];
-        if (!b.alive || (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0)) continue;
+        if (!b.alive) continue;
+        const aFlying = (a.monkeyLeapT !== undefined && a.monkeyLeapT > 0) || (a.flightT !== undefined && a.flightT > 0);
+        const bFlying = (b.monkeyLeapT !== undefined && b.monkeyLeapT > 0) || (b.flightT !== undefined && b.flightT > 0);
+        if (aFlying !== bFlying) continue;
         let dx = b.x - a.x, dz = b.z - a.z;
         const ra = radiusOf(a.mass), rb = radiusOf(b.mass), minD = ra + rb;
         if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
@@ -3805,18 +4302,39 @@ export class World {
       vic.slowT = Math.max(vic.slowT, att.superT > 0 ? 3.5 : 2.0);
     }
 
-    // Ram: battering ram stun (0.8s normal, 2.0s with rainbow)
+    // Ram: battering ram stun & double knockback on max charge, rainbow slams into fence
     if (att.species === 'ram') {
+      if (att.power >= 5.5) {
+        k *= 2.0;
+        vic.vx = nx * k + vic.vx * 0.15;
+        vic.vz = nz * k + vic.vz * 0.15;
+        this.events.push({ k: 'ramKnockback', id: att.id, targetId: vic.id, x: r2(vic.x), z: r2(vic.z), rainbow: att.superT > 0 });
+      }
+      if (att.superT > 0) {
+        k = Math.max(k * 2.2, 220);
+        vic.vx = nx * k;
+        vic.vz = nz * k;
+        const fenceDist = CFG.R - 1.5;
+        const projX = vic.x + nx * (k * 0.2);
+        const projZ = vic.z + nz * (k * 0.2);
+        if (Math.hypot(projX, projZ) >= fenceDist) {
+          vic.x = (projX / Math.hypot(projX, projZ)) * fenceDist;
+          vic.z = (projZ / Math.hypot(projX, projZ)) * fenceDist;
+          this.kill(vic, 'fence');
+        }
+      }
       const ramStun = att.superT > 0 ? 2.0 : 0.8;
       vic.stunT = Math.max(vic.stunT, ramStun);
-      if (outsideFence(vic)) {
-        vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 2.5 : 1.2);
-      }
     }
 
-    // Bull: ferocious gore and mass siphon (5% normal, 12% with rainbow)
+    // Bull: ferocious gore and mass siphon, plus toss & squish on max charge
     if (att.species === 'bull') {
-      vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 0.9 : 0.45);
+      if (att.power >= 4.0) {
+        vic.tossT = 1.2;
+        vic.stunT = Math.max(vic.stunT, 1.8);
+      } else {
+        vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 0.9 : 0.45);
+      }
       const siphonPct = att.superT > 0 ? 0.12 : 0.05;
       const stolen = Math.min(vic.mass - 10, Math.round(vic.mass * siphonPct));
       if (stolen > 0) {
@@ -3835,18 +4353,40 @@ export class World {
       }
     }
 
-    // Phoenix: fiery blaze singes victim and scatters food (14% with rainbow)
+    // Phoenix: fiery blaze singes victim and scatters food (18% with rainbow)
     if (att.species === 'phoenix') {
-      const dropPct = att.superT > 0 ? 0.14 : 0.05;
+      const dropPct = att.superT > 0 ? 0.18 : 0.08;
       const burnDrop = Math.min(vic.mass - 10, Math.round(vic.mass * dropPct));
       if (burnDrop > 0) {
         vic.mass -= burnDrop;
         this.scatter(
           vic.x, vic.z, burnDrop,
           radiusOf(vic.mass) + (att.superT > 0 ? 2.5 : 1.5),
-          nx * (att.superT > 0 ? 14 : 8),
-          nz * (att.superT > 0 ? 14 : 8)
+          nx * (att.superT > 0 ? 16 : 9),
+          nz * (att.superT > 0 ? 16 : 9)
         );
+        if (att.superT > 0) {
+          vic.stunT = Math.max(vic.stunT, 0.8);
+        }
+      }
+    }
+
+    // Ram: Sừng kim cương phản chấn cực mạnh đối thủ lùi xa
+    if (att.species === 'ram') {
+      vic.vx += nx * (att.superT > 0 ? 32 : 18);
+      vic.vz += nz * (att.superT > 0 ? 32 : 18);
+      vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 1.5 : 1.0);
+    }
+
+    // Boar: Nanh sắt cày ủi hất văng và rơi thêm thức ăn
+    if (att.species === 'boar') {
+      vic.vx += nx * (att.superT > 0 ? 28 : 16);
+      vic.vz += nz * (att.superT > 0 ? 28 : 16);
+      vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 1.2 : 0.7);
+      const boarDrop = Math.min(vic.mass - 10, Math.round(vic.mass * (att.superT > 0 ? 0.12 : 0.05)));
+      if (boarDrop > 0) {
+        vic.mass -= boarDrop;
+        this.scatter(vic.x, vic.z, boarDrop, radiusOf(vic.mass) + 1.5, nx * 10, nz * 10);
       }
     }
 
@@ -3987,7 +4527,7 @@ export class World {
       p.heartDeathZ = p.z;
       p.alive = false;
       p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
-      p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
+      p.superT = 0; p.flyT = 0; p.flightT = 0; p.burnT = 0; p.tossT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
       p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
       p.inWaterT = 0; p.slowT = 0; p.squishT = 0;
       p.monkeyLeapT = 0; p.monkeyBounced = false; p.treeShakeT = 0;
@@ -4079,7 +4619,7 @@ export class World {
 
     p.alive = false;
     p.dashT = 0; p.stunT = 0; p.charging = false; p.pressed = false; p.holdT = 0;
-    p.superT = 0; p.flyT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
+    p.superT = 0; p.flyT = 0; p.flightT = 0; p.burnT = 0; p.tossT = 0; p.wheelT = 0; p.speedT = 0; p.shieldT = 0;
     p.pitchforkT = 0; p.pitchforkHits = 0; p.hasDynamite = false;
     p.monkeyLeapT = 0; p.monkeyBounced = false; p.treeShakeT = 0;
     p.treeShakeTreeId = undefined;
@@ -4533,7 +5073,7 @@ export class World {
         | (o.shieldT > 0 ? FLAG.IMMUNITY : 0)
         | (o.hasHeart ? FLAG.HEART : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
-        | (o.flyT > 0 ? FLAG.FLYING : 0)
+        | ((o.flyT > 0 || (o.flightT && o.flightT > 0) || (o.tossT && o.tossT > 0)) ? FLAG.FLYING : 0)
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
         | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
         | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0)

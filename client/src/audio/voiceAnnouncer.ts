@@ -378,12 +378,13 @@ class VoiceAnnouncerManager {
    */
   public play(key: string, priority: VoicePriority = 3): void {
     if (!ENABLE_VOICE_ANNOUNCER || !this.enabled) return;
-    if (isMuted() && key !== 'kids_lock') return;
+    const isKidsWarning = key === 'kids_lock' || key.startsWith('time_');
+    if (isMuted() && !isKidsWarning) return;
     if (!isVietnameseLang()) return;
 
     const now = performance.now();
     const last = this.lastPlayedAt.get(key);
-    if (last !== undefined && now - last < SAME_KEY_COOLDOWN_MS && key !== 'kids_lock') return;
+    if (last !== undefined && now - last < SAME_KEY_COOLDOWN_MS && !isKidsWarning) return;
 
     // Nếu đang phát một câu QUAN TRỌNG HƠN (priority nhỏ hơn), bỏ qua câu kém quan trọng này
     if (this.isPlaying && priority > this.currentPriority) {
@@ -400,7 +401,7 @@ class VoiceAnnouncerManager {
 
     this.loadVoiceBuffer(key).then((buf) => {
       // Nếu trong lúc tải đã có sự kiện khác mới hơn cắt ngang -> hủy bỏ ngay
-      if (myToken !== this.playToken || !buf || !this.enabled || (isMuted() && key !== 'kids_lock')) {
+      if (myToken !== this.playToken || !buf || !this.enabled || (isMuted() && !isKidsWarning)) {
         if (myToken === this.playToken) {
           this.isPlaying = false;
           this.currentPriority = 4;

@@ -132,13 +132,19 @@ export type GameEvent =
   | { k: 'monkeyLeap'; id: number; x: number; z: number; dur: number; height: number; ratio: number; rainbow?: boolean; bounce?: boolean }
   | { k: 'monkeyLand'; id: number; x: number; z: number; r: number; ratio: number; isGorilla?: boolean; inWater?: boolean; rainbow?: boolean }
   | { k: 'mammothRoar'; id: number; x: number; z: number; r: number; dur: number; rainbow?: boolean }
-  | { k: 'wolfBite'; id: number; targetId: number; x: number; z: number; fromX?: number; fromZ?: number; stolen?: number; loss?: number; rainbow?: boolean; step?: number; total?: number }
+  | { k: 'wolfBite'; id: number; targetId: number; x: number; z: number; fromX?: number; fromZ?: number; anchorX?: number; anchorZ?: number; stolen?: number; loss?: number; rainbow?: boolean; step?: number; total?: number }
   | { k: 'sundaySummon'; dur: number }
   | { k: 'morph'; id: number; species: Species; dur: number }
   | { k: 'heartRevive'; id: number; x: number; z: number; mass: number; dur: number }
   | { k: 'heartRevived'; id: number; x: number; z: number; mass: number }
   | { k: 'heartCollect'; id: number; name: string }
   | { k: 'dolphinDeliver'; x: number; z: number }
+  | { k: 'phoenixFire'; id: number; x: number; z: number; a: number; len: number; w: number; rainbow?: boolean }
+  | { k: 'ramKnockback'; id: number; targetId: number; x: number; z: number; rainbow?: boolean }
+  | { k: 'swanIce'; id: number; x: number; z: number; r: number; rainbow?: boolean }
+  | { k: 'boarMud'; id: number; x: number; z: number; a: number; giant: boolean; r?: number; rainbow?: boolean }
+  | { k: 'bullToss'; id: number; targetIds: number[]; x: number; z: number; r: number; rainbow?: boolean }
+  | { k: 'burn'; id: number; dur: number }
   | { k: 'map'; map: MapData; food: FoodWire[]; tools: ToolWire[]; transition?: boolean };
 
 /** [id, stage: 0..3, big, small, flowers] */

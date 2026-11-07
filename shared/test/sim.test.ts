@@ -3404,6 +3404,243 @@ describe('fruit trees', () => {
         expect(p.bot).toBe(false);
       }
     });
+
+    it('evolved species special skills and Super rainbow power', () => {
+      const w = emptyWorld();
+
+      // 1. Phoenix charged blaze
+      const p1Id = w.addPlayer('Phoenix', 'phoenix', false);
+      const p1 = place(w, p1Id, 0, 0, 3200);
+      p1.holdT = 0.5;
+      (w as any).dash(p1);
+      expect(p1.flyT).toBeGreaterThan(0);
+      expect(p1.plow).toBe(true);
+
+      // Super Phoenix
+      p1.superT = 10;
+      p1.dashT = 0;
+      (w as any).dash(p1);
+      expect(p1.flyT).toBe(0.70);
+      expect(p1.power).toBe(7.5);
+
+      // 2. Swan tidal wave pushes and slows nearby rivals
+      const sId = w.addPlayer('Swan', 'swan', false);
+      const swan = place(w, sId, 10, 10, 3200);
+      swan.a = 0; // facing +x
+      const enemyId = w.addPlayer('Enemy', 'chicken', false);
+      const enemy = place(w, enemyId, 15, 10, 50); // in front of swan
+
+      swan.holdT = 0.5;
+      (w as any).dash(swan);
+      expect(enemy.vx).toBeGreaterThan(0);
+      expect(enemy.slowT).toBeGreaterThan(0);
+
+      // 3. Bull earth stomp siphons mass and stuns
+      const bId = w.addPlayer('Bull', 'bull', false);
+      const bull = place(w, bId, 50, 50, 3200);
+      const vicId = w.addPlayer('Victim', 'pig', false);
+      const vic = place(w, vicId, 55, 50, 100);
+      const vicMassBefore = vic.mass;
+
+      bull.holdT = 0.5;
+      (w as any).dash(bull);
+      expect(vic.stunT).toBeGreaterThan(0);
+      expect(vic.mass).toBeLessThan(vicMassBefore);
+      expect(bull.mass).toBeGreaterThan(3200);
+
+      // 4. Ram and Boar high power
+      const ramId = w.addPlayer('Ram', 'ram', false);
+      const ram = place(w, ramId, 100, 100, 3200);
+      ram.holdT = 0.5;
+      (w as any).dash(ram);
+      expect(ram.power).toBe(4.6);
+
+      const boarId = w.addPlayer('Boar', 'boar', false);
+      const boar = place(w, boarId, 200, 200, 3200);
+      boar.holdT = 0.5;
+      (w as any).dash(boar);
+      expect(boar.power).toBe(4.2);
+
+      // 5. Pegasus sky flight
+      const pegId = w.addPlayer('Pegasus', 'pegasus', false);
+      const peg = place(w, pegId, 300, 300, 3200);
+      peg.holdT = 0.5;
+      (w as any).dash(peg);
+      expect(peg.flyT).toBe(0.65);
+    });
+
+    describe('EVOLVED 3000KG SUPER SKILLS (Phoenix, Ram, Swan, Boar, Pegasus, Bull)', () => {
+      it('Phoenix max charge creates fire carpet: kills <= 100kg immediately and burns > 100kg for 3s', () => {
+        const w = emptyWorld();
+        const pId = w.addPlayer('Phoenix', 'phoenix', false);
+        const smallVictimId = w.addPlayer('SmallChick', 'chicken', false);
+        const bigVictimId = w.addPlayer('BigCow', 'cow', false);
+
+        const phoenix = place(w, pId, 0, 0, 3200);
+        phoenix.input.a = 0; // facing +X
+        const smallVic = place(w, smallVictimId, 10, 0, 80);
+        const bigVic = place(w, bigVictimId, 15, 0, 500);
+
+        phoenix.holdT = 1.0; // Max charge
+        (w as any).dash(phoenix);
+
+        // Verify fire carpet event
+        expect(w.events.some((e) => e.k === 'phoenixFire' && e.id === pId && e.len === 24)).toBe(true);
+
+        // Small victim (80kg <= 100kg) immediately carbonized/killed
+        expect(smallVic.alive).toBe(false);
+
+        // Big victim (> 100kg) catches fire for 3s
+        expect(bigVic.alive).toBe(true);
+        expect(bigVic.burnT).toBe(3.0);
+        expect(bigVic.slowT).toBeGreaterThan(0);
+
+        // Over time, burn reduces mass every 0.5s
+        const bigMassBefore = bigVic.mass;
+        for (let i = 0; i < 35; i++) {
+          w.step();
+        }
+        expect(bigVic.mass).toBeLessThan(bigMassBefore);
+      });
+
+      it('Phoenix rainbow super max charge creates huge 38m fire carpet', () => {
+        const w = emptyWorld();
+        const pId = w.addPlayer('Phoenix', 'phoenix', false);
+        const victimId = w.addPlayer('FarVictim', 'sheep', false);
+
+        const phoenix = place(w, pId, 0, 0, 3200);
+        phoenix.superT = 10;
+        phoenix.input.a = 0;
+        const victim = place(w, victimId, 32, 0, 80); // 32m away (within 38m carpet)
+
+        phoenix.holdT = 1.0;
+        (w as any).dash(phoenix);
+
+        expect(w.events.some((e) => e.k === 'phoenixFire' && e.id === pId && e.len === 38 && e.w === 14)).toBe(true);
+        expect(victim.alive).toBe(false);
+      });
+
+      it('Ram max charge delivers 2x knockback, and Rainbow Ram flings victims across map', () => {
+        const w = emptyWorld();
+        const rId = w.addPlayer('Ram', 'ram', false);
+        const vId = w.addPlayer('Victim', 'pig', false);
+        const ram = place(w, rId, 0, 0, 3200);
+        const vic = place(w, vId, 3, 0, 500);
+
+        ram.holdT = 1.0;
+        (w as any).dash(ram);
+        expect(ram.power).toBe(6.0);
+
+        // Hit victim with max charge Ram
+        w.hit(ram, vic, 25, 1, 0);
+        expect(w.events.some((e) => e.k === 'ramKnockback' && e.id === rId)).toBe(true);
+        expect(vic.vx).toBeGreaterThan(30);
+
+        // Rainbow Ram has 9.5 power and extreme fling velocity
+        ram.superT = 10;
+        ram.holdT = 1.0;
+        (w as any).dash(ram);
+        expect(ram.power).toBe(9.5);
+      });
+
+      it('Swan max charge flies for 10s, and Rainbow Swan drops freezing ice balls', () => {
+        const w = emptyWorld();
+        const sId = w.addPlayer('Swan', 'swan', false);
+        const enemyId = w.addPlayer('Enemy', 'dog', false);
+        const swan = place(w, sId, 0, 0, 3200);
+        const enemy = place(w, enemyId, 19, 3, 200);
+
+        swan.superT = 10;
+        swan.holdT = 1.0; // Max charge
+        (w as any).dash(swan);
+
+        expect(swan.flightT).toBe(10.0);
+        expect(swan.flyT).toBe(10.0);
+
+        // Step through simulation for ~1.2s: Swan drops ice balls and freezes enemy
+        for (let i = 0; i < 25; i++) {
+          w.step();
+        }
+
+        expect(swan.flightT).toBeGreaterThan(8.0);
+        expect(swan.flyT).toBeGreaterThan(8.0);
+        expect(enemy.stunT).toBeGreaterThan(0);
+        expect(w.events.some((e) => e.k === 'swanIce' && e.id === sId)).toBe(true);
+      });
+
+      it('Boar max charge throws mud boulder: slows and damages, Rainbow Boar roots for 3s', () => {
+        const w = emptyWorld();
+        const bId = w.addPlayer('Boar', 'boar', false);
+        const v1Id = w.addPlayer('NearVictim', 'sheep', false);
+        const boar = place(w, bId, 0, 0, 3200);
+        boar.input.a = 0;
+        const v1 = place(w, v1Id, 8, 0, 500);
+
+        const v1MassBefore = v1.mass;
+        boar.holdT = 1.0;
+        (w as any).dash(boar);
+
+        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 3.5)).toBe(true);
+        expect(v1.slowT).toBe(2.5);
+        expect(v1.mass).toBeLessThan(v1MassBefore);
+
+        // Rainbow Boar: roots enemy for 3.0s
+        const v2Id = w.addPlayer('FarVictim', 'cow', false);
+        const v2 = place(w, v2Id, 18, 0, 500);
+        boar.superT = 10;
+        boar.holdT = 1.0;
+        (w as any).dash(boar);
+
+        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 6.0 && e.rainbow === true)).toBe(true);
+        expect(v2.stunT).toBe(3.0);
+      });
+
+      it('Pegasus max charge flies for 10s, and Rainbow Pegasus drops 5 rainbow candies', () => {
+        const w = emptyWorld();
+        const pId = w.addPlayer('Pegasus', 'pegasus', false);
+        const peg = place(w, pId, 0, 0, 3200);
+
+        peg.superT = 10;
+        peg.holdT = 1.0;
+        (w as any).dash(peg);
+
+        expect(peg.flightT).toBe(10.0);
+        expect(peg.flyT).toBe(10.0);
+
+        // Step through simulation for full 10s flight
+        for (let i = 0; i < 330; i++) {
+          w.step();
+        }
+
+        // Dropped exactly 5 rainbow candies
+        expect(peg.pegasusCandyCount).toBe(5);
+        expect(w.events.filter((e) => e.k === 'superFood').length).toBeGreaterThanOrEqual(5);
+      });
+
+      it('Bull max charge tosses rival in air, dropping them squished flat for 3s', () => {
+        const w = emptyWorld();
+        const bId = w.addPlayer('Bull', 'bull', false);
+        const vId = w.addPlayer('Victim', 'horse', false);
+        const bull = place(w, bId, 0, 0, 3200);
+        bull.input.a = 0;
+        const vic = place(w, vId, 4, 0, 500);
+
+        bull.holdT = 1.0;
+        (w as any).dash(bull);
+
+        expect(w.events.some((e) => e.k === 'bullToss' && e.id === bId)).toBe(true);
+        expect(vic.tossT).toBe(1.2);
+        expect(vic.stunT).toBeGreaterThanOrEqual(1.8);
+
+        // Step simulation for 1.3s so toss completes and victim lands
+        for (let i = 0; i < 45; i++) {
+          w.step();
+        }
+
+        expect(vic.tossT).toBe(0);
+        expect(vic.squishT).toBeGreaterThan(0);
+      });
+    });
   });
 });
 

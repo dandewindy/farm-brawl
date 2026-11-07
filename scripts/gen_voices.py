@@ -43,6 +43,9 @@ BASE_VOICE_LINES: list[tuple[str, str, str]] = [
     # 0. Chào mừng vào trận & Kết thúc giờ chơi của bé (Windy)
     ("welcome", "Thục Đoan", "Chào mừng đến với nông trại!"),
     ("kids_lock", "Thục Đoan", "Kết thúc giờ chơi rồi Windy ơi, hãy nghỉ ngơi một chút nhé!"),
+    ("time_1min", "Thục Đoan", "Còn một phút nữa thôi bé ơi!"),
+    ("time_30s", "Thục Đoan", "Còn ba mươi giây nữa thôi bé ơi!"),
+    ("time_10s", "Thục Đoan", "Còn mười giây nữa là hết giờ chơi rồi!"),
 
     # Nhóm A: Vương quyền & Bục Vinh Quang
     ("king_you", "Thùy Dung", "Bạn đã lên ngôi Vua nông trại! Hãy ban hành điều răn mới!"),
