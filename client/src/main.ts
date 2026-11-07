@@ -281,6 +281,10 @@ function runClientOptimisticFoodPass(
   foodMap: Map<number, FoodItem>,
   onOptimisticEatVisual?: (foodId: number, x: number, z: number, value: number) => void
 ): number {
+  const meEnt = gameState.ents.get(gameState.myId);
+  if ((predictor.flightT && predictor.flightT > 0) || (predictor.flyT && predictor.flyT > 0) || (meEnt && (meEnt.flags & FLAG.FLYING) !== 0)) {
+    return 0;
+  }
   for (const [fid, entry] of optimisticEatenMap.entries()) {
     if (now - entry.eatenAtPerf > OPTIMISTIC_EAT_EXPIRY_MS) {
       optimisticEatenMap.delete(fid);
@@ -2028,6 +2032,13 @@ function handleGameEvent(ev: GameEvent): void {
     case 'fly': {
       sfxSuperFly(ev.id === myId ? 1 : 0.6);
       if (ev.id === myId) shake = Math.max(shake, 0.7);
+      const meta = gameState.metas.get(ev.id);
+      if (meta?.species === 'phoenix') {
+        animals.spawnShockwave(ev.x, 0.08, ev.z, 6.5, 0xff3d00);
+        animals.spawnShockwave(ev.x, 0.12, ev.z, 4.5, 0xffa000);
+        foodParts.burst(ev.x, 1.2, ev.z, 0xff3d00, 36, 10, 10, 1.2);
+        foodParts.burst(ev.x, 1.6, ev.z, 0xffeb3b, 24, 8, 8, 0.9);
+      }
       break;
     }
     case 'napoleon': {
@@ -2459,7 +2470,7 @@ function handleGameEvent(ev: GameEvent): void {
       sfxWolfBite(isMine ? 1.0 : 0.45, !!ev.rainbow);
 
       // Play fierce wolf howl sound effect on the initial frenzy strike
-      if (ev.step === 1) {
+      if (ev.step === 1 && (ev.isMax || ev.rainbow)) {
         sfxWolfHowl(isMine ? 1.0 : 0.65);
       }
 
@@ -2597,15 +2608,10 @@ function handleGameEvent(ev: GameEvent): void {
       const cosA = Math.cos(ev.a);
       const sinA = Math.sin(ev.a);
       const dist = ev.giant ? 22 : 16;
-      const boulderCol = ev.rainbow ? 0xff4081 : 0x5d4037;
-      for (let d = 3; d <= dist; d += 4) {
-        const mx = ev.x + cosA * d;
-        const mz = ev.z + sinA * d;
-        animals.spawnShockwave(mx, 0.08, mz, ev.giant ? 4.5 : 2.8, boulderCol);
-        foodParts.burst(mx, 0.8, mz, boulderCol, 14, 6, 6, 0.6);
-      }
-      foodParts.smokePoof(ev.x + cosA * dist, 1.0, ev.z + sinA * dist, ev.giant ? 4.5 : 3.0, 20);
-      if (isMine) shake = Math.max(shake, ev.giant ? 1.4 : 0.9);
+      const targetX = ev.x + cosA * dist;
+      const targetZ = ev.z + sinA * dist;
+      animals.spawnMudBoulder(ev.x + cosA * 1.2, ev.z + sinA * 1.2, targetX, targetZ, ev.r || 3.5, !!ev.giant, !!ev.rainbow);
+      if (isMine) shake = Math.max(shake, ev.giant ? 1.5 : 1.0);
       break;
     }
     case 'bullToss': {
@@ -2627,8 +2633,8 @@ function handleGameEvent(ev: GameEvent): void {
     case 'burn': {
       const ent = gameState.ents.get(ev.id);
       if (ent) {
-        foodParts.burst(ent.x, 1.2, ent.z, 0xff3d00, 16, 5, 5, 0.6);
-        foodParts.smokePoof(ent.x, 1.4, ent.z, 1.5, 10);
+        foodParts.burst(ent.x, 1.2, ent.z, 0xff3d00, 22, 8, 8, 0.7);
+        foodParts.burst(ent.x, 1.5, ent.z, 0xffa01a, 16, 6, 6, 0.5);
       }
       break;
     }
@@ -3550,6 +3556,7 @@ function animate(now: number): void {
   animals.updateShockwaves(dt);
   animals.updateWaterRipples(dt);
   animals.updateGroundCracks(dt);
+  animals.updateMudBoulders(dt);
 
   // Update animated world hazards (water ripples, pulsing coals, flames, electric fence arcs)
   const playerPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z } : undefined;

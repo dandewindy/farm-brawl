@@ -23,6 +23,7 @@ export class ClientPredictor {
   dashT = 0;
   flyT = 0;
   flightT = 0;
+  flightCd = 0;
   leapT = 0;
   isLeaping = false;
   ex = 0;
@@ -48,6 +49,7 @@ export class ClientPredictor {
     this.dashT = 0;
     this.flyT = 0;
     this.flightT = 0;
+    this.flightCd = 0;
     this.leapT = 0;
     this.isLeaping = false;
     this.ex = 0;
@@ -274,7 +276,7 @@ export class ClientPredictor {
         return;
       }
       if (species === 'swan') {
-        if (held >= 0.75) {
+        if (held >= 0.75 && (isSuper || (this.flightCd <= 0 && this.flightT <= 0))) {
           this.flightT = 10.0;
           this.flyT = 10.0;
         }
@@ -289,7 +291,7 @@ export class ClientPredictor {
         return;
       }
       if (species === 'pegasus') {
-        if (held >= 0.75) {
+        if (held >= 0.75 && (isSuper || (this.flightCd <= 0 && this.flightT <= 0))) {
           this.flightT = 10.0;
           this.flyT = 10.0;
         }
@@ -408,9 +410,13 @@ export class ClientPredictor {
       left -= h;
       this.dashT = Math.max(0, this.dashT - h);
       this.stunT = Math.max(0, this.stunT - h);
+      if (this.flightCd > 0) this.flightCd = Math.max(0, this.flightCd - h);
       if (this.flightT > 0) {
         this.flightT = Math.max(0, this.flightT - h);
-        this.flyT = Math.max(this.flyT, this.flightT);
+        this.flyT = this.flightT;
+        if (this.flightT <= 0 && (flags & FLAG.SUPER) === 0 && (species === 'swan' || species === 'pegasus')) {
+          this.flightCd = 10.0;
+        }
       } else {
         this.flyT = Math.max(0, this.flyT - h);
       }

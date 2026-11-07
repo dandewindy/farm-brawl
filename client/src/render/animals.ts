@@ -38,6 +38,9 @@ interface AnimalVisual {
   squishFactor?: number;
   visualY?: number;
   waterRippleTimer?: number;
+  currentFlyH?: number;
+  wasFlying?: boolean;
+  fireCones?: THREE.Group;
   arms?: THREE.Group[];
   tailSegments?: (THREE.Mesh | THREE.Group)[];
   trunk?: THREE.Group;
@@ -829,8 +832,7 @@ function buildWolf(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   const snoutColor = s.snout ?? 0xb0bec5;
   const earColor = s.ear ?? 0x37474f;
   const innerEarColor = s.innerEar ?? 0x90a4ae;
-  const eyeColor = s.eye ?? 0xffca28;
-  const legsColor = s.legs ?? 0x455a64;
+    const legsColor = s.legs ?? 0x455a64;
   const pawsColor = s.paws ?? 0xcfd8dc;
   const tailTipColor = s.tailTip ?? 0x1c262b;
 
@@ -938,40 +940,39 @@ function buildWolf(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   nose.scale.set(0.95, 0.85, 1.15);
   headGroup.add(nose);
 
-  // Đôi mắt sói hung dữ sắc lạnh hình quả hạnh nhân xếch ngược + Gờ chân mày cau có gầm gừ (Fierce Predator Wolf Eyes)
-  const fierceEyeColor = eyeColor || 0xff9100; // Hổ phách rực lửa săn mồi
-  const eyeGlowMat = animalMat(fierceEyeColor, { roughness: 0.1, emissive: 0xff3d00, emissiveIntensity: 1.2 });
-  const pupilMat = animalMat(0x050505, { roughness: 0.1 });
+  // Đôi mắt sói giống mắt heo rừng nhưng tròng trắng màu đỏ rực, mống mắt màu đen
+  const redScleraMat = animalMat(0xd50000, { roughness: 0.35, emissive: 0xb71c1c, emissiveIntensity: 0.6 });
+  const blackPupilMat = animalMat(0x111111, { roughness: 0.2 });
+  const eyeHlMat = animalMat(0xffffff, { roughness: 0.5 });
   const browMat = animalMat(maneColor, { roughness: 0.7 });
 
   // Nếp nhăn cau có giận dữ trên sống mũi giữa 2 mắt (Snarl wrinkles)
   blob(headGroup, maneColor, 0.10, [1.45, 0.38, 0.82], 0.28, 0.18, 0, [0, 0, -0.15]);
 
+  const eyeS = 0.078;
   for (const side of [-1, 1]) {
-    // 1. Mắt sói xếch quả hạnh nhân (Almond-shaped slanted predator eye)
-    const eyeGroup = new THREE.Group();
-    eyeGroup.position.set(0.28, 0.18, side * 0.22);
-    eyeGroup.rotation.set(side * 0.28, side * 0.38, -0.36);
-
-    // Lòng mắt quả hạnh nhân xếch phát sáng rực lửa hổ phách
-    const eyeSclera = new THREE.Mesh(new THREE.SphereGeometry(0.092, 12, 10), eyeGlowMat);
-    eyeSclera.scale.set(1.5, 0.75, 0.45);
+    const zOff = side * 0.21;
+    // 1. Tròng trắng màu đỏ hình cầu giống cấu trúc mắt heo rừng
+    const eyeSclera = new THREE.Mesh(new THREE.SphereGeometry(eyeS, 14, 10), redScleraMat);
+    eyeSclera.position.set(0.26, 0.16, zOff);
     eyeSclera.userData.eye = true;
-    eyeGroup.add(eyeSclera);
 
-    // Đồng tử mắt dựng đứng hình khe sắc nhọn (Demonic vertical slit predator pupil)
-    const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.12, 0.05), pupilMat);
-    pupil.position.set(0.032, 0, 0);
+    // 2. Mống mắt hình cầu màu đen
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(eyeS * 0.58, 12, 8), blackPupilMat);
+    pupil.position.set(0.26 + eyeS * 0.55, 0.16, zOff);
     pupil.userData.eye = true;
-    eyeGroup.add(pupil);
 
-    headGroup.add(eyeGroup);
+    // 3. Đốm sáng phản chiếu trắng tinh
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(eyeS * 0.20, 8, 6), eyeHlMat);
+    hl.position.set(0.26 + eyeS * 0.95, 0.16 + eyeS * 0.28, zOff - side * eyeS * 0.12);
 
-    // 2. Gờ chân mày sói đậm dày, xếch chéo đè lên mắt tạo ánh nhìn gầm gừ hung dữ (Aggressive Furrowed Brow)
-    const browGeo = new THREE.BoxGeometry(0.22, 0.065, 0.085);
+    headGroup.add(eyeSclera, pupil, hl);
+
+    // Gờ chân mày sói đậm dày, xếch chéo đè lên mắt tạo ánh nhìn gầm gừ hung dữ
+    const browGeo = new THREE.BoxGeometry(0.18, 0.055, 0.075);
     const brow = new THREE.Mesh(browGeo, browMat);
-    brow.position.set(0.28, 0.24, side * 0.21);
-    brow.rotation.set(side * 0.40, side * 0.35, -0.45);
+    brow.position.set(0.26, 0.23, zOff);
+    brow.rotation.set(side * 0.35, side * 0.25, -0.38);
     headGroup.add(brow);
   }
 
@@ -3314,6 +3315,20 @@ interface GroundCrack {
   active: boolean;
 }
 
+interface ActiveMudBoulder {
+  group: THREE.Group;
+  startX: number;
+  startZ: number;
+  targetX: number;
+  targetZ: number;
+  progress: number;
+  duration: number;
+  peakY: number;
+  radius: number;
+  isGiant: boolean;
+  isRainbow: boolean;
+}
+
 function buildGroundCrackMesh(matDark: THREE.Material, matGlow: THREE.Material): THREE.Group {
   const grp = new THREE.Group();
   const darkPositions: number[] = [];
@@ -3589,6 +3604,107 @@ export class AnimalRenderer {
     }
   }
 
+  private readonly mudBoulders: ActiveMudBoulder[] = [];
+
+  spawnMudBoulder(startX: number, startZ: number, targetX: number, targetZ: number, radius: number, isGiant: boolean, isRainbow: boolean): void {
+    const group = new THREE.Group();
+    const boulderColor = isRainbow ? 0xff4081 : 0x4e342e;
+    const clumpColor = isRainbow ? 0xff80ab : 0x3e2723;
+    const bMat = new THREE.MeshStandardMaterial({
+      color: boulderColor,
+      roughness: 0.95,
+      metalness: 0.05,
+      emissive: isRainbow ? 0xff1744 : 0x1f140e,
+      emissiveIntensity: isRainbow ? 0.35 : 0.1,
+    });
+    const cMat = new THREE.MeshStandardMaterial({
+      color: clumpColor,
+      roughness: 0.92,
+      metalness: 0.05,
+    });
+
+    const baseSize = isGiant ? radius * 0.95 : radius * 0.65;
+    // Main deformed mud core
+    const mainCore = new THREE.Mesh(new THREE.DodecahedronGeometry(baseSize, 1), bMat);
+    mainCore.scale.set(1.15, 0.9, 1.05);
+    mainCore.castShadow = true;
+    group.add(mainCore);
+
+    // Clumped dirt rocks around core
+    for (let i = 0; i < 5; i++) {
+      const clump = new THREE.Mesh(new THREE.DodecahedronGeometry(baseSize * (0.35 + (i % 3) * 0.12), 0), cMat);
+      const a = (i / 5) * Math.PI * 2;
+      clump.position.set(Math.cos(a) * baseSize * 0.7, ((i % 3) - 1) * baseSize * 0.3, Math.sin(a) * baseSize * 0.7);
+      group.add(clump);
+    }
+
+    group.position.set(startX, 0.4, startZ);
+    this.scene.add(group);
+
+    const dist = Math.hypot(targetX - startX, targetZ - startZ);
+    const duration = Math.min(0.65, Math.max(0.35, dist / 42));
+    const peakY = Math.min(6.5, Math.max(3.2, dist * 0.22));
+
+    this.mudBoulders.push({
+      group,
+      startX,
+      startZ,
+      targetX,
+      targetZ,
+      progress: 0,
+      duration,
+      peakY,
+      radius,
+      isGiant,
+      isRainbow,
+    });
+  }
+
+  updateMudBoulders(dt: number): void {
+    for (let i = this.mudBoulders.length - 1; i >= 0; i--) {
+      const b = this.mudBoulders[i];
+      b.progress += dt / b.duration;
+      if (b.progress < 1.0) {
+        const p = b.progress;
+        const cx = b.startX + (b.targetX - b.startX) * p;
+        const cz = b.startZ + (b.targetZ - b.startZ) * p;
+        const cy = Math.sin(p * Math.PI) * b.peakY + 0.4;
+        b.group.position.set(cx, cy, cz);
+        b.group.rotation.x += dt * 7.5;
+        b.group.rotation.y += dt * 5.0;
+        b.group.rotation.z += dt * 6.0;
+
+        if (Math.random() < 0.45) {
+          const puffCol = b.isRainbow ? 0xff4081 : 0x5d4037;
+          this.onPuff?.(cx + (Math.random() - 0.5) * 0.4, cy, cz + (Math.random() - 0.5) * 0.4, puffCol, b.radius * 0.55, 0.35);
+        }
+      } else {
+        // Impact!
+        const hitColor = b.isRainbow ? 0xff4081 : 0x5d4037;
+        this.spawnShockwave(b.targetX, 0.08, b.targetZ, b.radius * 2.2, hitColor);
+        this.spawnShockwave(b.targetX, 0.12, b.targetZ, b.radius * 1.4, b.isRainbow ? 0xffeb3b : 0x8d6e63);
+        this.spawnGroundCracks(b.targetX, b.targetZ, b.radius * 1.5);
+        this.onSmokePoof?.(b.targetX, 0.9, b.targetZ, b.radius * 1.8, b.isGiant ? 32 : 18);
+        for (let k = 0; k < (b.isGiant ? 8 : 5); k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const d = Math.random() * b.radius * 0.9;
+          this.onPuff?.(b.targetX + Math.cos(ang) * d, 0.6, b.targetZ + Math.sin(ang) * d, hitColor, b.radius * 0.7, 0.55);
+        }
+
+        this.scene.remove(b.group);
+        b.group.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            const m = c as THREE.Mesh;
+            m.geometry?.dispose();
+            if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+            else m.material?.dispose();
+          }
+        });
+        this.mudBoulders.splice(i, 1);
+      }
+    }
+  }
+
   notifyThrow(id: number): void {
     const vis = this.visuals.get(id);
     if (vis) {
@@ -3704,6 +3820,10 @@ export class AnimalRenderer {
       if (vis.summonGroup) {
         this.scene.remove(vis.summonGroup);
       }
+      if (vis.fireCones) {
+        vis.root.remove(vis.fireCones);
+        vis.fireCones = undefined;
+      }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
       this.visuals.delete(id);
@@ -3732,6 +3852,10 @@ export class AnimalRenderer {
       }
       if (vis.summonGroup) {
         this.scene.remove(vis.summonGroup);
+      }
+      if (vis.fireCones) {
+        vis.root.remove(vis.fireCones);
+        vis.fireCones = undefined;
       }
       this.group.remove(vis.root);
       this.scene.remove(vis.ring);
@@ -3782,12 +3906,12 @@ export class AnimalRenderer {
     const isPlowing = (flags & 2) !== 0;
     const isCharging = (flags & 4) !== 0;
     const isStunned = (flags & 8) !== 0;
-    const isWater = (flags & 16) !== 0;
-    const isMud = (flags & 32) !== 0;
-    const isSafeSwimmer = vis.species === 'duck' || vis.species === 'swan' || vis.species === 'dog' || vis.species === 'wolf' || vis.species === 'pegasus';
-    const isDrowning = (flags & 64) !== 0 && !isSafeSwimmer;
     const isSuper = (flags & FLAG.SUPER) !== 0;
     const isFlying = (flags & FLAG.FLYING) !== 0;
+    const isWater = ((flags & 16) !== 0) && !isFlying && ((vis.currentFlyH || 0) < 0.35);
+    const isMud = ((flags & 32) !== 0) && !isFlying && ((vis.currentFlyH || 0) < 0.35);
+    const isSafeSwimmer = vis.species === 'duck' || vis.species === 'swan' || vis.species === 'dog' || vis.species === 'wolf' || vis.species === 'pegasus';
+    const isDrowning = (flags & 64) !== 0 && !isSafeSwimmer;
     const isSquished = (flags & FLAG.SQUISHED) !== 0;
     const isWheel = (flags & FLAG.WHEEL) !== 0;
     const isTreeShake = (flags & FLAG.TREE_SHAKE) !== 0;
@@ -3951,10 +4075,30 @@ export class AnimalRenderer {
       const peakH = vis.leapHeight || (vis.species === 'gorilla' ? 5.5 + 2.5 * r : 4.0 + 2.0 * r);
       bodyY += arc * peakH;
     }
-    if (isFlying) {
-      const flyH = (vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (3.5 * r + 1.2) : (1.2 * r);
-      bodyY += flyH;
+    const targetFlyH = isFlying
+      ? ((vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (3.5 * r + 1.2) : (1.2 * r))
+      : 0;
+
+    if (vis.currentFlyH === undefined) vis.currentFlyH = targetFlyH;
+    if (targetFlyH > vis.currentFlyH) {
+      // Bay lên nhanh dứt khoát
+      vis.currentFlyH += (targetFlyH - vis.currentFlyH) * Math.min(1.0, dt * 7.5);
+    } else if (targetFlyH < vis.currentFlyH) {
+      // Hạ cánh từ từ, lượn xuống đất êm dịu thay vì giật rơi thẳng xuống
+      vis.currentFlyH += (targetFlyH - vis.currentFlyH) * Math.min(1.0, dt * 3.5);
+      if (vis.currentFlyH < 0.02) vis.currentFlyH = 0;
     }
+    bodyY += vis.currentFlyH;
+
+    if (isFlying && !vis.wasFlying && vis.species === 'phoenix') {
+      // Hiệu ứng lửa bùng phát dưới chân khi Phượng hoàng bay lên
+      this.spawnShockwave(x, 0.08, z, 6.5, 0xff3d00);
+      this.spawnShockwave(x, 0.12, z, 4.5, 0xffa000);
+      this.onPuff?.(x, bodyY + 0.3, z, 0xff3d00, 3.0, 1.2);
+      this.onPuff?.(x, bodyY + 0.6, z, 0xffa000, 2.5, 0.9);
+    }
+    vis.wasFlying = isFlying;
+
     if (isTossed) {
       bodyY += 4.5 * sc + Math.sin(now * 0.01) * 0.4 * sc;
     }
@@ -3967,8 +4111,39 @@ export class AnimalRenderer {
     } else {
       vis.root.rotation.x = 0;
     }
-    if (isBurning && Math.random() < 0.35) {
-      this.onPuff?.(x + (Math.random() - 0.5) * r, bodyY + Math.random() * r, z + (Math.random() - 0.5) * r, 0xff3d00, 1.2, 0.4);
+
+    // Hiệu ứng lửa bập bùng trên người con vật bị dính thiêu đốt giống địa hình bếp lửa (thay thế khói trắng)
+    if (isBurning) {
+      if (!vis.fireCones) {
+        const fg = new THREE.Group();
+        for (let i = 0; i < 4; i++) {
+          const flMat = new THREE.MeshBasicMaterial({
+            color: i % 3 === 0 ? 0xffcc22 : i % 3 === 1 ? 0xff7711 : 0xff3300,
+            transparent: true,
+            opacity: 0.90,
+          });
+          const coneGeo = new THREE.ConeGeometry(0.22, 0.75, 6);
+          coneGeo.translate(0, 0.375, 0);
+          const fl = new THREE.Mesh(coneGeo, flMat);
+          const ang = (i / 4) * Math.PI * 2;
+          fl.position.set(Math.cos(ang) * 0.28, 0.35, Math.sin(ang) * 0.28);
+          fg.add(fl);
+        }
+        vis.fireCones = fg;
+        vis.root.add(fg);
+      }
+      vis.fireCones.visible = true;
+      const fcChildren = vis.fireCones.children as THREE.Mesh[];
+      for (let idx = 0; idx < fcChildren.length; idx++) {
+        const fl = fcChildren[idx];
+        fl.scale.y = (0.8 + 0.45 * Math.sin(now / 80 + idx * 1.7)) * sc;
+        fl.scale.x = fl.scale.z = (0.9 + 0.2 * Math.sin(now / 65 + idx)) * sc;
+      }
+      if (Math.random() < 0.25) {
+        this.onPuff?.(x + (Math.random() - 0.5) * r, bodyY + Math.random() * r + 0.3, z + (Math.random() - 0.5) * r, 0xffa01a, 0.6, 0.3);
+      }
+    } else if (vis.fireCones) {
+      vis.fireCones.visible = false;
     }
 
     const isThrowing = (vis.throwTimer !== undefined && vis.throwTimer > 0);
@@ -4432,10 +4607,16 @@ export class AnimalRenderer {
       }
     } else if (vis.species === 'boar') {
       if (isCharging) {
+        // Heo rừng gồng: chúi đầu rúc mõm sâu xuống đất chuẩn bị hất tảng bùn
         const t = Math.min(1, Math.max(0, lvl));
-        vis.body.position.x = 0.10 * t;
-        vis.body.position.y = -0.14 * t * r;
-        vis.body.rotation.z = -0.22 * t;
+        vis.body.position.x = 0.16 * t;
+        vis.body.position.y = -0.28 * t * r;
+        vis.body.rotation.z = -0.42 * t;
+      } else if (isDashing || isPlowing) {
+        // Hất mạnh mõm và cặp nanh ngược lên trời để hất tảng bùn khổng lồ
+        vis.body.position.x = -0.06;
+        vis.body.position.y = 0.26 * r;
+        vis.body.rotation.z = 0.55;
       } else {
         vis.body.position.x = 0;
         vis.body.position.y = 0;

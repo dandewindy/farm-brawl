@@ -3581,7 +3581,7 @@ describe('fruit trees', () => {
         (w as any).dash(boar);
 
         expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 3.5)).toBe(true);
-        expect(v1.slowT).toBe(2.5);
+        expect(v1.slowT).toBe(3.0);
         expect(v1.mass).toBeLessThan(v1MassBefore);
 
         // Rainbow Boar: roots enemy for 3.0s
@@ -3743,6 +3743,83 @@ describe('fruit trees', () => {
         expect(big.alive).toBe(true);
         expect(big.tossT).toBe(1.4);
         expect(big.squishT).toBe(1.5);
+      });
+
+
+      it('Swan and Pegasus have 10s flight cooldown when not rainbow, but rainbow bypasses cooldown', () => {
+        const w = emptyWorld();
+        const s = place(w, w.addPlayer('SwanTest', 'swan', false), 0, 0, 3200);
+        s.holdT = 0.8;
+        (w as any).dash(s);
+        expect(s.flightT).toBe(10.0);
+
+        // Mid-air re-charge without rainbow cannot reset flight time
+        w.step(); // s.flightT drops slightly below 10
+        expect(s.flightT).toBeLessThan(10.0);
+        const midAirT = s.flightT;
+        s.holdT = 0.8;
+        (w as any).dash(s);
+        expect(s.flightT).toBe(midAirT); // Not reset to 10.0
+
+        // Step until flight ends
+        for (let i = 0; i < 340; i++) {
+          w.step();
+        }
+        expect(s.flightT).toBe(0);
+        expect(s.flightCd).toBeGreaterThan(0);
+
+        // Trying to max charge fly again while cooldown > 0 should NOT take flight
+        s.holdT = 0.8;
+        (w as any).dash(s);
+        expect(s.flightT).toBe(0); // Cooldown blocked takeoff, did ground dash instead!
+
+        // If Rainbow Super mode is active, flight cooldown is bypassed
+        s.superT = 10.0;
+        s.holdT = 0.8;
+        (w as any).dash(s);
+        expect(s.flightT).toBe(10.0);
+      });
+
+      it('Flying animals do not capture podium while mid-air', () => {
+        const w = emptyWorld();
+        w.podiumShield = false; // Open shield
+        const pod = w.map.podium;
+        const p = place(w, w.addPlayer('AirPegasus', 'pegasus', false), pod[0], pod[1], 3200);
+        p.flightT = 10.0;
+        p.flyT = 10.0;
+
+        w.step();
+        expect(w.podiumCaptor).toBe(0);
+        expect(w.podiumProgress).toBe(0);
+
+        // Once landed on podium, can capture
+        p.flightT = 0;
+        p.flyT = 0;
+        w.step();
+        expect(w.podiumCaptor).toBe(p.id);
+      });
+
+      it('Wolf bite emits isMax true on max charge (>= 0.75s) and false on light charge', () => {
+        const w = emptyWorld();
+        const wolf = place(w, w.addPlayer('WolfTest', 'wolf', false), 0, 0, 3200);
+        const vic = place(w, w.addPlayer('Victim', 'cow', false), 2, 0, 100);
+
+        // Light charge (holdT = 0.3s)
+        wolf.holdT = 0.3;
+        (w as any).dash(wolf);
+        w.step();
+        const lightEvent = w.events.find(e => e.k === 'wolfBite' && e.id === wolf.id);
+        expect(lightEvent).toBeDefined();
+        expect(lightEvent?.isMax).toBe(false);
+
+        // Max charge (holdT = 0.8s)
+        w.events.length = 0;
+        wolf.holdT = 0.8;
+        (w as any).dash(wolf);
+        w.step();
+        const maxEvent = w.events.find(e => e.k === 'wolfBite' && e.id === wolf.id);
+        expect(maxEvent).toBeDefined();
+        expect(maxEvent?.isMax).toBe(true);
       });
 
       it('Aerial combat: rainbow flying animal air-dashing knocks flying enemy down without touching ground players', () => {

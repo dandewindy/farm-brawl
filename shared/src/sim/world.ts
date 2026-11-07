@@ -93,6 +93,8 @@ export interface Player extends Body {
   wolfAnchorX?: number;
   wolfAnchorZ?: number;
   flightT?: number;
+  flightCd?: number;
+  wolfIsMax?: boolean;
   burnT?: number;
   burnDmgTimer?: number;
   burnSafeFromDeath?: boolean;
@@ -481,7 +483,7 @@ export class World {
       hasHeart: false, heartReviving: false, heartReviveTimer: undefined,
       monkeyLeapT: 0, monkeyBounced: false, treeShakeT: 0, mammothRoarT: 0, mammothRoarCd: 0,
       wolfFrenzyT: 0, wolfLungeT: 0, wolfTargetId: undefined, wolfBitesLeft: 0, wolfChainTargets: undefined, wolfChainRainbow: false,
-      flightT: 0, burnT: 0, burnDmgTimer: 0, tossT: 0, pegasusCandyCount: 0, pegasusCandyTimer: 0, swanIceTimer: 0,
+      flightT: 0, flightCd: 0, burnT: 0, burnDmgTimer: 0, tossT: 0, pegasusCandyCount: 0, pegasusCandyTimer: 0, swanIceTimer: 0,
     });
     delete p.morphOrigSpecies;
     delete p.morphT;
@@ -1148,14 +1150,20 @@ export class World {
         }
       }
       if (p.flyT > 0) p.flyT = Math.max(0, p.flyT - DT);
+      if (p.flightCd && p.flightCd > 0) {
+        p.flightCd = Math.max(0, p.flightCd - DT);
+      }
       if (p.flightT && p.flightT > 0) {
         p.flightT = Math.max(0, p.flightT - DT);
         p.flyT = p.flightT;
         p.inWaterT = 0;
+        if (p.flightT <= 0 && p.superT <= 0 && (p.species === 'swan' || p.species === 'pegasus')) {
+          p.flightCd = 10.0;
+        }
         if (p.species === 'pegasus' && p.superT > 0 && (p.pegasusCandyCount ?? 0) < 5) {
-          p.pegasusCandyTimer = (p.pegasusCandyTimer ?? 1.2) - DT;
+          p.pegasusCandyTimer = (p.pegasusCandyTimer ?? 2.0) - DT;
           if (p.pegasusCandyTimer <= 0) {
-            p.pegasusCandyTimer = 1.8;
+            p.pegasusCandyTimer = 1.95;
             p.pegasusCandyCount = (p.pegasusCandyCount ?? 0) + 1;
             this.addFood(p.x, p.z, 6, 3);
             this.events.push({ k: 'superFood', x: r2(p.x), z: r2(p.z) });
@@ -1658,8 +1666,8 @@ export class World {
         this.podiumWarned5s = false;
       }
     } else {
-      // Shield is OPEN
-      const onPodium = alive.filter((p) => Math.hypot(p.x - podX, p.z - podZ) <= PR);
+      // Shield is OPEN (flying players cannot capture or contest the podium)
+      const onPodium = alive.filter((p) => (!p.flightT || p.flightT <= 0) && (!p.flyT || p.flyT <= 0) && Math.hypot(p.x - podX, p.z - podZ) <= PR);
 
       if (onPodium.length === 0) {
         this.podiumContested = false;
@@ -2794,17 +2802,30 @@ export class World {
   private executeSwanSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
     p.a = p.input.a;
     if (isMax) {
-      p.flightT = 10.0;
-      p.flyT = 10.0;
-      p.cd = 0.5;
-      p.swanIceTimer = isRainbow ? 1.0 : 0;
-      p.vx = Math.cos(p.a) * 36;
-      p.vz = Math.sin(p.a) * 36;
-      p.dashT = 0.6;
-      p.plow = true;
-      p.power = isRainbow ? 5.5 : 3.5;
-      p.dashHit.clear();
-      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      if (!isRainbow && ((p.flightCd ?? 0) > 0 || (p.flightT ?? 0) > 0)) {
+        // Cooldown bay 10s dang kich hoat -> luot thuong duoi dat
+        const inWater = p.terrain === 1;
+        const speed = (inWater ? 48 : 42) * 1.3;
+        p.vx = Math.cos(p.a) * speed;
+        p.vz = Math.sin(p.a) * speed;
+        p.dashT = 0.50;
+        p.plow = true;
+        p.power = 3.5;
+        p.cd = CFG.DASH_CD * 0.5;
+        p.dashHit.clear();
+      } else {
+        p.flightT = 10.0;
+        p.flyT = 10.0;
+        p.cd = 0.5;
+        p.swanIceTimer = isRainbow ? 1.0 : 0;
+        p.vx = Math.cos(p.a) * 36;
+        p.vz = Math.sin(p.a) * 36;
+        p.dashT = 0.6;
+        p.plow = true;
+        p.power = isRainbow ? 5.5 : 3.5;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      }
     } else {
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
       const inWater = p.terrain === 1;
@@ -2867,7 +2888,7 @@ export class World {
               this.scatter(other.x, other.z, loss, rOther + 0.5);
             }
           } else {
-            other.slowT = Math.max(other.slowT, 2.5);
+            other.slowT = Math.max(other.slowT, 3.0);
             const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.08));
             if (loss > 0) {
               other.mass -= loss;
@@ -2911,19 +2932,31 @@ export class World {
   private executePegasusSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
     p.a = p.input.a;
     if (isMax) {
-      p.flightT = 10.0;
-      p.flyT = 10.0;
-      p.cd = 0.5;
-      p.pegasusCandyCount = 0;
-      p.pegasusCandyTimer = isRainbow ? 1.0 : 0;
-      const flySp = isRainbow ? 64 : 40;
-      p.vx = Math.cos(p.a) * flySp;
-      p.vz = Math.sin(p.a) * flySp;
-      p.dashT = 0.6;
-      p.plow = true;
-      p.power = isRainbow ? 6.5 : 3.8;
-      p.dashHit.clear();
-      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      if (!isRainbow && ((p.flightCd ?? 0) > 0 || (p.flightT ?? 0) > 0)) {
+        // Cooldown bay 10s dang kich hoat -> luot thuong duoi dat
+        const flySpeed = 48 * 1.35;
+        p.vx = Math.cos(p.a) * flySpeed;
+        p.vz = Math.sin(p.a) * flySpeed;
+        p.dashT = 0.65;
+        p.plow = true;
+        p.power = 3.8;
+        p.cd = CFG.DASH_CD * 0.5;
+        p.dashHit.clear();
+      } else {
+        p.flightT = 10.0;
+        p.flyT = 10.0;
+        p.cd = 0.5;
+        p.pegasusCandyCount = 0;
+        p.pegasusCandyTimer = isRainbow ? 2.0 : 0;
+        const flySp = isRainbow ? 64 : 40;
+        p.vx = Math.cos(p.a) * flySp;
+        p.vz = Math.sin(p.a) * flySp;
+        p.dashT = 0.6;
+        p.plow = true;
+        p.power = isRainbow ? 6.5 : 3.8;
+        p.dashHit.clear();
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      }
     } else {
       const c = clamp((p.holdT - 0.2) / 1.0, 0, 1);
       const flySpeed = (isRainbow ? 72 : 48) * (1 + 0.35 * c);
@@ -3059,6 +3092,7 @@ export class World {
     const ratio = (clampedHold - 0.2) / 1.0;
     p.a = p.input.a;
     p.wolfRatio = ratio;
+    p.wolfIsMax = isRainbow || p.holdT >= 0.75;
     p.dashHit.clear();
     const rWolf = radiusOf(p.mass);
     const cosA = Math.cos(p.a);
@@ -3369,6 +3403,7 @@ export class World {
         rainbow: true,
         step: stepNum,
         total: p.wolfBiteTotal || 1,
+        isMax: true,
       });
       this.events.push({
         k: 'hit',
@@ -3469,6 +3504,7 @@ export class World {
         rainbow: false,
         step: p.wolfBiteStep,
         total: p.wolfBiteTotal || 3,
+        isMax: !!p.wolfIsMax,
       });
       this.events.push({
         k: 'hit',
