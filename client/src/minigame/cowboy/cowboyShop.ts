@@ -9,6 +9,7 @@ import {
   buildShopStall,
   buildShopItemModel,
   buildShopSack,
+  buildShopStoreBackground,
   disposeHierarchy,
   type FarmerNPC,
   type ShopItemModel,
@@ -34,6 +35,7 @@ export class CowboyShop {
   // 3D Objects & Scene Environment
   private farmerNPC: FarmerNPC | null = null;
   private shopStall: THREE.Group | null = null;
+  private shopBackground: THREE.Group | null = null;
   private itemModels: ShopItemModel[] = [];
   private shopSack: ShopSack | null = null;
   private floorMesh: THREE.Mesh | null = null;
@@ -125,13 +127,8 @@ export class CowboyShop {
           </div>
         </div>
 
-        <!-- Bottom Action Bar (Qua màn mới & Thoát) -->
+        <!-- Bottom Action Bar (Qua màn mới & Thoát ở giữa và gần nhau) -->
         <div class="cb-shop-bottom-bar">
-          <button type="button" id="cbShopExitBtn" class="cb-btn-shop-exit" title="Thoát trò chơi về sảnh chính">
-            <span class="btn-ico">🚪</span>
-            <span class="btn-txt" data-i18n="cb_exit">${t('cb_exit')}</span>
-          </button>
-
           <button type="button" id="cbShopNextRoundBtn" class="cb-btn-shop-next" title="Tiếp tục sang màn mới">
             <span class="btn-ico">🎯</span>
             <div class="btn-body">
@@ -139,18 +136,29 @@ export class CowboyShop {
               <small class="btn-sub" data-i18n="cb_shop_next_sub">${t('cb_shop_next_sub')}</small>
             </div>
           </button>
+
+          <button type="button" id="cbShopExitBtn" class="cb-btn-shop-exit" title="Thoát trò chơi về sảnh chính">
+            <span class="btn-ico">🚪</span>
+            <span class="btn-txt" data-i18n="cb_exit">${t('cb_exit')}</span>
+          </button>
         </div>
 
-        <!-- Simplified Confirm Purchase Modal -->
+        <!-- Chi tiết vật phẩm & Thao tác Mua / Trang bị (Hiện lên khi bấm vào ô) -->
         <div id="cbShopConfirmModal" class="cb-shop-confirm-modal-wrap" hidden>
           <div class="cb-shop-confirm-card">
+            <button type="button" id="cfCloseXBtn" class="cf-close-btn" title="Đóng">✕</button>
             <div class="cf-icon" id="cfIcon">🥾</div>
             <h3 class="cf-title" id="cfTitle">${t('cb_shop_confirm_title')}</h3>
+            <div class="cf-effect-pill" id="cfEffectPill">⚡ Tác dụng</div>
             <p class="cf-desc" id="cfDesc"></p>
-            <div class="cf-price-badge" id="cfPriceBadge">🪙 10 Credit</div>
-            <div class="cf-actions">
-              <button type="button" id="cfCancelBtn" class="cf-btn-cancel" data-i18n="cb_cancel">${t('cb_cancel')}</button>
+            <div class="cf-meta-row">
+              <span class="cf-owned-count" id="cfOwnedCount">Đang sở hữu: <b>0</b></span>
+              <span class="cf-price-badge" id="cfPriceBadge">🪙 6 Credit</span>
+            </div>
+            <div class="cf-actions" id="cfActions">
+              <button type="button" id="cfEquipBtn" class="cf-btn-equip" hidden>🎒 TRANG BỊ</button>
               <button type="button" id="cfConfirmBtn" class="cf-btn-buy">🪙 <span data-i18n="cb_buy_now">${t('cb_buy_now')}</span></button>
+              <button type="button" id="cfCancelBtn" class="cf-btn-cancel" data-i18n="cb_cancel">${t('cb_cancel')}</button>
             </div>
           </div>
         </div>
@@ -229,6 +237,10 @@ export class CowboyShop {
     this.shopStall = buildShopStall();
     this.scene.add(this.shopStall);
 
+    // 2b. Phông nền nông trại mộc mạc (ván gỗ, xà gồ, đèn bão, kiện rơm, thùng sồi)
+    this.shopBackground = buildShopStoreBackground();
+    this.scene.add(this.shopBackground);
+
     // 3. Tạo 6 Model 3D Vật Phẩm trưng bày trên 2 tầng kệ
     this.itemModels = [];
     COWBOY_ITEMS_CATALOG.forEach((item, idx) => {
@@ -281,28 +293,24 @@ export class CowboyShop {
       const owned = cowboyInventory.getCount(item.kind);
       const isEquipped = cowboyInventory.isEquipped(item.kind);
 
-      const slot = document.createElement('div');
+      const slot = document.createElement('button');
+      slot.type = 'button';
       slot.className = `cb-shelf-slot slot-${idx} ${isEquipped ? 'is-equipped' : ''}`;
+      slot.setAttribute('title', `Bấm để xem chi tiết và mua ${item.nameVi}`);
+
+      // Ô trưng bày rộng thoáng, chỉ hiển thị pill tag giá gỗ nhỏ bên dưới và badge sở hữu
       slot.innerHTML = `
-        <div class="slot-badge-top">${item.nameVi}</div>
-        <div class="slot-stat-pill">${item.effectLabel}</div>
-        <div class="slot-owned-count">${t('cb_owned_label')} <b>${owned}</b></div>
-        <div class="slot-actions">
-          ${
-            isEquipped
-              ? `<button type="button" class="btn-slot-equip equipped">✅ ${t('cb_equipped')}</button>`
-              : owned > 0
-              ? `<button type="button" class="btn-slot-equip">🎒 ${t('cb_equip')}</button>`
-              : ''
-          }
-          <button type="button" class="btn-slot-buy" data-kind="${item.kind}">
-            <span class="b-price">${item.price} 🪙</span>
-            <span class="b-txt">${t('cb_buy_now')}</span>
-          </button>
+        <span class="slot-owned-badge ${isEquipped ? 'equipped' : (owned > 0 ? 'owned' : '')}">
+          ${isEquipped ? '✅ ' + t('cb_equipped') : (owned > 0 ? `🎒 x${owned}` : '')}
+        </span>
+        <div class="slot-price-pill">
+          <span class="p-ico">🪙</span>
+          <b class="p-val">${item.price}</b>
+          <span class="p-name">${item.nameVi}</span>
         </div>
       `;
 
-      // Hover hiển thị tooltip thông tin chi tiết
+      // Hover nhẹ nhàng cập nhật tooltip nổi
       slot.addEventListener('mouseenter', () => {
         if (!tooltip) return;
         const iconEl = tooltip.querySelector('#tipIcon')!;
@@ -329,21 +337,10 @@ export class CowboyShop {
         if (tooltip) tooltip.hidden = true;
       });
 
-      // Bấm nút Mua -> Mở modal confirm đơn giản
-      slot.querySelector('.btn-slot-buy')?.addEventListener('click', (e) => {
-        e.stopPropagation();
+      // BẤM VÀO Ô TRÊN GIAN HÀNG ĐỂ MỞ BẢNG CHI TIẾT VÀ CHỌN MUA / TRANG BỊ
+      slot.addEventListener('click', () => {
+        if (tooltip) tooltip.hidden = true;
         this.openConfirmModal(item);
-      });
-
-      // Bấm nút Trang bị / Tháo trang bị
-      slot.querySelector('.btn-slot-equip')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (cowboyInventory.isEquipped(item.kind)) {
-          cowboyInventory.unequipForRound(item.kind);
-        } else {
-          cowboyInventory.equipForRound(item.kind);
-        }
-        this.renderSlotsUI();
       });
 
       this.slotsContainer.appendChild(slot);
@@ -352,24 +349,58 @@ export class CowboyShop {
 
   private openConfirmModal(item: CowboyItemDef): void {
     this.pendingBuyItem = item;
+    const owned = cowboyInventory.getCount(item.kind);
+    const isEquipped = cowboyInventory.isEquipped(item.kind);
+
     const cfIcon = this.confirmModalEl.querySelector('#cfIcon')!;
     const cfTitle = this.confirmModalEl.querySelector('#cfTitle')!;
+    const cfEffect = this.confirmModalEl.querySelector('#cfEffectPill')!;
     const cfDesc = this.confirmModalEl.querySelector('#cfDesc')!;
+    const cfOwned = this.confirmModalEl.querySelector('#cfOwnedCount')!;
     const cfPrice = this.confirmModalEl.querySelector('#cfPriceBadge')!;
+    const cfEquipBtn = this.confirmModalEl.querySelector('#cfEquipBtn') as HTMLButtonElement | null;
+    const cfConfirmBtn = this.confirmModalEl.querySelector('#cfConfirmBtn') as HTMLButtonElement | null;
 
     cfIcon.textContent = item.icon;
-    cfTitle.textContent = `${t('cb_shop_confirm_title')} - ${item.nameVi}`;
-    cfDesc.textContent = t('cb_shop_confirm_prompt')
-      .replace('{item}', item.nameVi)
-      .replace('{effect}', item.effectLabel)
-      .replace('{price}', String(item.price));
-    cfPrice.textContent = `🪙 ${item.price} Credit (${t('cb_shop_credits_lbl')} ${this.wallet.getCredits()})`;
+    cfTitle.textContent = item.nameVi;
+    if (cfEffect) cfEffect.textContent = `⚡ ${item.effectLabel}`;
+    cfDesc.textContent = item.descVi;
+    if (cfOwned) cfOwned.innerHTML = `Đang sở hữu: <b>${owned}</b>`;
+    cfPrice.textContent = `🪙 ${item.price} Credit (Bạn có: ${this.wallet.getCredits()})`;
+
+    // Hiển thị nút Trang Bị nếu đã sở hữu
+    if (cfEquipBtn) {
+      if (owned > 0) {
+        cfEquipBtn.hidden = false;
+        cfEquipBtn.textContent = isEquipped ? '✅ BỎ TRANG BỊ' : '🎒 TRANG BỊ NGAY';
+        cfEquipBtn.className = `cf-btn-equip ${isEquipped ? 'equipped' : ''}`;
+        cfEquipBtn.onclick = () => {
+          if (cowboyInventory.isEquipped(item.kind)) {
+            cowboyInventory.unequipForRound(item.kind);
+          } else {
+            cowboyInventory.equipForRound(item.kind);
+          }
+          this.renderSlotsUI();
+          this.openConfirmModal(item);
+        };
+      } else {
+        cfEquipBtn.hidden = true;
+      }
+    }
+
+    if (cfConfirmBtn) {
+      cfConfirmBtn.innerHTML = `🪙 <span>MUA NGAY (${item.price} C)</span>`;
+    }
 
     this.confirmModalEl.hidden = false;
   }
 
   private bindEvents(): void {
     // Hủy modal confirm
+    this.confirmModalEl.querySelector('#cfCloseXBtn')?.addEventListener('click', () => {
+      this.confirmModalEl.hidden = true;
+      this.pendingBuyItem = null;
+    });
     this.confirmModalEl.querySelector('#cfCancelBtn')?.addEventListener('click', () => {
       this.confirmModalEl.hidden = true;
       this.pendingBuyItem = null;

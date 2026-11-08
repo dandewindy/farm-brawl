@@ -98,6 +98,11 @@ export class CowboyArena {
   });
 
   private spawnTimer = 0;
+
+  // Cơ chế nhấn giữ gồng canh cự ly xa gần
+  private isAimCharging = false;
+  private aimChargeStartTime = 0;
+  private currentAimZ = 1.0;
   private selectedRopeCount = 1;
   private isNetSweeping = false;
   private currentTheme: CowboyThemeId = 'farm';
@@ -1228,9 +1233,78 @@ export class CowboyArena {
     }
   }
 
+  /** Bắt đầu gồng dây canh cự ly xa gần khi nhấn giữ nút Quăng dây / phím Space */
+  public startAimCharge(): void {
+    if (!this.canLaunch()) return;
+    this.isAimCharging = true;
+    this.aimChargeStartTime = performance.now();
+    this.currentAimZ = 1.0;
+  }
+
+  /** Dừng trạng thái gồng dây */
+  public stopAimCharge(): void {
+    this.isAimCharging = false;
+  }
+
+  /** Lấy cự ly Z đang được canh hiện tại */
+  public getCurrentAimZ(): number {
+    return this.currentAimZ;
+  }
+
+  /** Phóng thòng lọng tới cự ly Z đã canh sẵn khi thả nút */
+  public launchVolleyWithAim(ropeCount: number, targetZ: number): boolean {
+    if (!this.canLaunch()) return false;
+    this.isAimCharging = false;
+
+    cowboyAudio.playLassoThrow();
+
+    const hasRainbowNet = cowboyInventory.isEquipped('rainbow_net');
+    if (hasRainbowNet) {
+      cowboyInventory.consume('rainbow_net');
+      this.triggerRainbowNetSweep();
+      return true;
+    }
+
+    const count = Math.max(1, Math.min(5, ropeCount));
+    this.selectedRopeCount = count;
+    const targets = COWBOY_TARGET_SPREADS[count - 1];
+
+    // Clamped Z: bao phủ từ làn gần (1.0), giữa (-0.6) đến xa (-2.4)
+    const clampedZ = Math.max(-2.5, Math.min(2.2, targetZ));
+
+    for (let i = 0; i < count; i++) {
+      const rope = this.ropes[i];
+      rope.state = 'flying';
+      rope.progress = 0;
+      rope.caughtAnimalId = null;
+
+      rope.startX = (i - (count - 1) / 2) * 0.42;
+      rope.startY = 0.38;
+      rope.startZ = 5.2;
+
+      rope.targetX = targets[i];
+      rope.targetY = 1.1;
+      rope.targetZ = clampedZ;
+
+      rope.ribbonMesh.visible = true;
+      rope.loopMesh.visible = true;
+      rope.loopMesh.scale.setScalar(1);
+    }
+
+    for (let i = count; i < 5; i++) {
+      const rope = this.ropes[i];
+      rope.state = 'idle';
+      rope.ribbonMesh.visible = false;
+      rope.loopMesh.visible = false;
+    }
+
+    return true;
+  }
+
   /** Phóng thòng lọng (hoặc bung Lưới Cầu Vồng nếu đã trang bị) */
   public launchVolley(ropeCount: number): boolean {
     if (!this.canLaunch()) return false;
+    this.isAimCharging = false;
 
     cowboyAudio.playLassoThrow();
 
@@ -1458,8 +1532,21 @@ export class CowboyArena {
     const target = targets[i] || [0, 1.62, 2.7];
 
     const targetX = target[0];
-    const targetY = target[1];
-    const targetZ = target[2];
+    let targetY = target[1];
+    let targetZ = target[2];
+
+    // Khi đang nhấn giữ gồng nút Quăng dây:
+    // Đưa dây ra xa hoặc về gần liên tục (Z oscillation) và đưa lên xuống (Y bobbing) để canh cự ly
+    if (this.isAimCharging) {
+      const elapsed = (performance.now() - this.aimChargeStartTime) * 0.001;
+      // Chu kỳ dao động mượt mà 0..1 từ gần (2.2) đến xa (-2.5)
+      const reachCycle = 0.5 - 0.5 * Math.cos(elapsed * 4.0);
+      const aimZ = 2.2 + (-2.5 - 2.2) * reachCycle;
+      this.currentAimZ = aimZ;
+      const bobY = Math.sin(elapsed * 6.5) * 0.35;
+      targetY = 1.62 + bobY;
+      targetZ = aimZ;
+    }
 
     // Toàn bộ sợi dây thòng lọng dao động nhẹ nhàng, tự nhiên trong không gian 3D
     const oscY = Math.sin(time * 3.2 + i * 0.9) * 0.055;

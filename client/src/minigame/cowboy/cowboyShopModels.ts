@@ -165,46 +165,103 @@ export function buildFarmerNPC(): FarmerNPC {
 
   headPivot.add(hatGroup);
 
-  // --- TAY TRÁI (CHỐNG HÔNG) ---
+  // --- TAY TRÁI (KHỚP NỐI LIỀN MẠCH, CHỐNG HÔNG) ---
   const leftArm = new THREE.Group();
-  leftArm.position.set(-0.52, 1.82, 0);
-  const leftUpper = createMesh(new THREE.CylinderGeometry(0.12, 0.11, 0.42, 8), 0xd32f2f, { roughness: 0.8 });
-  leftUpper.position.set(-0.12, -0.16, 0);
-  leftUpper.rotation.z = -0.65;
-  leftArm.add(leftUpper);
+  leftArm.position.set(-0.50, 1.78, 0);
 
-  const leftFore = createMesh(new THREE.CylinderGeometry(0.1, 0.1, 0.38, 8), 0xd32f2f, { roughness: 0.8 });
-  leftFore.position.set(-0.16, -0.42, 0.14);
-  leftFore.rotation.set(0.6, 0, -0.85);
-  leftArm.add(leftFore);
+  // Khớp vai trái
+  const leftShoulder = createMesh(new THREE.SphereGeometry(0.14, 12, 10), 0xd32f2f, { roughness: 0.8 });
+  leftArm.add(leftShoulder);
 
-  const leftHand = createMesh(new THREE.SphereGeometry(0.11, 8, 8), 0xffcc80, { roughness: 0.6 });
-  leftHand.position.set(-0.08, -0.52, 0.28);
-  leftArm.add(leftHand);
+  // Cánh tay trên trái
+  const leftUpperArm = new THREE.Group();
+  leftUpperArm.rotation.set(0.1, 0, -0.68);
+  const leftUpperMesh = createMesh(new THREE.CylinderGeometry(0.12, 0.10, 0.38, 12), 0xd32f2f, { roughness: 0.8 });
+  leftUpperMesh.position.y = -0.19;
+  leftUpperArm.add(leftUpperMesh);
+
+  // Khớp khuỷu tay trái
+  const leftElbow = createMesh(new THREE.SphereGeometry(0.11, 10, 10), 0xd32f2f, { roughness: 0.8 });
+  leftElbow.position.y = -0.38;
+  leftUpperArm.add(leftElbow);
+
+  // Cẳng tay dưới trái
+  const leftForearm = new THREE.Group();
+  leftForearm.position.y = -0.38;
+  leftForearm.rotation.set(0.75, 0.2, 0.95);
+  const leftForeMesh = createMesh(new THREE.CylinderGeometry(0.10, 0.09, 0.34, 12), 0xd32f2f, { roughness: 0.8 });
+  leftForeMesh.position.y = -0.17;
+  leftForearm.add(leftForeMesh);
+
+  // Khớp cổ tay & Bàn tay trái
+  const leftWrist = createMesh(new THREE.SphereGeometry(0.08, 10, 8), 0xffcc80, { roughness: 0.6 });
+  leftWrist.position.y = -0.34;
+  leftForearm.add(leftWrist);
+
+  const leftHand = createMesh(new THREE.SphereGeometry(0.10, 12, 10), 0xffcc80, { roughness: 0.6 });
+  leftHand.scale.set(1.0, 0.8, 1.2);
+  leftHand.position.set(0, -0.40, 0.05);
+  leftForearm.add(leftHand);
+
+  leftUpperArm.add(leftForearm);
+  leftArm.add(leftUpperArm);
   group.add(leftArm);
 
-  // --- TAY PHẢI (ĐƯA RA GIỚI THIỆU & CHÀO MỪNG QUẦY HÀNG) ---
+  // --- TAY PHẢI (KHỚP NỐI LIỀN MẠCH, ĐƯA TAY MỞ RỘNG CHÀO MỪNG) ---
   const rightArmPivot = new THREE.Group();
-  rightArmPivot.position.set(0.52, 1.82, 0);
+  rightArmPivot.position.set(0.50, 1.78, 0);
 
-  const rightUpper = createMesh(new THREE.CylinderGeometry(0.12, 0.11, 0.45, 8), 0xd32f2f, { roughness: 0.8 });
-  rightUpper.position.set(0.18, -0.15, 0.12);
-  rightUpper.rotation.set(0.45, 0, 0.85);
-  rightArmPivot.add(rightUpper);
+  // Khớp vai phải
+  const rightShoulder = createMesh(new THREE.SphereGeometry(0.14, 12, 10), 0xd32f2f, { roughness: 0.8 });
+  rightArmPivot.add(rightShoulder);
 
+  // Cánh tay trên phải
+  const rightUpperGroup = new THREE.Group();
+  rightUpperGroup.rotation.set(0.42, 0, 0.72);
+  const rightUpperMesh = createMesh(new THREE.CylinderGeometry(0.12, 0.10, 0.40, 12), 0xd32f2f, { roughness: 0.8 });
+  rightUpperMesh.position.y = -0.20;
+  rightUpperGroup.add(rightUpperMesh);
+
+  // Khớp khuỷu tay phải
+  const rightElbow = createMesh(new THREE.SphereGeometry(0.11, 10, 10), 0xd32f2f, { roughness: 0.8 });
+  rightElbow.position.y = -0.40;
+  rightUpperGroup.add(rightElbow);
+
+  // Cẳng tay dưới phải
   const rightForearm = new THREE.Group();
-  rightForearm.position.set(0.38, -0.28, 0.22);
-  const rightForeMesh = createMesh(new THREE.CylinderGeometry(0.1, 0.09, 0.46, 8), 0xd32f2f, { roughness: 0.8 });
-  rightForeMesh.position.set(0.18, 0.1, 0.18);
-  rightForeMesh.rotation.set(-0.35, 0.6, -1.05);
+  rightForearm.position.y = -0.40;
+  rightForearm.rotation.set(-0.25, 0.35, -0.90);
+  const rightForeMesh = createMesh(new THREE.CylinderGeometry(0.10, 0.09, 0.42, 12), 0xd32f2f, { roughness: 0.8 });
+  rightForeMesh.position.y = -0.21;
   rightForearm.add(rightForeMesh);
 
-  const rightHand = createMesh(new THREE.BoxGeometry(0.16, 0.2, 0.08), 0xffcc80, { roughness: 0.6 });
-  rightHand.position.set(0.38, 0.24, 0.32);
-  rightHand.rotation.set(-0.2, 0.5, -0.4);
-  rightForearm.add(rightHand);
+  // Khớp cổ tay & Bàn tay mở chào đón
+  const rightWrist = createMesh(new THREE.SphereGeometry(0.08, 10, 8), 0xffcc80, { roughness: 0.6 });
+  rightWrist.position.y = -0.42;
+  rightForearm.add(rightWrist);
 
-  rightArmPivot.add(rightForearm);
+  const rightHandGroup = new THREE.Group();
+  rightHandGroup.position.set(0, -0.46, 0);
+  rightHandGroup.rotation.set(-0.2, 0.3, 0);
+
+  const rightPalm = createMesh(new THREE.BoxGeometry(0.14, 0.05, 0.16), 0xffcc80, { roughness: 0.6 });
+  rightHandGroup.add(rightPalm);
+
+  const thumb = createMesh(new THREE.CapsuleGeometry(0.035, 0.08, 6, 6), 0xffcc80, { roughness: 0.6 });
+  thumb.position.set(-0.08, 0.02, 0.04);
+  thumb.rotation.set(0.3, 0.2, 0.5);
+  rightHandGroup.add(thumb);
+
+  for (let f = 0; f < 4; f++) {
+    const finger = createMesh(new THREE.CapsuleGeometry(0.025, 0.09, 5, 5), 0xffcc80, { roughness: 0.6 });
+    finger.position.set(-0.045 + f * 0.03, 0, 0.12);
+    finger.rotation.x = 0.2;
+    rightHandGroup.add(finger);
+  }
+  rightForearm.add(rightHandGroup);
+
+  rightUpperGroup.add(rightForearm);
+  rightArmPivot.add(rightUpperGroup);
   group.add(rightArmPivot);
 
   let blinkTimer = 0;
@@ -272,30 +329,33 @@ export function buildShopStall(): THREE.Group {
   frontSkirt.position.set(0, 0.44, 1.05);
   stall.add(frontSkirt);
 
+  // Tầng kệ trên đặt tại y = 2.05, tầng kệ dưới tại y = 1.05
   const topShelf = createMesh(new THREE.BoxGeometry(4.2, 0.14, 0.72), 0x795548, { roughness: 0.7 });
-  topShelf.position.set(0, 2.12, -0.15);
+  topShelf.position.set(0, 2.05, -0.15);
   stall.add(topShelf);
 
   const bottomShelf = createMesh(new THREE.BoxGeometry(4.2, 0.14, 0.72), 0x795548, { roughness: 0.7 });
-  bottomShelf.position.set(0, 1.08, 0.1);
+  bottomShelf.position.set(0, 1.05, 0.1);
   stall.add(bottomShelf);
 
+  // Cột trụ gỗ cao hơn vươn lên đỡ mái che y = 3.65
   for (const x of [-2.05, 2.05]) {
-    const post = createMesh(new THREE.BoxGeometry(0.14, 2.8, 0.14), 0x3e2723, { roughness: 0.8 });
-    post.position.set(x, 1.4, -0.45);
+    const post = createMesh(new THREE.BoxGeometry(0.14, 3.6, 0.14), 0x3e2723, { roughness: 0.8 });
+    post.position.set(x, 1.8, -0.45);
     stall.add(post);
   }
 
+  // MÁI CHE NÂNG CAO LÊN y = 3.65 (GÓC NGHIÊNG NHẸ 0.10 RAD) ĐỂ KHÔNG BAO GIỜ CHE VẬT PHẨM TẦNG TRÊN
   const canopyGroup = new THREE.Group();
-  canopyGroup.position.set(0, 2.95, -0.1);
-  canopyGroup.rotation.x = 0.22;
+  canopyGroup.position.set(0, 3.65, -0.22);
+  canopyGroup.rotation.x = 0.10;
 
   const stripes = 8;
   const stripeWidth = 4.6 / stripes;
   for (let s = 0; s < stripes; s++) {
     const isRed = s % 2 === 0;
     const stripe = createMesh(
-      new THREE.BoxGeometry(stripeWidth * 0.96, 0.08, 1.3),
+      new THREE.BoxGeometry(stripeWidth * 0.96, 0.08, 1.4),
       isRed ? 0xd32f2f : 0xfff9c4,
       { roughness: 0.7 }
     );
@@ -308,7 +368,7 @@ export function buildShopStall(): THREE.Group {
       { roughness: 0.7 }
     );
     scallop.rotation.x = Math.PI / 2;
-    scallop.position.set(-2.3 + (s + 0.5) * stripeWidth, -0.12, 0.65);
+    scallop.position.set(-2.3 + (s + 0.5) * stripeWidth, -0.10, 0.70);
     canopyGroup.add(scallop);
   }
   stall.add(canopyGroup);
@@ -333,7 +393,7 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
   const isTop = slotIdx < 3;
   const col = slotIdx % 3;
   const posX = -1.35 + col * 1.35 + 0.65;
-  const posY = isTop ? 2.22 : 1.18;
+  const posY = isTop ? 2.12 : 1.12;
   const posZ = isTop ? -0.12 : 0.12;
 
   const pedestalPos = new THREE.Vector3(posX, posY, posZ);
@@ -711,4 +771,140 @@ export function buildShopSack(scene: THREE.Scene): ShopSack {
       disposeHierarchy(flyingItem);
     },
   };
+}
+
+// =========================================================================
+// 5. PHÔNG NỀN NÔNG TRẠI MỘC MẠC (RUSTIC BARN STORE BACKGROUND)
+// =========================================================================
+
+export function buildShopStoreBackground(): THREE.Group {
+  const bg = new THREE.Group();
+
+  // 1. Tường gỗ ván mộc (12 tấm ván ngang phong cách barnhouse)
+  const plankMat1 = { color: 0x4e342e, roughness: 0.9 };
+  const plankMat2 = { color: 0x3e2723, roughness: 0.85 };
+  const plankMat3 = { color: 0x5d4037, roughness: 0.92 };
+
+  for (let p = 0; p < 12; p++) {
+    const mat = p % 3 === 0 ? plankMat1 : p % 3 === 1 ? plankMat2 : plankMat3;
+    const plank = createMesh(new THREE.BoxGeometry(26, 0.58, 0.08), mat.color, mat);
+    plank.position.set(0, 0.35 + p * 0.58, -2.4);
+    bg.add(plank);
+  }
+
+  // 2. Xà gồ gỗ ngang & Cột trụ lớn 2 bên
+  const beamMat = { color: 0x271611, roughness: 0.8 };
+  const topBeam = createMesh(new THREE.BoxGeometry(26, 0.36, 0.36), beamMat.color, beamMat);
+  topBeam.position.set(0, 5.2, -1.8);
+  bg.add(topBeam);
+
+  for (const x of [-6.8, 6.8]) {
+    const pillar = createMesh(new THREE.BoxGeometry(0.42, 6.5, 0.42), beamMat.color, beamMat);
+    pillar.position.set(x, 2.8, -1.8);
+    bg.add(pillar);
+  }
+
+  // 3. Hai đèn bão treo phát sáng ấm cúng (1 bên trái trên đầu bác nông dân, 1 bên phải)
+  const lanternPositions = [
+    { x: -3.2, y: 3.8, z: -1.2 },
+    { x: 3.8, y: 3.8, z: -1.2 },
+  ];
+
+  for (const pos of lanternPositions) {
+    const lanternGroup = new THREE.Group();
+    lanternGroup.position.set(pos.x, pos.y, pos.z);
+
+    // Dây xích sắt treo từ xà gồ
+    const chain = createMesh(new THREE.CylinderGeometry(0.015, 0.015, 1.2, 6), 0x212121, { metalness: 0.8 });
+    chain.position.y = 0.6;
+    lanternGroup.add(chain);
+
+    // Khung đèn sắt hở với 4 thanh góc mảnh để lộ lõi phát sáng rực rỡ bên trong
+    for (const sx of [-0.15, 0.15]) {
+      for (const sz of [-0.15, 0.15]) {
+        const strut = createMesh(new THREE.BoxGeometry(0.024, 0.38, 0.024), 0x263238, { metalness: 0.8, roughness: 0.3 });
+        strut.position.set(sx, 0.02, sz);
+        lanternGroup.add(strut);
+      }
+    }
+    const topRing = createMesh(new THREE.TorusGeometry(0.18, 0.018, 6, 16), 0x263238, { metalness: 0.8 });
+    topRing.rotation.x = Math.PI / 2;
+    topRing.position.y = 0.20;
+    lanternGroup.add(topRing);
+
+    const bottomRing = createMesh(new THREE.TorusGeometry(0.15, 0.018, 6, 16), 0x263238, { metalness: 0.8 });
+    bottomRing.rotation.x = Math.PI / 2;
+    bottomRing.position.y = -0.16;
+    lanternGroup.add(bottomRing);
+
+    // Lõi đèn kính phát sáng vàng ấm
+    const glass = createMesh(new THREE.CylinderGeometry(0.13, 0.11, 0.32, 8), 0xffd54f, {
+      emissive: 0xffa000,
+      emissiveIntensity: 0.9,
+      roughness: 0.2,
+    });
+    lanternGroup.add(glass);
+
+    // Nón che đèn
+    const cap = createMesh(new THREE.ConeGeometry(0.24, 0.12, 6), 0x212121, { metalness: 0.8 });
+    cap.position.y = 0.24;
+    lanternGroup.add(cap);
+
+    // Đèn điểm ấm áp
+    const pLight = new THREE.PointLight(0xffb74d, 1.2, 6.5);
+    pLight.position.set(0, 0, 0);
+    lanternGroup.add(pLight);
+
+    bg.add(lanternGroup);
+  }
+
+  // 4. Các kiện rơm vàng xếp góc tường (Hay bales)
+  const hayMat = { color: 0xe0a96d, roughness: 0.95 };
+  const hayPositions = [
+    { x: 4.8, y: 0.36, z: -1.5, rot: 0.1 },
+    { x: 5.6, y: 0.36, z: -1.4, rot: -0.15 },
+    { x: 5.2, y: 0.92, z: -1.45, rot: 0.05 },
+    { x: -5.2, y: 0.36, z: -1.5, rot: 0.2 },
+  ];
+  for (const hp of hayPositions) {
+    const hay = createMesh(new THREE.BoxGeometry(1.2, 0.65, 0.85), hayMat.color, hayMat);
+    hay.position.set(hp.x, hp.y, hp.z);
+    hay.rotation.y = hp.rot;
+    bg.add(hay);
+
+    // Dây thừng buộc kiện rơm
+    for (const b of [-0.3, 0.3]) {
+      const twine = createMesh(new THREE.BoxGeometry(0.04, 0.66, 0.86), 0x8d6e63, { roughness: 0.9 });
+      twine.position.set(hp.x + b, hp.y, hp.z);
+      twine.rotation.y = hp.rot;
+      bg.add(twine);
+    }
+  }
+
+  // 5. Thùng gỗ sồi (Barrels) cạnh tường
+  const barrelMat = { color: 0x5d4037, roughness: 0.7 };
+  const barrelPositions = [
+    { x: -4.4, y: 0.55, z: -1.2 },
+    { x: 4.2, y: 0.55, z: -1.1 },
+  ];
+  for (const bp of barrelPositions) {
+    const barrel = createMesh(new THREE.CylinderGeometry(0.42, 0.38, 1.1, 14), barrelMat.color, barrelMat);
+    barrel.position.set(bp.x, bp.y, bp.z);
+    bg.add(barrel);
+
+    // Đai sắt thùng
+    for (const y of [-0.35, 0.35]) {
+      const hoop = createMesh(new THREE.TorusGeometry(0.43, 0.02, 6, 16), 0x263238, { metalness: 0.8 });
+      hoop.rotation.x = Math.PI / 2;
+      hoop.position.set(bp.x, bp.y + y, bp.z);
+      bg.add(hoop);
+    }
+  }
+
+  // 6. Cuộn dây thừng treo trên vách gỗ
+  const ropeCoil = createMesh(new THREE.TorusGeometry(0.35, 0.05, 8, 20), 0xd4a359, { roughness: 0.85 });
+  ropeCoil.position.set(-2.2, 3.2, -2.32);
+  bg.add(ropeCoil);
+
+  return bg;
 }

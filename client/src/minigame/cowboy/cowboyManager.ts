@@ -116,8 +116,8 @@ export class CowboyManager {
     let volleyCatches = 0;
     let volleyMisses = 0;
 
-    // Kết nối sự kiện Quăng Dây
-    this.hud.onLaunch = (bet) => {
+    // Hàm thực thi quăng dây (hỗ trợ cả quăng nhanh và quăng sau khi gồng canh cự ly)
+    const executeVolleyLaunch = (bet: number, isAimCharge: boolean) => {
       if (!this.arena || !this.arena.canLaunch()) {
         return; // Guard against rapid clicks while ropes are in-flight!
       }
@@ -158,7 +158,11 @@ export class CowboyManager {
         }
         this.syncStats();
         this.hud?.setBusy(true);
-        const launched = this.arena.launchVolley(bet);
+
+        const launched = isAimCharge
+          ? this.arena.launchVolleyWithAim(bet, this.arena.getCurrentAimZ())
+          : this.arena.launchVolley(bet);
+
         if (!launched) {
           this.wallet.refundBet(bet);
           if (cowboyKids.isEnabled()) {
@@ -168,6 +172,20 @@ export class CowboyManager {
           this.hud?.setBusy(false);
         }
       }
+    };
+
+    // Kết nối sự kiện Gồng Dây & Quăng Dây
+    this.hud.onChargeStart = () => {
+      this.arena?.startAimCharge();
+    };
+
+    this.hud.onChargeRelease = (_durationMs) => {
+      const bet = this.hud?.getBet() ?? 1;
+      executeVolleyLaunch(bet, true);
+    };
+
+    this.hud.onLaunch = (bet) => {
+      executeVolleyLaunch(bet, false);
     };
 
     // Bắt dính thú

@@ -6837,9 +6837,9 @@ body.mobile-phone #adminToggleBtn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  width: 100%;
-  max-width: 860px;
+  gap: 16px;
+  width: min(980px, 96vw);
+  max-width: 980px;
   padding: 8px 18px 10px;
   background: linear-gradient(180deg, #3d291c 0%, #24160e 100%);
   border: 2px solid var(--gold);
@@ -6847,12 +6847,47 @@ body.mobile-phone #adminToggleBtn {
   box-shadow: 0 6px 0 #140b06, 0 10px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-.cowboy-controls-left {
+.cb-ctrl-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  justify-content: center;
+}
+
+.cb-ctrl-left {
+  flex: 1.1;
   min-width: 0;
+  align-items: flex-start;
+}
+
+.cb-ctrl-center {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.cb-ctrl-right {
+  flex: 1.1;
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.cb-col-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  color: #d4a359;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.cb-ctrl-right .cb-col-label {
+  align-self: flex-end;
 }
 
 /* Bet Row */
@@ -6921,6 +6956,42 @@ body.mobile-phone #adminToggleBtn {
   align-items: center;
   justify-content: center;
   gap: 3px;
+}
+.cb-auto-launch-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+  color: rgba(255, 214, 71, 0.9);
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  user-select: none;
+}
+
+.cb-auto-launch-hint span b,
+.cb-auto-launch-hint #cbAutoCountdown {
+  color: #ff5252;
+  font-weight: 900;
+}
+
+.cowboy-red-button.is-charging {
+  animation: redButtonCharging 0.32s ease-in-out infinite alternate !important;
+  box-shadow: 0 0 22px rgba(255, 59, 48, 0.85), 0 0 38px rgba(255, 214, 71, 0.6) !important;
+}
+
+@keyframes redButtonCharging {
+  0% {
+    transform: scale(0.97);
+    filter: brightness(1.05);
+  }
+  100% {
+    transform: scale(1.04);
+    filter: brightness(1.3);
+  }
 }
 .cowboy-red-button {
   position: relative;
@@ -7297,6 +7368,83 @@ body.mobile-phone #adminToggleBtn {
   border: none;
   box-shadow: none;
   overflow: visible;
+}
+
+
+/* ==========================================================================
+   LOBBY GAME SELECTOR TABS (2 ô ngang hàng, In hoa & Highlight)
+   ========================================================================== */
+.lobby-game-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto 12px auto;
+  padding: 4px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lobby-game-tab {
+  flex: 1;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 16px;
+  background: rgba(36, 24, 18, 0.75);
+  border: 2px solid rgba(212, 163, 89, 0.35);
+  border-radius: 12px;
+  color: #c9b09a;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-weight: 800;
+  font-size: 13.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.2, 0, 0.2, 1);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.lobby-game-tab:hover:not(.active) {
+  background: rgba(56, 38, 28, 0.9);
+  border-color: rgba(255, 214, 71, 0.6);
+  color: #fff3e0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.lobby-game-tab.active {
+  background: linear-gradient(180deg, rgba(255, 214, 71, 0.25) 0%, rgba(212, 163, 89, 0.14) 100%), #2b1a12;
+  border: 2.5px solid #ffd647;
+  color: #ffd647;
+  font-weight: 900;
+  box-shadow: 0 0 16px rgba(255, 214, 71, 0.4), 0 4px 10px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.lobby-game-tab .tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.lobby-game-tab .tab-title {
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cb-game-nav {
+  margin-top: 6px;
+  margin-bottom: 14px;
 }
 
 .chrome-tab-bar {
@@ -9481,31 +9629,90 @@ body.mobile-phone #adminToggleBtn {
 }
 
 .cb-shelf-slot {
-  pointer-events: auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background: rgba(43, 27, 18, 0.35);
-  border: 1.5px solid rgba(212, 163, 89, 0.45);
-  border-radius: 14px;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  justify-content: flex-end;
+  min-width: 140px;
+  height: 200px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 2px solid transparent;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  background: transparent;
   box-sizing: border-box;
 }
 
 .cb-shelf-slot:hover {
-  transform: translateY(-4px) scale(1.02);
-  background: rgba(62, 39, 35, 0.7);
-  border-color: #ffd54f;
-  box-shadow: 0 10px 24px rgba(255, 213, 79, 0.35);
+  border-color: rgba(255, 214, 71, 0.8);
+  background: radial-gradient(circle at 50% 60%, rgba(255, 214, 71, 0.15) 0%, transparent 75%);
+  box-shadow: 0 0 24px rgba(255, 214, 71, 0.4);
+  transform: translateY(-4px) scale(1.03);
 }
 
 .cb-shelf-slot.is-equipped {
-  border-color: #00e676;
-  background: rgba(0, 200, 83, 0.15);
+  border-color: rgba(0, 230, 118, 0.6);
+  background: radial-gradient(circle at 50% 60%, rgba(0, 230, 118, 0.12) 0%, transparent 75%);
+}
+
+.slot-owned-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 214, 71, 0.6);
+  color: #ffd54f;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+.slot-owned-badge.equipped {
+  background: linear-gradient(135deg, #00c853, #009624);
+  border-color: #b9f6ca;
+  color: #fff;
+}
+
+.slot-price-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(180deg, #4e342e 0%, #2b170e 100%);
+  border: 2px solid #ffd54f;
+  border-radius: 20px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.15s;
+}
+
+.cb-shelf-slot:hover .slot-price-pill {
+  transform: scale(1.06);
+  border-color: #fff;
+  box-shadow: 0 0 14px rgba(255, 214, 71, 0.7);
+}
+
+.slot-price-pill .p-ico {
+  font-size: 14px;
+}
+
+.slot-price-pill .p-val {
+  color: #ffd54f;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.slot-price-pill .p-name {
+  color: #ffecb3;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .slot-badge-top {
@@ -9654,7 +9861,8 @@ body.mobile-phone #adminToggleBtn {
 .cb-shop-bottom-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 20px;
   pointer-events: auto;
   padding: 10px 14px;
   background: linear-gradient(0deg, rgba(20, 10, 6, 0.9) 0%, rgba(20, 10, 6, 0.5) 85%, transparent 100%);
@@ -9723,6 +9931,87 @@ body.mobile-phone #adminToggleBtn {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+}
+
+
+/* Confirm & Details Modal in Shop */
+.cf-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1.5px solid rgba(255, 214, 71, 0.4);
+  color: #ffd54f;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cf-close-btn:hover {
+  background: #ff5252;
+  border-color: #ff7875;
+  color: #fff;
+}
+
+.cf-effect-pill {
+  display: inline-block;
+  padding: 3px 12px;
+  background: rgba(0, 230, 118, 0.2);
+  border: 1px solid #00e676;
+  border-radius: 12px;
+  color: #00e676;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.cf-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.cf-owned-count {
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.cf-owned-count b {
+  color: #00e676;
+  font-size: 14px;
+}
+
+.cf-btn-equip {
+  flex: 1;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #43a047, #2e7d32);
+  border: 2px solid #81c784;
+  border-radius: 20px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #1b5e20;
+}
+
+.cf-btn-equip.equipped {
+  background: linear-gradient(180deg, #ff9800, #f57c00);
+  border-color: #ffb74d;
+  box-shadow: 0 3px 0 #e65100;
 }
 
 .cb-shop-confirm-card {
@@ -9893,5 +10182,43 @@ body.mobile-phone #adminToggleBtn {
   .cb-btn-shop-exit {
     font-size: 12px;
     padding: 8px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cowboy-controls-card {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  .cb-ctrl-left {
+    flex: 1;
+  }
+  .cb-ctrl-right {
+    flex: 1;
+  }
+  .cb-bet-btn {
+    min-width: 48px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .cb-bet-btn span {
+    font-size: 8.5px;
+  }
+  .cowboy-red-button {
+    width: 115px;
+    height: 52px;
+  }
+  .cowboy-red-button .btn-top .txt {
+    font-size: 13.5px;
+  }
+  .cb-quick-3d-slot {
+    width: 38px;
+    height: 38px;
+  }
+  .lobby-game-tab {
+    font-size: 11.5px;
+    padding: 6px 8px;
+    gap: 5px;
+    min-height: 36px;
   }
 }

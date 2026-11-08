@@ -39,7 +39,11 @@ export class CowboyHud {
   private autoLaunchInterval: any = null;
 
   public onBetChange?: (bet: number) => void;
+  public onChargeStart?: () => void;
+  public onChargeRelease?: (durationMs: number) => void;
   public onLaunch?: (bet: number) => void;
+  private isCharging = false;
+  private chargeStartTime = 0;
   public onExit?: () => void;
   public onRoundEnd?: () => void;
   public onClaimRelief?: () => void;
@@ -104,45 +108,44 @@ export class CowboyHud {
       <!-- Toast notifications -->
       <div id="cbToastBox" class="cowboy-toast-box"></div>
 
-      <!-- Bottom Arcade Controls -->
+      <!-- Bottom Arcade Controls: 3 Cột Ngang Hàng (Trái: Item 3D, Giữa: Nút Quăng + Tự động sau, Phải: Chọn Số Dây) -->
       <div class="cowboy-bottom-bar">
         <div class="cowboy-controls-card">
-          <div class="cowboy-controls-left">
-            <!-- Quick item bar right above bet selector -->
-            <div class="cowboy-quick-item-bar" id="cbQuickItemBar">
-              <div class="cb-quick-bar-header">
-                <span class="cb-quick-bar-label">
-                  <span class="ico">🎒</span>
-                  <span data-i18n="cb_quick_items">KHO VẬT PHẨM (BẤM ĐỂ DÙNG NGAY):</span>
-                </span>
-              </div>
-              <div class="cb-quick-items-row" id="cbQuickItemsRow"></div>
+          <!-- CỘT TRÁI: Kho vật phẩm 3D xoay vòng -->
+          <div class="cb-ctrl-col cb-ctrl-left" id="cbQuickItemBar">
+            <div class="cb-col-label">
+              <span class="ico">🎒</span>
+              <span data-i18n="cb_quick_items">VẬT PHẨM</span>
             </div>
-
-            <!-- Bet selector row (1 to 5 ropes) -->
-            <div class="cowboy-bet-row">
-              <span class="cowboy-bet-label" data-i18n="cb_pick_ropes">CHỌN SỐ DÂY (CREDIT):</span>
-              <div class="cowboy-bet-group">
-                <button type="button" class="cb-bet-btn on" data-bet="1">1 DÂY <span>(1 C)</span></button>
-                <button type="button" class="cb-bet-btn" data-bet="2">2 DÂY <span>(2 C)</span></button>
-                <button type="button" class="cb-bet-btn" data-bet="3">3 DÂY <span>(3 C)</span></button>
-                <button type="button" class="cb-bet-btn" data-bet="4">4 DÂY <span>(4 C)</span></button>
-                <button type="button" class="cb-bet-btn" data-bet="5">5 DÂY <span>(5 C)</span></button>
-              </div>
-            </div>
+            <div class="cb-quick-items-row" id="cbQuickItemsRow"></div>
           </div>
 
-          <!-- Tactile Red Button with Auto Launch Hint directly underneath -->
-          <div class="cowboy-launch-area">
-            <button type="button" id="cbLaunchBtn" class="cowboy-red-button">
+          <!-- CỘT GIỮA: Nút Quăng Dây Đỏ Tactile + Tự động sau -->
+          <div class="cb-ctrl-col cb-ctrl-center">
+            <button type="button" id="cbLaunchBtn" class="cowboy-red-button" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
               <div class="btn-top">
                 <span class="ico">🎯</span>
                 <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
-                <small data-i18n="cb_space_hint">Space</small>
+                <small class="key-hint" data-i18n="cb_space_hint">Space</small>
               </div>
             </button>
             <div id="cbAutoLaunchHint" class="cb-auto-launch-hint">
-              <span data-i18n="cb_auto_throw_hint">Tự động sau:</span> <span id="cbAutoCountdown">10</span>s
+              <span data-i18n="cb_auto_throw_hint">Tự động sau:</span> <span id="cbAutoCountdown">10</span> s
+            </div>
+          </div>
+
+          <!-- CỘT PHẢI: Chọn số dây (Credit) -->
+          <div class="cb-ctrl-col cb-ctrl-right">
+            <div class="cb-col-label">
+              <span class="ico">🪙</span>
+              <span data-i18n="cb_pick_ropes">SỐ DÂY (CREDIT)</span>
+            </div>
+            <div class="cowboy-bet-group">
+              <button type="button" class="cb-bet-btn on" data-bet="1">1 DÂY <span>(1 C)</span></button>
+              <button type="button" class="cb-bet-btn" data-bet="2">2 DÂY <span>(2 C)</span></button>
+              <button type="button" class="cb-bet-btn" data-bet="3">3 DÂY <span>(3 C)</span></button>
+              <button type="button" class="cb-bet-btn" data-bet="4">4 DÂY <span>(4 C)</span></button>
+              <button type="button" class="cb-bet-btn" data-bet="5">5 DÂY <span>(5 C)</span></button>
             </div>
           </div>
         </div>
@@ -194,6 +197,31 @@ export class CowboyHud {
     this.betButtons = Array.from(this.rootEl.querySelectorAll('.cb-bet-btn'));
   }
 
+  private startCharge(): void {
+    if (this.isModalOpen || this.isBusy || this.isCharging) return;
+    this.isCharging = true;
+    this.chargeStartTime = performance.now();
+    this.launchBtn.classList.add('is-charging');
+    this.onChargeStart?.();
+  }
+
+  private releaseCharge(): void {
+    if (!this.isCharging) return;
+    this.isCharging = false;
+    this.launchBtn.classList.remove('is-charging');
+    const duration = performance.now() - this.chargeStartTime;
+    this.resetAutoLaunchTimer();
+    this.launchBtn.classList.add('is-pressed');
+    const tid = setTimeout(() => this.launchBtn.classList.remove('is-pressed'), 120);
+    this.activeTimeouts.push(tid);
+
+    if (duration > 120) {
+      this.onChargeRelease?.(duration);
+    } else {
+      this.onLaunch?.(this.currentBet);
+    }
+  }
+
   private bindEvents(): void {
     // Nút chọn mức cược
     for (const btn of this.betButtons) {
@@ -204,11 +232,19 @@ export class CowboyHud {
       });
     }
 
-    // Nút Quăng dây
-    this.launchBtn.addEventListener('click', () => {
+    // Nút Quăng dây hỗ trợ nhấn nhanh & nhấn giữ gồng canh cự ly xa gần
+    this.launchBtn.addEventListener('pointerdown', (e) => {
       if (this.isModalOpen || this.isBusy) return;
-      this.resetAutoLaunchTimer();
-      this.onLaunch?.(this.currentBet);
+      e.preventDefault();
+      this.startCharge();
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (this.isCharging) this.releaseCharge();
+    });
+
+    window.addEventListener('pointercancel', () => {
+      if (this.isCharging) this.releaseCharge();
     });
 
     // Nút Kho Đồ
@@ -229,6 +265,7 @@ export class CowboyHud {
 
     // Bấm phím Space để quăng dây
     window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
 
     // Xử lý modal cứu trợ
     const claimBtn = this.rootEl.querySelector('#cbClaimReliefBtn') as HTMLButtonElement;
@@ -373,13 +410,10 @@ export class CowboyHud {
   private onKeyDown = (e: KeyboardEvent): void => {
     if (this.rootEl.hidden) return;
     if (e.code === 'Space') {
+      if (e.repeat) return;
       if (this.isModalOpen || this.isBusy) return;
       e.preventDefault();
-      this.resetAutoLaunchTimer();
-      this.launchBtn.classList.add('is-pressed');
-      this.onLaunch?.(this.currentBet);
-      const tid = setTimeout(() => this.launchBtn.classList.remove('is-pressed'), 120);
-      this.activeTimeouts.push(tid);
+      this.startCharge();
     } else if (e.code === 'Escape') {
       if (this.isModalOpen) {
         this.closeBackpackModal();
@@ -391,6 +425,16 @@ export class CowboyHud {
       if (!this.isModalOpen && !this.isBusy) {
         this.setBet(parseInt(e.key, 10));
         this.resetAutoLaunchTimer();
+      }
+    }
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    if (this.rootEl.hidden) return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (this.isCharging) {
+        this.releaseCharge();
       }
     }
   };
@@ -506,7 +550,7 @@ export class CowboyHud {
     this.updateAutoLaunchDisplay();
 
     this.autoLaunchInterval = setInterval(() => {
-      if (document.hidden || this.isBusy || this.isModalOpen || this.rootEl.hidden) return;
+      if (document.hidden || this.isBusy || this.isModalOpen || this.rootEl.hidden || this.isCharging) return;
 
       this.autoLaunchSecondsLeft--;
       this.updateAutoLaunchDisplay();
@@ -598,6 +642,7 @@ export class CowboyHud {
 
   public destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
     this.stopRoundTimer();
     this.stopAutoLaunchTimer();
     for (const tid of this.activeTimeouts) {

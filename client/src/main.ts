@@ -580,8 +580,8 @@ const cowboyManager = new CowboyManager();
 setupCowboyLobbyHub(cowboyManager, hud);
 
 function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
-  const tabFarmBrawl = document.getElementById('tabFarmBrawl');
-  const tabCoolCowboy = document.getElementById('tabCoolCowboy');
+  const farmBrawlTabs = document.querySelectorAll<HTMLButtonElement>('.tab-farm-brawl');
+  const cowboyTabs = document.querySelectorAll<HTMLButtonElement>('.tab-cowboy');
   const mainLobbyCard = document.getElementById('mainLobbyCard');
   const cowboyLobbyCard = document.getElementById('cowboyLobbyCard');
   const btnCowboyArcade = document.getElementById('btnCowboyArcade');
@@ -592,18 +592,26 @@ function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
 
   function switchLobbyTab(tab: 'main' | 'cowboy') {
     if (tab === 'main') {
-      tabFarmBrawl?.classList.add('active');
-      tabFarmBrawl?.setAttribute('aria-selected', 'true');
-      tabCoolCowboy?.classList.remove('active');
-      tabCoolCowboy?.setAttribute('aria-selected', 'false');
+      farmBrawlTabs.forEach((el) => {
+        el.classList.add('active');
+        el.setAttribute('aria-selected', 'true');
+      });
+      cowboyTabs.forEach((el) => {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+      });
       if (mainLobbyCard) mainLobbyCard.hidden = false;
       if (cowboyLobbyCard) cowboyLobbyCard.hidden = true;
       hudRef.startPreview();
     } else {
-      tabCoolCowboy?.classList.add('active');
-      tabCoolCowboy?.setAttribute('aria-selected', 'true');
-      tabFarmBrawl?.classList.remove('active');
-      tabFarmBrawl?.setAttribute('aria-selected', 'false');
+      cowboyTabs.forEach((el) => {
+        el.classList.add('active');
+        el.setAttribute('aria-selected', 'true');
+      });
+      farmBrawlTabs.forEach((el) => {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+      });
       if (mainLobbyCard) mainLobbyCard.hidden = true;
       if (cowboyLobbyCard) cowboyLobbyCard.hidden = false;
       hudRef.stopPreview();
@@ -611,8 +619,8 @@ function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
     }
   }
 
-  tabFarmBrawl?.addEventListener('click', () => switchLobbyTab('main'));
-  tabCoolCowboy?.addEventListener('click', () => switchLobbyTab('cowboy'));
+  farmBrawlTabs.forEach((el) => el.addEventListener('click', () => switchLobbyTab('main')));
+  cowboyTabs.forEach((el) => el.addEventListener('click', () => switchLobbyTab('cowboy')));
   btnCowboyArcade?.addEventListener('click', () => switchLobbyTab('cowboy'));
 
   function syncCowboyLobbyState() {
