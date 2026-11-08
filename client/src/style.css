@@ -6587,3 +6587,2693 @@ body.mobile-phone #adminToggleBtn {
   padding: 0 !important;
   line-height: 1 !important;
 }
+
+
+/* ==========================================================================
+   MINIGAME: CAO BỒI KÉO BÒ (COOL COWBOY ARCADE)
+   ========================================================================== */
+
+/* 1. Nút vào minigame ở sảnh chính (Lobby Button) */
+.btn-cowboy-arcade {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, #4a2e18 0%, #2e1a0e 100%);
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 #180c06, 0 6px 12px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+}
+.btn-cowboy-arcade:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 #180c06, 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+.btn-cowboy-arcade:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #180c06, 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+.btn-cowboy-arcade .cb-btn-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(232, 182, 65, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+.btn-cowboy-arcade .cb-btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  z-index: 1;
+}
+.btn-cowboy-arcade .cb-btn-badge {
+  font-family: var(--f-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #1f1a17;
+  background: var(--gold);
+  padding: 1px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.btn-cowboy-arcade .cb-btn-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-cowboy-arcade .cb-btn-ico {
+  font-size: 24px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+.btn-cowboy-arcade .cb-btn-title {
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 0 10px rgba(232, 182, 65, 0.4);
+}
+.btn-cowboy-arcade .cb-btn-sub {
+  font-family: var(--f-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: #e6c89c;
+  opacity: 0.9;
+}
+
+/* 2. Fullscreen Container & 3D Canvas */
+.cowboy-arcade-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 99990;
+  background: #110d0a;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cowboy-arcade-root .cowboy-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* 3. HUD Layer Overlay */
+.cowboy-hud-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 10;
+  font-family: var(--f-display);
+  box-sizing: border-box;
+}
+
+/* 4. Top Marquee Bar */
+.cowboy-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, rgba(34, 23, 16, 0.96) 0%, rgba(20, 14, 10, 0.88) 100%);
+  border-bottom: 3px solid var(--gold);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  gap: 12px;
+}
+.cowboy-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cowboy-title-box .cowboy-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+.cowboy-title-box .cowboy-ico svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cowboy-title-box .cowboy-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 12px rgba(232, 182, 65, 0.5);
+}
+.cowboy-title-box .cowboy-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #1f1a17;
+  background: var(--gold);
+  padding: 2px 7px;
+  border-radius: 8px;
+  letter-spacing: 0.08em;
+}
+
+/* 5. Stats Bar (LED Arcade Readout) */
+.cowboy-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cowboy-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: 4px 12px;
+  background: rgba(14, 10, 8, 0.85);
+  border: 1.5px solid rgba(232, 182, 65, 0.4);
+  border-radius: 8px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.cowboy-stat-box .c-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #a89f91;
+  text-transform: uppercase;
+}
+.cowboy-stat-box .c-val {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 8px currentColor;
+}
+.cowboy-stat-box.credit .c-val {
+  color: #ffd54f;
+}
+.cowboy-stat-box.score .c-val {
+  color: #73d13d;
+}
+.cowboy-stat-box.catches .c-val {
+  color: #40a9ff;
+}
+
+/* Exit button */
+.cowboy-exit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, #8a2419 0%, #5c140d 100%);
+  border: 1.5px solid #d4594c;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--f-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  box-shadow: 0 3px 0 #3a0a06;
+  cursor: pointer;
+  transition: transform 0.08s, filter 0.15s;
+}
+.cowboy-exit-btn:hover {
+  filter: brightness(1.15);
+}
+.cowboy-exit-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #3a0a06;
+}
+
+/* 6. Bottom Arcade Controls */
+.cowboy-bottom-bar {
+  display: flex;
+  justify-content: center;
+  padding: 12px 18px 20px;
+  background: linear-gradient(0deg, rgba(20, 14, 10, 0.95) 0%, rgba(32, 22, 16, 0.85) 80%, transparent 100%);
+  pointer-events: auto;
+}
+.cowboy-controls-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  max-width: 860px;
+  padding: 8px 18px 10px;
+  background: linear-gradient(180deg, #3d291c 0%, #24160e 100%);
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  box-shadow: 0 6px 0 #140b06, 0 10px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.cowboy-controls-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Bet Row */
+.cowboy-bet-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cowboy-bet-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f2ead7;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.cowboy-bet-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cb-bet-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #4f3b2d 0%, #352419 100%);
+  border: 2px solid #6b4d38;
+  border-radius: 8px;
+  color: #f2ead7;
+  font-family: var(--f-display);
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 #1c120b;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.cb-bet-btn span {
+  font-size: 10px;
+  color: #d1b899;
+  font-weight: 600;
+}
+.cb-bet-btn:hover {
+  border-color: #ffd54f;
+  transform: translateY(-1px);
+}
+.cb-bet-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #1c120b;
+}
+.cb-bet-btn.on {
+  background: linear-gradient(180deg, #8a5718 0%, #5c370a 100%);
+  border-color: #ffd54f;
+  color: #fff;
+  box-shadow: 0 3px 0 #361f04, 0 0 10px rgba(255, 213, 79, 0.4);
+}
+.cb-bet-btn.on span {
+  color: #ffe082;
+}
+
+/* Big Tactile 3D Red Push Button (Sanwa Style) */
+.cowboy-launch-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cowboy-red-button {
+  position: relative;
+  width: 140px;
+  height: 64px;
+  padding: 0;
+  background: #5c1008;
+  border: none;
+  border-radius: 32px;
+  box-shadow: 0 6px 0 #2e0804, 0 8px 16px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.cowboy-red-button .btn-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 30%, #ff4d4f 0%, #cf1322 70%, #a8071a 100%);
+  border: 2px solid #ff7875;
+  border-radius: 32px;
+  color: #fff;
+  font-family: var(--f-display);
+  transform: translateY(-5px);
+  transition: transform 0.08s, background 0.08s;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4), inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+}
+.cowboy-red-button .btn-top .ico {
+  font-size: 18px;
+  line-height: 1;
+}
+.cowboy-red-button .btn-top .txt {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  line-height: 1.1;
+}
+.cowboy-red-button .btn-top small {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #ffccc7;
+  opacity: 0.9;
+}
+.cowboy-red-button:hover .btn-top {
+  background: radial-gradient(circle at 50% 30%, #ff7875 0%, #e82030 70%, #b80c1d 100%);
+}
+.cowboy-red-button:active,
+.cowboy-red-button.is-pressed {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #2e0804, 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+.cowboy-red-button:active .btn-top,
+.cowboy-red-button.is-pressed .btn-top {
+  transform: translateY(-1px);
+}
+
+/* 7. Floating Score Layer */
+.cowboy-float-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 12;
+}
+.cb-float-item {
+  position: absolute;
+  font-family: var(--f-display);
+  font-weight: 800;
+  transform: translate(-50%, -50%);
+  animation: cbFloatUp 1.3s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.cb-float-item.win {
+  font-size: 26px;
+  color: #ffd54f;
+  text-shadow: 0 2px 6px #000, 0 0 10px rgba(255, 213, 79, 0.7);
+}
+.cb-float-item.jackpot {
+  font-size: 32px;
+  color: #fff;
+  background: linear-gradient(90deg, #ff4d4f, #faad14, #52c41a, #1890ff, #722ed1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.9)) drop-shadow(0 0 12px rgba(255, 215, 0, 0.8));
+}
+.cb-float-item.miss {
+  font-size: 20px;
+  color: #ff7875;
+  font-style: italic;
+  text-shadow: 0 2px 4px #000;
+}
+@keyframes cbFloatUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -20px) scale(1.15);
+  }
+  35% {
+    transform: translate(-50%, -30px) scale(1);
+  }
+  80% {
+    opacity: 0.95;
+    transform: translate(-50%, -60px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -85px) scale(0.85);
+  }
+}
+
+/* 8. Toast Notifications */
+.cowboy-toast-box {
+  position: absolute;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 15;
+}
+.cb-toast-item {
+  padding: 8px 18px;
+  background: rgba(36, 24, 16, 0.95);
+  border: 1.5px solid var(--gold);
+  border-radius: 20px;
+  color: #f2ead7;
+  font-family: var(--f-body);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  animation: cbToastFade 0.25s ease-out;
+}
+@keyframes cbToastFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 9. Relief Modal (Cứu trợ credit) */
+.cowboy-modal-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 25;
+  pointer-events: auto;
+}
+.cowboy-modal-card {
+  width: 90%;
+  max-width: 420px;
+  padding: 24px;
+  background: linear-gradient(180deg, #3d291c 0%, #24160e 100%);
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  text-align: center;
+}
+.cowboy-modal-card .cm-icon {
+  font-size: 42px;
+  margin-bottom: 8px;
+}
+.cowboy-modal-card .cm-icon.horse-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 8px;
+}
+.cowboy-modal-card .cm-icon.horse-ico svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cowboy-modal-card .cm-title {
+  font-family: var(--f-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--gold);
+  margin: 0 0 8px;
+}
+.cowboy-modal-card .cm-desc {
+  font-family: var(--f-body);
+  font-size: 13px;
+  color: #e6c89c;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+.cowboy-modal-card .cm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cb-btn-relief {
+  padding: 10px 16px;
+  background: linear-gradient(180deg, #4f7a32 0%, #2f4f1c 100%);
+  border: 2px solid #85c957;
+  border-radius: 10px;
+  color: #fff;
+  font-family: var(--f-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  box-shadow: 0 3px 0 #1b2e10;
+  cursor: pointer;
+  transition: transform 0.08s;
+}
+.cb-btn-relief:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #1b2e10;
+}
+.cb-btn-exit {
+  padding: 8px 14px;
+  background: #38281d;
+  border: 1.5px solid #5a4232;
+  border-radius: 8px;
+  color: #d1b899;
+  font-family: var(--f-display);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cb-btn-exit:hover {
+  background: #4a3628;
+  color: #fff;
+}
+
+/* 10. Responsive Design for Mobile & iPad */
+@media (max-width: 680px) {
+  .cowboy-top-bar {
+    padding: 6px 10px;
+  }
+  .cowboy-title-box .cowboy-title {
+    font-size: 16px;
+  }
+  .cowboy-title-box .cowboy-badge {
+    display: none;
+  }
+  .cowboy-stat-box {
+    min-width: 60px;
+    padding: 2px 6px;
+  }
+  .cowboy-stat-box .c-lbl {
+    font-size: 9px;
+  }
+  .cowboy-stat-box .c-val {
+    font-size: 16px;
+  }
+  .cowboy-controls-card {
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .cowboy-bet-row {
+    align-items: center;
+  }
+  .cb-bet-btn {
+    min-width: 52px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .cowboy-red-button {
+    width: 120px;
+    height: 52px;
+  }
+  .cowboy-red-button .btn-top .txt {
+    font-size: 14px;
+  }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .cowboy-top-bar {
+    padding: 4px 12px;
+  }
+  .cowboy-bottom-bar {
+    padding: 6px 12px 10px;
+  }
+  .cowboy-controls-card {
+    padding: 6px 14px;
+    max-width: 680px;
+  }
+  .cowboy-red-button {
+    height: 48px;
+    width: 110px;
+  }
+  .cowboy-red-button .btn-top .txt {
+    font-size: 13px;
+  }
+}
+
+
+/* Mobile landscape adjustments for Cowboy minigame button in left column */
+@media (max-height: 540px) and (orientation: landscape) {
+  .start-col-left .btn-cowboy-arcade {
+    margin-top: 4px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 0 #180c06, 0 3px 6px rgba(0, 0, 0, 0.4);
+  }
+  .start-col-left .btn-cowboy-arcade .cb-btn-title {
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  .start-col-left .btn-cowboy-arcade .cb-btn-sub {
+    font-size: 9px;
+    line-height: 1.1;
+  }
+  .start-col-left .btn-cowboy-arcade .cb-btn-ico {
+    font-size: 16px;
+  }
+  .start-col-left .btn-cowboy-arcade .cb-btn-badge {
+    font-size: 8px;
+    padding: 0 4px;
+  }
+
+  /* 2 chế độ team và friend không hiện nút trên mobile landscape để gọn bảng */
+  body.mode-team #btnCowboyArcade,
+  body.mode-friend #btnCowboyArcade {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   COWBOY MINIGAME UPGRADE: CHROME TAB BAR, LOBBY HUB, 3D THEMES & SHOP
+   ========================================================================== */
+
+/* Lobby Tabs Wrapper: attaches chrome tabs right onto card top edge with no gap */
+.lobby-tabs-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(780px, 96vw);
+  max-width: 780px;
+  margin: auto;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.lobby-tabs-wrapper > .card {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* 1. Chrome Browser Style Tab Bar - Elevated tabs protruding above active card with seamless border continuity */
+.lobby-tabs-wrapper {
+  position: relative;
+  width: min(840px, 96vw);
+  max-width: 840px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.chrome-tab-bar {
+  display: flex;
+  align-items: flex-end;
+  height: 42px;
+  background: transparent;
+  padding: 0 16px;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+  gap: 6px;
+  z-index: 10;
+  margin-bottom: -2.5px; /* Overlaps exactly over the card's 2.5px top border */
+}
+
+.chrome-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 18px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-weight: 800;
+  font-size: 14px;
+  color: #a89078;
+  background: rgba(26, 17, 11, 0.90);
+  border: 2px solid rgba(212, 163, 89, 0.45);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, height 0.15s;
+  backdrop-filter: blur(6px);
+  z-index: 1;
+}
+
+.chrome-tab:hover:not(.active) {
+  background: rgba(45, 28, 18, 0.95);
+  color: #e8d8c8;
+  border-color: rgba(212, 163, 89, 0.7);
+}
+
+.chrome-tab.active {
+  background: #241812; /* Matches card background exactly */
+  color: #ffd647;
+  height: 42px; /* Protrudes distinctly higher than inactive tab */
+  padding: 0 22px;
+  font-size: 15px;
+  border: 2.5px solid #d4a359;
+  border-bottom: 3px solid #241812 !important; /* Masks the card's top border underneath */
+  border-radius: 14px 14px 0 0;
+  z-index: 15;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4);
+  margin-bottom: -2.5px;
+}
+
+.chrome-tab-divider {
+  display: none;
+}
+
+.chrome-tab .tab-icon {
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+.chrome-tab .tab-title {
+  letter-spacing: 0.03em;
+}
+
+.chrome-tab .tab-badge {
+  background: linear-gradient(135deg, #ff3d00, #ff9100);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(255, 61, 0, 0.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* 2. Card bodies inside lobby-tabs-wrapper */
+.card.start-card-wide,
+.cowboy-lobby-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  background: #241812 !important;
+  border: 2.5px solid #d4a359 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65) !important;
+  padding: 14px 20px 18px;
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.2s ease-out;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+}
+
+.cb-lobby-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.cb-lobby-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.cb-top-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(31, 26, 23, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  color: #ffd647;
+  transition: all 0.18s;
+  position: relative;
+}
+
+.cb-top-icon-btn:hover {
+  background: rgba(60, 45, 35, 0.9);
+  border-color: #ffd647;
+  transform: translateY(-1px);
+}
+
+.cb-badge-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4caf50;
+  border: 1.5px solid #241812;
+}
+
+.cb-badge-dot.off {
+  display: none;
+}
+
+/* Header Banner matching Farm Brawl heading */
+.cb-header-banner {
+  text-align: center;
+  margin: 2px 0 10px;
+}
+
+.cb-banner-logo-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cb-banner-ico {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.cb-banner-title {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffd647;
+  letter-spacing: 0.05em;
+  margin: 0;
+  line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 16px rgba(255,214,71,0.3);
+}
+
+.cb-banner-subtitle {
+  font-family: var(--f-body, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: #d1b899;
+  margin: 3px 0 0;
+  opacity: 0.9;
+}
+
+.cb-lobby-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cb-lobby-title-box .cb-ico {
+  font-size: 36px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
+.cb-titles .cb-main-title {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffd647;
+  letter-spacing: 0.05em;
+  margin: 0;
+  line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.cb-titles .cb-sub-title {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: #d1b899;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.cb-lobby-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cb-top-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(18, 12, 8, 0.7);
+  border: 1.5px solid #d4a359;
+  border-radius: 20px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 14px;
+  color: #fff;
+}
+
+.cb-top-stat-pill .lbl {
+  font-size: 11px;
+  color: #c9ad93;
+}
+
+.cb-top-stat-pill b {
+  font-size: 18px;
+  color: #ffd647;
+}
+
+.cb-top-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: linear-gradient(180deg, #442a18 0%, #28170c 100%);
+  border: 1.5px solid #a37242;
+  border-radius: 10px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 3px 0 #180d07;
+}
+
+.cb-top-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.cb-top-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #180d07;
+}
+
+.cb-kids-btn .cb-badge-off {
+  background: #616161;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.cb-kids-btn .cb-badge-on {
+  background: #2e7d32;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* 3. Main Cowboy Lobby Layout (2 Columns) - Symmetrical & Balanced */
+.cb-lobby-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.cb-lobby-col-left, .cb-lobby-col-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.cb-lobby-col-left .sec-label,
+.cb-lobby-col-right .sec-label {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffd647;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  height: 16px;
+  line-height: 16px;
+}
+
+/* Map Selector Cards */
+.cb-map-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.cb-map-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(22, 15, 10, 0.7);
+  border: 2px solid rgba(138, 92, 53, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.cb-map-card:hover {
+  background: rgba(45, 30, 20, 0.85);
+  border-color: rgba(212, 163, 89, 0.7);
+}
+
+.cb-map-card.on {
+  background: rgba(56, 38, 24, 0.95);
+  border: 2.5px solid #ffd647;
+  box-shadow: 0 0 14px rgba(255, 214, 71, 0.35);
+}
+
+.cb-map-card .map-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.4);
+}
+
+.map-farm { background: linear-gradient(135deg, #2e7d32, #66bb6a); }
+.map-prairie { background: linear-gradient(135deg, #d84315, #ff7043); }
+.map-ice { background: linear-gradient(135deg, #0277bd, #29b6f6); }
+
+.cb-map-card .map-meta {
+  flex: 1;
+}
+
+.cb-map-card .map-name {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 2px;
+}
+
+.cb-map-card.on .map-name {
+  color: #ffd647;
+}
+
+.cb-map-card .map-desc {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  color: #c9ad93;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.cb-map-card .map-check {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffd647;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.cb-map-card.on .map-check {
+  opacity: 1;
+}
+
+/* Rules Card */
+.cb-rules-card {
+  background: rgba(18, 12, 8, 0.75);
+  border: 1.5px solid rgba(138, 92, 53, 0.45);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  margin-bottom: 12px;
+  text-align: left !important;
+}
+
+.cb-rule-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-family: var(--f-body, sans-serif);
+  font-size: 12px;
+  color: #d1b899;
+  line-height: 1.4;
+  text-align: left !important;
+}
+
+.cb-rule-row .r-txt {
+  text-align: left !important;
+  flex: 1;
+}
+
+.cb-rule-row .r-ico {
+  font-size: 16px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.cb-rule-row b {
+  color: #fff;
+}
+
+/* Active Items Row */
+.cb-active-items-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-active-items-row .ai-label {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 12px;
+  font-weight: 800;
+  color: #c9ad93;
+  letter-spacing: 0.05em;
+}
+
+.cb-active-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cb-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #3d2c1c 0%, #20140a 100%);
+  border: 1.5px solid #d4a359;
+  border-radius: 14px;
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  color: #ffd647;
+}
+
+.cb-no-item {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  color: #8c7661;
+  font-style: italic;
+}
+
+/* Big Start Game Button - Exactly matching VÀO NÔNG TRẠI style */
+.cb-btn-start-game {
+  width: 100% !important;
+  height: 60px !important;
+  margin-top: auto !important;
+  margin-bottom: 0 !important;
+  padding: 0 14px !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+  font-family: var(--f-display) !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.cb-start-btn-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.cb-start-btn-top .ico {
+  font-size: 32px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.cb-start-btn-top .txt-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.cb-start-btn-top .t-main {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.7), 0 0 10px rgba(255, 202, 40, 0.4);
+  line-height: 1.1;
+}
+
+.cb-start-btn-top .t-sub {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  color: #ffcdd2;
+  font-weight: 600;
+}
+
+/* 4. Top Marquee Timer & Shop Button In-Game */
+.cowboy-stat-box.round-timer {
+  border-color: #81d4fa;
+  background: rgba(2, 119, 189, 0.35);
+}
+
+.cowboy-stat-box.round-timer .c-val {
+  color: #81d4fa;
+  font-variant-numeric: tabular-nums;
+}
+
+.cowboy-stat-box.round-timer.danger {
+  border-color: #ff5252;
+  background: rgba(211, 47, 47, 0.5);
+  animation: timerPulse 0.8s infinite alternate;
+}
+
+.cowboy-stat-box.round-timer.danger .c-val {
+  color: #ff5252;
+}
+
+@keyframes timerPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px #ff5252); }
+  100% { transform: scale(1.08); filter: drop-shadow(0 0 14px #ff5252); }
+}
+
+.cowboy-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cowboy-shop-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #ff8f00 0%, #c43e00 100%);
+  border: 1.5px solid #ffca28;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #7e2700;
+  transition: all 0.12s;
+}
+
+.cowboy-shop-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.cowboy-shop-btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+/* Auto Launch Hint Badge */
+.cb-auto-launch-hint {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 3px 10px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 214, 71, 0.5);
+  border-radius: 12px;
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd647;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.cb-auto-launch-hint b {
+  font-size: 13px;
+  color: #ff5252;
+}
+
+/* 5. Cowboy Shop Overlay & Wooden Cards Grid */
+.cowboy-shop-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.cb-shop-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 9, 6, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.cb-shop-content {
+  position: relative;
+  width: 94%;
+  max-width: 920px;
+  max-height: 90vh;
+  background: #2b1d14;
+  border: 3.5px solid #d4a359;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  padding: 18px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  animation: zoomIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cb-shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid rgba(212, 163, 89, 0.35);
+  padding-bottom: 10px;
+}
+
+.cb-shop-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cb-shop-ico {
+  font-size: 32px;
+}
+
+.cb-shop-main-title {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffd647;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.cb-shop-sub-title {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: #d1b899;
+}
+
+.cb-shop-wallet-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(15, 10, 6, 0.8);
+  border: 1.5px solid #d4a359;
+  border-radius: 16px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+}
+
+.cb-shop-wallet-box .c-lbl { font-size: 11px; color: #c9ad93; }
+.cb-shop-wallet-box .c-val { font-size: 20px; color: #ffd647; font-weight: 800; }
+.cb-shop-wallet-box .c-unit { font-size: 11px; color: #fff; }
+
+/* Merchant Booth Display */
+.cb-merchant-stage {
+  position: relative;
+  background: linear-gradient(180deg, #3d2616 0%, #1f1208 100%);
+  border: 2px solid #8d5d34;
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+}
+
+.cb-clerk-avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cb-clerk-avatar .avatar-emoji {
+  font-size: 28px;
+}
+
+.cb-clerk-avatar .clerk-name {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cb-merchant-sign {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffd647;
+  letter-spacing: 0.06em;
+}
+
+/* 6 Items Grid (Wooden Cards based on reference) */
+.cb-shop-cards-scroll {
+  overflow-y: auto;
+  max-height: 52vh;
+  padding-right: 4px;
+}
+
+.cb-shop-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.cb-item-card {
+  position: relative;
+  background: linear-gradient(180deg, #442a18 0%, #29180c 100%);
+  border: 2.5px solid #d4a359;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.cb-item-card:hover {
+  transform: translateY(-3px);
+  border-color: #ffd647;
+  box-shadow: 0 8px 18px rgba(255, 214, 71, 0.25);
+}
+
+.cb-item-card.equipped {
+  border-color: #4caf50;
+  box-shadow: 0 0 14px rgba(76, 175, 80, 0.4);
+}
+
+.card-icon-halo {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(255, 214, 71, 0.28) 0%, transparent 70%);
+  margin-bottom: 6px;
+}
+
+.card-icon-halo .item-emoji {
+  font-size: 38px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
+.cb-item-card .item-name {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 3px;
+}
+
+.cb-item-card .item-stat {
+  font-family: var(--f-body, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd647;
+  margin-bottom: 6px;
+}
+
+.cb-item-card .item-owned-badge {
+  font-family: var(--f-body, sans-serif);
+  font-size: 10px;
+  color: #c9ad93;
+  margin-bottom: 10px;
+}
+
+.cb-item-card .card-action-box {
+  width: 100%;
+  margin-top: auto;
+}
+
+.cb-card-btn-view {
+  width: 100%;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #e65100 0%, #bf360c 100%);
+  border: 1.5px solid #ffab40;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cb-item-card.equipped .cb-card-btn-view {
+  background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
+  border-color: #81c784;
+}
+
+.cb-shop-btn-resume {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
+  border: 2.5px solid #81c784;
+  border-radius: 12px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 0 #0d3810;
+  transition: all 0.12s;
+}
+
+.cb-shop-btn-resume:hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+}
+
+.cb-shop-btn-resume:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0d3810;
+}
+
+/* 6. Item Detail Modal */
+.cb-shop-modal-wrap {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100020;
+}
+
+.cb-shop-modal-card {
+  position: relative;
+  width: 90%;
+  max-width: 440px;
+  background: #2b1d14;
+  border: 3px solid #d4a359;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.8);
+}
+
+.cb-modal-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #c9ad93;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.cb-modal-icon-glow {
+  font-size: 56px;
+  margin-bottom: 8px;
+}
+
+.cb-modal-title {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffd647;
+  margin: 0 0 4px;
+}
+
+.cb-modal-badge {
+  font-family: var(--f-body, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: #81d4fa;
+  margin-bottom: 10px;
+}
+
+.cb-modal-desc {
+  font-family: var(--f-body, sans-serif);
+  font-size: 12px;
+  color: #d1b899;
+  line-height: 1.4;
+  margin: 0 0 14px;
+}
+
+.cb-modal-price-row {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 15px;
+  color: #ffd647;
+  margin-bottom: 14px;
+}
+
+.cb-modal-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.cb-btn-buy, .cb-btn-equip {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+
+.cb-btn-buy {
+  background: linear-gradient(180deg, #ff8f00 0%, #c43e00 100%);
+  border-color: #ffd54f;
+  color: #fff;
+}
+
+.cb-btn-equip {
+  background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
+  border-color: #81c784;
+  color: #fff;
+}
+
+/* 7. Cowboy Kids Modal */
+.cb-kids-modal-card {
+  max-width: 480px;
+  text-align: left;
+}
+
+.cb-kids-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 14px 0 20px;
+}
+
+.cb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-form-label {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd647;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cb-time-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cb-time-opt {
+  padding: 8px 4px;
+  background: rgba(18, 12, 8, 0.7);
+  border: 1.5px solid rgba(138, 92, 53, 0.4);
+  border-radius: 8px;
+  color: #d1b899;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cb-time-opt.on {
+  background: #d4a359;
+  color: #1f1208;
+  border-color: #ffd647;
+  font-weight: 800;
+}
+
+.cb-credit-limit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cb-slider {
+  flex: 1;
+  accent-color: #ffd647;
+}
+
+.cb-limit-val {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffd647;
+  min-width: 65px;
+}
+
+.cb-pin-input {
+  padding: 8px 12px;
+  background: rgba(18, 12, 8, 0.85);
+  border: 1.5px solid #a37242;
+  border-radius: 8px;
+  color: #ffd647;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 16px;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+/* 8. Responsive Mobile & Tablet Adjustments (Portrait & Landscape Optimized) */
+@media (max-width: 768px) {
+  .lobby-tabs-wrapper {
+    width: min(420px, 96vw);
+    max-width: 420px;
+    margin: auto 0;
+    border-radius: 14px;
+  }
+  .chrome-tab-bar {
+    height: 36px;
+    padding: 0 4px;
+    gap: 2px;
+  }
+  .chrome-tab {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    gap: 5px;
+    border-radius: 6px 6px 0 0;
+  }
+  .chrome-tab.active {
+    height: 32px;
+  }
+  .chrome-tab .tab-icon {
+    font-size: 14px;
+  }
+  .chrome-tab .tab-badge {
+    display: none;
+  }
+  .card.start-card-wide,
+  .cowboy-lobby-card {
+    padding: 8px 12px 10px !important;
+  }
+  .cb-lobby-top {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+  .cb-titles .cb-main-title {
+    font-size: 15px;
+  }
+  .cb-titles .cb-sub-title {
+    display: none;
+  }
+  .cb-lobby-top-actions {
+    gap: 6px;
+  }
+  .cb-top-stat-pill {
+    padding: 3px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .cb-top-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+  .cb-lobby-body {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .cb-map-card {
+    padding: 5px 8px;
+  }
+  .cb-map-card .map-thumb {
+    width: 32px;
+    height: 32px;
+  }
+  .cb-map-card .map-ico {
+    font-size: 14px;
+  }
+  .cb-map-card .map-name {
+    font-size: 12px;
+  }
+  .cb-map-card .map-desc {
+    font-size: 9.5px;
+    line-height: 1.15;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cb-rules-card {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .cb-rule-row {
+    font-size: 10.5px;
+    line-height: 1.2;
+    gap: 5px;
+  }
+  .cb-rule-row .r-ico {
+    font-size: 12px;
+  }
+  .cb-btn-start-game {
+    padding: 8px 12px;
+  }
+  .cb-start-btn-top .ico {
+    font-size: 20px;
+  }
+  .cb-start-btn-top .t-main {
+    font-size: 14px;
+  }
+  .cb-start-btn-top .t-sub {
+    font-size: 10px;
+  }
+  .cb-shop-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* In-game Portrait HUD */
+  .cowboy-top-bar {
+    padding: 3px 6px;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  .cowboy-title-box {
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .cowboy-title-box .cowboy-ico {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+  }
+  .cowboy-title-group {
+    display: none !important;
+  }
+  .cowboy-stats-bar {
+    gap: 3px;
+    flex: 1;
+    justify-content: center;
+  }
+  .cowboy-stat-box {
+    min-width: 38px;
+    padding: 1px 3px;
+    border-radius: 5px;
+  }
+  .cowboy-stat-box .c-lbl {
+    font-size: 7px;
+    letter-spacing: 0.01em;
+  }
+  .cowboy-stat-box .c-val {
+    font-size: 11px;
+  }
+  .cowboy-top-actions {
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .cowboy-backpack-btn, .cowboy-exit-btn {
+    padding: 2px 6px;
+    font-size: 9.5px;
+    gap: 3px;
+    border-radius: 6px;
+  }
+  .cowboy-backpack-btn .ico, .cowboy-exit-btn .ico {
+    font-size: 11px;
+  }
+  .cowboy-bottom-bar {
+    padding: 4px 8px 10px;
+  }
+  .cowboy-controls-card {
+    flex-direction: column;
+    padding: 6px 10px 8px;
+    gap: 6px;
+    max-width: 440px;
+  }
+  .cowboy-controls-left {
+    width: 100%;
+    gap: 4px;
+  }
+  .cb-quick-bar-label {
+    font-size: 9.5px;
+  }
+  .cb-quick-items-row {
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+  .cb-quick-slot {
+    padding: 2px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+  .cowboy-bet-label {
+    font-size: 9.5px;
+  }
+  .cowboy-bet-group {
+    gap: 4px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+  .cb-bet-btn {
+    min-width: 44px;
+    padding: 3px 4px;
+    font-size: 10px;
+    flex: 1;
+  }
+  .cb-bet-btn span {
+    font-size: 8px;
+  }
+  .cowboy-launch-area {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+  .cb-auto-launch-hint {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  .cowboy-red-button {
+    width: 110px;
+    height: 40px;
+  }
+  .cowboy-red-button .btn-top .ico {
+    font-size: 16px;
+  }
+  .cowboy-red-button .btn-top .txt {
+    font-size: 12px;
+  }
+  .cowboy-red-button .btn-top small {
+    display: none;
+  }
+}
+
+/* Mobile Landscape Tuning (Height <= 520px) - Compact, no overlap, perfect UI hierarchy */
+@media (max-height: 520px) and (orientation: landscape) {
+  .lobby-tabs-wrapper {
+    width: min(720px, 98vw);
+    max-width: 720px;
+    margin: auto 0;
+    border-radius: 12px;
+  }
+  .chrome-tab-bar {
+    height: 32px;
+    padding: 0 6px;
+    gap: 2px;
+  }
+  .chrome-tab {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    gap: 4px;
+    border-radius: 6px 6px 0 0;
+  }
+  .chrome-tab.active {
+    height: 28px;
+  }
+  .chrome-tab .tab-icon {
+    font-size: 13px;
+  }
+  .chrome-tab .tab-badge {
+    display: none;
+  }
+  .card.start-card-wide,
+  .cowboy-lobby-card {
+    padding: 5px 12px 5px !important;
+  }
+  .cb-lobby-top {
+    position: static !important;
+    padding-bottom: 3px;
+    border-bottom: 1.5px solid rgba(212, 163, 89, 0.3);
+  }
+  .cb-lobby-title-box {
+    gap: 6px;
+  }
+  .cb-lobby-title-box .cb-ico {
+    font-size: 16px;
+  }
+  .cb-titles .cb-main-title {
+    font-size: 13px;
+    line-height: 1;
+    margin: 0;
+  }
+  .cb-titles .cb-sub-title {
+    display: none !important;
+  }
+  .cb-lobby-top-actions {
+    gap: 5px;
+  }
+  .cb-top-stat-pill {
+    padding: 2px 8px;
+    font-size: 10.5px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+  .cb-top-btn {
+    padding: 2px 7px;
+    font-size: 10px;
+    gap: 3px;
+    border-radius: 6px;
+  }
+  .cb-top-btn .ico {
+    font-size: 12px;
+  }
+  .cb-lobby-body {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .cb-lobby-col-left, .cb-lobby-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .cb-lobby-col-left .sec-label,
+  .cb-lobby-col-right .sec-label {
+    font-size: 9px;
+    margin: 0 0 1px;
+    letter-spacing: 0.04em;
+  }
+  .cb-map-selector {
+    gap: 3px;
+  }
+  .cb-map-card {
+    padding: 3px 6px;
+    border-radius: 7px;
+    gap: 6px;
+  }
+  .cb-map-card .map-thumb {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 5px;
+  }
+  .cb-map-card .map-ico {
+    font-size: 13px;
+  }
+  .cb-map-card .map-name {
+    font-size: 11px;
+    margin: 0;
+  }
+  .cb-map-card .map-desc {
+    font-size: 8.5px;
+    line-height: 1.1;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cb-map-card .map-check {
+    font-size: 11px;
+  }
+  .cb-rules-card {
+    padding: 4px 6px;
+    gap: 2px;
+    border-radius: 7px;
+  }
+  .cb-rule-row {
+    font-size: 9px;
+    line-height: 1.15;
+    gap: 4px;
+  }
+  .cb-rule-row .r-ico {
+    font-size: 11px;
+    min-width: 13px;
+  }
+  .cb-active-items-row {
+    margin: 1px 0 2px;
+  }
+  .cb-active-items-row .ai-label {
+    font-size: 8.5px;
+  }
+  .cb-active-items-row .cb-no-item {
+    font-size: 8.5px;
+  }
+  .cb-btn-start-game {
+    padding: 5px 8px;
+    border-radius: 8px;
+  }
+  .cb-start-btn-top {
+    gap: 6px;
+  }
+  .cb-start-btn-top .ico {
+    font-size: 16px;
+  }
+  .cb-start-btn-top .t-main {
+    font-size: 12.5px;
+    letter-spacing: 0.03em;
+  }
+  .cb-start-btn-top .t-sub {
+    display: none !important;
+  }
+
+  /* In-game Landscape HUD Tuning - Very compact, frees up 75%+ screen for 3D action */
+  .cowboy-top-bar {
+    padding: 2px 10px;
+    gap: 8px;
+  }
+  .cowboy-title-box {
+    gap: 4px;
+  }
+  .cowboy-title-box .cowboy-ico {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+  .cowboy-title-group .cowboy-title {
+    font-size: 12px;
+  }
+  .cowboy-title-group .cowboy-badge {
+    display: none !important;
+  }
+  .cowboy-stats-bar {
+    gap: 4px;
+  }
+  .cowboy-stat-box {
+    min-width: 44px;
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+  .cowboy-stat-box .c-lbl {
+    font-size: 7.5px;
+  }
+  .cowboy-stat-box .c-val {
+    font-size: 12px;
+  }
+  .cowboy-top-actions {
+    gap: 5px;
+  }
+  .cowboy-backpack-btn, .cowboy-exit-btn {
+    padding: 2px 7px;
+    font-size: 10px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+  .cowboy-backpack-btn .ico, .cowboy-exit-btn .ico {
+    font-size: 11px;
+  }
+
+  /* Bottom Controls Card: Compact, slim, 1-row bets */
+  .cowboy-bottom-bar {
+    padding: 2px 8px 4px;
+    background: linear-gradient(0deg, rgba(20, 14, 10, 0.90) 0%, rgba(20, 14, 10, 0.4) 70%, transparent 100%);
+  }
+  .cowboy-controls-card {
+    max-width: 680px;
+    padding: 3px 10px 4px;
+    gap: 10px;
+    border-radius: 10px;
+    border-width: 1.5px;
+  }
+  .cowboy-controls-left {
+    gap: 2px;
+  }
+  .cowboy-quick-item-bar {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    gap: 2px;
+  }
+  .cb-quick-bar-label {
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+  }
+  .cb-quick-bar-label .ico {
+    font-size: 10px;
+  }
+  .cb-quick-items-row {
+    gap: 3px;
+    padding: 0;
+  }
+  .cb-quick-slot {
+    padding: 1px 6px;
+    font-size: 9px;
+    gap: 3px;
+    border-radius: 8px;
+  }
+  .cb-quick-slot .slot-ico {
+    font-size: 11px;
+  }
+  .cb-quick-slot .slot-name {
+    font-size: 9px;
+  }
+  .cb-quick-slot .slot-qty {
+    font-size: 8px;
+    padding: 0 3px;
+  }
+  .cowboy-bet-row {
+    gap: 2px;
+  }
+  .cowboy-bet-label {
+    font-size: 8.5px;
+  }
+  .cowboy-bet-group {
+    gap: 3px;
+    flex-wrap: nowrap;
+  }
+  .cb-bet-btn {
+    min-width: 40px;
+    padding: 2px 4px;
+    font-size: 9.5px;
+    border-radius: 5px;
+  }
+  .cb-bet-btn span {
+    font-size: 7.5px;
+  }
+  .cowboy-launch-area {
+    gap: 3px;
+  }
+  .cb-auto-launch-hint {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+  .cowboy-red-button {
+    width: 78px;
+    height: 38px;
+    border-radius: 8px;
+  }
+  .cowboy-red-button .btn-top .ico {
+    font-size: 14px;
+  }
+  .cowboy-red-button .btn-top .txt {
+    font-size: 11px;
+  }
+  .cowboy-red-button .btn-top small {
+    display: none !important;
+  }
+}
+
+
+/* 9. Cowboy Quick Item Bar & Backpack */
+.cowboy-quick-item-bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1.5px solid rgba(138, 92, 53, 0.35);
+}
+
+.cb-quick-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cb-quick-bar-label {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  color: #d4a359;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cb-quick-items-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+}
+
+.cb-quick-items-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px;
+  overflow: visible !important;
+}
+
+.cb-quick-items-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+.cb-quick-3d-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: radial-gradient(circle at 50% 30%, rgba(60, 42, 30, 0.8) 0%, rgba(20, 14, 10, 0.95) 100%);
+  border: 2px solid rgba(138, 92, 53, 0.55);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cb-quick-3d-slot:hover {
+  border-color: #ffd647;
+  background: radial-gradient(circle at 50% 30%, rgba(85, 60, 40, 0.9) 0%, rgba(30, 20, 14, 0.98) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(255, 214, 71, 0.25);
+}
+
+.cb-quick-3d-slot.active {
+  border-color: #4caf50;
+  background: radial-gradient(circle at 50% 30%, rgba(46, 125, 50, 0.75) 0%, rgba(20, 50, 25, 0.95) 100%);
+  box-shadow: 0 0 16px rgba(76, 175, 80, 0.6);
+}
+
+.cb-quick-3d-slot.empty {
+  opacity: 0.85;
+}
+
+.cb-item-3d-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  perspective: 400px;
+}
+
+.cb-item-3d-spinner {
+  display: inline-block;
+  transform-style: preserve-3d;
+  animation: itemSpin3D 3.5s linear infinite;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+
+.cb-quick-3d-slot:hover .cb-item-3d-spinner {
+  animation-duration: 1.5s;
+}
+
+@keyframes itemSpin3D {
+  0% {
+    transform: translateY(0px) rotateY(-25deg) rotateX(10deg) scale(1);
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+  50% {
+    transform: translateY(-4px) rotateY(25deg) rotateX(-10deg) scale(1.08);
+    filter: drop-shadow(0 6px 10px rgba(255, 214, 71, 0.4));
+  }
+  100% {
+    transform: translateY(0px) rotateY(-25deg) rotateX(10deg) scale(1);
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+}
+
+.cb-item-3d-ico {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.cb-item-3d-pedestal {
+  width: 22px;
+  height: 5px;
+  background: radial-gradient(ellipse at center, rgba(212, 163, 89, 0.7) 0%, transparent 70%);
+  border-radius: 50%;
+  margin-top: 1px;
+}
+
+.cb-quick-3d-slot.active .cb-item-3d-pedestal {
+  background: radial-gradient(ellipse at center, rgba(129, 199, 132, 0.8) 0%, transparent 70%);
+}
+
+.cb-item-qty-tag {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 5px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(212, 163, 89, 0.6);
+  border-radius: 8px;
+  color: #ffd647;
+  line-height: 14px;
+}
+
+.cb-item-qty-tag.has-qty {
+  background: #ffd647;
+  color: #241812;
+  border-color: #fff;
+}
+
+/* Floating Hover Tooltip */
+.cb-item-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  width: 220px;
+  background: rgba(24, 16, 12, 0.96);
+  border: 2px solid #d4a359;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 100;
+  text-align: left;
+}
+
+.cb-item-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #d4a359 transparent transparent transparent;
+}
+
+.cb-quick-3d-slot:hover .cb-item-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.cb-item-tooltip .tt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 6px;
+}
+
+.cb-item-tooltip .tt-name {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffd647;
+}
+
+.cb-item-tooltip .tt-status {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.cb-item-tooltip .tt-status.equipped {
+  background: #2e7d32;
+  color: #a5d6a7;
+}
+
+.cb-item-tooltip .tt-status.ready {
+  background: #ff8f00;
+  color: #fff;
+}
+
+.cb-item-tooltip .tt-status.empty {
+  background: #616161;
+  color: #ccc;
+}
+
+.cb-item-tooltip .tt-desc {
+  font-size: 11px;
+  color: #d1b899;
+  line-height: 1.3;
+  margin: 0 0 6px;
+}
+
+.cb-item-tooltip .tt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(212, 163, 89, 0.25);
+  padding-top: 5px;
+}
+
+.cb-item-tooltip .tt-effect {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #81c784;
+}
+
+.cb-item-tooltip .tt-action {
+  font-size: 9.5px;
+  color: #ffb74d;
+  font-style: italic;
+}
+
+.cb-quick-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(18, 12, 8, 0.75);
+  border: 1.5px solid rgba(138, 92, 53, 0.45);
+  border-radius: 20px;
+  color: #d1b899;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.cb-quick-slot:hover {
+  background: rgba(45, 28, 18, 0.9);
+  border-color: #ffd647;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.cb-quick-slot.active {
+  background: linear-gradient(180deg, rgba(46, 125, 50, 0.85) 0%, rgba(27, 94, 32, 0.95) 100%);
+  border-color: #81c784;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(129, 199, 132, 0.5);
+}
+
+.cb-quick-slot.empty {
+  opacity: 0.55;
+}
+
+.cb-quick-slot .slot-ico {
+  font-size: 16px;
+}
+
+.cb-quick-slot .slot-qty {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  color: #ffd647;
+}
+
+.cb-quick-slot.active .slot-qty {
+  background: #1b5e20;
+  color: #a5d6a7;
+}
+
+.cowboy-backpack-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+  border: 1.5px solid #a1887f;
+  border-radius: 8px;
+  color: #ffd647;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cowboy-backpack-btn:hover {
+  background: linear-gradient(180deg, #6d4c41 0%, #4e342e 100%);
+  border-color: #ffd647;
+  transform: translateY(-1px);
+}
+
+.cb-backpack-modal-card {
+  max-width: 500px;
+}
+
+.cb-backpack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 14px 0 18px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.cb-backpack-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(18, 12, 8, 0.75);
+  border: 1.5px solid rgba(138, 92, 53, 0.45);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.cb-backpack-item .bp-ico {
+  font-size: 26px;
+}
+
+.cb-backpack-item .bp-info {
+  flex: 1;
+  text-align: left;
+}
+
+.cb-backpack-item .bp-name {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffd647;
+  margin: 0;
+}
+
+.cb-backpack-item .bp-count {
+  font-size: 11px;
+  color: #81d4fa;
+}
+
+.cb-backpack-empty-msg {
+  text-align: center;
+  color: #c9ad93;
+  font-size: 13px;
+  padding: 24px 10px;
+  grid-column: 1 / -1;
+}

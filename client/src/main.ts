@@ -35,6 +35,10 @@ import { KidsPlayManager } from './features/kidsMode';
 import { KidsUiController } from './ui/kidsUi';
 import { AdminPanel } from './ui/admin';
 import { voiceAnnouncer } from './audio/voiceAnnouncer';
+import { CowboyManager } from './minigame/cowboy/cowboyManager';
+import { cowboyKids } from './minigame/cowboy/cowboyKids';
+import { cowboyInventory, COWBOY_ITEMS_CATALOG } from './minigame/cowboy/cowboyItems';
+import type { CowboyThemeId } from './minigame/cowboy/cowboyTypes';
 
 // Initialize Kids UI Controller & Voice Announcer (Decoupled)
 KidsUiController.init();
@@ -382,15 +386,18 @@ input.onReleaseRam = (held: number) => {
   if (canDash) {
     predictor.predictDash(myMeta.species, validHeld, input.aimA, gameState.map, isSuper, triggeredDashSeq);
     const isEvolved = isEvolvedSpecies(myMeta.species) || curMass >= 3000;
-    const isChargedRam = validHeld > 0.15;
-    // Kỹ năng đặc biệt của Thần thú: Chỉ kích hoạt khi Siêu cấp (isSuper) HOẶC khi GỒNG LỰC (isChargedRam)!
-    if (isSuper || (isEvolved && isChargedRam)) {
+    const isMaxCharge = validHeld >= 0.75;
+    // Kỹ năng đặc biệt của Thần thú: Giờ đây CHỈ khi GỒNG MAX (isMaxCharge) hoặc Siêu cấp (isSuper) mới có hiệu ứng âm thanh kỹ năng đặc biệt
+    if (isSuper || (isEvolved && isMaxCharge)) {
       if (myMeta.species === 'phoenix') sfxPhoenixInferno(isSuper, 1.25);
       else if (myMeta.species === 'swan') sfxSwanTidalWave(isSuper, 1.25);
       else if (myMeta.species === 'boar') sfxBoarBulldozer(isSuper, 1.25);
       else if (myMeta.species === 'ram') sfxRamDiamondClash(isSuper, 1.25);
       else if (myMeta.species === 'bull') sfxBullEarthStomp(isSuper, 1.25);
       else if (myMeta.species === 'pegasus') sfxPegasusSkyFlight(isSuper, 1.25);
+      else if (myMeta.species === 'mammoth') sfxMammothRoar(1.2);
+      else if (myMeta.species === 'gorilla') sfxGorillaRoar(1.2);
+      else if (myMeta.species === 'wolf') sfxWolfHowl(1.2);
       else sfxRainbowSuperSkill(myMeta.species, 1.15);
       shake = Math.max(shake, 1.25);
       const shockColor = isSuper ? 0xffea00 : (myMeta.species === 'phoenix' ? 0xff3d00 : (myMeta.species === 'swan' ? 0x00e5ff : (myMeta.species === 'pegasus' ? 0xffd700 : (myMeta.species === 'boar' ? 0xd84315 : 0x76ff03))));
@@ -567,6 +574,194 @@ hud.onReconnect = () => {
     transport.forceReconnect();
   }
 };
+
+// Minigame: Cao Bồi Kéo Bò (Cool Cowboy Arcade)
+const cowboyManager = new CowboyManager();
+setupCowboyLobbyHub(cowboyManager, hud);
+
+function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
+  const tabFarmBrawl = document.getElementById('tabFarmBrawl');
+  const tabCoolCowboy = document.getElementById('tabCoolCowboy');
+  const mainLobbyCard = document.getElementById('mainLobbyCard');
+  const cowboyLobbyCard = document.getElementById('cowboyLobbyCard');
+  const btnCowboyArcade = document.getElementById('btnCowboyArcade');
+  const startEl = document.getElementById('start');
+
+  let selectedTheme: CowboyThemeId = (localStorage.getItem('farm_brawl_cowboy_theme') as CowboyThemeId) || 'farm';
+  if (!['farm', 'prairie', 'ice'].includes(selectedTheme)) selectedTheme = 'farm';
+
+  function switchLobbyTab(tab: 'main' | 'cowboy') {
+    if (tab === 'main') {
+      tabFarmBrawl?.classList.add('active');
+      tabFarmBrawl?.setAttribute('aria-selected', 'true');
+      tabCoolCowboy?.classList.remove('active');
+      tabCoolCowboy?.setAttribute('aria-selected', 'false');
+      if (mainLobbyCard) mainLobbyCard.hidden = false;
+      if (cowboyLobbyCard) cowboyLobbyCard.hidden = true;
+      hudRef.startPreview();
+    } else {
+      tabCoolCowboy?.classList.add('active');
+      tabCoolCowboy?.setAttribute('aria-selected', 'true');
+      tabFarmBrawl?.classList.remove('active');
+      tabFarmBrawl?.setAttribute('aria-selected', 'false');
+      if (mainLobbyCard) mainLobbyCard.hidden = true;
+      if (cowboyLobbyCard) cowboyLobbyCard.hidden = false;
+      hudRef.stopPreview();
+      syncCowboyLobbyState();
+    }
+  }
+
+  tabFarmBrawl?.addEventListener('click', () => switchLobbyTab('main'));
+  tabCoolCowboy?.addEventListener('click', () => switchLobbyTab('cowboy'));
+  btnCowboyArcade?.addEventListener('click', () => switchLobbyTab('cowboy'));
+
+  function syncCowboyLobbyState() {
+    const creditValEl = document.getElementById('cbLobbyCreditVal');
+    if (creditValEl) {
+      creditValEl.textContent = String(manager.getWallet().getCredits());
+    }
+
+    const kidsBadge = document.getElementById('cbLobbyKidsBadge');
+    if (kidsBadge) {
+      if (cowboyKids.isEnabled()) {
+        const rem = cowboyKids.getRemainingMinutes();
+        kidsBadge.className = 'cb-badge-dot on';
+        kidsBadge.title = `Chế độ trẻ em: Đang bật (${rem}p)`;
+      } else {
+        kidsBadge.className = 'cb-badge-dot off';
+        kidsBadge.title = 'Chế độ trẻ em: Đang tắt';
+      }
+    }
+
+    const pillsContainer = document.getElementById('cbActiveItemsPills');
+    if (pillsContainer) {
+      pillsContainer.innerHTML = '';
+      let hasEquipped = false;
+      for (const item of COWBOY_ITEMS_CATALOG) {
+        if (cowboyInventory.isEquipped(item.kind)) {
+          hasEquipped = true;
+          const pill = document.createElement('span');
+          pill.className = 'cb-active-pill';
+          pill.innerHTML = `${item.icon} <b>${item.nameVi}</b> (${item.effectLabel})`;
+          pillsContainer.appendChild(pill);
+        }
+      }
+      if (!hasEquipped) {
+        pillsContainer.innerHTML = '<span class="cb-no-item">Chưa trang bị vật phẩm (Mở Cửa Hàng để mua)</span>';
+      }
+    }
+  }
+
+  const mapCards = document.querySelectorAll('.cb-map-card');
+  function updateThemeSelection(theme: CowboyThemeId) {
+    selectedTheme = theme;
+    localStorage.setItem('farm_brawl_cowboy_theme', theme);
+    mapCards.forEach((c) => {
+      const t = c.getAttribute('data-theme');
+      if (t === theme) {
+        c.classList.add('on');
+      } else {
+        c.classList.remove('on');
+      }
+    });
+  }
+  updateThemeSelection(selectedTheme);
+
+  mapCards.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const t = (btn.getAttribute('data-theme') as CowboyThemeId) || 'farm';
+      updateThemeSelection(t);
+    });
+  });
+
+  const startCowboyBtn = document.getElementById('btnStartCowboyGame');
+  startCowboyBtn?.addEventListener('click', () => {
+    unlockAudio();
+    if (cowboyKids.isEnabled() && cowboyKids.checkTimeExpired()) {
+      alert('⏰ Đã hết giờ chơi hôm nay của bé! Hãy nhờ ba mẹ nhập mã PIN để mở khóa.');
+      return;
+    }
+    const opened = manager.open(selectedTheme);
+    if (opened) {
+      if (startEl) startEl.hidden = true;
+      hudRef.stopPreview();
+    }
+  });
+
+
+  const kidsBtn = document.getElementById('btnLobbyKids');
+  const kidsModal = document.getElementById('cowboyKidsModal');
+  const toggleEnable = document.getElementById('cbKidsToggleEnable') as HTMLInputElement;
+  const timeOpts = document.querySelectorAll('.cb-time-opt');
+  const sliderLimit = document.getElementById('cbKidsCreditLimit') as HTMLInputElement;
+  const sliderLimitVal = document.getElementById('cbKidsCreditLimitVal');
+  const pinInput = document.getElementById('cbKidsPinInput') as HTMLInputElement;
+  const btnCancelKids = document.getElementById('btnCancelKidsModal');
+  const btnSaveKids = document.getElementById('btnSaveKidsModal');
+
+  let selectedTimeLimit = 30;
+
+  kidsBtn?.addEventListener('click', () => {
+    if (!kidsModal) return;
+    const cfg = cowboyKids.getConfig();
+    if (toggleEnable) toggleEnable.checked = cfg.enabled;
+    selectedTimeLimit = cfg.timeLimitMinutes;
+    timeOpts.forEach((btn) => {
+      const m = parseInt(btn.getAttribute('data-minutes') || '30', 10);
+      if (m === selectedTimeLimit) btn.classList.add('on');
+      else btn.classList.remove('on');
+    });
+    if (sliderLimit) {
+      sliderLimit.value = String(cfg.maxDailyCredits);
+      if (sliderLimitVal) sliderLimitVal.textContent = `${cfg.maxDailyCredits} Credit`;
+    }
+    if (pinInput) pinInput.value = '';
+    kidsModal.hidden = false;
+  });
+
+  timeOpts.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedTimeLimit = parseInt(btn.getAttribute('data-minutes') || '30', 10);
+      timeOpts.forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+    });
+  });
+
+  sliderLimit?.addEventListener('input', () => {
+    const val = Math.min(20, Math.max(5, parseInt(sliderLimit.value, 10)));
+    sliderLimit.value = String(val);
+    if (sliderLimitVal) sliderLimitVal.textContent = `${val} Credit`;
+  });
+
+  btnCancelKids?.addEventListener('click', () => {
+    if (kidsModal) kidsModal.hidden = true;
+  });
+
+  btnSaveKids?.addEventListener('click', () => {
+    const enteredPin = (pinInput?.value || '').trim();
+    if (!enteredPin) {
+      alert('Vui lòng nhập mã PIN phụ huynh (Mặc định: 1234)!');
+      return;
+    }
+    const res = cowboyKids.updateSettings(enteredPin, {
+      enabled: toggleEnable?.checked ?? false,
+      timeLimitMinutes: selectedTimeLimit,
+      maxDailyCredits: Math.min(20, parseInt(sliderLimit?.value || '20', 10)),
+    });
+    alert(res.msg);
+    if (res.success) {
+      if (kidsModal) kidsModal.hidden = true;
+      syncCowboyLobbyState();
+    }
+  });
+
+  manager.onClose = () => {
+    if (startEl) startEl.hidden = false;
+    document.body.classList.add('menu');
+    syncCowboyLobbyState();
+    switchLobbyTab('cowboy');
+  };
+}
 
 hud.onExitLobby = () => {
   if (transport) {
@@ -1643,13 +1838,26 @@ const gameState = new GameState({
             const mySpecies = gameState.metas.get(gameState.myId)?.species ?? 'pig';
             const isEvolved = isEvolvedSpecies(mySpecies) || mass >= 3000;
             const isPlowing = (flags & FLAG.PLOW) !== 0;
-            if (isSuper || (isEvolved && isPlowing)) {
+            const isMaxSkill = isSuper || (isEvolved && isPlowing && (flags & FLAG.SUPER) !== 0);
+            if (isMaxSkill) {
               if (mySpecies === 'phoenix') sfxPhoenixInferno(isSuper, 1.1);
               else if (mySpecies === 'swan') sfxSwanTidalWave(isSuper, 1.1);
               else if (mySpecies === 'boar') sfxBoarBulldozer(isSuper, 1.1);
               else if (mySpecies === 'ram') sfxRamDiamondClash(isSuper, 1.1);
               else if (mySpecies === 'bull') sfxBullEarthStomp(isSuper, 1.1);
               else if (mySpecies === 'pegasus') sfxPegasusSkyFlight(isSuper, 1.1);
+              else if (mySpecies === 'wolf') {
+                if (isSuper) sfxWolfHowl(1.1);
+                else sfxDash(1.1);
+              }
+              else if (mySpecies === 'mammoth') {
+                if (isSuper) sfxMammothRoar(1.0);
+                else sfxDash(1.0);
+              }
+              else if (mySpecies === 'gorilla') {
+                if (isSuper) sfxGorillaRoar(1.0);
+                else sfxDash(1.0);
+              }
               else sfxRainbowSuperSkill(mySpecies, 1.15);
             } else {
               sfxDash(1);
@@ -2017,6 +2225,9 @@ function handleGameEvent(ev: GameEvent): void {
     }
     case 'superFood': {
       sfxSuperFood();
+      const peg = animals.getVisualNear(ev.x, ev.z, 18, 'pegasus');
+      const startY = peg ? (peg.root.position.y + 2.0) : 9.0;
+      animals.spawnFallingCandy(ev.x, startY, ev.z);
       hud.showToast(t('superFood'));
       break;
     }
@@ -2409,7 +2620,7 @@ function handleGameEvent(ev: GameEvent): void {
         foodParts.burst(ev.x, 0.5, ev.z, 0xff00ff, 28, 7, 8, 0.8);
         foodParts.burst(ev.x, 0.8, ev.z, 0x00ffff, 20, 6, 7, 0.7);
         animals.spawnGroundCracks(ev.x, ev.z, ev.r * 1.2);
-        if (ev.isGorilla) sfxGorillaRoar(ev.id === myId ? 1.0 : 0.6);
+        if (ev.isGorilla && (ev.ratio >= 0.85 || ev.rainbow)) sfxGorillaRoar(ev.id === myId ? 1.0 : 0.6);
         sfxHit(4.5, ev.id === myId ? 1.0 : 0.6);
         const me = gameState.ents.get(myId);
         const dist = me ? Math.hypot(me.x - ev.x, me.z - ev.z) : 99;
@@ -2605,13 +2816,24 @@ function handleGameEvent(ev: GameEvent): void {
       const isMine = ev.id === myId;
       sfxBoarBulldozer(!!ev.rainbow, isMine ? 1.0 : computeSpatialVolume(ev.x, ev.z, 0.75));
       sfxBoarGrunt(isMine ? 0.9 : computeSpatialVolume(ev.x, ev.z, 0.6));
-      const cosA = Math.cos(ev.a);
-      const sinA = Math.sin(ev.a);
       const dist = ev.giant ? 22 : 16;
-      const targetX = ev.x + cosA * dist;
-      const targetZ = ev.z + sinA * dist;
-      animals.spawnMudBoulder(ev.x + cosA * 1.2, ev.z + sinA * 1.2, targetX, targetZ, ev.r || 3.5, !!ev.giant, !!ev.rainbow);
-      if (isMine) shake = Math.max(shake, ev.giant ? 1.5 : 1.0);
+      if (ev.rainbow) {
+        const angles = [ev.a - 0.26, ev.a, ev.a + 0.26];
+        for (const angle of angles) {
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          const targetX = ev.x + cos * dist;
+          const targetZ = ev.z + sin * dist;
+          animals.spawnMudBoulder(ev.x + cos * 1.2, ev.z + sin * 1.2, targetX, targetZ, ev.r || 3.8, true, true);
+        }
+      } else {
+        const cosA = Math.cos(ev.a);
+        const sinA = Math.sin(ev.a);
+        const targetX = ev.x + cosA * dist;
+        const targetZ = ev.z + sinA * dist;
+        animals.spawnMudBoulder(ev.x + cosA * 1.2, ev.z + sinA * 1.2, targetX, targetZ, ev.r || 3.5, !!ev.giant, false);
+      }
+      if (isMine) shake = Math.max(shake, ev.rainbow ? 1.6 : (ev.giant ? 1.5 : 1.0));
       break;
     }
     case 'bullToss': {
@@ -3557,6 +3779,7 @@ function animate(now: number): void {
   animals.updateWaterRipples(dt);
   animals.updateGroundCracks(dt);
   animals.updateMudBoulders(dt);
+  animals.updateFallingCandies(dt);
 
   // Update animated world hazards (water ripples, pulsing coals, flames, electric fence arcs)
   const playerPos = me ? { x: predictor.on ? predictor.x : me.x, z: predictor.on ? predictor.z : me.z } : undefined;

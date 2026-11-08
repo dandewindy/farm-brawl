@@ -855,7 +855,11 @@ export class HudManager {
       }
     };
     repositionHowBox();
-    window.addEventListener('resize', repositionHowBox);
+    this.repositionCowboyButton();
+    window.addEventListener('resize', () => {
+      repositionHowBox();
+      this.repositionCowboyButton();
+    });
   }
 
   private initEvents(): void {
@@ -1364,6 +1368,7 @@ export class HudManager {
             document.body.classList.toggle('mode-team', mode === 'team');
             document.body.classList.toggle('mode-friend', mode === 'friend');
             this.setSelectedTeam(this.selectedTeam);
+            this.repositionCowboyButton();
             const startScreen = document.getElementById('start');
             if (startScreen && startScreen.scrollTop > 20) {
               startScreen.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1849,7 +1854,54 @@ export class HudManager {
     this.updateHof([]);
     this.updateSpeciesUI?.();
     this.updateCarousel();
+    this.repositionCowboyButton();
     requestAnimationFrame(() => this.updateCarousel());
+  }
+
+  public repositionCowboyButton(): void {
+    const isLandscapeMobile = window.matchMedia('(orientation: landscape) and (max-height: 540px)').matches;
+    const leftCol = document.querySelector('.start-col-left');
+    const rightCol = document.querySelector('.start-col-right');
+    const cowboyBtn = document.getElementById('btnCowboyArcade');
+    const playBtn = document.getElementById('play');
+    const ffaPreviewBox = document.getElementById('ffaPreviewBox');
+
+    if (!cowboyBtn || !leftCol || !rightCol) return;
+
+    if (isLandscapeMobile) {
+      if (this.selectedMode === 'ffa') {
+        cowboyBtn.hidden = false;
+        cowboyBtn.style.display = 'flex';
+        // Đưa nút qua cột bên trái của chế độ tự do để không cần cuộn
+        if (ffaPreviewBox && ffaPreviewBox.nextSibling) {
+          leftCol.insertBefore(cowboyBtn, ffaPreviewBox.nextSibling);
+        } else {
+          leftCol.appendChild(cowboyBtn);
+        }
+      } else {
+        // 2 chế độ kia (trại đấu & bạn bè) sẽ không hiện cho gọn bảng
+        cowboyBtn.hidden = true;
+        cowboyBtn.style.display = 'none';
+      }
+    } else {
+      // Màn hình dọc hoặc Desktop / Tablet: hiển thị bình thường ở cột phải dưới nút play
+      cowboyBtn.hidden = false;
+      cowboyBtn.style.display = 'flex';
+      if (playBtn && playBtn.nextSibling) {
+        rightCol.insertBefore(cowboyBtn, playBtn.nextSibling);
+      } else {
+        rightCol.appendChild(cowboyBtn);
+      }
+    }
+  }
+
+  public stopPreview(): void {
+    this.previewRenderer?.stop();
+  }
+
+  public startPreview(): void {
+    this.previewRenderer?.start();
+    this.previewRenderer?.resize();
   }
 
   public setPlayLoading(loading: boolean, text?: string, progress?: number): void {

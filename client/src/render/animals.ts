@@ -60,6 +60,8 @@ interface AnimalVisual {
   throwTimer?: number;
   wolfBiteTimer?: number;
   bullSmokeTimer?: number;
+  wasTossed?: boolean;
+  tossTimer?: number;
   mudSplats: THREE.Mesh[];
   mudSplatMat: THREE.MeshBasicMaterial;
   cartGroup: THREE.Group;
@@ -2209,36 +2211,41 @@ function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
   }
 
   // 3. ĐẦU HEO RỪNG HÌNH NÊM SẮC SẢO & MÕM TỰ NHIÊN (Chiseled Wedge Boar Skull & Snout)
-  // Cổ gáy dày dặn vươn chéo xuống đầu
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0.86, 1.10, 0);
+  headGroup.name = 'boarHead';
+  headGroup.userData.origY = 1.10;
+
+  // Cổ gáy dày dặn vươn chéo xuống đầu (nối thân)
   blob(g, bodyColor, 0.42, [1.38, 1.15, 0.92], 0.58, 1.12, 0, [0, 0, -0.24]);
 
-  // Hộp sọ heo rừng
-  const skull = part(new THREE.SphereGeometry(0.36, 16, 12), bodyColor, 0.86, 1.10, 0);
+  // Hộp sọ heo rừng (tương đối theo headGroup)
+  const skull = part(new THREE.SphereGeometry(0.36, 16, 12), bodyColor, 0, 0, 0);
   skull.scale.set(1.15, 1.0, 0.92);
-  g.add(skull);
+  headGroup.add(skull);
 
   // Sống mũi heo rừng vuốt dốc nối mượt mà từ trán xuống mõm
-  const snoutBridge = part(new THREE.CylinderGeometry(0.18, 0.30, 0.46, 10), snoutColor, 1.18, 0.98, 0);
+  const snoutBridge = part(new THREE.CylinderGeometry(0.18, 0.30, 0.46, 10), snoutColor, 0.32, -0.12, 0);
   snoutBridge.rotation.z = -Math.PI / 2 - 0.12;
-  g.add(snoutBridge);
+  headGroup.add(snoutBridge);
 
-  // Đĩa mõm sừng dẹt mềm mại ôm khít đầu mũi (triệt tiêu 100% cảm giác bánh xe phẳng lì lơ lửng)
-  const snoutDisc = part(new THREE.CylinderGeometry(0.16, 0.18, 0.09, 14), ridgeColor, 1.42, 0.94, 0);
+  // Đĩa mõm sừng dẹt mềm mại ôm khít đầu mũi
+  const snoutDisc = part(new THREE.CylinderGeometry(0.16, 0.18, 0.09, 14), ridgeColor, 0.56, -0.16, 0);
   snoutDisc.rotation.z = -Math.PI / 2 - 0.12;
-  g.add(snoutDisc);
+  headGroup.add(snoutDisc);
 
   // 2 lỗ mũi heo rừng sâu rõ nét
   for (const nz of [-0.065, 0.065]) {
-    blob(g, 0x111111, 0.038, [0.8, 1.3, 0.9], 1.46, 0.94, nz);
+    blob(headGroup, 0x111111, 0.038, [0.8, 1.3, 0.9], 0.60, -0.16, nz);
   }
 
-  // 4. CẶP RĂNG NANH HEO RỪNG TIẾN HOÁ UỐN CONG VÚT NGƯỢC LÊN TRÊN (Loại bỏ hoàn toàn nanh quặp xuống cằm)
+  // 4. CẶP RĂNG NANH HEO RỪNG TIẾN HOÁ UỐN CONG VÚT NGƯỢC LÊN TRÊN
   const tuskMatOpts = { roughness: 0.25, metalness: 0.15 };
   for (const z of [-0.24, 0.24]) {
     const side = z > 0 ? 1 : -1;
     const tuskGroup = new THREE.Group();
-    // Gốc nanh cắm chắc vào khóe hàm dưới của mõm heo
-    tuskGroup.position.set(1.16, 0.86, z);
+    // Gốc nanh cắm chắc vào khóe hàm dưới của mõm heo (tương đối theo headGroup)
+    tuskGroup.position.set(0.30, -0.24, z);
 
     // Gốc nanh ngà bọc khóe mép hàm dưới
     const rootSocket = part(new THREE.SphereGeometry(0.075, 8, 8), snoutColor, 0, 0, 0);
@@ -2257,28 +2264,30 @@ function buildBoar(g: THREE.Group, s: Record<string, number>): THREE.Group[] {
     tuskTip.rotation.x = side * 0.42;
     tuskGroup.add(tuskTip);
 
-    g.add(tuskGroup);
+    headGroup.add(tuskGroup);
   }
 
   // 5. ĐÔI TAI HEO RỪNG NHỌN VỂNH CẢNH GIÁC & MẮT HỔ PHÁCH HUNG TỢN
   for (const z of [-0.30, 0.30]) {
     const side = z > 0 ? 1 : -1;
-    const ear = part(new THREE.ConeGeometry(0.11, 0.36, 6), ridgeColor, 0.62, 1.52, z);
+    const ear = part(new THREE.ConeGeometry(0.11, 0.36, 6), ridgeColor, -0.24, 0.42, z);
     ear.rotation.x = side * 0.42;
     ear.rotation.z = -0.30;
-    g.add(ear);
+    headGroup.add(ear);
     // Lòng tai hồng đất da thú
-    const innerEar = part(new THREE.ConeGeometry(0.075, 0.28, 5), bellyColor, 0.64, 1.52, z * 0.92);
+    const innerEar = part(new THREE.ConeGeometry(0.075, 0.28, 5), bellyColor, -0.22, 0.42, z * 0.92);
     innerEar.rotation.x = side * 0.42;
     innerEar.rotation.z = -0.30;
-    g.add(innerEar);
+    headGroup.add(innerEar);
   }
 
   // Gờ mày gồ cao và đôi mắt heo rừng hổ phách tinh anh
   for (const z of [-0.24, 0.24]) {
-    blob(g, ridgeColor, 0.11, [1.2, 0.6, 0.7], 0.98, 1.25, z, [0, 0, -0.26]);
+    blob(headGroup, ridgeColor, 0.11, [1.2, 0.6, 0.7], 0.12, 0.15, z, [0, 0, -0.26]);
   }
-  addEyes(g, 1.02, 1.20, 0.26, 0.075);
+  addEyes(headGroup, 0.16, 0.10, 0.26, 0.075);
+
+  g.add(headGroup);
 
   // Đuôi heo rừng nhỏ ngắn vểnh có chùm lông ở chóp
   const tailStem = part(new THREE.CylinderGeometry(0.04, 0.05, 0.35, 6), bodyColor, -0.82, 1.05, 0);
@@ -3329,6 +3338,16 @@ interface ActiveMudBoulder {
   isRainbow: boolean;
 }
 
+interface ActiveFallingCandy {
+  group: THREE.Group;
+  x: number;
+  z: number;
+  startY: number;
+  progress: number;
+  duration: number;
+  bounced: boolean;
+}
+
 function buildGroundCrackMesh(matDark: THREE.Material, matGlow: THREE.Material): THREE.Group {
   const grp = new THREE.Group();
   const darkPositions: number[] = [];
@@ -3605,6 +3624,127 @@ export class AnimalRenderer {
   }
 
   private readonly mudBoulders: ActiveMudBoulder[] = [];
+  private readonly fallingCandies: ActiveFallingCandy[] = [];
+
+  getVisualNear(x: number, z: number, maxDist = 18, species?: Species): AnimalVisual | null {
+    let closest: AnimalVisual | null = null;
+    let closestDistSq = maxDist * maxDist;
+    for (const vis of this.visuals.values()) {
+      if (species && vis.species !== species) continue;
+      const dx = vis.root.position.x - x;
+      const dz = vis.root.position.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < closestDistSq) {
+        closestDistSq = d2;
+        closest = vis;
+      }
+    }
+    return closest;
+  }
+
+  spawnFallingCandy(x: number, startY?: number, z = 0): void {
+    if (startY === undefined || startY < 6.0) {
+      const peg = this.getVisualNear(x, z, 18, 'pegasus');
+      const horseY = peg ? peg.root.position.y : 7.5;
+      startY = Math.max(9.0, horseY + 2.0);
+    }
+    const group = new THREE.Group();
+    // Khởi tạo kích thước phóng to khi vừa thả từ trên cao
+    group.scale.setScalar(2.4);
+
+    const candyMat = new THREE.MeshStandardMaterial({
+      color: 0xff1493,
+      metalness: 0.35,
+      roughness: 0.22,
+      emissive: 0xff007f,
+      emissiveIntensity: 0.5,
+    });
+    const goldBandMat = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0xffab00,
+      emissiveIntensity: 0.3,
+    });
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12), candyMat);
+    sphere.castShadow = true;
+    group.add(sphere);
+
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.055, 8, 20), goldBandMat);
+    band.rotation.x = Math.PI / 2;
+    group.add(band);
+
+    const wrapper1 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.22, 8), goldBandMat);
+    wrapper1.position.set(0.40, 0, 0);
+    wrapper1.rotation.z = -Math.PI / 2;
+    group.add(wrapper1);
+
+    const wrapper2 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.22, 8), goldBandMat);
+    wrapper2.position.set(-0.40, 0, 0);
+    wrapper2.rotation.z = Math.PI / 2;
+    group.add(wrapper2);
+
+    group.position.set(x, startY, z);
+    this.scene.add(group);
+
+    this.fallingCandies.push({
+      group,
+      x,
+      z,
+      startY,
+      progress: 0,
+      duration: 0.55,
+      bounced: false,
+    });
+  }
+
+  updateFallingCandies(dt: number): void {
+    for (let i = this.fallingCandies.length - 1; i >= 0; i--) {
+      const c = this.fallingCandies[i];
+      c.progress += dt / c.duration;
+      c.group.rotation.x += dt * 6.0;
+      c.group.rotation.y += dt * 7.5;
+      c.group.rotation.z += dt * 4.5;
+
+      if (c.progress < 1.0) {
+        // Rơi nhanh dần theo trọng lực từ phía trên cao của ngựa
+        const p = c.progress;
+        const curY = Math.max(0.2, c.startY * (1 - p * p) + 0.25);
+        c.group.position.set(c.x, curY, c.z);
+        // Thu nhỏ mượt mà từ kích thước to (2.4x) trên cao xuống kích thước chuẩn (1.0x) khi chạm đất
+        const fallScale = 2.4 - 1.4 * p;
+        c.group.scale.setScalar(fallScale);
+        if (Math.random() < 0.45) {
+          this.onPuff?.(c.x + (Math.random() - 0.5) * 0.4, curY, c.z + (Math.random() - 0.5) * 0.4, 0xff80ab, 0.45, 0.35);
+        }
+      } else if (c.progress < 1.35) {
+        // Tiếp đất: giữ đúng kích thước chuẩn mặc định (1.0x)
+        c.group.scale.setScalar(1.0);
+        if (!c.bounced) {
+          c.bounced = true;
+          this.spawnShockwave(c.x, 0.08, c.z, 3.2, 0xff69b4);
+          this.spawnShockwave(c.x, 0.12, c.z, 2.0, 0xffd700);
+          this.onPuff?.(c.x, 0.4, c.z, 0xff1493, 0.8, 0.4);
+          this.onPuff?.(c.x, 0.5, c.z, 0xffeb3b, 0.6, 0.35);
+        }
+        const bounceP = (c.progress - 1.0) / 0.35;
+        const bounceY = Math.sin(bounceP * Math.PI) * 0.42 + 0.25;
+        c.group.position.set(c.x, bounceY, c.z);
+      } else {
+        // Tiếp đất hoàn tất
+        this.scene.remove(c.group);
+        c.group.traverse((mesh) => {
+          if ((mesh as THREE.Mesh).isMesh) {
+            const m = mesh as THREE.Mesh;
+            m.geometry?.dispose();
+            if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+            else m.material?.dispose();
+          }
+        });
+        this.fallingCandies.splice(i, 1);
+      }
+    }
+  }
 
   spawnMudBoulder(startX: number, startZ: number, targetX: number, targetZ: number, radius: number, isGiant: boolean, isRainbow: boolean): void {
     const group = new THREE.Group();
@@ -4100,17 +4240,27 @@ export class AnimalRenderer {
     vis.wasFlying = isFlying;
 
     if (isTossed) {
-      bodyY += 4.5 * sc + Math.sin(now * 0.01) * 0.4 * sc;
+      if (!vis.wasTossed) {
+        vis.tossTimer = 0;
+      }
+      vis.tossTimer = (vis.tossTimer || 0) + dt;
+      const tossDur = 0.55;
+      const prog = Math.min(1.0, vis.tossTimer / tossDur);
+      // Quỹ đạo parabol ném vút lên cao rồi cắm nhanh xuống đất trong 0.55s
+      bodyY += Math.sin(prog * Math.PI) * (4.8 * sc);
+      // Xoay lộn 2 vòng trên không (4*PI == 0 rad khi tiếp đất)
+      vis.root.rotation.x = prog * Math.PI * 4.0;
+      vis.root.rotation.z = Math.sin(prog * Math.PI) * 1.5;
+    } else {
+      vis.wasTossed = false;
+      vis.tossTimer = 0;
+      vis.root.rotation.x = 0;
+      vis.root.rotation.z = 0;
     }
+    vis.wasTossed = isTossed;
     if (sq > 0) bodyY = (y + 0.05) * sq + bodyY * (1 - sq);
     vis.root.position.set(x, bodyY, z);
     vis.root.rotation.y = -angle + (isStunned && sq <= 0.4 ? Math.sin(now / 50) * 0.5 : 0);
-    if (isTossed) {
-      vis.root.rotation.x = Math.sin(now * 0.012) * 2.2;
-      vis.root.rotation.z = Math.cos(now * 0.01) * 1.5;
-    } else {
-      vis.root.rotation.x = 0;
-    }
 
     // Hiệu ứng lửa bập bùng trên người con vật bị dính thiêu đốt giống địa hình bếp lửa (thay thế khói trắng)
     if (isBurning) {
@@ -4606,21 +4756,23 @@ export class AnimalRenderer {
         vis.body.rotation.z = 0;
       }
     } else if (vis.species === 'boar') {
-      if (isCharging) {
-        // Heo rừng gồng: chúi đầu rúc mõm sâu xuống đất chuẩn bị hất tảng bùn
-        const t = Math.min(1, Math.max(0, lvl));
-        vis.body.position.x = 0.16 * t;
-        vis.body.position.y = -0.28 * t * r;
-        vis.body.rotation.z = -0.42 * t;
-      } else if (isDashing || isPlowing) {
-        // Hất mạnh mõm và cặp nanh ngược lên trời để hất tảng bùn khổng lồ
-        vis.body.position.x = -0.06;
-        vis.body.position.y = 0.26 * r;
-        vis.body.rotation.z = 0.55;
-      } else {
-        vis.body.position.x = 0;
-        vis.body.position.y = 0;
-        vis.body.rotation.z = 0;
+      // Heo rừng: thân mình giữ nguyên vị trí, chỉ xoay trục đầu (chúi nhẹ khi gồng, hất lên khi ủi)
+      vis.body.position.set(0, 0, 0);
+      vis.body.rotation.set(0, 0, 0);
+      const boarHead = vis.root.getObjectByName('boarHead') as THREE.Group | null;
+      if (boarHead) {
+        // Cố định gốc đầu tại khớp cổ (0.86, 1.10, 0), tuyệt đối không dịch chuyển position làm hở cổ/rời thân
+        boarHead.position.set(0.86, 1.10, 0);
+        if (isCharging) {
+          // Gồng: chỉ xoay trục đầu hơi chúi xuống tự nhiên
+          const t = Math.min(1, Math.max(0, lvl));
+          boarHead.rotation.z = -0.32 * t;
+        } else if (isDashing || isPlowing) {
+          // Hất đầu lên văng đối thủ / bùn
+          boarHead.rotation.z = 0.36;
+        } else {
+          boarHead.rotation.z = 0;
+        }
       }
     } else if (vis.species === 'pegasus') {
       if (isCharging) {

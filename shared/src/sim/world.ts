@@ -103,6 +103,7 @@ export interface Player extends Body {
   pegasusCandyCount?: number;
   pegasusCandyTimer?: number;
   swanIceTimer?: number;
+  rootT?: number;
   morphT?: number;
   morphOrigSpecies?: Species;
   hasHeart?: boolean;
@@ -834,7 +835,7 @@ export class World {
           const adminSpeedMult = (p.adminSpeedMult && p.adminSpeedMult > 1) ? p.adminSpeedMult : 1.0;
           const pegasusFlightMult = (p.species === 'pegasus' && p.superT > 0 && (p.flightT ?? 0) > 0) ? 1.45 : 1.0;
           const tillSpeedMult = ((this.tillTruck.active && p.id === this.napoleonId) ? 1.5 : 1.0) * ((p.species === 'monkey' || p.species === 'gorilla') && p.superT > 0 ? 1.30 : 1.0) * slowMult * speedBoost * adminSpeedMult * pegasusFlightMult;
-          stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult);
+          stepMove(p, p.input, h, p.species, effectiveTerrain, tillSpeedMult, p.superT > 0);
         }
         const isFlying = (p.flightT !== undefined && p.flightT > 0);
         if (!isLeaping && !isFlying) {
@@ -1142,6 +1143,7 @@ export class World {
         if (p.pitchforkT <= 0) p.pitchforkHits = undefined;
       }
       if (p.slowT > 0) p.slowT = Math.max(0, p.slowT - DT);
+      if (p.rootT && p.rootT > 0) p.rootT = p.rootT <= DT ? 0 : Math.max(0, p.rootT - DT);
       if (p.superT > 0) {
         p.superT = Math.max(0, p.superT - DT);
         if (p.species === 'mammoth') {
@@ -2049,7 +2051,7 @@ export class World {
 
   /** hold to charge, release to ram */
   private handleButton(p: Player): void {
-    if (p.slowT > 0 || p.terrain === 1 || p.stunT > 0) {
+    if (p.slowT > 0 || p.terrain === 1 || p.stunT > 0 || (p.rootT && p.rootT > 0)) {
       p.pressed = false; p.holdT = 0; p.charging = false; p.btnLatch = false; p.releaseLatch = false;
       return;
     }
@@ -2072,7 +2074,8 @@ export class World {
       return;
     }
 
-    const down = (p.input.btn || p.btnLatch) && p.stunT <= 0;
+    const isRooted = (p.rootT ?? 0) > 0;
+    const down = (p.input.btn || p.btnLatch) && p.stunT <= 0 && !isRooted;
     p.btnLatch = false;
     if (down && p.input.btn) {
       if (p.cd > 0.05 || p.dashT > 0) {
@@ -2091,7 +2094,7 @@ export class World {
       return;
     }
     // released (or a tap that came and went between two ticks)
-    if ((p.pressed || down) && p.cd <= 0.12 && p.dashT <= 0 && p.stunT <= 0) this.dash(p);
+    if ((p.pressed || down) && p.cd <= 0.12 && p.dashT <= 0 && p.stunT <= 0 && !isRooted) this.dash(p);
     p.pressed = false; p.holdT = 0; p.charging = false;
   }
 
@@ -2464,11 +2467,12 @@ export class World {
 
     if (p.species === 'mammoth') {
       // Mammoth:
-      // Húc nhẹ (holdT <= 0.15s): lướt giống các con khác, gây dẹp lép và kill < 100kg trong this.hit
-      // Gồng (holdT > 0.15s): sóng âm tại chỗ, khuếch tán 1/4 bản đồ (~35m), choáng 0.5s - 1.5s, hồi chiêu gồng 3s
-      if (p.holdT > 0.15) {
+      // Húc nhẹ / gồng chưa max: lướt giống các con khác, gây dẹp lép và kill < 100kg trong this.hit, KHÔNG spam âm thanh hú
+      // Gồng max (holdT >= 0.75s) hoặc siêu cấp cầu vồng: sóng âm tại chỗ, khuếch tán diện rộng, choáng, hồi chiêu gồng 3s
+      const isMax = p.holdT >= 0.75;
+      if (isMax || p.superT > 0) {
         if (!p.mammothRoarCd || p.mammothRoarCd <= 0) {
-          this.executeMammothRoar(p, false);
+          this.executeMammothRoar(p, p.superT > 0);
           return;
         }
       }
@@ -2864,13 +2868,15 @@ export class World {
   private executeBoarSkill(p: Player, isRainbow: boolean, isMax: boolean): void {
     p.a = p.input.a;
     if (isMax) {
+      // Heo rừng gồng max đứng tại chỗ hất tảng bùn (mình đứng nguyên tại chỗ)
       const range = isRainbow ? 24 : 18;
-      const boulderR = isRainbow ? 6.0 : 3.5;
+      const boulderR = isRainbow ? 7.5 : 3.8; // Phạm vi rộng hơn cho 3 cục đất cầu vồng
       const cosA = Math.cos(p.a);
       const sinA = Math.sin(p.a);
 
       for (const other of this.players.values()) {
         if (!other.alive || other.id === p.id || other.shieldT > 0 || other.adminGod) continue;
+        if (p.team !== undefined && other.team !== undefined && p.team === other.team) continue;
         const dx = other.x - p.x;
         const dz = other.z - p.z;
         const forwardDist = dx * cosA + dz * sinA;
@@ -2879,17 +2885,21 @@ export class World {
 
         if (forwardDist >= 0 && forwardDist <= range + rOther && lateralDist <= boulderR + rOther) {
           if (isRainbow) {
+            // Sức mạnh cầu vồng: 3 cục đất kèm CHOÁNG 3s + Sát thương mạnh
             other.stunT = Math.max(other.stunT, 3.0);
             other.vx = 0;
             other.vz = 0;
-            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.12));
+            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.14));
             if (loss > 0) {
               other.mass -= loss;
               this.scatter(other.x, other.z, loss, rOther + 0.5);
             }
           } else {
-            other.slowT = Math.max(other.slowT, 3.0);
-            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.08));
+            // Gồng max thường: 1 cục đất TRÓI CHÂN 3s + Sát thương
+            other.rootT = Math.max(other.rootT || 0, 3.0);
+            other.vx = 0;
+            other.vz = 0;
+            const loss = Math.min(other.mass - 10, Math.round(other.mass * 0.10));
             if (loss > 0) {
               other.mass -= loss;
               this.scatter(other.x, other.z, loss, rOther + 0.5);
@@ -2898,10 +2908,11 @@ export class World {
         }
       }
 
-      p.vx = Math.cos(p.a) * (isRainbow ? 55 : 42);
-      p.vz = Math.sin(p.a) * (isRainbow ? 55 : 42);
-      p.dashT = 0.45;
-      p.plow = true;
+      // Đứng tại chỗ, không lao về phía trước
+      p.vx = 0;
+      p.vz = 0;
+      p.dashT = 0.35;
+      p.plow = false;
       p.power = isRainbow ? 6.5 : 4.2;
       p.cd = CFG.DASH_CD * 0.6;
       p.dashHit.clear();
@@ -2995,14 +3006,14 @@ export class World {
                 other.lastHitT = this.time;
                 this.kill(other, 'crush');
               } else {
-                other.tossT = 1.4;
+                other.tossT = 0.65;
                 other.squishT = 1.5;
                 other.stunT = Math.max(other.stunT, 2.5);
                 other.vx = Math.cos(angleToEnemy) * 36;
                 other.vz = Math.sin(angleToEnemy) * 36;
               }
             } else {
-              other.tossT = 1.2;
+              other.tossT = 0.55;
               other.stunT = Math.max(other.stunT, 1.8);
               other.vx = Math.cos(angleToEnemy) * 16;
               other.vz = Math.sin(angleToEnemy) * 16;
@@ -3800,7 +3811,7 @@ export class World {
             a.dashHit.add(b.id);
             b.flightT = 0;
             b.flyT = 0;
-            b.tossT = 1.2;
+            b.tossT = 0.55;
             b.squishT = 1.2;
             b.stunT = Math.max(b.stunT, 1.8);
             const ramAngle = Math.atan2(dz, dx);
@@ -3814,7 +3825,7 @@ export class World {
             b.dashHit.add(a.id);
             a.flightT = 0;
             a.flyT = 0;
-            a.tossT = 1.2;
+            a.tossT = 0.55;
             a.squishT = 1.2;
             a.stunT = Math.max(a.stunT, 1.8);
             const ramAngle = Math.atan2(-dz, -dx);
@@ -4505,16 +4516,16 @@ export class World {
     if (att.species === 'ram') {
       if (att.power >= 5.5) {
         k *= 2.2;
-        vic.tossT = 1.0;
-        vic.flyT = 1.0;
+        vic.tossT = 0.55;
+        vic.flyT = 0.55;
         vic.vx = nx * k + vic.vx * 0.15;
         vic.vz = nz * k + vic.vz * 0.15;
         this.events.push({ k: 'ramKnockback', id: att.id, targetId: vic.id, x: r2(vic.x), z: r2(vic.z), rainbow: att.superT > 0 });
       }
       if (att.superT > 0) {
         k = Math.max(k * 2.5, 260);
-        vic.tossT = 1.8;
-        vic.flyT = 1.8;
+        vic.tossT = 0.65;
+        vic.flyT = 0.65;
         vic.vx = nx * k;
         vic.vz = nz * k;
         const fenceDist = CFG.R - 1.5;
@@ -4533,7 +4544,7 @@ export class World {
     // Bull: ferocious gore and mass siphon, plus toss & squish on max charge
     if (att.species === 'bull') {
       if (att.power >= 4.0) {
-        vic.tossT = 1.2;
+        vic.tossT = 0.55;
         vic.stunT = Math.max(vic.stunT, 1.8);
       } else {
         vic.stunT = Math.max(vic.stunT, att.superT > 0 ? 0.9 : 0.45);
@@ -5285,7 +5296,8 @@ export class World {
         | (o.mammothRoarT && o.mammothRoarT > 0 ? FLAG.MAMMOTH_ROAR : 0)
         | (o.wolfFrenzyT && o.wolfFrenzyT > 0 ? FLAG.WOLF_FRENZY : 0)
         | (o.tossT && o.tossT > 0 ? FLAG.TOSSED : 0)
-        | (o.burnT && o.burnT > 0 ? FLAG.BURNING : 0);
+        | (o.burnT && o.burnT > 0 ? FLAG.BURNING : 0)
+        | (o.rootT && o.rootT > 0 ? FLAG.ROOT : 0);
       p.push([o.id, r2(o.x), r2(o.z), r2(o.a), Math.round(o.mass), flags, o.charging ? Math.round(chargeLevel(o.holdT) * 10) : 0]);
     }
     let hofList = this.hof;

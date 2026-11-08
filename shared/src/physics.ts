@@ -26,6 +26,8 @@ export interface Body {
   dashT: number;
   /** seconds of stun left (knocked back, no control) */
   stunT: number;
+  /** seconds of root left (cannot move or dash, but can turn) */
+  rootT?: number;
   /** holding the ram button long enough to be slowed down */
   charging: boolean;
 }
@@ -37,23 +39,26 @@ export function terrainFactor(sp: Species, t: Terrain): number {
   return (sp === 'duck' || sp === 'swan') ? 0.92 : 1;
 }
 
-export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolean): number {
+export function maxSpeed(sp: Species, mass: number, t: Terrain, charging: boolean, isRainbow = false): number {
+  // Heo rừng khi gồng đứng nguyên tại chỗ (kể cả khi có cầu vồng hoặc mass >= 3000)
+  if (sp === 'boar' && charging && (mass >= 3000 || isRainbow)) return 0;
   return CFG.MOVE_SPEED * TRAITS[sp].speed * Math.pow(20 / Math.max(1, mass), 0.15) * terrainFactor(sp, t) * (charging ? 0.45 : 1);
 }
 
 /** advance one body by dt seconds */
-export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult = 1.0): void {
+export function stepMove(b: Body, inp: Input, dt: number, sp: Species, t: Terrain, speedMult = 1.0, isRainbow = false): void {
   const stunned = b.stunT > 0;
+  const rooted = (b.rootT ?? 0) > 0;
   if (b.dashT > 0) {
     const d = Math.exp(-1.2 * dt);
     b.vx *= d;
     b.vz *= d;
-  } else if (stunned || !inp.mv) {
+  } else if (stunned || rooted || !inp.mv) {
     const d = Math.exp(-3.5 * dt);
     b.vx *= d;
     b.vz *= d;
   } else {
-    const ms = maxSpeed(sp, b.mass, t, b.charging) * speedMult;
+    const ms = maxSpeed(sp, b.mass, t, b.charging, isRainbow) * speedMult;
     const speed = Math.hypot(b.vx, b.vz);
     if (speed > ms) {
       const excess = speed - ms;

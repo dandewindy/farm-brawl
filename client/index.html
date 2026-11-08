@@ -333,7 +333,45 @@
   </div>
 
   <div id="start" class="screen">
-    <div class="card start-card-wide">
+    <div class="lobby-tabs-wrapper">
+      <!-- Chrome Browser Style Tab Bar -->
+      <div class="chrome-tab-bar" id="lobbyTabBar" role="tablist">
+        <button type="button" class="chrome-tab active" id="tabFarmBrawl" role="tab" aria-selected="true" data-tab="main">
+          <span class="tab-icon">🏆</span>
+          <span class="tab-title" data-i18n="tab_arena">Đấu Trường Sinh Tồn</span>
+        </button>
+        <div class="chrome-tab-divider" id="cbTabDivider"></div>
+        <button type="button" class="chrome-tab" id="tabCoolCowboy" role="tab" aria-selected="false" data-tab="cowboy">
+          <span class="tab-icon">
+            <svg class="horse-cowboy-ico" viewBox="0 0 48 48" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 16 L6 6 L15 10 Z" fill="#935128" stroke="#4a250e" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M9 12 L7 7 L12 10 Z" fill="#f09898"/>
+            <path d="M38 16 L42 6 L33 10 Z" fill="#935128" stroke="#4a250e" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M39 12 L41 7 L36 10 Z" fill="#f09898"/>
+            <rect x="11" y="14" width="26" height="24" rx="11" fill="#b06432" stroke="#4a250e" stroke-width="2"/>
+            <path d="M20 13 C21 9, 27 9, 28 13 Z" fill="#381c0b"/>
+            <path d="M14 15 C14 5, 18 3, 24 4.5 C30 3, 34 5, 34 15 Z" fill="#754320" stroke="#361a08" stroke-width="1.8"/>
+            <path d="M21 4.5 C23 6, 25 6, 27 4.5" stroke="#361a08" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M14 13.5 C19 12, 29 12, 34 13.5 L34 15.5 C29 14, 19 14, 14 15.5 Z" fill="#2d1405"/>
+            <circle cx="24" cy="13.8" r="2.2" fill="#ffca28" stroke="#361a08" stroke-width="0.8"/>
+            <path d="M3 15 C12 8, 36 8, 45 15 C47 17.5, 39 19, 24 19 C9 19, 1 17.5, 3 15 Z" fill="#8d5227" stroke="#361a08" stroke-width="1.8"/>
+            <ellipse cx="18" cy="24.5" rx="3.2" ry="3.8" fill="#1b1008"/>
+            <circle cx="19.2" cy="23.2" r="1.3" fill="#ffffff"/>
+            <circle cx="17.2" cy="26" r="0.6" fill="#ffffff"/>
+            <ellipse cx="30" cy="24.5" rx="3.2" ry="3.8" fill="#1b1008"/>
+            <circle cx="31.2" cy="23.2" r="1.3" fill="#ffffff"/>
+            <circle cx="29.2" cy="26" r="0.6" fill="#ffffff"/>
+            <ellipse cx="24" cy="34" rx="8" ry="5" fill="#f5d5b8" stroke="#8d5227" stroke-width="1.2"/>
+            <ellipse cx="20.5" cy="33.8" rx="1.4" ry="1.7" fill="#4a250e"/>
+            <ellipse cx="27.5" cy="33.8" rx="1.4" ry="1.7" fill="#4a250e"/>
+            <path d="M21.5 36.5 C23 37.5, 25 37.5, 26.5 36.5" stroke="#4a250e" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          </span>
+          <span class="tab-title" data-i18n="tab_cowboy">Cao Bồi Kéo Bò</span>
+        </button>
+      </div>
+
+      <div class="card start-card-wide" id="mainLobbyCard">
       <div class="wall-top">
         <div class="wall-top-left">
           <button id="disclaimerBtn" type="button" title="Miễn trừ trách nhiệm / Disclaimer" aria-label="Disclaimer">
@@ -564,6 +602,8 @@
 
           <button id="play" class="btn-red play-btn-main" type="button" data-i18n="play">VÀO NÔNG TRẠI</button>
 
+
+
           <!-- Lobby Loading Progress Indicator & Status Bar -->
           <div id="lobbyLoadingBox" class="lobby-loading-box" hidden>
             <div class="llb-header">
@@ -607,6 +647,174 @@
             <div id="spSkinPalette" class="sp-palette"></div>
             <p id="speciesHint" class="hint"></p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MINIGAME TAB: Cool Cowboy Lobby View -->
+    <div class="card cowboy-lobby-card" id="cowboyLobbyCard" hidden>
+      <div class="cb-lobby-top">
+        <div class="cb-lobby-top-left"></div>
+        <div class="cb-lobby-top-actions">
+          <div class="cb-top-stat-pill" id="cbLobbyWalletPill" title="Tích lũy tự động +1 Credit mỗi phút khi dưới 20">
+            <span class="ico">🪙</span>
+            <b id="cbLobbyCreditVal">20</b>
+          </div>
+          <button type="button" id="btnLobbyKids" class="cb-top-icon-btn cb-kids-btn" title="Cài đặt dành cho trẻ em / Kids Mode" aria-label="Trẻ em">
+            <span class="ico">👶</span>
+            <span id="cbLobbyKidsBadge" class="cb-badge-dot off"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Center Logo Banner matching Farm Brawl heading style -->
+      <div class="cb-header-banner">
+        <div class="cb-banner-logo-row">
+          <span class="cb-banner-ico">
+            <svg class="horse-cowboy-ico" viewBox="0 0 48 48" width="44" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 16 L6 6 L15 10 Z" fill="#935128" stroke="#4a250e" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M9 12 L7 7 L12 10 Z" fill="#f09898"/>
+            <path d="M38 16 L42 6 L33 10 Z" fill="#935128" stroke="#4a250e" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M39 12 L41 7 L36 10 Z" fill="#f09898"/>
+            <rect x="11" y="14" width="26" height="24" rx="11" fill="#b06432" stroke="#4a250e" stroke-width="2"/>
+            <path d="M20 13 C21 9, 27 9, 28 13 Z" fill="#381c0b"/>
+            <path d="M14 15 C14 5, 18 3, 24 4.5 C30 3, 34 5, 34 15 Z" fill="#754320" stroke="#361a08" stroke-width="1.8"/>
+            <path d="M21 4.5 C23 6, 25 6, 27 4.5" stroke="#361a08" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M14 13.5 C19 12, 29 12, 34 13.5 L34 15.5 C29 14, 19 14, 14 15.5 Z" fill="#2d1405"/>
+            <circle cx="24" cy="13.8" r="2.2" fill="#ffca28" stroke="#361a08" stroke-width="0.8"/>
+            <path d="M3 15 C12 8, 36 8, 45 15 C47 17.5, 39 19, 24 19 C9 19, 1 17.5, 3 15 Z" fill="#8d5227" stroke="#361a08" stroke-width="1.8"/>
+            <ellipse cx="18" cy="24.5" rx="3.2" ry="3.8" fill="#1b1008"/>
+            <circle cx="19.2" cy="23.2" r="1.3" fill="#ffffff"/>
+            <circle cx="17.2" cy="26" r="0.6" fill="#ffffff"/>
+            <ellipse cx="30" cy="24.5" rx="3.2" ry="3.8" fill="#1b1008"/>
+            <circle cx="31.2" cy="23.2" r="1.3" fill="#ffffff"/>
+            <circle cx="29.2" cy="26" r="0.6" fill="#ffffff"/>
+            <ellipse cx="24" cy="34" rx="8" ry="5" fill="#f5d5b8" stroke="#8d5227" stroke-width="1.2"/>
+            <ellipse cx="20.5" cy="33.8" rx="1.4" ry="1.7" fill="#4a250e"/>
+            <ellipse cx="27.5" cy="33.8" rx="1.4" ry="1.7" fill="#4a250e"/>
+            <path d="M21.5 36.5 C23 37.5, 25 37.5, 26.5 36.5" stroke="#4a250e" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          </span>
+          <h2 class="cb-banner-title" data-i18n="cb_title">CAO BỒI KÉO BÒ</h2>
+        </div>
+        <p class="cb-banner-subtitle" data-i18n="cb_subtitle">Quăng dây chuẩn xác • Bắt thần thú giật thưởng điểm cao!</p>
+      </div>
+
+      <!-- Main Cowboy Lobby Body (2 symmetrical balanced columns) -->
+      <div class="cb-lobby-body">
+        <!-- Left Column: Map Selector -->
+        <div class="cb-lobby-col-left">
+          <p class="sec-label" data-i18n="cb_pick_map">CHỌN BẢN ĐỒ / ĐỊA HÌNH 3D</p>
+          <div class="cb-map-selector">
+            <button type="button" class="cb-map-card on" data-theme="farm">
+              <div class="map-thumb map-farm">
+                <span class="map-ico">🏞️</span>
+              </div>
+              <div class="map-meta">
+                <h4 class="map-name" data-i18n="cb_map_farm_name">Nông Trại Vui Vẻ</h4>
+                <p class="map-desc" data-i18n="cb_map_farm_desc">Đồng cỏ xanh ngát, cây táo đỏ, cối xay gió &amp; hàng rào gỗ cổ điển.</p>
+              </div>
+              <span class="map-check">✓</span>
+            </button>
+
+            <button type="button" class="cb-map-card" data-theme="prairie">
+              <div class="map-thumb map-prairie">
+                <span class="map-ico">🏜️</span>
+              </div>
+              <div class="map-meta">
+                <h4 class="map-name" data-i18n="cb_map_prairie_name">Hẻm Núi Viễn Tây</h4>
+                <p class="map-desc" data-i18n="cb_map_prairie_desc">Sa mạc đỏ rực, xương rồng saguaro, xe chở quặng vàng &amp; bụi mù mịt.</p>
+              </div>
+              <span class="map-check">✓</span>
+            </button>
+
+            <button type="button" class="cb-map-card" data-theme="ice">
+              <div class="map-thumb map-ice">
+                <span class="map-ico">❄️</span>
+              </div>
+              <div class="map-meta">
+                <h4 class="map-name" data-i18n="cb_map_ice_name">Thung Lũng Băng Tuyết</h4>
+                <p class="map-desc" data-i18n="cb_map_ice_desc">Thông phủ tuyết trắng, tinh thể pha lê băng phát sáng &amp; mưa tuyết rơi.</p>
+              </div>
+              <span class="map-check">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Column: Rules & Play Button (Matching VÀO NÔNG TRẠI style) -->
+        <div class="cb-lobby-col-right">
+          <p class="sec-label" data-i18n="cb_rules_title">CƠ CHẾ VÒNG CHƠI</p>
+          <div class="cb-rules-card">
+            <div class="cb-rule-row">
+              <span class="r-ico">⏱️</span>
+              <div class="r-txt" data-i18n="cb_rule_3min"><b>3 Phút Mỗi Vòng:</b> Quăng dây trúng thú giật điểm thưởng! Hết giờ mở Cửa hàng.</div>
+            </div>
+            <div class="cb-rule-row">
+              <span class="r-ico">⚡</span>
+              <div class="r-txt" data-i18n="cb_rule_auto10s"><b>Tự Động Quăng Sau 10s:</b> Nếu bạn giữ dây không bấm trong 10 giây, dây sẽ tự động phóng!</div>
+            </div>
+            <div class="cb-rule-row">
+              <span class="r-ico">✨</span>
+              <div class="r-txt" data-i18n="cb_rule_mythic"><b>Thú Hiếm &amp; Thần Thoại:</b> Cơ hội gặp thú Lấp Lánh x2 điểm và Thú Cầu Vồng x3 điểm siêu hiếm!</div>
+            </div>
+            <div class="cb-rule-row">
+              <span class="r-ico">🎒</span>
+              <div class="r-txt" data-i18n="cb_rule_items"><b>Vật Phẩm Trợ Thủ:</b> Giày tăng tốc, Khiên chống hụt, Thuốc tăng lực XXX, Lưới cầu vồng quét sạch màn hình.</div>
+            </div>
+          </div>
+
+          <!-- Big Play Button matching VÀO NÔNG TRẠI red style -->
+          <button type="button" id="btnStartCowboyGame" class="btn-red play-btn-main cb-btn-start-game" data-i18n="cb_enter_btn">
+            VÀO TRẬN KÉO BÒ
+          </button>
+        </div>
+      </div>
+    </div>
+    </div> <!-- .lobby-tabs-wrapper -->
+
+    <!-- Cowboy Kids Mode Modal -->
+    <div id="cowboyKidsModal" class="center-modal-wrap" hidden>
+      <div class="center-modal-card cb-kids-modal-card">
+        <div class="cm-icon">🛡️</div>
+        <h3 class="cm-title" data-i18n="cb_kids_title">CÀI ĐẶT DÀNH CHO TRẺ EM</h3>
+        <p class="cm-desc" data-i18n="cb_kids_desc">Quản lý thời lượng chơi và hạn mức Credit mỗi ngày của bé.</p>
+
+        <div class="cb-kids-form">
+          <div class="cb-form-group">
+            <label class="cb-form-label">
+              <span data-i18n="cb_kids_enable">Bật chế độ trẻ em:</span>
+              <input type="checkbox" id="cbKidsToggleEnable" class="cb-toggle-switch">
+            </label>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-form-label" data-i18n="cb_kids_time_limit">Thời gian chơi tối đa mỗi phiên:</label>
+            <div class="cb-time-options">
+              <button type="button" class="cb-time-opt" data-minutes="15">15 Phút</button>
+              <button type="button" class="cb-time-opt on" data-minutes="30">30 Phút</button>
+              <button type="button" class="cb-time-opt" data-minutes="45">45 Phút</button>
+              <button type="button" class="cb-time-opt" data-minutes="60">60 Phút</button>
+            </div>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-form-label" data-i18n="cb_kids_credit_limit">Hạn mức Credit tối đa mỗi ngày (Tối đa 20):</label>
+            <div class="cb-credit-limit-row">
+              <input type="range" id="cbKidsCreditLimit" min="5" max="20" step="1" value="20" class="cb-slider">
+              <span id="cbKidsCreditLimitVal" class="cb-limit-val">20 Credit</span>
+            </div>
+            <small class="cb-hint" data-i18n="cb_kids_credit_hint">Credit tối đa của bé không vượt quá giới hạn 20 của người chơi thường.</small>
+          </div>
+
+          <div class="cb-form-group">
+            <label class="cb-form-label" data-i18n="cb_kids_pin_label">Mã PIN phụ huynh (4 chữ số):</label>
+            <input type="password" id="cbKidsPinInput" maxlength="4" placeholder="Mặc định: 1234" class="cb-pin-input">
+          </div>
+        </div>
+
+        <div class="cm-actions">
+          <button type="button" id="btnCancelKidsModal" class="cm-btn cm-btn-cancel" data-i18n="cb_cancel">HỦY BỎ</button>
+          <button type="button" id="btnSaveKidsModal" class="cm-btn cm-btn-confirm" data-i18n="cb_save">LƯU CÀI ĐẶT</button>
         </div>
       </div>
     </div>

@@ -2116,6 +2116,32 @@ describe('fruit trees', () => {
       expect(w.players.get(pId)!.species).toBe('elephant');
     });
 
+    it('secret easter egg: names containing Cho / Chó / Dog / Cún get 100% dog on random', () => {
+      const dogNames = [
+        'Cho',
+        'cho',
+        'CHÓ',
+        'Chó Con',
+        'chú cún',
+        'Dog',
+        'doggy',
+        'MyDog',
+        '🐶 Cún Yêu',
+        '[VIP] Cho',
+      ];
+
+      for (const name of dogNames) {
+        expect(getEasterEggSpeciesFromName(name)).toBe('dog');
+        for (let i = 0; i < 5; i++) {
+          expect(pickRandomSpecies(name)).toBe('dog');
+        }
+      }
+
+      const w = emptyWorld();
+      const pId = w.addPlayer('Chó Cưng', 'random' as any);
+      expect(w.players.get(pId)!.species).toBe('dog');
+    });
+
     it('other names use normal random selection', () => {
       expect(getEasterEggSpeciesFromName('Gà Con')).toBeNull();
       expect(getEasterEggSpeciesFromName('Heo Ụt Ịt')).toBeNull();
@@ -3568,7 +3594,7 @@ describe('fruit trees', () => {
         expect(w.events.some((e) => e.k === 'swanIce' && e.id === sId)).toBe(true);
       });
 
-      it('Boar max charge throws mud boulder: slows and damages, Rainbow Boar roots for 3s', () => {
+      it('Boar max charge stands in place, throws mud boulder: roots 3s and damages, Rainbow Boar throws 3 boulders with 3s stun', () => {
         const w = emptyWorld();
         const bId = w.addPlayer('Boar', 'boar', false);
         const v1Id = w.addPlayer('NearVictim', 'sheep', false);
@@ -3580,19 +3606,32 @@ describe('fruit trees', () => {
         boar.holdT = 1.0;
         (w as any).dash(boar);
 
-        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 3.5)).toBe(true);
-        expect(v1.slowT).toBe(3.0);
+        expect(boar.vx).toBe(0);
+        expect(boar.vz).toBe(0);
+        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 3.8)).toBe(true);
+        expect(v1.rootT).toBe(3.0);
         expect(v1.mass).toBeLessThan(v1MassBefore);
 
-        // Rainbow Boar: roots enemy for 3.0s
+        // Rooted victim cannot dash while rootT > 0
+        v1.input.btn = true;
+        (w as any).handleButton(v1);
+        expect(v1.pressed).toBe(false);
+
+        // Rainbow Boar: 3 boulders with 3.0s stun
         const v2Id = w.addPlayer('FarVictim', 'cow', false);
         const v2 = place(w, v2Id, 18, 0, 500);
         boar.superT = 10;
         boar.holdT = 1.0;
         (w as any).dash(boar);
 
-        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 6.0 && e.rainbow === true)).toBe(true);
+        expect(boar.vx).toBe(0);
+        expect(boar.vz).toBe(0);
+        expect(w.events.some((e) => e.k === 'boarMud' && e.id === bId && e.r === 7.5 && e.rainbow === true)).toBe(true);
         expect(v2.stunT).toBe(3.0);
+
+        // Advance world steps: root decays properly
+        for (let t = 0; t < 65; t++) w.step();
+        expect(v1.rootT ?? 0).toBe(0);
       });
 
       it('Pegasus max charge flies for 10s, and Rainbow Pegasus drops 5 rainbow candies', () => {
@@ -3629,7 +3668,7 @@ describe('fruit trees', () => {
         (w as any).dash(bull);
 
         expect(w.events.some((e) => e.k === 'bullToss' && e.id === bId)).toBe(true);
-        expect(vic.tossT).toBe(1.2);
+        expect(vic.tossT).toBe(0.55);
         expect(vic.stunT).toBeGreaterThanOrEqual(1.8);
 
         // Step simulation for 1.3s so toss completes and victim lands
@@ -3741,7 +3780,7 @@ describe('fruit trees', () => {
         (w as any).executeBullSkill(bull, true, true);
         expect(small.alive).toBe(false);
         expect(big.alive).toBe(true);
-        expect(big.tossT).toBe(1.4);
+        expect(big.tossT).toBe(0.65);
         expect(big.squishT).toBe(1.5);
       });
 
@@ -3840,7 +3879,7 @@ describe('fruit trees', () => {
 
         // p2 is knocked down
         expect(p2.flightT).toBe(0);
-        expect(p2.tossT).toBe(1.2);
+        expect(p2.tossT).toBe(0.55);
         expect(p2.squishT).toBe(1.2);
 
         // groundPig is untouched

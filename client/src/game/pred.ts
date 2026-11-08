@@ -37,6 +37,7 @@ export class ClientPredictor {
   stunned = false;
   stunT = 0;
   plow = false;
+  lastFlags = 0;
   podShieldActive = true;
   currentSeq = 0;
 
@@ -132,6 +133,7 @@ export class ClientPredictor {
     }
 
     const isServerStun = (flags & 8) !== 0;
+    this.lastFlags = flags;
     this.isLeaping = this.leapT > 0;
     if (this.isLeaping) {
       this.stunned = false;
@@ -192,7 +194,7 @@ export class ClientPredictor {
   }
 
   predictDash(species: Species, held: number, aimA: number, map: MapData | null, isSuper = false, _dashSeq?: number): void {
-    if (!this.on || this.stunned || this.stunT > 0) return;
+    if (!this.on || this.stunned || this.stunT > 0 || (this.lastFlags & FLAG.ROOT) !== 0) return;
     const inWater = map ? map.pond.some((b) => insideBlob(b, this.x, this.z)) : false;
     if (inWater) return;
 
@@ -323,6 +325,13 @@ export class ClientPredictor {
         return;
       }
       if (species === 'boar') {
+        if (held >= 0.75) {
+          this.vx = 0;
+          this.vz = 0;
+          this.dashT = 0.35;
+          this.plow = false;
+          return;
+        }
         const speed = 44 * (1 + 0.4 * c);
         this.vx = Math.cos(aimA) * speed;
         this.vz = Math.sin(aimA) * speed;
@@ -397,12 +406,14 @@ export class ClientPredictor {
     _metas?: any
   ): void {
     if (!this.on || !map) return;
+    this.lastFlags = flags;
     const stun = (flags & 8) !== 0 || this.stunned || this.stunT > 0;
+    const rooted = (flags & FLAG.ROOT) !== 0;
     // Wolf bite frenzy: the server pins the wolf in place between bites (it teleports via wolfBite events)
     const wolfFrenzy = species === 'wolf' && (flags & FLAG.WOLF_FRENZY) !== 0;
     const mm = Math.max(1, myMass);
-    const charging = !stun && !wolfFrenzy && holding;
-    const canMove = !stun && !wolfFrenzy && aimMove;
+    const charging = !stun && !wolfFrenzy && !rooted && holding;
+    const canMove = !stun && !wolfFrenzy && !rooted && aimMove;
     const plowing = (flags & 2) !== 0 || this.plow;
 
     for (let left = dt; left > 1e-4;) {
@@ -439,7 +450,8 @@ export class ClientPredictor {
 
       const spMult = TRAITS[species]?.speed ?? 1.0;
       const pegasusFlightMult = (species === 'pegasus' && (flags & FLAG.SUPER) !== 0 && this.flightT > 0) ? 1.45 : 1.0;
-      const maxSp = CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult * pegasusFlightMult;
+      const isBoarChargingStationary = species === 'boar' && charging && (mm >= 3000 || (flags & FLAG.SUPER) !== 0);
+      const maxSp = isBoarChargingStationary ? 0 : CFG.MOVE_SPEED * spMult * Math.pow(20 / mm, 0.15) * terrain * (charging ? 0.45 : 1) * speedMult * pegasusFlightMult;
 
       if (this.leapT > 0) {
         this.leapT = Math.max(0, this.leapT - h);

@@ -62,6 +62,7 @@ export const FLAG = {
   WOLF_FRENZY: 2097152,
   TOSSED: 4194304,
   BURNING: 8388608,
+  ROOT: 16777216,
 } as const;
 
 export type DeathCause = 'fence' | 'drown' | 'well' | 'fire' | 'starve' | 'till' | 'dynamite' | 'crush';

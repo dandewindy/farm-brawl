@@ -174,6 +174,11 @@ export function getEasterEggSpeciesFromName(name: string): Species | null {
   // Also strip common clan tags in brackets, parentheses, or emojis at start: e.g. "[VN] Khỉ", "(VN) Voi", "👑 Khỉ"
   clean = clean.replace(/^(\[[^\]]*\]|\([^)]*\)|<[^>]*>|[\s\p{P}\p{S}]+)/u, '').trim();
 
+  // Names containing "Cho" / "Chó" / "Dog" / "Cún" get 100% dog on random selection
+  if (clean.includes('cho') || clean.includes('dog') || clean.includes('cun')) {
+    return 'dog';
+  }
+
   if (
     clean.startsWith('monkey') || clean.startsWith('money') || clean.startsWith('khi')
   ) {
