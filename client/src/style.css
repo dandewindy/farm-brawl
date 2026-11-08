@@ -6917,8 +6917,10 @@ body.mobile-phone #adminToggleBtn {
 /* Big Tactile 3D Red Push Button (Sanwa Style) */
 .cowboy-launch-area {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
 }
 .cowboy-red-button {
   position: relative;
@@ -7903,24 +7905,27 @@ body.mobile-phone #adminToggleBtn {
   box-shadow: none;
 }
 
-/* Auto Launch Hint Badge */
+/* Auto Launch Hint - Clean text directly below red throw button */
 .cb-auto-launch-hint {
-  display: inline-block;
-  margin-bottom: 6px;
-  padding: 3px 10px;
-  background: rgba(0, 0, 0, 0.65);
-  border: 1px solid rgba(255, 214, 71, 0.5);
-  border-radius: 12px;
+  display: block;
+  margin-top: 2px;
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
   font-family: var(--f-body, sans-serif);
   font-size: 11px;
   font-weight: 700;
-  color: #ffd647;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  color: #ffeb99;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  letter-spacing: 0.2px;
 }
 
+.cb-auto-launch-hint span,
 .cb-auto-launch-hint b {
-  font-size: 13px;
-  color: #ff5252;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffeb99;
 }
 
 /* 5. Cowboy Shop Overlay & Wooden Cards Grid */
@@ -8570,15 +8575,16 @@ body.mobile-phone #adminToggleBtn {
     font-size: 8px;
   }
   .cowboy-launch-area {
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    gap: 8px;
+    justify-content: center;
+    gap: 3px;
   }
   .cb-auto-launch-hint {
-    font-size: 9px;
-    padding: 2px 6px;
+    font-size: 10px;
+    padding: 0;
+    background: transparent;
+    border: none;
   }
   .cowboy-red-button {
     width: 110px;
@@ -8868,11 +8874,16 @@ body.mobile-phone #adminToggleBtn {
     font-size: 7.5px;
   }
   .cowboy-launch-area {
-    gap: 3px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
   }
   .cb-auto-launch-hint {
-    font-size: 8px;
-    padding: 1px 4px;
+    font-size: 9px;
+    padding: 0;
+    background: transparent;
+    border: none;
   }
   .cowboy-red-button {
     width: 78px;
@@ -9276,4 +9287,611 @@ body.mobile-phone #adminToggleBtn {
   font-size: 13px;
   padding: 24px 10px;
   grid-column: 1 / -1;
+}
+
+/* =========================================================================
+   5. FULLSCREEN 3D GAME SHOP (CỬA HÀNG BÁC NÔNG DÂN)
+   ========================================================================= */
+
+.cowboy-shop-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100010;
+  background: #1a0f0a;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--f-body, sans-serif);
+}
+
+.cb-shop-3d-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.cb-shop-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cb-shop-ui-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+/* Header bar */
+.cb-shop-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+  background: linear-gradient(180deg, rgba(20, 10, 6, 0.88) 0%, rgba(20, 10, 6, 0.45) 85%, transparent 100%);
+  padding: 12px 20px;
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 214, 71, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.cb-shop-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cb-brand-ico {
+  font-size: 38px;
+  filter: drop-shadow(0 2px 8px rgba(255, 214, 71, 0.5));
+}
+
+.cb-brand-title {
+  margin: 0;
+  font-family: var(--f-title, sans-serif);
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffd647;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 16px rgba(255, 179, 0, 0.5);
+  letter-spacing: 1px;
+}
+
+.cb-brand-subtitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffecb3;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.8px;
+}
+
+.cb-shop-wallet-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #3e2723, #1b0000);
+  border: 2px solid #ffd54f;
+  padding: 8px 18px;
+  border-radius: 28px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.cb-shop-wallet-badge .w-ico {
+  font-size: 26px;
+  animation: coinGlow 2s infinite ease-in-out;
+}
+
+.cb-shop-wallet-badge .w-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffd54f;
+  letter-spacing: 0.6px;
+  display: block;
+}
+
+.cb-shop-wallet-badge .w-val {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Farmer Speech Bubble */
+.cb-farmer-speech-bubble {
+  position: absolute;
+  top: 96px;
+  left: 36px;
+  max-width: 380px;
+  background: rgba(33, 17, 10, 0.92);
+  border: 2px solid #ffd647;
+  border-radius: 16px;
+  padding: 12px 18px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: bubblePop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.cb-farmer-speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 32px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 12px solid #ffd647;
+}
+
+.speech-avatar {
+  font-size: 32px;
+}
+
+.speech-name {
+  font-size: 13px;
+  color: #ffd54f;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.speech-msg {
+  margin: 0;
+  font-size: 12px;
+  color: #fff8e1;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+/* Shelves UI grid */
+.cb-shop-shelves-ui {
+  position: absolute;
+  top: 14%;
+  left: 28%;
+  right: 14%;
+  bottom: 15%;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cb-shop-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 18px 24px;
+  width: 100%;
+  max-width: 760px;
+  height: 72%;
+}
+
+.cb-shelf-slot {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(43, 27, 18, 0.35);
+  border: 1.5px solid rgba(212, 163, 89, 0.45);
+  border-radius: 14px;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.cb-shelf-slot:hover {
+  transform: translateY(-4px) scale(1.02);
+  background: rgba(62, 39, 35, 0.7);
+  border-color: #ffd54f;
+  box-shadow: 0 10px 24px rgba(255, 213, 79, 0.35);
+}
+
+.cb-shelf-slot.is-equipped {
+  border-color: #00e676;
+  background: rgba(0, 200, 83, 0.15);
+}
+
+.slot-badge-top {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.slot-stat-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd54f;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  margin-top: auto;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.slot-owned-count {
+  font-size: 10px;
+  color: #e0e0e0;
+  margin-bottom: 6px;
+}
+
+.slot-owned-count b {
+  color: #00e676;
+  font-size: 11px;
+}
+
+.slot-actions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 4px;
+}
+
+.btn-slot-buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #ffb300, #ff8f00);
+  border: none;
+  border-radius: 18px;
+  padding: 6px 12px;
+  color: #3e2723;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #b26a00, 0 4px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.btn-slot-buy:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #b26a00;
+}
+
+.btn-slot-equip {
+  background: linear-gradient(180deg, #43a047, #2e7d32);
+  border: none;
+  border-radius: 14px;
+  padding: 4px 10px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #1b5e20;
+}
+
+.btn-slot-equip.equipped {
+  background: linear-gradient(180deg, #00c853, #009624);
+}
+
+/* Floating Tooltip */
+.cb-item-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 100020;
+  background: #2b170e;
+  border: 2px solid #ffd54f;
+  border-radius: 14px;
+  padding: 14px 18px;
+  max-width: 320px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.cb-item-tooltip .tip-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tip-icon {
+  font-size: 28px;
+}
+
+.tip-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffd54f;
+}
+
+.tip-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #00e676;
+}
+
+.tip-desc {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #ffecb3;
+  line-height: 1.45;
+}
+
+.tip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 213, 79, 0.3);
+  padding-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tip-owned {
+  color: #e0e0e0;
+}
+
+.tip-price {
+  color: #ffd54f;
+}
+
+/* Bottom Bar */
+.cb-shop-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+  padding: 10px 14px;
+  background: linear-gradient(0deg, rgba(20, 10, 6, 0.9) 0%, rgba(20, 10, 6, 0.5) 85%, transparent 100%);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.cb-btn-shop-exit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(180deg, #5d4037, #3e2723);
+  border: 2px solid #8d6e63;
+  border-radius: 28px;
+  color: #efebe9;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #271611, 0 6px 14px rgba(0, 0, 0, 0.6);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.cb-btn-shop-exit:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #271611;
+}
+
+.cb-btn-shop-next {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 34px;
+  background: linear-gradient(180deg, #00e676, #00a152);
+  border: 2.5px solid #b9f6ca;
+  border-radius: 32px;
+  color: #003314;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #006020, 0 8px 20px rgba(0, 230, 118, 0.45);
+  transition: transform 0.08s, box-shadow 0.08s;
+  letter-spacing: 0.5px;
+}
+
+.cb-btn-shop-next:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #006020;
+}
+
+.cb-btn-shop-next .btn-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: #004d1a;
+  display: block;
+}
+
+/* Simplified Confirm Modal */
+.cb-shop-confirm-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 100030;
+  background: rgba(10, 5, 3, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.cb-shop-confirm-card {
+  width: 90%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #3e2723, #23120b);
+  border: 3px solid #ffd54f;
+  border-radius: 18px;
+  padding: 24px 28px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9);
+  text-align: center;
+  animation: zoomIn 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.cf-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.cf-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #ffd54f;
+  font-weight: 900;
+}
+
+.cf-desc {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #ffecb3;
+  line-height: 1.45;
+}
+
+.cf-price-badge {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 213, 79, 0.5);
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffd54f;
+  margin-bottom: 18px;
+}
+
+.cf-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.cf-btn-cancel {
+  flex: 1;
+  padding: 10px 16px;
+  background: #4e342e;
+  border: 1.5px solid #6d4c41;
+  border-radius: 12px;
+  color: #d7ccc8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cf-btn-buy {
+  flex: 1.2;
+  padding: 10px 20px;
+  background: linear-gradient(180deg, #ffb300, #ff8f00);
+  border: 2px solid #ffe082;
+  border-radius: 12px;
+  color: #3e2723;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #b26a00;
+}
+
+@keyframes bubblePop {
+  0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes coinGlow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px #ffd54f); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 8px #ffd54f); }
+}
+
+/* Fix hidden and modal visibility */
+.cb-shop-confirm-modal-wrap[hidden],
+.cb-item-tooltip[hidden],
+#cowboyShopRoot[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .cb-brand-title {
+    font-size: 19px;
+  }
+  .cb-brand-subtitle {
+    font-size: 10px;
+  }
+  .cb-shop-shelves-ui {
+    top: 17%;
+    left: 20%;
+    right: 5%;
+    bottom: 15%;
+  }
+  .cb-shop-slots-grid {
+    gap: 10px 14px;
+    max-width: 580px;
+  }
+  .cb-farmer-speech-bubble {
+    top: 80px;
+    left: 16px;
+    max-width: 250px;
+    padding: 10px 14px;
+  }
+  .cb-farmer-speech-bubble .speech-msg {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 650px) {
+  .cb-shop-header-bar {
+    padding: 8px 12px;
+  }
+  .cb-brand-title {
+    font-size: 16px;
+  }
+  .cb-brand-subtitle {
+    display: none;
+  }
+  .cb-farmer-speech-bubble {
+    display: none;
+  }
+  .cb-shop-shelves-ui {
+    inset: 72px 10px 72px 10px;
+    overflow-y: auto;
+    pointer-events: auto;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: 8px;
+  }
+  .cb-shop-slots-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto;
+    gap: 8px;
+    height: auto;
+    max-width: 100%;
+  }
+  .cb-shelf-slot {
+    padding: 6px 8px;
+  }
+  .slot-badge-top {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .slot-stat-pill {
+    font-size: 10px;
+  }
+  .btn-slot-buy {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .cb-btn-shop-next {
+    font-size: 14px;
+    padding: 8px 20px;
+  }
+  .cb-btn-shop-exit {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
 }

@@ -13,7 +13,7 @@ export class CowboyHud {
   private autoCountdownValEl!: HTMLElement;
   private betButtons: HTMLButtonElement[] = [];
   private launchBtn!: HTMLButtonElement;
-  private shopBtn!: HTMLButtonElement;
+
   public onOpenShop?: () => void;
   private backpackBtn!: HTMLButtonElement;
   private exitBtn!: HTMLButtonElement;
@@ -87,10 +87,6 @@ export class CowboyHud {
         </div>
 
         <div class="cowboy-top-actions">
-          <button type="button" id="cbShopBtn" class="cowboy-shop-btn" title="Cửa hàng / Shop">
-            <span class="ico">🏪</span>
-            <span class="txt" data-i18n="cb_shop_lbl">CỬA HÀNG</span>
-          </button>
           <button type="button" id="cbBackpackBtn" class="cowboy-backpack-btn" title="Kho vật phẩm trợ thủ">
             <span class="ico">🎒</span>
             <span class="txt" data-i18n="cb_backpack_lbl">KHO ĐỒ</span>
@@ -136,18 +132,18 @@ export class CowboyHud {
             </div>
           </div>
 
-          <!-- Auto Launch Hint & Big Tactile Red Button -->
+          <!-- Tactile Red Button with Auto Launch Hint directly underneath -->
           <div class="cowboy-launch-area">
-            <div id="cbAutoLaunchHint" class="cb-auto-launch-hint">
-              <span data-i18n="cb_auto_throw_hint">⏱️ Tự động quăng sau:</span> <b id="cbAutoCountdown">10</b>s
-            </div>
             <button type="button" id="cbLaunchBtn" class="cowboy-red-button">
               <div class="btn-top">
                 <span class="ico">🎯</span>
                 <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
-                <small data-i18n="cb_space_hint">(Phím Space)</small>
+                <small data-i18n="cb_space_hint">Space</small>
               </div>
             </button>
+            <div id="cbAutoLaunchHint" class="cb-auto-launch-hint">
+              <span data-i18n="cb_auto_throw_hint">Tự động sau:</span> <span id="cbAutoCountdown">10</span>s
+            </div>
           </div>
         </div>
       </div>
@@ -186,10 +182,7 @@ export class CowboyHud {
     this.roundTimerValEl = this.rootEl.querySelector('#cbRoundTimerVal')!;
     this.autoCountdownValEl = this.rootEl.querySelector('#cbAutoCountdown')!;
     this.launchBtn = this.rootEl.querySelector('#cbLaunchBtn')!;
-    this.shopBtn = this.rootEl.querySelector('#cbShopBtn')!;
-    this.shopBtn?.addEventListener('click', () => {
-      this.onOpenShop?.();
-    });
+    // Shop button removed from active gameplay HUD (opens automatically when round ends)
     this.backpackBtn = this.rootEl.querySelector('#cbBackpackBtn')!;
     this.exitBtn = this.rootEl.querySelector('#cbExitBtn')!;
     this.toastBox = this.rootEl.querySelector('#cbToastBox')!;

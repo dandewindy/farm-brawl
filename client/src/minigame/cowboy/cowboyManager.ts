@@ -293,6 +293,11 @@ export class CowboyManager {
       this.hud?.updateInventory();
     };
 
+    // Thoát trò chơi từ Cửa Hàng
+    this.shop.onExit = () => {
+      this.close();
+    };
+
     // Thoát ra Lobby
     this.hud.onExit = () => {
       this.close();
@@ -310,6 +315,7 @@ export class CowboyManager {
     }
     const duration = hasTimeClock ? 240 : 180;
     this.hud?.startRoundTimer(duration);
+    this.arena?.syncReadyRopes();
     this.arena?.start();
   }
 
@@ -362,7 +368,7 @@ export class CowboyManager {
     }
 
     if (this.shop) {
-      this.shop.close();
+      this.shop.destroy();
       this.shop = null;
     }
 

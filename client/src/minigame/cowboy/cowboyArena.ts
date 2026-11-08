@@ -1461,9 +1461,15 @@ export class CowboyArena {
     const targetY = target[1];
     const targetZ = target[2];
 
-    // Vòng thòng lọng cố định 1 vị trí, nghiêng theo góc nhìn thứ 1 tạo hình elip/oval dẹt theo chiều cao
-    rope.loopMesh.position.set(targetX, targetY, targetZ);
-    rope.loopMesh.rotation.set(0.68, 0, 0); // Giữ cố định góc nghiêng elip dẹt
+    // Toàn bộ sợi dây thòng lọng dao động nhẹ nhàng, tự nhiên trong không gian 3D
+    const oscY = Math.sin(time * 3.2 + i * 0.9) * 0.055;
+    const oscX = Math.cos(time * 2.4 + i * 0.7) * 0.035;
+    const oscZ = Math.sin(time * 2.8 + i * 0.8) * 0.025;
+    rope.loopMesh.position.set(targetX + oscX, targetY + oscY, targetZ + oscZ);
+
+    const oscPitch = Math.sin(time * 2.5 + i) * 0.045;
+    const oscRoll = Math.cos(time * 2.1 + i) * 0.04;
+    rope.loopMesh.rotation.set(0.68 + oscPitch, 0, oscRoll);
     rope.loopMesh.scale.set(1.0, 1.0, 1.0);
 
     // Nút thắt (honda) xoay tròn liên tục quanh vành elip của thòng lọng
@@ -1491,9 +1497,12 @@ export class CowboyArena {
       const t = s / 16;
       const it = 1 - t;
 
-      const sag = Math.sin(t * Math.PI) * -0.12;
-      const waveX = Math.sin(time * 5.5 + t * 4.0 + i) * 0.022 * t;
-      const waveY = Math.cos(time * 4.5 + t * 3.5 + i) * 0.018 * t;
+      // Biên độ dao động suy giảm về 0 ở cả 2 đầu t=0 (tay) và t=1 (nút thắt)
+      // Đảm bảo đuôi dây luôn tracking dính chặt 100% vào vòng dây không bị tách rời
+      const env = Math.sin(t * Math.PI);
+      const sag = env * -0.12;
+      const waveX = Math.sin(time * 4.8 + t * 4.0 + i) * 0.032 * env;
+      const waveY = Math.cos(time * 3.8 + t * 3.5 + i) * 0.025 * env;
 
       const curX = it * startX + t * endX + waveX;
       const curY = it * startY + t * endY + sag + waveY;
