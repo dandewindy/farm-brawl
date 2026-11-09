@@ -9586,35 +9586,36 @@ body.mobile-phone #adminToggleBtn {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
-/* Farmer Speech Bubble */
+/* Farmer Speech Bubble - Căn chỉnh gần đầu và tay Bác Nông Dân */
 .cb-farmer-speech-bubble {
   position: absolute;
-  top: 96px;
-  left: 36px;
-  max-width: 380px;
-  background: rgba(33, 17, 10, 0.92);
-  border: 2px solid #ffd647;
-  border-radius: 16px;
+  top: 25%;
+  left: 7%;
+  max-width: 330px;
+  background: rgba(33, 17, 10, 0.94);
+  border: 2.5px solid #ffd647;
+  border-radius: 18px;
   padding: 12px 18px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
   pointer-events: auto;
   display: flex;
   align-items: flex-start;
   gap: 12px;
   animation: bubblePop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  z-index: 10;
 }
 
 .cb-farmer-speech-bubble::after {
   content: '';
   position: absolute;
-  bottom: -12px;
-  left: 32px;
+  bottom: -14px;
+  left: 54px;
   width: 0;
   height: 0;
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
-  border-top: 12px solid #ffd647;
+  border-top: 14px solid #ffd647;
 }
 
 .speech-avatar {
@@ -9914,19 +9915,25 @@ body.mobile-phone #adminToggleBtn {
 }
 
 .cb-btn-shop-exit {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
+  justify-content: center;
+  padding: 12px 28px;
   background: linear-gradient(180deg, #5d4037, #3e2723);
   border: 2px solid #8d6e63;
-  border-radius: 28px;
+  border-radius: 14px;
   color: #efebe9;
-  font-size: 14px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 4px 0 #271611, 0 6px 14px rgba(0, 0, 0, 0.6);
-  transition: transform 0.08s, box-shadow 0.08s;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
+  letter-spacing: 0.5px;
+}
+
+.cb-btn-shop-exit:hover {
+  filter: brightness(1.1);
 }
 
 .cb-btn-shop-exit:active {
@@ -9935,24 +9942,29 @@ body.mobile-phone #adminToggleBtn {
 }
 
 .cb-btn-shop-next {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 34px;
+  justify-content: center;
+  padding: 12px 36px;
   background: linear-gradient(180deg, #00e676, #00a152);
-  border: 2.5px solid #b9f6ca;
-  border-radius: 32px;
+  border: 2px solid #b9f6ca;
+  border-radius: 14px;
   color: #003314;
-  font-size: 18px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 17px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 6px 0 #006020, 0 8px 20px rgba(0, 230, 118, 0.45);
-  transition: transform 0.08s, box-shadow 0.08s;
+  box-shadow: 0 5px 0 #006020, 0 8px 20px rgba(0, 230, 118, 0.45);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
   letter-spacing: 0.5px;
 }
 
+.cb-btn-shop-next:hover {
+  filter: brightness(1.08);
+}
+
 .cb-btn-shop-next:active {
-  transform: translateY(3px);
+  transform: translateY(2px);
   box-shadow: 0 3px 0 #006020;
 }
 
@@ -10058,77 +10070,154 @@ body.mobile-phone #adminToggleBtn {
 }
 
 .cb-shop-confirm-card {
-  width: 90%;
-  max-width: 440px;
+  width: 92%;
+  max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  background: linear-gradient(180deg, #3e2723, #23120b);
+  background: linear-gradient(180deg, #381f17 0%, #20100a 100%);
   border: 3px solid #ffd54f;
-  border-radius: 18px;
-  padding: 24px 28px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9);
+  border-radius: 22px;
+  padding: 26px 30px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   text-align: center;
   animation: zoomIn 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
 .cf-icon {
-  font-size: 48px;
-  margin-bottom: 8px;
+  font-size: 52px;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
 }
 
 .cf-title {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0 0 6px;
+  font-size: 22px;
   color: #ffd54f;
   font-weight: 900;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  letter-spacing: 0.5px;
 }
 
 .cf-desc {
-  margin: 0 0 14px;
-  font-size: 13px;
+  margin: 0 0 16px;
+  font-size: 13.5px;
   color: #ffecb3;
-  line-height: 1.45;
+  line-height: 1.5;
+  text-wrap: balance;
 }
 
 .cf-price-badge {
-  display: inline-block;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 213, 79, 0.5);
-  padding: 6px 16px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1.5px solid rgba(255, 213, 79, 0.55);
+  padding: 6px 14px;
   border-radius: 16px;
   font-size: 13px;
   font-weight: 800;
   color: #ffd54f;
-  margin-bottom: 18px;
 }
 
 .cf-actions {
   display: flex;
-  gap: 12px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
 
-.cf-btn-cancel {
-  flex: 1;
-  padding: 10px 16px;
-  background: #4e342e;
-  border: 1.5px solid #6d4c41;
-  border-radius: 12px;
-  color: #d7ccc8;
-  font-weight: 700;
+.cf-action-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.cf-btn-buy,
+.cf-btn-equip {
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
   cursor: pointer;
+  white-space: nowrap;
+  text-align: center;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
 }
 
 .cf-btn-buy {
-  flex: 1.2;
-  padding: 10px 20px;
   background: linear-gradient(180deg, #ffb300, #ff8f00);
   border: 2px solid #ffe082;
+  color: #2b170e;
+  box-shadow: 0 4px 0 #b26a00, 0 4px 12px rgba(255, 179, 0, 0.4);
+}
+
+.cf-btn-buy:hover {
+  filter: brightness(1.08);
+}
+
+.cf-btn-buy:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #b26a00;
+}
+
+.cf-btn-equip {
+  background: linear-gradient(180deg, #43a047, #2e7d32);
+  border: 2px solid #81c784;
+  color: #ffffff;
+  box-shadow: 0 4px 0 #1b5e20, 0 4px 12px rgba(67, 160, 71, 0.35);
+}
+
+.cf-btn-equip:hover {
+  filter: brightness(1.08);
+}
+
+.cf-btn-equip:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1b5e20;
+}
+
+.cf-btn-equip.equipped {
+  background: linear-gradient(180deg, #ff9800, #f57c00);
+  border-color: #ffb74d;
+  box-shadow: 0 4px 0 #e65100, 0 4px 12px rgba(245, 124, 0, 0.35);
+}
+
+.cf-btn-cancel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, #4e342e, #3e2723);
+  border: 1.5px solid #6d4c41;
   border-radius: 12px;
-  color: #3e2723;
-  font-weight: 900;
+  color: #d7ccc8;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
   cursor: pointer;
-  box-shadow: 0 3px 0 #b26a00;
+  box-shadow: 0 3px 0 #271611;
+  transition: transform 0.08s, box-shadow 0.08s, background 0.12s;
+}
+
+.cf-btn-cancel:hover {
+  background: linear-gradient(180deg, #5d4037, #4e342e);
+  color: #fff;
+}
+
+.cf-btn-cancel:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #271611;
+}
+
+@media (max-width: 440px) {
+  .cf-action-row {
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 
 @keyframes zoomIn {

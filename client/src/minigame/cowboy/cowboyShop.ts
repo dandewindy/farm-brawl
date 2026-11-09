@@ -131,10 +131,9 @@ export class CowboyShop {
           </div>
         </div>
 
-        <!-- Bottom Action Bar (Qua màn mới & Thoát ở giữa và gần nhau) -->
+        <!-- Bottom Action Bar (Qua màn mới & Thoát ở giữa và gần nhau, bỏ icon theo chuẩn Farm Brawl) -->
         <div class="cb-shop-bottom-bar">
           <button type="button" id="cbShopNextRoundBtn" class="cb-btn-shop-next" title="Tiếp tục sang màn mới">
-            <span class="btn-ico">🎯</span>
             <div class="btn-body">
               <span class="btn-txt" data-i18n="cb_shop_next_round">${t('cb_shop_next_round')}</span>
               <small class="btn-sub" data-i18n="cb_shop_next_sub">${t('cb_shop_next_sub')}</small>
@@ -142,7 +141,6 @@ export class CowboyShop {
           </button>
 
           <button type="button" id="cbShopExitBtn" class="cb-btn-shop-exit" title="Thoát trò chơi về sảnh chính">
-            <span class="btn-ico">🚪</span>
             <span class="btn-txt" data-i18n="cb_exit">${t('cb_exit')}</span>
           </button>
         </div>
@@ -162,8 +160,10 @@ export class CowboyShop {
             <span class="cf-price-badge" id="cfPriceBadge">🪙 6 Credit</span>
           </div>
           <div class="cf-actions" id="cfActions">
-            <button type="button" id="cfEquipBtn" class="cf-btn-equip" hidden>🎒 TRANG BỊ</button>
-            <button type="button" id="cfConfirmBtn" class="cf-btn-buy">🪙 <span data-i18n="cb_buy_now">${t('cb_buy_now')}</span></button>
+            <div class="cf-action-row">
+              <button type="button" id="cfEquipBtn" class="cf-btn-equip" hidden>TRANG BỊ</button>
+              <button type="button" id="cfConfirmBtn" class="cf-btn-buy"><span data-i18n="cb_buy_now">${t('cb_buy_now')}</span></button>
+            </div>
             <button type="button" id="cfCancelBtn" class="cf-btn-cancel" data-i18n="cb_cancel">${t('cb_cancel')}</button>
           </div>
         </div>
@@ -394,7 +394,7 @@ export class CowboyShop {
       if (owned > 0) {
         cfEquipBtn.hidden = false;
         cfEquipBtn.style.display = 'block';
-        cfEquipBtn.textContent = isEquipped ? '✅ BỎ TRANG BỊ' : '🎒 TRANG BỊ NGAY';
+        cfEquipBtn.textContent = isEquipped ? 'BỎ TRANG BỊ' : 'TRANG BỊ NGAY';
         cfEquipBtn.className = `cf-btn-equip ${isEquipped ? 'equipped' : ''}`;
         cfEquipBtn.onclick = () => {
           if (cowboyInventory.isEquipped(item.kind)) {
@@ -414,7 +414,7 @@ export class CowboyShop {
 
     if (cfConfirmBtn) {
       const canAfford = this.wallet.getCredits() >= item.price;
-      cfConfirmBtn.innerHTML = `🪙 <span>MUA NGAY (${item.price} C)</span>`;
+      cfConfirmBtn.innerHTML = owned > 0 ? `MUA THÊM (${item.price} C)` : `MUA NGAY (${item.price} C)`;
       cfConfirmBtn.disabled = !canAfford;
       cfConfirmBtn.style.opacity = canAfford ? '1.0' : '0.65';
       cfConfirmBtn.style.cursor = canAfford ? 'pointer' : 'not-allowed';
@@ -477,7 +477,8 @@ export class CowboyShop {
         cowboyAudio.playReward();
 
         this.renderSlotsUI();
-        const msg = t('cb_shop_thank_you').replace('{item}', item.nameVi);
+        const itemName = item?.nameVi || 'vật phẩm';
+        const msg = t('cb_shop_thank_you', { item: itemName });
         this.showFarmerSpeech(msg);
       } else {
         alert(res.msg);

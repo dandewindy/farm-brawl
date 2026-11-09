@@ -83,15 +83,65 @@ export function buildFarmerNPC(): FarmerNPC {
     group.add(buckle);
   }
 
-  // Chân & Ủng cao su
+  // Chân & Ủng làm việc của Bác Nông Dân
   for (const x of [-0.24, 0.24]) {
     const leg = createMesh(new THREE.CylinderGeometry(0.18, 0.16, 0.75, 10), 0x1565c0, { roughness: 0.8 });
-    leg.position.set(x, 0.48, 0);
+    leg.position.set(x, 0.52, 0);
     group.add(leg);
 
-    const boot = createMesh(new THREE.BoxGeometry(0.24, 0.26, 0.42), 0x4e342e, { roughness: 0.5 });
-    boot.position.set(x, 0.13, 0.08);
-    group.add(boot);
+    const bootGroup = new THREE.Group();
+    bootGroup.position.set(x, 0, 0);
+
+    // Cổ ủng cao su ôm gấu quần bò
+    const bootShaft = createMesh(new THREE.CylinderGeometry(0.20, 0.18, 0.32, 12), 0x3e2723, { roughness: 0.6 });
+    bootShaft.position.set(0, 0.24, 0.02);
+    bootGroup.add(bootShaft);
+
+    // Vành cổ ủng viền gập da màu nâu đất
+    const bootCuff = createMesh(new THREE.TorusGeometry(0.20, 0.025, 8, 16), 0x5d4037, { roughness: 0.7 });
+    bootCuff.rotation.x = Math.PI / 2;
+    bootCuff.position.set(0, 0.38, 0.02);
+    bootGroup.add(bootCuff);
+
+    // Gót ủng bo tròn tự nhiên
+    const bootHeel = createMesh(new THREE.SphereGeometry(0.18, 12, 10), 0x3e2723, { roughness: 0.5 });
+    bootHeel.scale.set(1.0, 0.9, 1.1);
+    bootHeel.position.set(0, 0.17, -0.04);
+    bootGroup.add(bootHeel);
+
+    // Mũi ủng nông dân cong vểnh nhẹ về phía trước (không chạm đất)
+    const bootToe = createMesh(new THREE.SphereGeometry(0.18, 12, 10), 0x3e2723, { roughness: 0.5 });
+    bootToe.scale.set(1.05, 0.72, 1.30);
+    bootToe.position.set(0, 0.16, 0.16);
+    bootToe.rotation.x = -0.16;
+    bootGroup.add(bootToe);
+
+    // Đế ủng cao su chính dày dặn
+    const sole = createMesh(new THREE.BoxGeometry(0.28, 0.05, 0.54), 0x1f140e, {
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    sole.position.set(0, 0.065, 0.08);
+    bootGroup.add(sole);
+
+    // Gót nâng (Heel block) chắc chắn ở phía sau
+    const heelBlock = createMesh(new THREE.BoxGeometry(0.26, 0.04, 0.18), 0x150d09, { roughness: 0.95 });
+    heelBlock.position.set(0, 0.02, -0.08);
+    bootGroup.add(heelBlock);
+
+    // Rãnh khấc gai chống trượt (Lug treads) ở nửa trước bàn chân
+    for (let t = 0; t < 3; t++) {
+      const lug = createMesh(new THREE.BoxGeometry(0.24, 0.025, 0.05), 0x150d09, { roughness: 0.95 });
+      lug.position.set(0, 0.025, 0.06 + t * 0.08);
+      bootGroup.add(lug);
+    }
+
+    // Đường viền mép đế ủng (Welt)
+    const welt = createMesh(new THREE.BoxGeometry(0.29, 0.02, 0.55), 0x8d6e63, { roughness: 0.8 });
+    welt.position.set(0, 0.09, 0.08);
+    bootGroup.add(welt);
+
+    group.add(bootGroup);
   }
 
   // --- ĐẦU & KHUÔN MẶT BÁC NÔNG DÂN ---
@@ -329,25 +379,25 @@ export function buildShopStall(): THREE.Group {
   frontSkirt.position.set(0, 0.44, 1.05);
   stall.add(frontSkirt);
 
-  // Tầng kệ trên đặt tại y = 2.05, tầng kệ dưới tại y = 1.05
-  const topShelf = createMesh(new THREE.BoxGeometry(4.2, 0.14, 0.72), 0x795548, { roughness: 0.7 });
-  topShelf.position.set(0, 2.05, -0.15);
+  // Tầng kệ trên đặt tại y = 2.32, tầng kệ dưới tại y = 0.98 (Khoảng cách thông thoáng 1.34 unit)
+  const topShelf = createMesh(new THREE.BoxGeometry(4.4, 0.14, 0.74), 0x795548, { roughness: 0.7 });
+  topShelf.position.set(0, 2.32, -0.15);
   stall.add(topShelf);
 
-  const bottomShelf = createMesh(new THREE.BoxGeometry(4.2, 0.14, 0.72), 0x795548, { roughness: 0.7 });
-  bottomShelf.position.set(0, 1.05, 0.1);
+  const bottomShelf = createMesh(new THREE.BoxGeometry(4.4, 0.14, 0.74), 0x795548, { roughness: 0.7 });
+  bottomShelf.position.set(0, 0.98, 0.1);
   stall.add(bottomShelf);
 
-  // Cột trụ gỗ cao hơn vươn lên đỡ mái che y = 3.65
-  for (const x of [-2.05, 2.05]) {
-    const post = createMesh(new THREE.BoxGeometry(0.14, 3.6, 0.14), 0x3e2723, { roughness: 0.8 });
-    post.position.set(x, 1.8, -0.45);
+  // Cột trụ gỗ cao vươn lên đỡ mái che y = 3.82
+  for (const x of [-2.1, 2.1]) {
+    const post = createMesh(new THREE.BoxGeometry(0.14, 3.82, 0.14), 0x3e2723, { roughness: 0.8 });
+    post.position.set(x, 1.91, -0.45);
     stall.add(post);
   }
 
-  // MÁI CHE NÂNG CAO LÊN y = 3.65 (GÓC NGHIÊNG NHẸ 0.10 RAD) ĐỂ KHÔNG BAO GIỜ CHE VẬT PHẨM TẦNG TRÊN
+  // MÁI CHE NÂNG CAO LÊN y = 3.82 (GÓC NGHIÊNG NHẸ 0.10 RAD) ĐỂ KHÔNG BAO GIỜ CHE VẬT PHẨM TẦNG TRÊN
   const canopyGroup = new THREE.Group();
-  canopyGroup.position.set(0, 3.65, -0.22);
+  canopyGroup.position.set(0, 3.82, -0.22);
   canopyGroup.rotation.x = 0.10;
 
   const stripes = 8;
@@ -393,7 +443,7 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
   const isTop = slotIdx < 3;
   const col = slotIdx % 3;
   const posX = -1.35 + col * 1.35 + 0.65;
-  const posY = isTop ? 2.12 : 1.12;
+  const posY = isTop ? 2.39 : 1.05;
   const posZ = isTop ? -0.12 : 0.12;
 
   const pedestalPos = new THREE.Vector3(posX, posY, posZ);
@@ -417,7 +467,7 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
   group.add(rim);
 
   const floatingGroup = new THREE.Group();
-  floatingGroup.position.y = 0.42;
+  floatingGroup.position.y = 0.36;
   group.add(floatingGroup);
 
   const sparklesGroup = new THREE.Group();
@@ -533,8 +583,8 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
       floatingGroup.add(bead);
     }
   } else if (kind === 'strength_potion') {
-    // 🧪 Thuốc Tăng Lực: Bình thủy tinh bầu dục chứa thần dược tím sủi bọt
-    const bottleBody = createMesh(new THREE.SphereGeometry(0.32, 14, 12), 0x9c27b0, {
+    // 🧪 Thuốc Tăng Lực: Bình thủy tinh bầu dục chứa thần dược tím sủi bọt (chiều cao tối ưu không chạm kệ trên)
+    const bottleBody = createMesh(new THREE.SphereGeometry(0.27, 14, 12), 0x9c27b0, {
       metalness: 0.3,
       roughness: 0.15,
       emissive: 0x7b1fa2,
@@ -542,19 +592,19 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
       transparent: true,
       opacity: 0.88,
     });
-    bottleBody.scale.set(1.0, 1.15, 1.0);
+    bottleBody.scale.set(1.0, 1.12, 1.0);
     floatingGroup.add(bottleBody);
 
-    const neck = createMesh(new THREE.CylinderGeometry(0.12, 0.14, 0.24, 12), 0xba68c8, {
+    const neck = createMesh(new THREE.CylinderGeometry(0.10, 0.12, 0.16, 12), 0xba68c8, {
       roughness: 0.2,
       transparent: true,
       opacity: 0.9,
     });
-    neck.position.y = 0.38;
+    neck.position.y = 0.28;
     floatingGroup.add(neck);
 
-    const cork = createMesh(new THREE.CylinderGeometry(0.13, 0.11, 0.12, 10), 0x8d6e63, { roughness: 0.85 });
-    cork.position.y = 0.52;
+    const cork = createMesh(new THREE.CylinderGeometry(0.11, 0.09, 0.08, 10), 0x8d6e63, { roughness: 0.85 });
+    cork.position.y = 0.38;
     floatingGroup.add(cork);
   } else if (kind === 'lucky_clover') {
     // 🍀 Cỏ 4 Lá May Mắn: 4 cánh lá hình trái tim xòe tròn cùng giọt sương vàng
@@ -658,40 +708,109 @@ export interface ShopSack {
 
 export function buildShopSack(scene: THREE.Scene): ShopSack {
   const group = new THREE.Group();
-  group.position.set(2.85, 0.48, 0.9);
+  // Đặt túi bên ngoài bàn (X = 3.42, Y = 0.42, Z = 1.12), tiếp đất vững chãi Y >= 0
+  group.position.set(3.42, 0.42, 1.12);
+  group.rotation.y = -0.32;
 
-  const sackBody = createMesh(new THREE.SphereGeometry(0.48, 14, 12), 0xd4a359, {
+  // innerSackGroup chứa thân túi để rung lắc khi mua mà KHÔNG làm nghiêng các đồng xu trên sàn
+  const innerSack = new THREE.Group();
+  group.add(innerSack);
+
+  // Thân túi vải lụa vàng kim phồng tròn căng mọng
+  const sackBody = createMesh(new THREE.SphereGeometry(0.44, 16, 14), 0xc68a4c, {
     roughness: 0.75,
-    metalness: 0.25,
+    metalness: 0.15,
   });
-  sackBody.scale.set(1.15, 0.95, 1.15);
-  group.add(sackBody);
+  sackBody.scale.set(1.22, 0.94, 1.18);
+  innerSack.add(sackBody);
 
-  const neckTorus = createMesh(new THREE.TorusGeometry(0.24, 0.06, 8, 18), 0xffb300, {
-    metalness: 0.8,
-    roughness: 0.3,
-    emissive: 0xff8f00,
-    emissiveIntensity: 0.4,
+  // Đáy túi tiếp đất êm ái
+  const sackBase = createMesh(new THREE.CylinderGeometry(0.36, 0.42, 0.14, 16), 0xa06733, { roughness: 0.8 });
+  sackBase.position.y = -0.30;
+  innerSack.add(sackBase);
+
+  // Cổ túi thắt nơ dây thừng vàng kim óng ánh
+  const ropeTie = createMesh(new THREE.TorusGeometry(0.22, 0.045, 8, 20), 0xffd54f, {
+    metalness: 0.85,
+    roughness: 0.25,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.45,
   });
-  neckTorus.rotation.x = Math.PI / 2;
-  neckTorus.position.y = 0.42;
-  group.add(neckTorus);
+  ropeTie.rotation.x = Math.PI / 2;
+  ropeTie.position.y = 0.34;
+  innerSack.add(ropeTie);
 
-  const ruffle = createMesh(new THREE.ConeGeometry(0.32, 0.24, 12), 0xd4a359, { roughness: 0.8 });
-  ruffle.position.y = 0.54;
-  group.add(ruffle);
+  // Dây thừng thắt rủ xuống mặt túi
+  for (const s of [-0.08, 0.08]) {
+    const ropeTassel = createMesh(new THREE.ConeGeometry(0.04, 0.18, 8), 0xffd54f, {
+      metalness: 0.85,
+      roughness: 0.25,
+      emissive: 0xffa000,
+      emissiveIntensity: 0.35,
+    });
+    ropeTassel.position.set(s, 0.22, 0.24);
+    ropeTassel.rotation.x = 0.28;
+    innerSack.add(ropeTassel);
+  }
 
-  const coinBadge = createMesh(new THREE.CylinderGeometry(0.14, 0.14, 0.04, 14), 0xffd700, {
-    metalness: 0.9,
+  // Miệng túi xòe lượn sóng hé lộ kho báu
+  const ruffle = createMesh(new THREE.CylinderGeometry(0.32, 0.20, 0.22, 16, 1, true), 0xc68a4c, {
+    roughness: 0.75,
+  });
+  ruffle.position.y = 0.46;
+  innerSack.add(ruffle);
+
+  // Đống tiền vàng óng ánh bên trong miệng túi
+  const goldMound = createMesh(new THREE.SphereGeometry(0.20, 12, 10), 0xffd700, {
+    metalness: 0.95,
+    roughness: 0.15,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.65,
+  });
+  goldMound.scale.set(1.1, 0.6, 1.1);
+  goldMound.position.y = 0.44;
+  innerSack.add(goldMound);
+
+  // Các đồng xu vàng lẻ lấp lánh trên miệng túi
+  for (let c = 0; c < 5; c++) {
+    const coin = createMesh(new THREE.CylinderGeometry(0.065, 0.065, 0.02, 12), 0xffeb3b, {
+      metalness: 0.95,
+      roughness: 0.15,
+      emissive: 0xffc107,
+      emissiveIntensity: 0.8,
+    });
+    const ang = (c / 5) * Math.PI * 2;
+    coin.position.set(Math.cos(ang) * 0.14, 0.50 + (c % 2) * 0.02, Math.sin(ang) * 0.14);
+    coin.rotation.set(0.3 * (c % 3 - 1), ang, 0.2);
+    innerSack.add(coin);
+  }
+
+  // Huy hiệu đồng tiền vàng lớn nổi bật ở mặt trước túi
+  const coinBadge = createMesh(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 16), 0xffd700, {
+    metalness: 0.95,
     roughness: 0.2,
     emissive: 0xffa000,
-    emissiveIntensity: 0.6,
+    emissiveIntensity: 0.7,
   });
   coinBadge.rotation.x = Math.PI / 2;
-  coinBadge.position.set(0, 0.08, 0.52);
-  group.add(coinBadge);
+  coinBadge.position.set(0, 0.04, 0.48);
+  innerSack.add(coinBadge);
 
-  // FIX CODEX FINDING 1: Gắn trực tiếp flyingItem vào scene ngay khi khởi tạo
+  // Vài đồng tiền vàng rơi vãi duyên dáng trên sàn cạnh túi (gắn trực tiếp vào group cố định trên sàn)
+  for (let f = 0; f < 4; f++) {
+    const floorCoin = createMesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 12), 0xffd700, {
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0xffa000,
+      emissiveIntensity: 0.5,
+    });
+    const fAng = (f / 4) * Math.PI * 1.5 + 0.8;
+    floorCoin.position.set(Math.cos(fAng) * 0.52, -0.40, Math.sin(fAng) * 0.52);
+    floorCoin.rotation.y = f * 0.7;
+    group.add(floorCoin);
+  }
+
+  // Flying Item bay vào túi
   const flyingItem = new THREE.Group();
   flyingItem.visible = false;
   const flyingOrb = createMesh(new THREE.SphereGeometry(0.22, 12, 10), 0xffeb3b, {
@@ -702,7 +821,6 @@ export function buildShopSack(scene: THREE.Scene): ShopSack {
   });
   flyingItem.add(flyingOrb);
 
-  // Thêm 4 hạt kim cương lấp lánh bay cùng vật phẩm
   for (let s = 0; s < 4; s++) {
     const sp = createMesh(new THREE.OctahedronGeometry(0.07, 0), 0xffffff, {
       emissive: 0xffd54f,
@@ -723,7 +841,7 @@ export function buildShopSack(scene: THREE.Scene): ShopSack {
     group,
     triggerPurchaseHop: (startWorldPos: THREE.Vector3) => {
       startP.copy(startWorldPos);
-      group.getWorldPosition(endP);
+      innerSack.getWorldPosition(endP);
       endP.y += 0.45; // Đích đến là miệng túi
 
       hopProgress = 0;
@@ -734,41 +852,42 @@ export function buildShopSack(scene: THREE.Scene): ShopSack {
       flyingItem.scale.set(1.0, 1.0, 1.0);
     },
     update: (dt: number, time: number) => {
-      // 1. Animation rung lắc túi hàng khi mua
+      // 1. Animation rung lắc túi hàng khi mua (chỉ rung innerSack, tiền sàn đứng yên)
       if (shakeTime > 0) {
         shakeTime -= dt;
         const progress = Math.max(0, shakeTime / 0.65);
-        group.rotation.z = Math.sin(time * 36) * 0.24 * progress;
-        group.rotation.x = Math.cos(time * 28) * 0.16 * progress;
-        group.scale.y = 1.0 + Math.sin(time * 30) * 0.18 * progress;
+        innerSack.rotation.z = Math.sin(time * 36) * 0.24 * progress;
+        innerSack.rotation.x = Math.cos(time * 28) * 0.16 * progress;
+        innerSack.scale.y = 1.0 + Math.sin(time * 30) * 0.18 * progress;
       } else {
-        group.rotation.set(0, 0, 0);
-        group.scale.set(1.0, 1.0, 1.0);
+        innerSack.rotation.z = 0;
+        innerSack.rotation.x = 0;
+        innerSack.scale.y = 1.0;
       }
 
-      // 2. Animation vật phẩm nhảy parabol vào túi
+      // 2. Quỹ đạo bay hình parabol của item vào túi
       if (hopProgress < 1.0) {
-        hopProgress += dt * 2.2;
-        if (hopProgress >= 1.0) {
-          hopProgress = 1.0;
+        hopProgress += dt * 1.85;
+        const p = Math.min(1.0, hopProgress);
+
+        const currentPos = new THREE.Vector3().lerpVectors(startP, endP, p);
+        const arcY = Math.sin(p * Math.PI) * 1.6;
+        currentPos.y += arcY;
+        flyingItem.position.copy(currentPos);
+
+        flyingItem.rotation.y = time * 12;
+        flyingItem.rotation.x = time * 8;
+
+        const sc = 1.0 - p * 0.65;
+        flyingItem.scale.set(sc, sc, sc);
+
+        if (p >= 1.0) {
           flyingItem.visible = false;
-          shakeTime = 0.55;
-        } else {
-          const p = hopProgress;
-          flyingItem.position.x = startP.x + (endP.x - startP.x) * p;
-          flyingItem.position.z = startP.z + (endP.z - startP.z) * p;
-          flyingItem.position.y = startP.y + (endP.y - startP.y) * p + Math.sin(p * Math.PI) * 1.8;
-          flyingItem.rotation.y += dt * 12.0;
-          flyingItem.scale.setScalar(1.0 - p * 0.45);
         }
       }
     },
     dispose: () => {
-      if (flyingItem.parent) {
-        flyingItem.parent.remove(flyingItem);
-      }
-      disposeHierarchy(group);
-      disposeHierarchy(flyingItem);
+      scene.remove(flyingItem);
     },
   };
 }

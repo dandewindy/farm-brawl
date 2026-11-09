@@ -93,15 +93,12 @@ export class CowboyHud {
 
         <div class="cowboy-top-actions">
           <button type="button" id="cbAdminShopBtn" class="cowboy-shop-btn admin-shop-btn" title="[Admin] Mở Cửa Hàng bất kỳ lúc nào" hidden>
-            <span class="ico">🏪</span>
             <span class="txt">CỬA HÀNG</span>
           </button>
           <button type="button" id="cbBackpackBtn" class="cowboy-backpack-btn" title="Kho vật phẩm trợ thủ">
-            <span class="ico">🎒</span>
             <span class="txt" data-i18n="cb_backpack_lbl">KHO ĐỒ</span>
           </button>
           <button type="button" id="cbExitBtn" class="cowboy-exit-btn" title="Thoát ra sảnh chính">
-            <span class="ico">🚪</span>
             <span class="txt" data-i18n="cb_exit">THOÁT</span>
           </button>
         </div>
@@ -129,7 +126,6 @@ export class CowboyHud {
           <div class="cb-ctrl-col cb-ctrl-center">
             <button type="button" id="cbLaunchBtn" class="cowboy-red-button" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
               <div class="btn-top">
-                <span class="ico">🎯</span>
                 <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
                 <small class="key-hint" data-i18n="cb_space_hint">Space</small>
               </div>
@@ -176,8 +172,8 @@ export class CowboyHud {
           <h3 class="cm-title">HẾT CREDIT RỒI CAO BỒI ƠI!</h3>
           <p id="cbReliefMsg" class="cm-desc">Đừng lo, ban tổ chức tặng bạn <b>5 Credit cứu trợ</b> để tiếp tục trổ tài kéo bò!</p>
           <div class="cm-actions">
-            <button type="button" id="cbClaimReliefBtn" class="cb-btn-relief">🎁 NHẬN 5 CREDIT</button>
-            <button type="button" id="cbReliefExitBtn" class="cb-btn-exit" data-i18n="cb_exit">🚪 VỀ SẢNH CHÍNH</button>
+            <button type="button" id="cbClaimReliefBtn" class="cb-btn-relief">NHẬN 5 CREDIT</button>
+            <button type="button" id="cbReliefExitBtn" class="cb-btn-exit" data-i18n="cb_exit">VỀ SẢNH CHÍNH</button>
           </div>
         </div>
       </div>
