@@ -134,10 +134,7 @@ export class CowboyShop {
         <!-- Bottom Action Bar (Qua màn mới & Thoát ở giữa và gần nhau, bỏ icon theo chuẩn Farm Brawl) -->
         <div class="cb-shop-bottom-bar">
           <button type="button" id="cbShopNextRoundBtn" class="cb-btn-shop-next" title="Tiếp tục sang màn mới">
-            <div class="btn-body">
-              <span class="btn-txt" data-i18n="cb_shop_next_round">${t('cb_shop_next_round')}</span>
-              <small class="btn-sub" data-i18n="cb_shop_next_sub">${t('cb_shop_next_sub')}</small>
-            </div>
+            <span class="btn-txt" data-i18n="cb_shop_next_round">${t('cb_shop_next_round')}</span>
           </button>
 
           <button type="button" id="cbShopExitBtn" class="cb-btn-shop-exit" title="Thoát trò chơi về sảnh chính">

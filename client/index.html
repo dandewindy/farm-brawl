@@ -16,7 +16,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23a5281b'/%3E%3Cpath d='M12 44 L16 22 L26 32 L32 16 L38 32 L48 22 L52 44 Z' fill='%23e8b641'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Be+Vietnam+Pro:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body class="menu">
@@ -656,6 +656,18 @@
             <span class="ico">🪙</span>
             <b id="cbLobbyCreditVal">20</b>
           </div>
+          <button type="button" id="cbLobbyFsBtn" class="cb-top-icon-btn" title="Toàn màn hình / Fullscreen" aria-label="Toàn màn hình">
+            <span class="fs-icon-enter">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </span>
+            <span class="fs-icon-exit" style="display:none;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+              </svg>
+            </span>
+          </button>
           <button type="button" id="btnLobbyKids" class="cb-top-icon-btn cb-kids-btn" title="Cài đặt dành cho trẻ em / Kids Mode" aria-label="Trẻ em">
             <span class="ico">👶</span>
             <span id="cbLobbyKidsBadge" class="cb-badge-dot off"></span>

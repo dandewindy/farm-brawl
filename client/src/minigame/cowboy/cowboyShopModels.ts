@@ -552,6 +552,7 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
     });
     orbit.rotation.x = Math.PI / 3;
     floatingGroup.add(orbit);
+    floatingGroup.scale.set(0.85, 0.85, 0.85); // Lucky shield -15%
   } else if (kind === 'rainbow_net') {
     // 🌈 Lưới Cầu Vồng: Vòng Torus đa sắc lung linh tỏa sáng rực rỡ
     const netTorus = createMesh(new THREE.TorusGeometry(0.45, 0.065, 12, 36), 0xff4081, {
@@ -570,6 +571,7 @@ export function buildShopItemModel(kind: CowboyItemKind, slotIdx: number): ShopI
     });
     innerRing.rotation.y = Math.PI / 2;
     floatingGroup.add(innerRing);
+    floatingGroup.scale.set(0.85, 0.85, 0.85); // Rainbow net -15%
 
     for (let k = 0; k < 4; k++) {
       const ang = (k / 4) * Math.PI * 2;

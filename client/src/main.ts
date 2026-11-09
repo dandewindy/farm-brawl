@@ -1058,7 +1058,9 @@ function updateFsIcon(): void {
   const active = isFsActive();
   const enterTitle = t('fullscreen') || 'Toàn màn hình';
   const exitTitle = 'Thu nhỏ màn hình';
-  [fsBtn, startFsBtn].forEach((btn) => {
+  const cbLobbyFsBtn = document.getElementById('cbLobbyFsBtn') as HTMLButtonElement | null;
+  const cbFsBtn = document.getElementById('cbFsBtn') as HTMLButtonElement | null;
+  [fsBtn, startFsBtn, cbLobbyFsBtn, cbFsBtn].forEach((btn) => {
     if (!btn) return;
     const enterEl = btn.querySelector('.fs-icon-enter') as HTMLElement | null;
     const exitEl = btn.querySelector('.fs-icon-exit') as HTMLElement | null;
@@ -1284,6 +1286,12 @@ if (adminToggleBtn) {
     handleAdminToggle(e);
   });
 }
+const cbLobbyFsBtn = document.getElementById('cbLobbyFsBtn');
+cbLobbyFsBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  startFsBtn?.click();
+});
+
 if (startFsBtn) {
   startFsBtn.addEventListener('click', (e) => {
     e.preventDefault();

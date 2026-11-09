@@ -9634,12 +9634,12 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-brand-title {
   margin: 0;
-  font-family: var(--f-title, sans-serif);
+  font-family: var(--f-display) !important;
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 800;
   color: #ffd647;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 16px rgba(255, 179, 0, 0.5);
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
 }
 
 .cb-brand-subtitle {
@@ -9684,13 +9684,13 @@ body.mobile-phone #adminToggleBtn {
 /* Farmer Speech Bubble - Căn chỉnh gần đầu và tay Bác Nông Dân */
 .cb-farmer-speech-bubble {
   position: absolute;
-  top: 25%;
-  left: 7%;
-  max-width: 330px;
+  top: 14%;
+  left: 16%;
+  max-width: 310px;
   background: rgba(33, 17, 10, 0.94);
   border: 2.5px solid #ffd647;
   border-radius: 18px;
-  padding: 12px 18px;
+  padding: 10px 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(10px);
   pointer-events: auto;
@@ -9704,13 +9704,13 @@ body.mobile-phone #adminToggleBtn {
 .cb-farmer-speech-bubble::after {
   content: '';
   position: absolute;
-  bottom: -14px;
-  left: 54px;
+  bottom: -13px;
+  left: 28px;
   width: 0;
   height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 14px solid #ffd647;
+  border-left: 6px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 13px solid #ffd647;
 }
 
 .speech-avatar {
@@ -9762,16 +9762,15 @@ body.mobile-phone #adminToggleBtn {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  min-width: 140px;
-  height: 200px;
-  padding: 10px;
-  border-radius: 18px;
+  min-width: 130px;
+  height: 142px;
+  padding: 6px 8px 8px;
+  border-radius: 16px;
   border: 2px solid transparent;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.2, 0, 0.2, 1);
   background: transparent;
   box-sizing: border-box;
-
   pointer-events: auto !important;
   user-select: none;
 }
@@ -9798,18 +9797,19 @@ body.mobile-phone #adminToggleBtn {
 
 .slot-owned-badge {
   position: absolute;
-  top: 8px;
+  top: 6px;
   right: 8px;
   font-family: var(--f-display, 'Baloo 2', sans-serif);
   font-size: 11px;
   font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(255, 214, 71, 0.6);
   color: #ffd54f;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   user-select: none;
+  z-index: 2;
 }
 
 .slot-owned-badge.equipped {
@@ -10009,49 +10009,29 @@ body.mobile-phone #adminToggleBtn {
   backdrop-filter: blur(8px);
 }
 
+.cb-btn-shop-next,
 .cb-btn-shop-exit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 28px;
-  background: linear-gradient(180deg, #5d4037, #3e2723);
-  border: 2px solid #8d6e63;
+  padding: 10px 24px;
+  min-width: 145px;
+  height: 48px;
   border-radius: 14px;
-  color: #efebe9;
   font-family: var(--f-display, 'Baloo 2', sans-serif);
   font-size: 15px;
   font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 4px 0 #271611, 0 6px 14px rgba(0, 0, 0, 0.6);
-  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
   letter-spacing: 0.5px;
-}
-
-.cb-btn-shop-exit:hover {
-  filter: brightness(1.1);
-}
-
-.cb-btn-shop-exit:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #271611;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
 }
 
 .cb-btn-shop-next {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 36px;
-  background: linear-gradient(180deg, #00e676, #00a152);
+  background: linear-gradient(180deg, #00e676 0%, #00c853 100%);
   border: 2px solid #b9f6ca;
-  border-radius: 14px;
-  color: #003314;
-  font-family: var(--f-display, 'Baloo 2', sans-serif);
-  font-size: 17px;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: 0 5px 0 #006020, 0 8px 20px rgba(0, 230, 118, 0.45);
-  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
-  letter-spacing: 0.5px;
+  color: #003311;
+  box-shadow: 0 4px 0 #006020, 0 6px 16px rgba(0, 230, 118, 0.4);
 }
 
 .cb-btn-shop-next:hover {
@@ -10060,259 +10040,23 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-btn-shop-next:active {
   transform: translateY(2px);
-  box-shadow: 0 3px 0 #006020;
+  box-shadow: 0 2px 0 #006020;
 }
 
-.cb-btn-shop-next .btn-sub {
-  font-size: 11px;
-  font-weight: 700;
-  color: #004d1a;
-  display: block;
-}
-
-/* Simplified Confirm Modal */
-.cb-shop-confirm-modal-wrap {
-  position: fixed;
-  inset: 0;
-  z-index: 100030;
-  background: rgba(10, 5, 3, 0.75);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-}
-
-
-/* Confirm & Details Modal in Shop */
-.cf-close-btn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1.5px solid rgba(255, 214, 71, 0.4);
-  color: #ffd54f;
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.cf-close-btn:hover {
-  background: #ff5252;
-  border-color: #ff7875;
-  color: #fff;
-}
-
-.cf-effect-pill {
-  display: inline-block;
-  padding: 3px 12px;
-  background: rgba(0, 230, 118, 0.2);
-  border: 1px solid #00e676;
-  border-radius: 12px;
-  color: #00e676;
-  font-size: 12px;
-  font-weight: 800;
-  margin-bottom: 12px;
-}
-
-.cf-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
-  margin-bottom: 20px;
-  box-sizing: border-box;
-}
-
-.cf-owned-count {
-  font-size: 13px;
-  color: #e0e0e0;
-}
-
-.cf-owned-count b {
-  color: #00e676;
-  font-size: 14px;
-}
-
-.cf-btn-equip {
-  flex: 1;
-  padding: 10px 14px;
-  background: linear-gradient(180deg, #43a047, #2e7d32);
-  border: 2px solid #81c784;
-  border-radius: 20px;
-  color: #fff;
-  font-family: var(--f-display, 'Baloo 2', sans-serif);
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 3px 0 #1b5e20;
-}
-
-.cf-btn-equip.equipped {
-  background: linear-gradient(180deg, #ff9800, #f57c00);
-  border-color: #ffb74d;
-  box-shadow: 0 3px 0 #e65100;
-}
-
-.cb-shop-confirm-card {
-  width: 92%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: linear-gradient(180deg, #381f17 0%, #20100a 100%);
-  border: 3px solid #ffd54f;
-  border-radius: 22px;
-  padding: 26px 30px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  text-align: center;
-  animation: zoomIn 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-}
-
-.cf-icon {
-  font-size: 52px;
-  margin-bottom: 6px;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
-}
-
-.cf-title {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: #ffd54f;
-  font-weight: 900;
-  font-family: var(--f-display, 'Baloo 2', sans-serif);
-  letter-spacing: 0.5px;
-}
-
-.cf-desc {
-  margin: 0 0 16px;
-  font-size: 13.5px;
-  color: #ffecb3;
-  line-height: 1.5;
-  text-wrap: balance;
-}
-
-.cf-price-badge {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1.5px solid rgba(255, 213, 79, 0.55);
-  padding: 6px 14px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 800;
-  color: #ffd54f;
-}
-
-.cf-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-.cf-action-row {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-}
-
-.cf-btn-buy,
-.cf-btn-equip {
-  flex: 1 1 0;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  border-radius: 14px;
-  font-family: var(--f-display, 'Baloo 2', sans-serif);
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  white-space: nowrap;
-  text-align: center;
-  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
-}
-
-.cf-btn-buy {
-  background: linear-gradient(180deg, #ffb300, #ff8f00);
-  border: 2px solid #ffe082;
-  color: #2b170e;
-  box-shadow: 0 4px 0 #b26a00, 0 4px 12px rgba(255, 179, 0, 0.4);
-}
-
-.cf-btn-buy:hover {
-  filter: brightness(1.08);
-}
-
-.cf-btn-buy:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #b26a00;
-}
-
-.cf-btn-equip {
-  background: linear-gradient(180deg, #43a047, #2e7d32);
-  border: 2px solid #81c784;
+.cb-btn-shop-exit {
+  background: linear-gradient(180deg, #4e342e 0%, #3e2723 100%);
+  border: 2px solid #8d6e63;
   color: #ffffff;
-  box-shadow: 0 4px 0 #1b5e20, 0 4px 12px rgba(67, 160, 71, 0.35);
+  box-shadow: 0 4px 0 #271611, 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
-.cf-btn-equip:hover {
+.cb-btn-shop-exit:hover {
   filter: brightness(1.08);
 }
 
-.cf-btn-equip:active {
+.cb-btn-shop-exit:active {
   transform: translateY(2px);
-  box-shadow: 0 2px 0 #1b5e20;
-}
-
-.cf-btn-equip.equipped {
-  background: linear-gradient(180deg, #ff9800, #f57c00);
-  border-color: #ffb74d;
-  box-shadow: 0 4px 0 #e65100, 0 4px 12px rgba(245, 124, 0, 0.35);
-}
-
-.cf-btn-cancel {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 18px;
-  background: linear-gradient(180deg, #4e342e, #3e2723);
-  border: 1.5px solid #6d4c41;
-  border-radius: 12px;
-  color: #d7ccc8;
-  font-family: var(--f-display, 'Baloo 2', sans-serif);
-  font-size: 13.5px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  box-shadow: 0 3px 0 #271611;
-  transition: transform 0.08s, box-shadow 0.08s, background 0.12s;
-}
-
-.cf-btn-cancel:hover {
-  background: linear-gradient(180deg, #5d4037, #4e342e);
-  color: #fff;
-}
-
-.cf-btn-cancel:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 #271611;
-}
-
-@media (max-width: 440px) {
-  .cf-action-row {
-    flex-direction: column;
-    gap: 8px;
-  }
+  box-shadow: 0 2px 0 #271611;
 }
 
 @keyframes zoomIn {
@@ -10729,6 +10473,221 @@ body.mobile-phone #adminToggleBtn {
 
   .slot-price-pill {
     padding: 4px 10px !important;
+    font-size: 11.5px !important;
+  }
+}
+
+
+
+/* ==========================================================================
+   ENHANCED 3D TACTILE CONTROLS (RAISED UP & ENLARGED ON WOODEN SILL)
+   ========================================================================== */
+.cowboy-bottom-bar {
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  bottom: 24px; /* Dời bảng điều khiển lên cao trên bậu cửa gỗ */
+  left: 0;
+  right: 0;
+  padding: 0 20px;
+  background: transparent !important;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.cowboy-controls-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(1040px, 98vw);
+  max-width: 1040px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  pointer-events: none;
+}
+
+.cowboy-controls-card > * {
+  pointer-events: auto;
+}
+
+/* Enlarge quick items & credit bet buttons */
+.cb-quick-3d-slot {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 14px !important;
+}
+
+.cb-col-label {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  margin-bottom: 6px !important;
+  color: #ffd647 !important;
+}
+
+.cb-bet-btn {
+  min-width: 76px !important;
+  height: 48px !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  border-radius: 12px !important;
+}
+
+/* MAGNIFICENT 3D CIRCULAR LAUNCH BUTTON */
+.cb-launch-circle-btn {
+  width: 106px !important;
+  height: 106px !important;
+  min-width: 106px !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: radial-gradient(circle at 35% 25%, #ff5252 0%, #e53935 45%, #b71c1c 85%, #600000 100%) !important;
+  border: 4px solid #ffcdd2 !important;
+  box-shadow: 0 8px 0 #5c0000, 0 16px 30px rgba(0, 0, 0, 0.7), inset 0 2px 6px rgba(255, 255, 255, 0.5) !important;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.cb-launch-circle-btn::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 16px;
+  right: 16px;
+  height: 42%;
+  border-radius: 50px 50px 30px 30px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.05) 100%);
+  pointer-events: none;
+}
+
+.cb-launch-circle-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 0 #5c0000, 0 18px 36px rgba(0, 0, 0, 0.75), inset 0 2px 6px rgba(255, 255, 255, 0.6) !important;
+}
+
+.cb-launch-circle-btn:active,
+.cb-launch-circle-btn.is-pressed {
+  transform: translateY(4px) scale(0.96) !important;
+  box-shadow: 0 4px 0 #5c0000, 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 3px 6px rgba(0, 0, 0, 0.4) !important;
+}
+
+.cb-launch-circle-btn.is-charging {
+  animation: cbPulseAimCharge 0.35s infinite alternate !important;
+}
+
+.cb-launch-circle-btn .btn-top .txt {
+  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9) !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  letter-spacing: 0.6px !important;
+}
+
+.cb-launch-circle-btn .btn-top .key-hint {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #ffcdd2 !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  padding: 2px 8px !important;
+  border-radius: 10px !important;
+  letter-spacing: 0.5px !important;
+}
+
+.cb-auto-launch-hint {
+  margin-top: 6px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  color: #fff8e1 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+}
+
+.cowboy-top-icon-btn,
+.cb-top-icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--paper, #fff8e7);
+  border: 0;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ink, #2b170e);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.cowboy-top-icon-btn:hover,
+.cb-top-icon-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+
+.cowboy-top-icon-btn:active,
+.cb-top-icon-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+
+
+/* Explicit Mobile Protection: Compact sizing on mobile/tablet screens */
+@media (max-width: 840px), (max-height: 540px) {
+  .cowboy-bottom-bar {
+    bottom: 8px !important;
+    padding: 0 8px 6px !important;
+  }
+
+  .cowboy-controls-card {
+    gap: 8px !important;
+  }
+
+  .cb-quick-3d-slot {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
+  }
+
+  .cb-col-label {
+    font-size: 10.5px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .cb-bet-btn {
+    min-width: 44px !important;
+    height: 38px !important;
+    padding: 2px 4px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+
+  .cb-bet-btn span {
+    font-size: 8px !important;
+  }
+
+  .cb-launch-circle-btn {
+    width: 76px !important;
+    height: 76px !important;
+    min-width: 76px !important;
+    box-shadow: 0 5px 0 #5c0000, 0 8px 18px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  .cb-launch-circle-btn .btn-top .txt {
     font-size: 11.5px !important;
   }
 }

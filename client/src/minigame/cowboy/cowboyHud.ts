@@ -95,6 +95,18 @@ export class CowboyHud {
           <button type="button" id="cbAdminShopBtn" class="cowboy-shop-btn admin-shop-btn" title="[Admin] Mở Cửa Hàng bất kỳ lúc nào" hidden>
             <span class="txt">CỬA HÀNG</span>
           </button>
+          <button type="button" id="cbFsBtn" class="cowboy-top-icon-btn cb-fs-btn" title="Toàn màn hình / Fullscreen" aria-label="Toàn màn hình">
+            <span class="fs-icon-enter">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </span>
+            <span class="fs-icon-exit" style="display:none;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+              </svg>
+            </span>
+          </button>
           <button type="button" id="cbBackpackBtn" class="cowboy-backpack-btn" title="Kho vật phẩm trợ thủ">
             <span class="txt" data-i18n="cb_backpack_lbl">KHO ĐỒ</span>
           </button>
@@ -267,6 +279,16 @@ export class CowboyHud {
     });
 
     // Nút Kho Đồ
+    const fsBtn = this.rootEl.querySelector('#cbFsBtn') as HTMLButtonElement | null;
+    // Đồng bộ icon fullscreen ngay khi gắn HUD
+    window.dispatchEvent(new Event('fullscreenchange'));
+
+    fsBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const trigger = document.getElementById('startFsBtn') || document.getElementById('fsBtn');
+      trigger?.click();
+    });
+
     this.backpackBtn.addEventListener('click', () => {
       this.openBackpackModal();
     });
