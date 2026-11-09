@@ -63,6 +63,14 @@ export class CowboyArena {
   private decorGroup = new THREE.Group();
   private dirtMesh!: THREE.Mesh;
   private fenceGroup = new THREE.Group();
+  private windowFrameGroup = new THREE.Group();
+  private leftJamb: THREE.Mesh | null = null;
+  private rightJamb: THREE.Mesh | null = null;
+  private leftBrace: THREE.Mesh | null = null;
+  private rightBrace: THREE.Mesh | null = null;
+  private sillBeam: THREE.Mesh | null = null;
+  private sillCap: THREE.Mesh | null = null;
+  private windowMaterials: THREE.Material[] = [];
   private windmillBlades?: THREE.Group;
   private snowParticles?: THREE.Points;
   private clouds: THREE.Group[] = [];
@@ -213,6 +221,94 @@ export class CowboyArena {
     }
 
     this.buildFence();
+    this.buildBarnWindowFrame();
+  }
+
+  
+  /**
+   * Tạo khung cửa sổ gỗ chuồng trại 3D ở cận cảnh (Cockpit / Window view)
+   * Mô phỏng người chơi đứng ở một ô cửa sổ gỗ nông trại quăng dây ra bãi quây
+   */
+  private buildBarnWindowFrame(): void {
+    // Gắn vào camera để luôn neo cố định tại cạnh dưới và 2 bên màn hình ở góc nhìn thứ nhất
+    this.scene.add(this.camera);
+    this.windowFrameGroup.name = 'barnWindowFrame';
+    this.camera.add(this.windowFrameGroup);
+
+    const woodTex = getCowboyWoodTexture();
+    const woodMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      color: 0x4a2e1b,
+      roughness: 0.85,
+      metalness: 0.08,
+    });
+
+    const woodCapMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      color: 0x664126,
+      roughness: 0.78,
+      metalness: 0.12,
+    });
+
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x212121,
+      roughness: 0.45,
+      metalness: 0.85,
+    });
+
+    this.windowMaterials.push(woodMat, woodCapMat, ironMat);
+
+    // 1. BẬU CỬA SỔ GỖ CHÍNH (MAIN WOODEN SILL BEAM TẠI ĐÁY MÀN HÌNH)
+    this.sillBeam = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.44, 0.75), woodMat);
+    this.sillBeam.position.set(0, -0.95, -2.1);
+    this.sillBeam.castShadow = true;
+    this.sillBeam.receiveShadow = true;
+    this.windowFrameGroup.add(this.sillBeam);
+
+    // Gờ nẹp trên của bậu cửa (Sill Cap) với mặt gỗ nhẵn bóng
+    this.sillCap = new THREE.Mesh(new THREE.BoxGeometry(7.3, 0.08, 0.80), woodCapMat);
+    this.sillCap.position.set(0, -0.71, -2.1);
+    this.windowFrameGroup.add(this.sillCap);
+
+    // Gờ nẹp gỗ phụ phía dưới bậu cửa tạo chiều sâu 3D
+    const sillSub = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.16, 0.65), woodMat);
+    sillSub.position.set(0, -1.22, -2.1);
+    this.windowFrameGroup.add(sillSub);
+
+    // 2. CÁC BẢN LỀ / NẸP SẮT RÈN & ĐINH TÁN ĐẦU TRÒN CỐ ĐỊNH BẬU CỬA
+    for (const x of [-2.2, -1.1, 0, 1.1, 2.2]) {
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.46, 0.78), ironMat);
+      strap.position.set(x, -0.94, -2.1);
+      this.windowFrameGroup.add(strap);
+
+      for (const y of [-0.78, -1.08]) {
+        const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.026, 6, 6), ironMat);
+        rivet.position.set(x, y, -1.71);
+        this.windowFrameGroup.add(rivet);
+      }
+    }
+
+    // 3. HAI CỘT KHUNG CỬA SỔ GỖ 2 BÊN MÉP (LEFT & RIGHT JAMBS) - TỰ ĐỘNG NEO VÀO MÉP MÀN HÌNH THEO TỶ LỆ ASPECT RATIO
+    const aspect = this.camera.aspect || 1.77;
+    const halfWidthAtZ = 2.1 * Math.tan(THREE.MathUtils.degToRad(26)) * aspect;
+
+    this.leftJamb = new THREE.Mesh(new THREE.BoxGeometry(0.38, 2.8, 0.55), woodMat);
+    this.leftJamb.position.set(-halfWidthAtZ, 0.40, -2.1);
+    this.windowFrameGroup.add(this.leftJamb);
+
+    this.rightJamb = new THREE.Mesh(new THREE.BoxGeometry(0.38, 2.8, 0.55), woodMat);
+    this.rightJamb.position.set(halfWidthAtZ, 0.40, -2.1);
+    this.windowFrameGroup.add(this.rightJamb);
+
+    this.leftBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.22), woodMat);
+    this.leftBrace.position.set(-halfWidthAtZ + 0.30, -0.42, -2.1);
+    this.leftBrace.rotation.z = -0.78;
+    this.windowFrameGroup.add(this.leftBrace);
+
+    this.rightBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.22), woodMat);
+    this.rightBrace.position.set(halfWidthAtZ - 0.30, -0.42, -2.1);
+    this.rightBrace.rotation.z = 0.78;
+    this.windowFrameGroup.add(this.rightBrace);
   }
 
   private buildFence(): void {
@@ -2135,6 +2231,16 @@ export class CowboyArena {
       r.lineGeo.dispose();
     }
     this.ropes = [];
+
+    this.windowFrameGroup.traverse((obj) => {
+      if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose();
+    });
+    this.windowFrameGroup.clear();
+    for (const mat of this.windowMaterials) {
+      mat.dispose();
+    }
+    this.windowMaterials = [];
+    this.camera.remove(this.windowFrameGroup);
 
     if (this.renderer.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);

@@ -124,7 +124,7 @@ export class CowboyHud {
 
           <!-- CỘT GIỮA: Nút Quăng Dây Đỏ Tactile + Tự động sau -->
           <div class="cb-ctrl-col cb-ctrl-center">
-            <button type="button" id="cbLaunchBtn" class="cowboy-red-button" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
+            <button type="button" id="cbLaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
               <div class="btn-top">
                 <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
                 <small class="key-hint" data-i18n="cb_space_hint">Space</small>
