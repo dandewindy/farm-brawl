@@ -743,8 +743,20 @@
 
       <!-- Main Cowboy Lobby Body (2 symmetrical balanced columns) -->
       <div class="cb-lobby-body">
-        <!-- Left Column: Map Selector -->
+        <!-- Left Column: Mode & Map Selector -->
         <div class="cb-lobby-col-left">
+          <p class="sec-label" data-i18n="cb_mode_label">CHẾ ĐỘ CHƠI</p>
+          <div id="cbModes" class="cb-modes-row">
+            <button type="button" class="cb-mode-btn on" data-cb-mode="solo">
+              <span class="n">CHƠI ĐƠN</span>
+              <span class="p">Chiến dịch vượt ải</span>
+            </button>
+            <button type="button" class="cb-mode-btn" data-cb-mode="friends">
+              <span class="n">2 NGƯỜI CHƠI</span>
+              <span class="p">Chung 1 màn hình</span>
+            </button>
+          </div>
+
           <p class="sec-label" data-i18n="cb_pick_map">CHỌN BẢN ĐỒ / ĐỊA HÌNH 3D</p>
           <div class="cb-map-selector">
             <button type="button" class="cb-map-card on" data-theme="farm">

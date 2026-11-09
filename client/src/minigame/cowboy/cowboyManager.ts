@@ -6,7 +6,9 @@ import { CowboyShop } from './cowboyShop';
 import { cowboyKids } from './cowboyKids';
 import { cowboyInventory } from './cowboyItems';
 import { cowboyAudio } from './cowboyAudio';
-import { isCowboyAdminName, type ActiveCowboyAnimal, type CowboyThemeId } from './cowboyTypes';
+import { isCowboyAdminName, getStageTargetScore, type ActiveCowboyAnimal, type CowboyThemeId } from './cowboyTypes';
+
+export { getStageTargetScore } from './cowboyTypes';
 
 export class CowboyManager {
   private container: HTMLElement;
@@ -19,6 +21,17 @@ export class CowboyManager {
   private currentTheme: CowboyThemeId = 'farm';
   private isShopOpen = false;
   private isRoundFinished = false;
+
+  // Game Modes State: Campaign Progression vs 2-Player Shared Screen
+  private isTwoPlayerMode = false;
+  private rematchTimeout: number | null = null;
+  private currentStage = 1;
+  private stageScore = 0;
+  private stageTarget = 80;
+  private p1Score = 0;
+  private p2Score = 0;
+  private p1Credits = 20;
+  private p2Credits = 20;
 
   public onClose?: () => void;
 
@@ -57,7 +70,7 @@ export class CowboyManager {
     }
   };
 
-  public open(theme: CowboyThemeId = 'farm'): boolean {
+  public open(theme: CowboyThemeId = 'farm', mode: 'solo' | 'friends' = 'solo'): boolean {
     if (this.isOpened) return true;
 
     // Kiểm tra Chế độ Trẻ Em (Thời lượng phiên)
@@ -74,22 +87,53 @@ export class CowboyManager {
     this.container.hidden = false;
 
     // Khởi tạo Arena 3D & HUD & Shop
+    this.isTwoPlayerMode = (mode === 'friends');
     this.arena = new CowboyArena(this.container);
     this.arena.setTheme(this.currentTheme);
+    this.arena.setTwoPlayerMode(this.isTwoPlayerMode);
 
     this.hud = new CowboyHud(this.container);
+    this.hud.setTwoPlayerMode(this.isTwoPlayerMode);
     this.shop = new CowboyShop(this.container, this.wallet);
 
     // Kiểm tra quà tặng hàng ngày & tích lũy thời gian offline/không chơi
     const daily = this.wallet.checkDailyGrant();
     const acc = this.wallet.updateAccumulatedCredits();
 
+    if (this.isTwoPlayerMode) {
+      this.p1Score = 0;
+      this.p2Score = 0;
+      this.p1Credits = this.wallet.getCredits();
+      this.p2Credits = this.wallet.getCredits();
+    } else {
+      this.currentStage = 1;
+      this.stageScore = 0;
+      this.stageTarget = getStageTargetScore(1);
+      this.hud.updateScore(0, this.stageTarget, 1);
+    }
+
     this.syncStats();
 
     // Đồng bộ số lượng dây thòng lọng chờ sẵn đan chéo với mức cược HUD
     this.arena.setSelectedRopesCount(this.hud.getBet());
     this.hud.onBetChange = (bet) => {
-      this.arena?.setSelectedRopesCount(bet);
+      this.arena?.setSelectedRopesCount(bet, 0);
+    };
+
+    this.hud.onP2BetChange = (bet) => {
+      this.arena?.setSelectedRopesCount(bet, 1);
+    };
+
+    this.hud.onP2Launch = (_isAimCharge, _aimZ) => {
+      if (!this.isTwoPlayerMode) return;
+      const bet = this.hud?.getBet(1) ?? 1;
+      if (!this.arena || !this.arena.canLaunch(1)) return;
+      if (this.p2Credits < bet) {
+        this.hud?.showToast(`⚠️ P2 còn ${this.p2Credits} Credit, không đủ cược ${bet} dây!`);
+        return;
+      }
+      this.p2Credits -= bet;
+      this.arena.launchVolleyWithAim(bet, -2.8, 1);
     };
 
     // Bắt đầu vòng lặp tích lũy 1 phút +1 credit khi online
@@ -192,12 +236,30 @@ export class CowboyManager {
       executeVolleyLaunch(bet, false);
     };
 
-    // Bắt dính thú
-    this.arena.onCatch = (animal: ActiveCowboyAnimal) => {
+    // Bắt dính thú (hỗ trợ cả Chơi Đơn Campaign & Chơi 2 Người Đối Kháng)
+    this.arena.onCatch = (animal: ActiveCowboyAnimal, playerIndex = 0) => {
       volleyCatches++;
       const payout = animal.score;
-      this.wallet.addWinnings(payout, 1);
-      this.syncStats();
+
+      if (this.isTwoPlayerMode) {
+        if (playerIndex === 0) {
+          this.p1Score += payout;
+          this.p1Credits += payout;
+          this.wallet.addWinnings(payout, 1);
+          this.syncStats();
+          this.hud?.showToast(`🎯 <b>P1</b> bắt dính ${animal.config.nameVi} (+${payout})!`, 1800);
+        } else {
+          this.p2Score += payout;
+          this.p2Credits += payout;
+          this.hud?.showToast(`🎯 <b>P2</b> bắt dính ${animal.config.nameVi} (+${payout})!`, 1800);
+        }
+      } else {
+        // Solo Campaign mode: tích lũy điểm mốc màn và credit ví
+        this.stageScore += payout;
+        this.wallet.addWinnings(payout, 1);
+        this.syncStats();
+        this.hud?.updateScore(this.stageScore, this.stageTarget, this.currentStage);
+      }
 
       // Hiển thị chữ nổi
       const screenPos = this.toScreenPosition(animal.x, 1.2, animal.z);
@@ -249,19 +311,23 @@ export class CowboyManager {
     };
 
     // Loạt dây hoàn thành thu về
-    this.arena.onVolleyFinish = () => {
-      this.hud?.setBusy(false);
-
-      // Nếu quăng 1 lần có trúng có trật thì chỉ cần báo trúng. Nếu trật hết thì mới báo trật!
-      if (volleyCatches === 0 && volleyMisses > 0) {
-        cowboyAudio.playVoice('cowboy_miss');
+    this.arena.onVolleyFinish = (playerIndex = 0) => {
+      if (playerIndex === 0) {
+        this.hud?.setBusy(false);
       }
 
-      this.hud?.updateInventory();
-      if (this.wallet.getCredits() === 0) {
-        cowboyAudio.playVoice('cowboy_empty');
-        const status = this.wallet.getReliefStatus();
-        this.hud?.showReliefModal(status.remainingToday);
+      // Nếu quăng 1 lần có trúng có trật thì chỉ cần báo trúng. Nếu trật hết thì mới báo trật!
+      if (playerIndex === 0) {
+        if (volleyCatches === 0 && volleyMisses > 0) {
+          cowboyAudio.playVoice('cowboy_miss');
+        }
+
+        this.hud?.updateInventory();
+        if (this.wallet.getCredits() === 0) {
+          cowboyAudio.playVoice('cowboy_empty');
+          const status = this.wallet.getReliefStatus();
+          this.hud?.showReliefModal(status.remainingToday);
+        }
       }
     };
 
@@ -287,13 +353,63 @@ export class CowboyManager {
       this.shop?.open(true);
     };
 
-    // Hết giờ vòng 3 phút -> Kết thúc vòng, mở Cửa Hàng
+    // Hết giờ vòng đấu -> Đánh giá Thắng/Thua theo mốc điểm hoặc kết quả đối kháng
     this.hud.onRoundEnd = () => {
-      this.isShopOpen = true;
-      this.isRoundFinished = true;
       this.arena?.stop();
       this.hud?.setBusy(true);
-      this.shop?.open();
+
+      if (this.isTwoPlayerMode) {
+        let resultMsg = '';
+        if (this.p1Score > this.p2Score) {
+          resultMsg = `🏆 <b>P1 CHIẾN THẮNG!</b> (${this.p1Score} vs ${this.p2Score} điểm)`;
+          cowboyAudio.playVoice('cowboy_welcome');
+        } else if (this.p2Score > this.p1Score) {
+          resultMsg = `🏆 <b>P2 CHIẾN THẮNG!</b> (${this.p2Score} vs ${this.p1Score} điểm)`;
+          cowboyAudio.playVoice('cowboy_welcome');
+        } else {
+          resultMsg = `🤝 <b>TRẬN ĐẤU HÒA!</b> (${this.p1Score} đều)`;
+        }
+        this.hud?.showToast(resultMsg, 5000);
+        if (this.rematchTimeout !== null) {
+          clearTimeout(this.rematchTimeout);
+        }
+        this.rematchTimeout = window.setTimeout(() => {
+          this.rematchTimeout = null;
+          this.startNewRound(90);
+        }, 2500);
+      } else {
+        // Xét điều kiện qua màn Campaign
+        if (this.stageScore >= this.stageTarget) {
+          // QUA MÀN!
+          const surplus = Math.max(0, this.stageScore - this.stageTarget);
+          const bonusCredit = Math.min(10, Math.floor(surplus / 20));
+          if (bonusCredit > 0) {
+            this.wallet.addCredits(bonusCredit);
+            this.syncStats();
+          }
+          cowboyAudio.playVoice('cowboy_welcome');
+          const bonusText = bonusCredit > 0 ? ` (Thưởng thêm +${bonusCredit} Credit dôi dư!)` : '';
+          this.hud?.showToast(`🎉 <b>CHÚC MỪNG QUA MÀN ${this.currentStage}!</b> Đạt ${this.stageScore}/${this.stageTarget} điểm${bonusText}`, 4500);
+
+          this.currentStage++;
+          this.isShopOpen = true;
+          this.isRoundFinished = true;
+          this.shop?.open();
+        } else {
+          // THUA CUỘC CHƯA ĐỦ ĐIỂM
+          cowboyAudio.playVoice('cowboy_miss');
+          this.hud?.showDefeatModal(this.currentStage, this.stageScore, this.stageTarget);
+        }
+      }
+    };
+
+    // Khi người chơi ấn chơi lại từ Màn 1 sau khi thua
+    this.hud.onRetryFromStage1 = () => {
+      this.currentStage = 1;
+      this.stageScore = 0;
+      this.stageTarget = getStageTargetScore(1);
+      this.hud?.updateScore(0, this.stageTarget, 1);
+      this.startNewRound(90);
     };
 
     // Khi người chơi ấn "QUAY TRỞ LẠI GAME" từ Cửa Hàng
@@ -303,7 +419,10 @@ export class CowboyManager {
       this.hud?.updateInventory();
       if (this.isRoundFinished) {
         this.isRoundFinished = false;
-        this.startNewRound();
+        this.stageScore = 0;
+        this.stageTarget = getStageTargetScore(this.currentStage);
+        this.hud?.updateScore(0, this.stageTarget, this.currentStage);
+        this.startNewRound(90);
       } else {
         this.hud?.resumeRoundTimer();
         this.arena?.start();
@@ -330,13 +449,22 @@ export class CowboyManager {
     return true;
   }
 
-  private startNewRound(): void {
-    const hasTimeClock = cowboyInventory.isEquipped('time_clock');
+  private startNewRound(duration = 90): void {
+    if (this.rematchTimeout !== null) {
+      clearTimeout(this.rematchTimeout);
+      this.rematchTimeout = null;
+    }
+    if (this.isTwoPlayerMode) {
+      this.p1Score = 0;
+      this.p2Score = 0;
+      this.hud?.updateScore(0, 0);
+    }
+    const hasTimeClock = !this.isTwoPlayerMode && cowboyInventory.isEquipped('time_clock');
     if (hasTimeClock) {
       cowboyInventory.consume('time_clock');
     }
-    const duration = hasTimeClock ? 240 : 180;
-    this.hud?.startRoundTimer(duration);
+    const finalDuration = hasTimeClock ? duration + 60 : duration;
+    this.hud?.startRoundTimer(finalDuration);
     this.arena?.syncReadyRopes();
     this.arena?.start();
   }

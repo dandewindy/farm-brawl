@@ -249,18 +249,33 @@ export class ClientPredictor {
       this.plow = true;
       let sp = 62;
       let dashT = 0.55;
-      let flyT = 0.55;
-      if (species === 'phoenix') { sp = 76; dashT = 0.70; flyT = 0.70; }
-      else if (species === 'pegasus') { sp = 75; dashT = 0.85; flyT = 0.85; }
-      else if (species === 'swan') { sp = 70; dashT = 0.70; flyT = 0.70; }
-      else if (species === 'boar') { sp = 68; dashT = 0.65; flyT = 0; }
-      else if (species === 'ram') { sp = 72; dashT = 0.65; flyT = 0; }
-      else if (species === 'bull') { sp = 70; dashT = 0.65; flyT = 0; }
+      let flyT = 0;
+      if (species === 'phoenix') {
+        sp = 76;
+        dashT = 0.70;
+        if (held > 0.15) flyT = held >= 0.75 ? 1.2 : 0.70;
+      } else if (species === 'pegasus') {
+        sp = 75;
+        dashT = 0.85;
+        if (held >= 0.75) {
+          this.flightT = 10.0;
+          flyT = 10.0;
+        }
+      } else if (species === 'swan') {
+        sp = 70;
+        dashT = 0.70;
+        if (held >= 0.75) {
+          this.flightT = 10.0;
+          flyT = 10.0;
+        }
+      } else if (species === 'boar') { sp = 68; dashT = 0.65; }
+      else if (species === 'ram') { sp = 72; dashT = 0.65; }
+      else if (species === 'bull') { sp = 70; dashT = 0.65; }
       this.vx = Math.cos(aimA) * sp;
       this.vz = Math.sin(aimA) * sp;
       this.a = aimA;
       this.dashT = dashT;
-      this.flyT = flyT;
+      this.flyT = Math.max(this.flyT, flyT);
       return;
     }
 
@@ -268,12 +283,13 @@ export class ClientPredictor {
     if (held > 0.15) {
       const c = Math.min(1, Math.max(0, (held - 0.2) / 1.0));
       if (species === 'phoenix') {
-        const flySpeed = 46 * (1 + 0.35 * c);
+        const isMax = held >= 0.75;
+        const flySpeed = isMax ? 48 : 46 * (1 + 0.35 * c);
         this.vx = Math.cos(aimA) * flySpeed;
         this.vz = Math.sin(aimA) * flySpeed;
         this.a = aimA;
-        this.dashT = 0.55;
-        this.flyT = 0.55;
+        this.dashT = isMax ? 0.80 : 0.55;
+        this.flyT = isMax ? 1.2 : 0.55;
         this.plow = true;
         return;
       }
@@ -288,7 +304,6 @@ export class ClientPredictor {
         this.vz = Math.sin(aimA) * speed;
         this.a = aimA;
         this.dashT = 0.50;
-        this.flyT = Math.max(this.flyT, 0.50);
         this.plow = true;
         return;
       }
@@ -302,7 +317,6 @@ export class ClientPredictor {
         this.vz = Math.sin(aimA) * flySpeed;
         this.a = aimA;
         this.dashT = 0.65;
-        this.flyT = Math.max(this.flyT, 0.65);
         this.plow = true;
         return;
       }

@@ -120,9 +120,12 @@ export class CowboyArena {
   private netSweepTimeout: any = null;
 
   // Callbacks
-  public onCatch?: (animal: ActiveCowboyAnimal) => void;
-  public onMiss?: (animal: ActiveCowboyAnimal) => void;
-  public onVolleyFinish?: () => void;
+  public onCatch?: (animal: ActiveCowboyAnimal, playerIndex?: number) => void;
+  public onMiss?: (animal: ActiveCowboyAnimal, playerIndex?: number) => void;
+  public onVolleyFinish?: (playerIndex?: number) => void;
+
+  private isTwoPlayerMode = false;
+  private selectedRopeCountP2 = 1;
 
   private isRunning = false;
   private animFrameId = 0;
@@ -165,6 +168,14 @@ export class CowboyArena {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+
+    // Cập nhật vị trí 2 cột cửa sổ tự động neo sát mép ngoài màn hình
+    const aspect = this.camera.aspect || 1.77;
+    const halfWidthAtZ = 2.1 * Math.tan(THREE.MathUtils.degToRad(26)) * aspect;
+    if (this.leftJamb) this.leftJamb.position.set(-halfWidthAtZ - 0.04, 0.40, -2.1);
+    if (this.rightJamb) this.rightJamb.position.set(halfWidthAtZ + 0.04, 0.40, -2.1);
+    if (this.leftBrace) this.leftBrace.position.set(-halfWidthAtZ + 0.12, -0.68, -2.1);
+    if (this.rightBrace) this.rightBrace.position.set(halfWidthAtZ - 0.12, -0.68, -2.1);
   };
 
   private initLighting(): void {
@@ -258,55 +269,56 @@ export class CowboyArena {
 
     this.windowMaterials.push(woodMat, woodCapMat, ironMat);
 
-    // 1. BẬU CỬA SỔ GỖ CHÍNH (MAIN WOODEN SILL BEAM TẠI ĐÁY MÀN HÌNH)
-    this.sillBeam = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.44, 0.75), woodMat);
-    this.sillBeam.position.set(0, -0.95, -2.1);
+    // 1. BẬU CỬA SỔ GỖ CHÍNH (MAIN WOODEN SILL BEAM TẠI ĐÁY MÀN HÌNH) - NỚI RỘNG & HẠ THẤP ĐỂ TỐI ĐA KHÔNG GIAN
+    this.sillBeam = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.28, 0.75), woodMat);
+    this.sillBeam.position.set(0, -1.06, -2.1);
     this.sillBeam.castShadow = true;
     this.sillBeam.receiveShadow = true;
     this.windowFrameGroup.add(this.sillBeam);
 
-    // Gờ nẹp trên của bậu cửa (Sill Cap) với mặt gỗ nhẵn bóng
-    this.sillCap = new THREE.Mesh(new THREE.BoxGeometry(7.3, 0.08, 0.80), woodCapMat);
-    this.sillCap.position.set(0, -0.71, -2.1);
+    // Gờ nẹp trên của bậu cửa (Sill Cap) mỏng và áp sát mép dưới
+    this.sillCap = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.05, 0.80), woodCapMat);
+    this.sillCap.position.set(0, -0.91, -2.1);
     this.windowFrameGroup.add(this.sillCap);
 
     // Gờ nẹp gỗ phụ phía dưới bậu cửa tạo chiều sâu 3D
-    const sillSub = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.16, 0.65), woodMat);
-    sillSub.position.set(0, -1.22, -2.1);
+    const sillSub = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.12, 0.65), woodMat);
+    sillSub.position.set(0, -1.24, -2.1);
     this.windowFrameGroup.add(sillSub);
 
     // 2. CÁC BẢN LỀ / NẸP SẮT RÈN & ĐINH TÁN ĐẦU TRÒN CỐ ĐỊNH BẬU CỬA
-    for (const x of [-2.2, -1.1, 0, 1.1, 2.2]) {
-      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.46, 0.78), ironMat);
-      strap.position.set(x, -0.94, -2.1);
+    for (const x of [-2.6, -1.3, 0, 1.3, 2.6]) {
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.30, 0.78), ironMat);
+      strap.position.set(x, -1.06, -2.1);
       this.windowFrameGroup.add(strap);
 
-      for (const y of [-0.78, -1.08]) {
-        const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.026, 6, 6), ironMat);
+      for (const y of [-0.96, -1.16]) {
+        const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 6), ironMat);
         rivet.position.set(x, y, -1.71);
         this.windowFrameGroup.add(rivet);
       }
     }
 
-    // 3. HAI CỘT KHUNG CỬA SỔ GỖ 2 BÊN MÉP (LEFT & RIGHT JAMBS) - TỰ ĐỘNG NEO VÀO MÉP MÀN HÌNH THEO TỶ LỆ ASPECT RATIO
+    // 3. HAI CỘT KHUNG CỬA SỔ GỖ 2 BÊN MÉP (LEFT & RIGHT JAMBS) - TỰ ĐỘNG NEO SÁT MÉP MÀN HÌNH
     const aspect = this.camera.aspect || 1.77;
     const halfWidthAtZ = 2.1 * Math.tan(THREE.MathUtils.degToRad(26)) * aspect;
 
-    this.leftJamb = new THREE.Mesh(new THREE.BoxGeometry(0.38, 2.8, 0.55), woodMat);
-    this.leftJamb.position.set(-halfWidthAtZ, 0.40, -2.1);
+    this.leftJamb = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.8, 0.55), woodMat);
+    this.leftJamb.position.set(-halfWidthAtZ - 0.04, 0.40, -2.1);
     this.windowFrameGroup.add(this.leftJamb);
 
-    this.rightJamb = new THREE.Mesh(new THREE.BoxGeometry(0.38, 2.8, 0.55), woodMat);
-    this.rightJamb.position.set(halfWidthAtZ, 0.40, -2.1);
+    this.rightJamb = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.8, 0.55), woodMat);
+    this.rightJamb.position.set(halfWidthAtZ + 0.04, 0.40, -2.1);
     this.windowFrameGroup.add(this.rightJamb);
 
-    this.leftBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.22), woodMat);
-    this.leftBrace.position.set(-halfWidthAtZ + 0.30, -0.42, -2.1);
+    // Ke góc gỗ nhỏ gọn nép sát mép ngoài không che chắn tầm nhìn
+    this.leftBrace = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.38, 0.18), woodMat);
+    this.leftBrace.position.set(-halfWidthAtZ + 0.12, -0.68, -2.1);
     this.leftBrace.rotation.z = -0.78;
     this.windowFrameGroup.add(this.leftBrace);
 
-    this.rightBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.22), woodMat);
-    this.rightBrace.position.set(halfWidthAtZ - 0.30, -0.42, -2.1);
+    this.rightBrace = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.38, 0.18), woodMat);
+    this.rightBrace.position.set(halfWidthAtZ - 0.12, -0.68, -2.1);
     this.rightBrace.rotation.z = 0.78;
     this.windowFrameGroup.add(this.rightBrace);
   }
@@ -1217,7 +1229,8 @@ export class CowboyArena {
       metalness: 0.2,
     });
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
+      const pIdx = i < 5 ? 0 : 1;
       const ribbonGeo = new THREE.BufferGeometry();
       const pos = new Float32Array(17 * 2 * 3);
       const uvs = new Float32Array(17 * 2 * 2);
@@ -1259,10 +1272,11 @@ export class CowboyArena {
 
       this.ropes.push({
         id: i,
-        lane: i,
+        lane: i % 5,
+        playerIndex: pIdx,
         state: 'idle',
         progress: 0,
-        startX: 0,
+        startX: pIdx === 0 ? 0 : 2.8,
         startY: 0.5,
         startZ: 5.5,
         targetX: 0,
@@ -1297,34 +1311,74 @@ export class CowboyArena {
     return this.animals;
   }
 
-  public canLaunch(): boolean {
-    if (this.isNetSweeping) return false;
-    return !this.ropes.some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
+  public setTwoPlayerMode(enabled: boolean): void {
+    this.isTwoPlayerMode = enabled;
+    this.syncReadyRopes();
   }
 
-  public setSelectedRopesCount(count: number): void {
-    this.selectedRopeCount = Math.max(1, Math.min(5, count));
-    if (this.canLaunch()) {
-      this.syncReadyRopes();
+  public canLaunch(playerIndex = 0): boolean {
+    if (this.isNetSweeping) return false;
+    const slice = playerIndex === 0 ? this.ropes.slice(0, 5) : this.ropes.slice(5, 10);
+    return !slice.some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
+  }
+
+  public setSelectedRopesCount(count: number, playerIndex = 0): void {
+    if (playerIndex === 0) {
+      this.selectedRopeCount = Math.max(1, Math.min(5, count));
+    } else {
+      this.selectedRopeCountP2 = Math.max(1, Math.min(5, count));
+    }
+    if (this.canLaunch(playerIndex)) {
+      this.syncReadyRopes(playerIndex as (0 | 1));
     }
   }
 
-  public syncReadyRopes(): void {
-    const count = this.selectedRopeCount;
-    for (let i = 0; i < 5; i++) {
-      const rope = this.ropes[i];
-      if (i < count) {
-        rope.state = 'ready';
-        rope.progress = 0;
-        rope.caughtAnimalId = null;
-        rope.ribbonMesh.visible = true;
-        rope.loopMesh.visible = true;
-      } else {
-        rope.state = 'idle';
-        rope.progress = 0;
-        rope.caughtAnimalId = null;
-        rope.ribbonMesh.visible = false;
-        rope.loopMesh.visible = false;
+  public syncReadyRopes(targetPlayerIndex?: 0 | 1): void {
+    const countP1 = this.selectedRopeCount;
+    const countP2 = this.selectedRopeCountP2;
+    const originP1X = this.isTwoPlayerMode ? -2.8 : 0;
+    const originP2X = 2.8;
+
+    // P1 Ropes (0..4)
+    if (targetPlayerIndex === undefined || targetPlayerIndex === 0) {
+      for (let i = 0; i < 5; i++) {
+        const rope = this.ropes[i];
+        rope.startX = originP1X + (i - (countP1 - 1) / 2) * 0.32;
+        if (i < countP1) {
+          rope.state = 'ready';
+          rope.progress = 0;
+          rope.caughtAnimalId = null;
+          rope.ribbonMesh.visible = true;
+          rope.loopMesh.visible = true;
+        } else {
+          rope.state = 'idle';
+          rope.progress = 0;
+          rope.caughtAnimalId = null;
+          rope.ribbonMesh.visible = false;
+          rope.loopMesh.visible = false;
+        }
+      }
+    }
+
+    // P2 Ropes (5..9)
+    if (targetPlayerIndex === undefined || targetPlayerIndex === 1) {
+      for (let i = 5; i < 10; i++) {
+        const rope = this.ropes[i];
+        const p2Idx = i - 5;
+        rope.startX = originP2X + (p2Idx - (countP2 - 1) / 2) * 0.32;
+        if (this.isTwoPlayerMode && p2Idx < countP2) {
+          rope.state = 'ready';
+          rope.progress = 0;
+          rope.caughtAnimalId = null;
+          rope.ribbonMesh.visible = true;
+          rope.loopMesh.visible = true;
+        } else {
+          rope.state = 'idle';
+          rope.progress = 0;
+          rope.caughtAnimalId = null;
+          rope.ribbonMesh.visible = false;
+          rope.loopMesh.visible = false;
+        }
       }
     }
   }
@@ -1348,37 +1402,43 @@ export class CowboyArena {
   }
 
   /** Phóng thòng lọng tới cự ly Z đã canh sẵn khi thả nút */
-  public launchVolleyWithAim(ropeCount: number, targetZ: number): boolean {
-    if (!this.canLaunch()) return false;
-    this.isAimCharging = false;
+  public launchVolleyWithAim(ropeCount: number, targetZ: number, playerIndex = 0): boolean {
+    if (!this.canLaunch(playerIndex)) return false;
+    if (playerIndex === 0) this.isAimCharging = false;
 
     cowboyAudio.playLassoThrow();
 
-    const hasRainbowNet = cowboyInventory.isEquipped('rainbow_net');
-    if (hasRainbowNet) {
-      cowboyInventory.consume('rainbow_net');
-      this.triggerRainbowNetSweep();
-      return true;
+    if (playerIndex === 0) {
+      const hasRainbowNet = cowboyInventory.isEquipped('rainbow_net');
+      if (hasRainbowNet) {
+        cowboyInventory.consume('rainbow_net');
+        this.triggerRainbowNetSweep();
+        return true;
+      }
     }
 
     const count = Math.max(1, Math.min(5, ropeCount));
-    this.selectedRopeCount = count;
-    const targets = COWBOY_TARGET_SPREADS[count - 1];
+    if (playerIndex === 0) this.selectedRopeCount = count;
+    else this.selectedRopeCountP2 = count;
 
-    // Clamped Z: bao phủ từ làn gần (1.0), giữa (-0.6) đến xa (-2.4)
+    const targets = COWBOY_TARGET_SPREADS[count - 1];
     const clampedZ = Math.max(-2.5, Math.min(2.2, targetZ));
 
+    const offsetStart = playerIndex === 0 ? 0 : 5;
+    const baseOriginX = playerIndex === 0 ? (this.isTwoPlayerMode ? -2.8 : 0) : 2.8;
+    const centerTargetX = playerIndex === 0 ? (this.isTwoPlayerMode ? -1.8 : 0) : 1.8;
+
     for (let i = 0; i < count; i++) {
-      const rope = this.ropes[i];
+      const rope = this.ropes[offsetStart + i];
       rope.state = 'flying';
       rope.progress = 0;
       rope.caughtAnimalId = null;
 
-      rope.startX = (i - (count - 1) / 2) * 0.42;
+      rope.startX = baseOriginX + (i - (count - 1) / 2) * 0.42;
       rope.startY = 0.38;
       rope.startZ = 5.2;
 
-      rope.targetX = targets[i];
+      rope.targetX = centerTargetX + targets[i] * (this.isTwoPlayerMode ? 0.7 : 1.0);
       rope.targetY = 1.1;
       rope.targetZ = clampedZ;
 
@@ -1388,7 +1448,7 @@ export class CowboyArena {
     }
 
     for (let i = count; i < 5; i++) {
-      const rope = this.ropes[i];
+      const rope = this.ropes[offsetStart + i];
       rope.state = 'idle';
       rope.ribbonMesh.visible = false;
       rope.loopMesh.visible = false;
@@ -1398,51 +1458,8 @@ export class CowboyArena {
   }
 
   /** Phóng thòng lọng (hoặc bung Lưới Cầu Vồng nếu đã trang bị) */
-  public launchVolley(ropeCount: number): boolean {
-    if (!this.canLaunch()) return false;
-    this.isAimCharging = false;
-
-    cowboyAudio.playLassoThrow();
-
-    const hasRainbowNet = cowboyInventory.isEquipped('rainbow_net');
-    if (hasRainbowNet) {
-      cowboyInventory.consume('rainbow_net');
-      this.triggerRainbowNetSweep();
-      return true;
-    }
-
-    const count = Math.max(1, Math.min(5, ropeCount));
-    this.selectedRopeCount = count;
-
-    const targets = COWBOY_TARGET_SPREADS[count - 1];
-
-    for (let i = 0; i < count; i++) {
-      const rope = this.ropes[i];
-      rope.state = 'flying';
-      rope.progress = 0;
-      rope.caughtAnimalId = null;
-
-      rope.startX = (i - (count - 1) / 2) * 0.42;
-      rope.startY = 0.38;
-      rope.startZ = 5.2;
-
-      rope.targetX = targets[i];
-      rope.targetY = 1.1;
-      rope.targetZ = -2.8; // Quét xuyên qua cả 3 làn (1.0, -0.6, -2.4)
-
-      rope.ribbonMesh.visible = true;
-      rope.loopMesh.visible = true;
-      rope.loopMesh.scale.setScalar(1);
-    }
-
-    for (let i = count; i < 5; i++) {
-      const rope = this.ropes[i];
-      rope.state = 'idle';
-      rope.ribbonMesh.visible = false;
-      rope.loopMesh.visible = false;
-    }
-
-    return true;
+  public launchVolley(ropeCount: number, playerIndex = 0): boolean {
+    return this.launchVolleyWithAim(ropeCount, -2.8, playerIndex);
   }
 
   /** Bung Lưới Cầu Vồng quét sạch mọi con thú trên màn hình */
@@ -1500,7 +1517,7 @@ export class CowboyArena {
         this.retireAnimal(id);
       }
       this.syncReadyRopes();
-      this.onVolleyFinish?.();
+      this.onVolleyFinish?.(0);
     }, 1200);
   }
 
@@ -1705,7 +1722,8 @@ export class CowboyArena {
   }
 
   private updateRopes(dt: number, time: number): void {
-    let anyRopeActive = false;
+    const p1WasActive = this.ropes.slice(0, 5).some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
+    const p2WasActive = this.isTwoPlayerMode && this.ropes.slice(5, 10).some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
     const hasSpeedBoots = cowboyInventory.isEquipped('speed_boots');
     const speedMult = hasSpeedBoots ? 1.6 : 1.0;
 
@@ -1715,7 +1733,6 @@ export class CowboyArena {
         this.updateReadyRopeGeometry(rope, time);
         continue;
       }
-      anyRopeActive = true;
 
       if (rope.state === 'flying') {
         rope.progress += dt * 3.2 * speedMult;
@@ -1791,7 +1808,7 @@ export class CowboyArena {
           if (animal) {
             this.spawnCoinBurst(animal.x, 1.2, animal.z, animal.isRainbow);
             this.spawn3DScorePopup(animal.x, 1.6, animal.z, animal.score, animal.isRainbow || animal.isSparkleX2);
-            this.onCatch?.(animal);
+            this.onCatch?.(animal, rope.playerIndex ?? 0);
           }
           this.retireAnimal(rope.caughtAnimalId!);
           rope.state = 'idle';
@@ -1810,10 +1827,16 @@ export class CowboyArena {
       this.updateRopeGeometry(rope, time);
     }
 
-    const stillActive = this.ropes.some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
-    if (anyRopeActive && !stillActive) {
-      this.syncReadyRopes();
-      this.onVolleyFinish?.();
+    const p1StillActive = this.ropes.slice(0, 5).some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
+    const p2StillActive = this.isTwoPlayerMode && this.ropes.slice(5, 10).some((r) => r.state === 'flying' || r.state === 'tug' || r.state === 'pulling' || r.state === 'miss');
+
+    if (p1WasActive && !p1StillActive) {
+      this.syncReadyRopes(0);
+      this.onVolleyFinish?.(0);
+    }
+    if (p2WasActive && !p2StillActive) {
+      this.syncReadyRopes(1);
+      this.onVolleyFinish?.(1);
     }
   }
 

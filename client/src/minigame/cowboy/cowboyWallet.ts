@@ -169,6 +169,12 @@ export class CowboyWallet {
   }
 
   /** Cộng tiền thưởng khi bắt dính thú */
+  public addCredits(amount: number): void {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    this.data.credits += Math.floor(amount);
+    this.save();
+  }
+
   public addWinnings(winAmount: number, catchesCount = 1): void {
     if (!Number.isFinite(winAmount) || winAmount <= 0) return;
     const cleanWin = Math.floor(winAmount);

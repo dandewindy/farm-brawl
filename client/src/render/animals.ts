@@ -4047,7 +4047,7 @@ export class AnimalRenderer {
     const isCharging = (flags & 4) !== 0;
     const isStunned = (flags & 8) !== 0;
     const isSuper = (flags & FLAG.SUPER) !== 0;
-    const isFlying = (flags & FLAG.FLYING) !== 0;
+    const isFlying = (vis.species === 'phoenix' || vis.species === 'swan' || vis.species === 'pegasus') && ((flags & FLAG.FLYING) !== 0);
     const isWater = ((flags & 16) !== 0) && !isFlying && ((vis.currentFlyH || 0) < 0.35);
     const isMud = ((flags & 32) !== 0) && !isFlying && ((vis.currentFlyH || 0) < 0.35);
     const isSafeSwimmer = vis.species === 'duck' || vis.species === 'swan' || vis.species === 'dog' || vis.species === 'wolf' || vis.species === 'pegasus';
@@ -4195,9 +4195,9 @@ export class AnimalRenderer {
       }
     }
 
-    // Body hopping & positioning: lướt mượt mà khi húc (isDashing), nhún bước chân nhẹ nhàng khi đi bộ
+    // Body hopping & positioning: lướt thẳng mặt đất khi húc (isDashing -> hopHeight = 0), nhún bước chân nhẹ nhàng khi đi bộ
     const isGroundHopping = !isLeapingVisual && (!isWater || isSuper);
-    const hopHeight = isDashing ? 0.05 : 0.10;
+    const hopHeight = isDashing ? 0 : 0.10;
     let bodyY = y + (isGroundHopping ? Math.abs(Math.sin(vis.phase)) * hopHeight * r : 0);
     // Monkey bipedal bobbing run
     if (vis.species === 'monkey' && !isLeapingVisual && !isWater && speed > 0.02) {
@@ -4216,7 +4216,7 @@ export class AnimalRenderer {
       bodyY += arc * peakH;
     }
     const targetFlyH = isFlying
-      ? ((vis.species === 'swan' || vis.species === 'pegasus' || vis.species === 'phoenix') ? (3.5 * r + 1.2) : (1.2 * r))
+      ? ((vis.species === 'swan' || vis.species === 'pegasus') ? (3.5 * r + 1.2) : vis.species === 'phoenix' ? (1.2 * r) : 0)
       : 0;
 
     if (vis.currentFlyH === undefined) vis.currentFlyH = targetFlyH;
@@ -4312,9 +4312,9 @@ export class AnimalRenderer {
       : isFlying
       ? 0.02
       : isPlowing
-      ? (vis.species === 'mammoth' ? 0 : vis.species === 'bull' ? (Math.sin(now / 70) * 0.35 + 0.15) : -0.4)
+      ? 0
       : isDashing
-      ? (vis.species === 'mammoth' ? 0 : vis.species === 'bull' ? (Math.sin(now / 70) * 0.35 + 0.15) : -0.25)
+      ? 0
       : isWater && isSafeSwimmer
       ? 0 // Khóa cứng nằm yên trên mặt nước, không chao đảo tới lui
       : isDrowning

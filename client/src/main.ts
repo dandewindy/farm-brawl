@@ -682,6 +682,16 @@ function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
     });
   });
 
+  let selectedCowboyMode: 'solo' | 'friends' = 'solo';
+  const cbModeBtns = document.querySelectorAll('.cb-mode-btn');
+  cbModeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      cbModeBtns.forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+      selectedCowboyMode = (btn.getAttribute('data-cb-mode') as 'solo' | 'friends') || 'solo';
+    });
+  });
+
   const startCowboyBtn = document.getElementById('btnStartCowboyGame');
   startCowboyBtn?.addEventListener('click', () => {
     unlockAudio();
@@ -689,7 +699,7 @@ function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
       alert('⏰ Đã hết giờ chơi hôm nay của bé! Hãy nhờ ba mẹ nhập mã PIN để mở khóa.');
       return;
     }
-    const opened = manager.open(selectedTheme);
+    const opened = manager.open(selectedTheme, selectedCowboyMode);
     if (opened) {
       if (startEl) startEl.hidden = true;
       hudRef.stopPreview();
@@ -3689,7 +3699,9 @@ function animate(now: number): void {
           pFlags &= ~FLAG.DASH;
           pFlags &= ~FLAG.PLOW;
         }
-        if (predictor.flyT > 0 || (ent.flags & FLAG.FLYING) !== 0) {
+        const canFlySpecies = meta.species === 'phoenix' || meta.species === 'swan' || meta.species === 'pegasus';
+        const predFlying = meta.species === 'phoenix' ? predictor.flyT > 0 : ((meta.species === 'swan' || meta.species === 'pegasus') && predictor.flightT > 0);
+        if (canFlySpecies && (predFlying || (ent.flags & FLAG.FLYING) !== 0)) {
           pFlags |= FLAG.FLYING;
         } else {
           pFlags &= ~FLAG.FLYING;

@@ -10486,7 +10486,7 @@ body.mobile-phone #adminToggleBtn {
   display: flex;
   justify-content: center;
   position: absolute;
-  bottom: 24px; /* Dời bảng điều khiển lên cao trên bậu cửa gỗ */
+  bottom: calc(24px + 10vh); /* Dời bảng điều khiển lên cao 1/10 vh để cực thoáng và không che bậu cửa gỗ */
   left: 0;
   right: 0;
   padding: 0 20px;
@@ -10618,30 +10618,40 @@ body.mobile-phone #adminToggleBtn {
 
 .cowboy-top-icon-btn,
 .cb-top-icon-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--paper, #fff8e7);
-  border: 0;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--ink, #2b170e);
-  transition: transform 0.08s, box-shadow 0.08s;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 8px !important;
+  background: #2e2622 !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: var(--paper, #fff8e7) !important;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .cowboy-top-icon-btn:hover,
 .cb-top-icon-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  background: #3e322a !important;
+  border-color: var(--gold, #ffd84a) !important;
+  color: var(--gold, #ffd84a) !important;
+  transform: scale(1.05) !important;
 }
 
 .cowboy-top-icon-btn:active,
 .cb-top-icon-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  transform: scale(0.95) !important;
+}
+
+.cowboy-top-icon-btn svg,
+.cb-top-icon-btn svg {
+  display: block;
+  stroke: currentColor;
 }
 
 
@@ -10649,7 +10659,7 @@ body.mobile-phone #adminToggleBtn {
 /* Explicit Mobile Protection: Compact sizing on mobile/tablet screens */
 @media (max-width: 840px), (max-height: 540px) {
   .cowboy-bottom-bar {
-    bottom: 8px !important;
+    bottom: calc(10px + 8vh) !important;
     padding: 0 8px 6px !important;
   }
 
@@ -10692,3 +10702,189 @@ body.mobile-phone #adminToggleBtn {
   }
 }
 
+
+/* ==========================================================================
+   COWBOY GAME MODES (CAMPAIGN PROGRESSION & 2-PLAYER SHARED SCREEN)
+   ========================================================================== */
+
+/* Single Cycle Bet Button - Condensed & Compact */
+.cb-cycle-bet-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.cb-cycle-bet-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px !important;
+  height: 52px !important;
+  padding: 4px 12px !important;
+  background: linear-gradient(180deg, #423225 0%, #2b1f16 100%) !important;
+  border: 2px solid #ffca28 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 0 #1b120c, 0 6px 14px rgba(0, 0, 0, 0.5) !important;
+  cursor: pointer;
+  transition: transform 0.08s, filter 0.15s, border-color 0.15s;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.cb-cycle-bet-btn:hover {
+  filter: brightness(1.15);
+  border-color: #ffe082 !important;
+  transform: translateY(-2px);
+}
+
+.cb-cycle-bet-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1b120c, 0 3px 6px rgba(0, 0, 0, 0.5) !important;
+}
+
+.cb-cycle-bet-btn .cb-cycle-num-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.cb-cycle-bet-btn .cb-cycle-val {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffd647;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.cb-cycle-bet-btn .cb-cycle-cost {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff8e7;
+  opacity: 0.9;
+}
+
+.cb-cycle-hint {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 235, 205, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+/* Campaign Goal Progress Bar on Top HUD */
+.cb-score-progress-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  margin-top: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.cb-score-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffd647, #4caf50);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Lobby Mode Selector in Cowboy Tab */
+.cb-modes-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cb-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background: #251d18;
+  border: 1.5px solid #4a3a2f;
+  border-radius: 10px;
+  color: var(--paper, #fff8e7);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cb-mode-btn:hover {
+  background: #332720;
+  border-color: #ffd647;
+}
+
+.cb-mode-btn.on {
+  background: #3e2e23;
+  border-color: #ffd647;
+  box-shadow: 0 0 12px rgba(255, 214, 71, 0.25);
+}
+
+.cb-mode-btn .n {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-weight: 900;
+  font-size: 13.5px;
+  color: #ffd647;
+  text-transform: uppercase;
+}
+
+.cb-mode-btn .p {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+}
+
+/* 2-Player Controls Layout */
+.cowboy-controls-card.mode-2p {
+  justify-content: space-between !important;
+  width: 100% !important;
+  max-width: 1060px !important;
+  padding: 0 16px !important;
+}
+
+.cb-2p-player-zone {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cb-2p-player-zone.p1-zone {
+  flex-direction: row;
+}
+
+.cb-2p-player-zone.p2-zone {
+  flex-direction: row-reverse;
+}
+
+.cb-2p-tag {
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.cb-2p-tag.p1 {
+  background: #1976d2;
+  color: #fff;
+  border: 1px solid #64b5f6;
+}
+
+.cb-2p-tag.p2 {
+  background: #d32f2f;
+  color: #fff;
+  border: 1px solid #e57373;
+}
+
+.cowboy-controls-card.cb-card-hidden,
+.cowboy-controls-card[hidden],
+.cb-card-hidden {
+  display: none !important;
+}

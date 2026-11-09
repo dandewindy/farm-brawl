@@ -2768,12 +2768,14 @@ export class World {
       p.vx = Math.cos(p.a) * flySpeed;
       p.vz = Math.sin(p.a) * flySpeed;
       p.dashT = isRainbow ? 0.70 : 0.55;
-      p.flyT = isRainbow ? 0.70 : 0.55;
+      p.flyT = p.holdT > 0.15 ? (isRainbow ? 0.70 : 0.55) : 0;
       p.plow = true;
       p.power = isRainbow ? 7.5 : 3.6;
       p.cd = CFG.DASH_CD * 0.5;
       p.dashHit.clear();
-      this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      if (p.flyT > 0) {
+        this.events.push({ k: 'fly', id: p.id, x: r2(p.x), z: r2(p.z) });
+      }
     }
   }
 
@@ -5289,7 +5291,10 @@ export class World {
         | (o.shieldT > 0 ? FLAG.IMMUNITY : 0)
         | (o.hasHeart ? FLAG.HEART : 0)
         | (o.superT > 0 ? FLAG.SUPER : 0)
-        | ((o.flyT > 0 || (o.flightT && o.flightT > 0) || (o.tossT && o.tossT > 0)) ? FLAG.FLYING : 0)
+        | (((o.species === 'swan' || o.species === 'pegasus')
+            ? ((o.flightT ?? 0) > 0)
+            : (o.species === 'phoenix' && (o.flyT > 0 || (o.flightT ?? 0) > 0)))
+          ? FLAG.FLYING : 0)
         | (o.wheelT > 0 ? FLAG.WHEEL : 0)
         | (o.monkeyLeapT && o.monkeyLeapT > 0 ? FLAG.MONKEY_LEAP : 0)
         | (o.treeShakeT && o.treeShakeT > 0 ? FLAG.TREE_SHAKE : 0)

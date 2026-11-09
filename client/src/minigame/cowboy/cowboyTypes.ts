@@ -69,6 +69,7 @@ export interface ActiveCowboyAnimal {
 export interface LassoRope {
   id: number;
   lane: number; // 0..4 (tương ứng 5 tia quăng dây theo hình cánh quạt)
+  playerIndex?: number; // 0 for P1, 1 for P2
   state: 'idle' | 'ready' | 'flying' | 'tug' | 'pulling' | 'miss';
   progress: number; // 0..1
   startX: number;
@@ -178,4 +179,11 @@ export function isCowboyAdminName(customName?: string): boolean {
   }
   const clean = name.toLowerCase();
   return clean === 'admin9112267' || clean === 'admin911226';
+}
+
+export function getStageTargetScore(stage: number): number {
+  const baseTargets = [80, 180, 300, 450, 650];
+  if (stage <= 5) return baseTargets[stage - 1];
+  const k = stage - 5;
+  return Math.round(650 + 200 * k + (25 * k * (k + 1)) / 2);
 }
