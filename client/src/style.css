@@ -10888,3 +10888,583 @@ body.mobile-phone #adminToggleBtn {
 .cb-card-hidden {
   display: none !important;
 }
+
+
+/* ==========================================================================
+   UNIFIED LOBBY RESPONSIVE FIX (DESKTOP, MOBILE LANDSCAPE & MOBILE PORTRAIT)
+   Zero wasted top space, zero protruding buttons, zero scrolling required
+   ========================================================================== */
+
+/* 1. Desktop & Default Lobby Header Alignment:
+   Float corner buttons (.wall-top and .cb-lobby-top) at top-right/left inside the card
+   so the 2 game tabs (.lobby-game-nav) sit right at the top of both cards at the exact same level! */
+.card.start-card-wide,
+.cowboy-lobby-card {
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.cb-header-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+@media (min-width: 769px) and (min-height: 541px) {
+  .card.start-card-wide .wall-top {
+    position: absolute !important;
+    top: 14px !important;
+    left: 20px !important;
+    right: 20px !important;
+    margin: 0 !important;
+    z-index: 15 !important;
+    pointer-events: none !important;
+  }
+  .card.start-card-wide .wall-top-left,
+  .card.start-card-wide .wall-top-right {
+    pointer-events: auto !important;
+  }
+  .cowboy-lobby-card .cb-lobby-top {
+    position: absolute !important;
+    top: 14px !important;
+    right: 20px !important;
+    left: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    z-index: 15 !important;
+  }
+  .cowboy-lobby-card {
+    gap: 10px !important;
+    padding: 14px 20px 16px !important;
+  }
+  .lobby-game-nav,
+  .cb-game-nav {
+    width: 360px !important;
+    max-width: 360px !important;
+    margin: 0 auto 8px auto !important;
+  }
+  .lobby-game-tab {
+    min-height: 38px !important;
+    padding: 6px 12px !important;
+    font-size: 12.5px !important;
+  }
+  .cb-header-banner {
+    margin: 0 0 4px !important;
+  }
+  .cb-modes-row {
+    margin-bottom: 8px !important;
+  }
+}
+
+/* 2. Mobile & Tablet Landscape (max-height: 540px):
+   Single-row header for BOTH Tab 1 & Tab 2, buttons strictly inside card border, fits 100% on 1 screen without scrolling */
+@media (orientation: landscape) and (max-height: 540px), (max-height: 540px) {
+  #spPreviewWrap {
+    display: none !important;
+  }
+
+  #start.screen {
+    padding: 4px 8px !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    overflow-y: auto !important;
+  }
+
+  .lobby-tabs-wrapper {
+    width: min(860px, 96vw) !important;
+    max-width: 860px !important;
+    margin: auto !important;
+  }
+
+  .card.start-card-wide,
+  .cowboy-lobby-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 7px 14px 8px !important;
+    border-radius: 14px !important;
+    margin: 0 !important;
+    gap: 4px !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Fix protruding top-right buttons in Tab 1: position absolute INSIDE .card, never fixed to viewport! */
+  .card.start-card-wide .wall-top {
+    position: absolute !important;
+    top: 7px !important;
+    right: 12px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    margin: 0 !important;
+    z-index: 25 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    pointer-events: auto !important;
+  }
+
+  .card.start-card-wide .wall-top-right {
+    gap: 5px !important;
+  }
+
+  #btnMainKids,
+  #startFsBtn,
+  #startBurgerBtn {
+    width: 30px !important;
+    height: 28px !important;
+    min-width: 30px !important;
+    min-height: 28px !important;
+    border-radius: 7px !important;
+    font-size: 14px !important;
+  }
+
+  /* Tab 1 Header Row: reserve 106px on right so name-box NEVER collides with top-right buttons */
+  .start-header-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin: 0 0 3px !important;
+    padding-right: 118px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .start-header-row .lobby-game-nav,
+  .cb-header-row .cb-game-nav {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .start-header-row .lobby-game-tab,
+  .cb-header-row .lobby-game-tab {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 2px 10px !important;
+    font-size: 10.5px !important;
+    border-radius: 8px !important;
+    gap: 5px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .start-header-row .lobby-game-tab .tab-icon,
+  .cb-header-row .lobby-game-tab .tab-icon {
+    font-size: 13px !important;
+  }
+
+  .start-header-row .lobby-game-tab .horse-cowboy-ico,
+  .cb-header-row .lobby-game-tab .horse-cowboy-ico {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .start-header-row .title-row {
+    font-size: 20px !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .start-header-row .name-box {
+    margin: 0 !important;
+    width: min(145px, 24%) !important;
+    max-width: 145px !important;
+    flex-shrink: 1 !important;
+  }
+
+  .start-cols {
+    align-items: stretch !important;
+  }
+
+  .start-col-left {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  .ffa-preview-box {
+    height: 72px !important;
+    max-height: 76px !important;
+    flex: 1 1 auto !important;
+    margin: 2px 0 4px !important;
+  }
+
+  .start-header-row .name-box #name {
+    height: 28px !important;
+    font-size: 12.5px !important;
+    padding: 2px 22px 2px 8px !important;
+    border-radius: 7px !important;
+  }
+
+  /* Tab 2 Top-Right Actions: position absolute INSIDE .cowboy-lobby-card, no empty bar or divider line! */
+  .cowboy-lobby-card .cb-lobby-top {
+    position: absolute !important;
+    top: 7px !important;
+    right: 12px !important;
+    left: auto !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    z-index: 25 !important;
+  }
+
+  .cowboy-lobby-card .cb-lobby-top-actions {
+    gap: 5px !important;
+  }
+
+  .cowboy-lobby-card .cb-top-stat-pill {
+    height: 28px !important;
+    padding: 2px 9px !important;
+    font-size: 11px !important;
+    border-radius: 7px !important;
+    box-sizing: border-box !important;
+  }
+
+  .cowboy-lobby-card .cb-top-stat-pill b {
+    font-size: 13px !important;
+  }
+
+  #cbLobbyFsBtn,
+  #btnLobbyKids {
+    width: 30px !important;
+    height: 28px !important;
+    min-width: 30px !important;
+    min-height: 28px !important;
+    border-radius: 7px !important;
+  }
+
+  /* Tab 2 Header Row: Single horizontal line matching Tab 1 */
+  .cb-header-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 14px !important;
+    margin: 0 0 3px !important;
+    padding-right: 148px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cb-header-banner {
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .cb-banner-logo-row {
+    gap: 6px !important;
+  }
+
+  .cb-banner-ico {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .cb-banner-ico svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .cb-banner-title {
+    font-size: 19px !important;
+    white-space: nowrap !important;
+  }
+
+  .cb-banner-subtitle {
+    display: none !important;
+  }
+
+  /* Tab 2 Body (2 columns, ultra-compact so everything fits without scrolling) */
+  .cb-lobby-body {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+
+  .cb-lobby-col-left,
+  .cb-lobby-col-right {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    justify-content: space-between !important;
+  }
+
+  .cb-lobby-col-left .sec-label,
+  .cb-lobby-col-right .sec-label {
+    font-size: 8.5px !important;
+    margin: 0 0 1px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cb-modes-row {
+    gap: 5px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .cb-mode-btn {
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+  }
+
+  .cb-mode-btn .n {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cb-mode-btn .p {
+    font-size: 8px !important;
+    margin-top: 1px !important;
+    line-height: 1 !important;
+  }
+
+  .cb-map-selector {
+    gap: 3px !important;
+  }
+
+  .cb-map-card {
+    padding: 3px 6px !important;
+    border-radius: 7px !important;
+    gap: 6px !important;
+    min-height: 0 !important;
+  }
+
+  .cb-map-card .map-thumb {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    border-radius: 5px !important;
+  }
+
+  .cb-map-card .map-ico {
+    font-size: 12px !important;
+  }
+
+  .cb-map-card .map-name {
+    font-size: 10.5px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+
+  .cb-map-card .map-desc {
+    font-size: 8px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 1 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  .cb-rules-card {
+    padding: 5px 8px !important;
+    gap: 3px !important;
+    border-radius: 7px !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  .cb-rule-row {
+    font-size: 8.5px !important;
+    line-height: 1.18 !important;
+    gap: 4px !important;
+  }
+
+  .cb-btn-start-game {
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 4px 10px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
+    margin-top: 3px !important;
+  }
+}
+
+/* 3. Mobile Portrait (max-width: 768px and portrait):
+   Compact vertical stack so both Tab 1 & Tab 2 fit cleanly on a portrait phone screen */
+@media (max-width: 768px) and (orientation: portrait) {
+  #start.screen {
+    padding: 4px 6px !important;
+    justify-content: flex-start !important;
+  }
+
+  .lobby-tabs-wrapper {
+    width: min(420px, 96vw) !important;
+    max-width: 420px !important;
+    margin: auto !important;
+  }
+
+  .card.start-card-wide,
+  .cowboy-lobby-card {
+    padding: 6px 10px 8px !important;
+    gap: 4px !important;
+  }
+
+  .card.start-card-wide .wall-top {
+    margin-bottom: 2px !important;
+  }
+
+  .start-header-row .title-row {
+    font-size: 21px !important;
+    margin: 0 !important;
+  }
+
+  .card.start-card-wide .slogan {
+    display: none !important;
+  }
+
+  .start-header-row .name-box {
+    margin: 2px auto 3px !important;
+  }
+
+  .start-header-row .name-box #name {
+    height: 30px !important;
+    font-size: 13px !important;
+  }
+
+  .card.start-card-wide .modes {
+    margin-bottom: 3px !important;
+    gap: 5px !important;
+  }
+
+  .card.start-card-wide .mode {
+    padding: 4px 6px !important;
+  }
+
+  .card.start-card-wide .ffa-preview-box {
+    height: 44px !important;
+    max-height: 44px !important;
+    margin: 2px 0 3px !important;
+  }
+
+  .card.start-card-wide .arenas {
+    margin-bottom: 3px !important;
+    gap: 5px !important;
+  }
+
+  .card.start-card-wide .arena-btn {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+  }
+
+  .card.start-card-wide .animal-picker-box {
+    margin-bottom: 3px !important;
+  }
+
+  .card.start-card-wide .play-btn {
+    padding: 7px 12px !important;
+    min-height: 38px !important;
+    font-size: 15px !important;
+    margin: 2px 0 4px !important;
+  }
+
+  .card.start-card-wide .how-box {
+    padding: 4px 8px !important;
+  }
+
+  .card.start-card-wide .how-title {
+    font-size: 9.5px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .card.start-card-wide ul.how li {
+    font-size: 9px !important;
+    line-height: 1.14 !important;
+    margin-bottom: 1px !important;
+  }
+
+  .cowboy-lobby-card .cb-lobby-top {
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+    margin-bottom: 2px !important;
+  }
+
+  .cb-game-nav,
+  .start-header-row .lobby-game-nav {
+    margin: 0 auto 4px auto !important;
+    gap: 6px !important;
+  }
+
+  .lobby-game-tab {
+    min-height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .cb-header-banner {
+    margin: 0 0 3px !important;
+  }
+
+  .cb-banner-ico {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .cb-banner-ico svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .cb-banner-title {
+    font-size: 20px !important;
+  }
+
+  .cb-banner-subtitle {
+    font-size: 10px !important;
+    margin-top: 1px !important;
+  }
+
+  .cb-modes-row {
+    gap: 6px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .cb-mode-btn {
+    padding: 5px 8px !important;
+  }
+
+  .cb-mode-btn .n {
+    font-size: 11.5px !important;
+  }
+
+  .cb-mode-btn .p {
+    font-size: 9px !important;
+  }
+
+  .cb-map-selector {
+    gap: 4px !important;
+  }
+
+  .cb-map-card {
+    padding: 4px 8px !important;
+  }
+
+  .cb-rules-card {
+    padding: 5px 8px !important;
+    gap: 3px !important;
+  }
+
+  .cb-rule-row {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+  }
+
+  .cb-btn-start-game {
+    min-height: 38px !important;
+    padding: 6px 12px !important;
+    font-size: 15px !important;
+    margin-top: 4px !important;
+  }
+}
