@@ -6,7 +6,7 @@ import { CowboyShop } from './cowboyShop';
 import { cowboyKids } from './cowboyKids';
 import { cowboyInventory } from './cowboyItems';
 import { cowboyAudio } from './cowboyAudio';
-import type { ActiveCowboyAnimal, CowboyThemeId } from './cowboyTypes';
+import { isCowboyAdminName, type ActiveCowboyAnimal, type CowboyThemeId } from './cowboyTypes';
 
 export class CowboyManager {
   private container: HTMLElement;
@@ -110,6 +110,10 @@ export class CowboyManager {
       cowboyAudio.playVoice('cowboy_welcome');
     } else {
       cowboyAudio.playVoice('cowboy_welcome');
+    }
+
+    if (isCowboyAdminName()) {
+      this.hud.showToast('👑 <b>CHẾ ĐỘ ADMIN:</b> Cho phép mở Cửa Hàng bất kỳ lúc nào (bấm nút CỬA HÀNG hoặc phím B)!', 4000);
     }
 
     // Biến theo dõi kết quả loạt quăng dây
@@ -280,7 +284,7 @@ export class CowboyManager {
       this.arena?.stop();
       this.hud?.pauseRoundTimer();
       this.hud?.setBusy(true);
-      this.shop?.open();
+      this.shop?.open(true);
     };
 
     // Hết giờ vòng 3 phút -> Kết thúc vòng, mở Cửa Hàng

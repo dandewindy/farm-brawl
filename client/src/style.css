@@ -8671,13 +8671,13 @@ body.mobile-phone #adminToggleBtn {
     gap: 3px;
     flex-shrink: 0;
   }
-  .cowboy-backpack-btn, .cowboy-exit-btn {
+  .cowboy-backpack-btn, .cowboy-exit-btn, .admin-shop-btn {
     padding: 2px 6px;
     font-size: 9.5px;
     gap: 3px;
     border-radius: 6px;
   }
-  .cowboy-backpack-btn .ico, .cowboy-exit-btn .ico {
+  .cowboy-backpack-btn .ico, .cowboy-exit-btn .ico, .admin-shop-btn .ico {
     font-size: 11px;
   }
   .cowboy-bottom-bar {
@@ -9377,6 +9377,37 @@ body.mobile-phone #adminToggleBtn {
   transition: all 0.15s ease;
 }
 
+
+.admin-shop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(180deg, #ff8f00 0%, #e65100 100%);
+  border: 1.5px solid #ffe082;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--f-display, 'Baloo 2', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(230, 81, 0, 0.45);
+  transition: all 0.15s ease;
+  animation: adminGlowPulse 2.5s infinite ease-in-out;
+}
+
+.admin-shop-btn:hover {
+  background: linear-gradient(180deg, #ffa000 0%, #ef6c00 100%);
+  border-color: #fff;
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 12px rgba(255, 143, 0, 0.6);
+}
+
+@keyframes adminGlowPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 179, 0, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(255, 214, 71, 0.8); }
+}
+
 .cowboy-backpack-btn:hover {
   background: linear-gradient(180deg, #6d4c41 0%, #4e342e 100%);
   border-color: #ffd647;
@@ -9616,6 +9647,7 @@ body.mobile-phone #adminToggleBtn {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 5;
 }
 
 .cb-shop-slots-grid {
@@ -9643,13 +9675,24 @@ body.mobile-phone #adminToggleBtn {
   transition: all 0.2s cubic-bezier(0.2, 0, 0.2, 1);
   background: transparent;
   box-sizing: border-box;
+
+  pointer-events: auto !important;
+  user-select: none;
+}
+
+.cb-shelf-slot * {
+  pointer-events: none;
 }
 
 .cb-shelf-slot:hover {
-  border-color: rgba(255, 214, 71, 0.8);
-  background: radial-gradient(circle at 50% 60%, rgba(255, 214, 71, 0.15) 0%, transparent 75%);
-  box-shadow: 0 0 24px rgba(255, 214, 71, 0.4);
+  border-color: rgba(255, 214, 71, 0.9);
+  background: radial-gradient(circle at 50% 60%, rgba(255, 214, 71, 0.2) 0%, transparent 75%);
+  box-shadow: 0 0 28px rgba(255, 214, 71, 0.45);
   transform: translateY(-4px) scale(1.03);
+}
+
+.cb-shelf-slot:active {
+  transform: translateY(-1px) scale(0.99);
 }
 
 .cb-shelf-slot.is-equipped {
@@ -10086,6 +10129,11 @@ body.mobile-phone #adminToggleBtn {
   font-weight: 900;
   cursor: pointer;
   box-shadow: 0 3px 0 #b26a00;
+}
+
+@keyframes zoomIn {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes bubblePop {

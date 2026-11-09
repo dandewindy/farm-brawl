@@ -161,3 +161,21 @@ export const HORSE_COWBOY_SVG = `
   <ellipse cx="27.5" cy="33.8" rx="1.4" ry="1.7" fill="#4a250e"/>
   <path d="M21.5 36.5 C23 37.5, 25 37.5, 26.5 36.5" stroke="#4a250e" stroke-width="1.3" stroke-linecap="round"/>
 </svg>`;
+
+
+/**
+ * Kiểm tra xem người chơi có quyền Admin minigame Cao Bồi hay không.
+ * Điều kiện: Tên người chơi là Admin9112267 hoặc Admin911226 (không phân biệt hoa thường).
+ */
+export function isCowboyAdminName(customName?: string): boolean {
+  let name = (customName ?? '').trim();
+  if (!name && typeof document !== 'undefined') {
+    const input = document.getElementById('name') as HTMLInputElement | null;
+    if (input && input.value) name = input.value.trim();
+  }
+  if (!name && typeof localStorage !== 'undefined') {
+    name = (localStorage.getItem('fb_name') ?? '').trim();
+  }
+  const clean = name.toLowerCase();
+  return clean === 'admin9112267' || clean === 'admin911226';
+}

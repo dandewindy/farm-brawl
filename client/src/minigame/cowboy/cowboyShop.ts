@@ -52,6 +52,10 @@ export class CowboyShop {
   // Trạng thái vật phẩm được chọn để mua
   private pendingBuyItem: CowboyItemDef | null = null;
 
+  // Three.js Raycaster for interactive 3D items & NPC
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+
   // Callbacks
   public onResumeGame?: () => void;
   public onExit?: () => void;
@@ -143,23 +147,24 @@ export class CowboyShop {
           </button>
         </div>
 
-        <!-- Chi tiết vật phẩm & Thao tác Mua / Trang bị (Hiện lên khi bấm vào ô) -->
-        <div id="cbShopConfirmModal" class="cb-shop-confirm-modal-wrap" hidden>
-          <div class="cb-shop-confirm-card">
-            <button type="button" id="cfCloseXBtn" class="cf-close-btn" title="Đóng">✕</button>
-            <div class="cf-icon" id="cfIcon">🥾</div>
-            <h3 class="cf-title" id="cfTitle">${t('cb_shop_confirm_title')}</h3>
-            <div class="cf-effect-pill" id="cfEffectPill">⚡ Tác dụng</div>
-            <p class="cf-desc" id="cfDesc"></p>
-            <div class="cf-meta-row">
-              <span class="cf-owned-count" id="cfOwnedCount">Đang sở hữu: <b>0</b></span>
-              <span class="cf-price-badge" id="cfPriceBadge">🪙 6 Credit</span>
-            </div>
-            <div class="cf-actions" id="cfActions">
-              <button type="button" id="cfEquipBtn" class="cf-btn-equip" hidden>🎒 TRANG BỊ</button>
-              <button type="button" id="cfConfirmBtn" class="cf-btn-buy">🪙 <span data-i18n="cb_buy_now">${t('cb_buy_now')}</span></button>
-              <button type="button" id="cfCancelBtn" class="cf-btn-cancel" data-i18n="cb_cancel">${t('cb_cancel')}</button>
-            </div>
+      </div>
+
+      <!-- Chi tiết vật phẩm & Thao tác Mua / Trang bị (Nằm ngoài ui-layer để độc lập hoàn toàn z-index) -->
+      <div id="cbShopConfirmModal" class="cb-shop-confirm-modal-wrap" hidden>
+        <div class="cb-shop-confirm-card">
+          <button type="button" id="cfCloseXBtn" class="cf-close-btn" title="Đóng">✕</button>
+          <div class="cf-icon" id="cfIcon">🥾</div>
+          <h3 class="cf-title" id="cfTitle">${t('cb_shop_confirm_title')}</h3>
+          <div class="cf-effect-pill" id="cfEffectPill">⚡ Tác dụng</div>
+          <p class="cf-desc" id="cfDesc"></p>
+          <div class="cf-meta-row">
+            <span class="cf-owned-count" id="cfOwnedCount">Đang sở hữu: <b>0</b></span>
+            <span class="cf-price-badge" id="cfPriceBadge">🪙 6 Credit</span>
+          </div>
+          <div class="cf-actions" id="cfActions">
+            <button type="button" id="cfEquipBtn" class="cf-btn-equip" hidden>🎒 TRANG BỊ</button>
+            <button type="button" id="cfConfirmBtn" class="cf-btn-buy">🪙 <span data-i18n="cb_buy_now">${t('cb_buy_now')}</span></button>
+            <button type="button" id="cfCancelBtn" class="cf-btn-cancel" data-i18n="cb_cancel">${t('cb_cancel')}</button>
           </div>
         </div>
       </div>
@@ -245,9 +250,13 @@ export class CowboyShop {
     this.itemModels = [];
     COWBOY_ITEMS_CATALOG.forEach((item, idx) => {
       const model = buildShopItemModel(item.kind, idx);
+      model.group.userData = { itemIndex: idx };
       this.scene.add(model.group);
       this.itemModels.push(model);
     });
+    if (this.farmerNPC) {
+      this.farmerNPC.group.userData = { isFarmer: true };
+    }
 
     // 4. Tạo Túi hàng / Thùng bảo bối bên góc phải (gắn trực tiếp flyingItem vào scene)
     this.shopSack = buildShopSack(this.scene);
@@ -331,6 +340,7 @@ export class CowboyShop {
         tooltip.style.left = `${rect.left + rect.width / 2}px`;
         tooltip.style.top = `${rect.top - 12}px`;
         tooltip.hidden = false;
+        tooltip.style.display = 'block';
       });
 
       slot.addEventListener('mouseleave', () => {
@@ -338,8 +348,13 @@ export class CowboyShop {
       });
 
       // BẤM VÀO Ô TRÊN GIAN HÀNG ĐỂ MỞ BẢNG CHI TIẾT VÀ CHỌN MUA / TRANG BỊ
-      slot.addEventListener('click', () => {
-        if (tooltip) tooltip.hidden = true;
+      slot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (tooltip) {
+          tooltip.hidden = true;
+          tooltip.style.display = 'none';
+        }
+        cowboyAudio.playLassoTug();
         this.openConfirmModal(item);
       });
 
@@ -347,10 +362,16 @@ export class CowboyShop {
     });
   }
 
-  private openConfirmModal(item: CowboyItemDef): void {
+  public openConfirmModal(item: CowboyItemDef): void {
     this.pendingBuyItem = item;
     const owned = cowboyInventory.getCount(item.kind);
     const isEquipped = cowboyInventory.isEquipped(item.kind);
+
+    const tooltip = this.rootEl.querySelector('#cbItemTooltip') as HTMLElement | null;
+    if (tooltip) {
+      tooltip.hidden = true;
+      tooltip.style.display = 'none';
+    }
 
     const cfIcon = this.confirmModalEl.querySelector('#cfIcon')!;
     const cfTitle = this.confirmModalEl.querySelector('#cfTitle')!;
@@ -372,6 +393,7 @@ export class CowboyShop {
     if (cfEquipBtn) {
       if (owned > 0) {
         cfEquipBtn.hidden = false;
+        cfEquipBtn.style.display = 'block';
         cfEquipBtn.textContent = isEquipped ? '✅ BỎ TRANG BỊ' : '🎒 TRANG BỊ NGAY';
         cfEquipBtn.className = `cf-btn-equip ${isEquipped ? 'equipped' : ''}`;
         cfEquipBtn.onclick = () => {
@@ -380,31 +402,58 @@ export class CowboyShop {
           } else {
             cowboyInventory.equipForRound(item.kind);
           }
+          cowboyAudio.playLassoTug();
           this.renderSlotsUI();
           this.openConfirmModal(item);
         };
       } else {
         cfEquipBtn.hidden = true;
+        cfEquipBtn.style.display = 'none';
       }
     }
 
     if (cfConfirmBtn) {
+      const canAfford = this.wallet.getCredits() >= item.price;
       cfConfirmBtn.innerHTML = `🪙 <span>MUA NGAY (${item.price} C)</span>`;
+      cfConfirmBtn.disabled = !canAfford;
+      cfConfirmBtn.style.opacity = canAfford ? '1.0' : '0.65';
+      cfConfirmBtn.style.cursor = canAfford ? 'pointer' : 'not-allowed';
+      cfConfirmBtn.title = canAfford ? '' : 'Bạn không đủ Credit';
     }
 
     this.confirmModalEl.hidden = false;
+    this.confirmModalEl.style.display = 'flex';
+  }
+
+  public closeConfirmModal(): void {
+    this.confirmModalEl.hidden = true;
+    this.confirmModalEl.style.display = 'none';
+    this.pendingBuyItem = null;
   }
 
   private bindEvents(): void {
-    // Hủy modal confirm
+    // Đóng modal confirm
     this.confirmModalEl.querySelector('#cfCloseXBtn')?.addEventListener('click', () => {
-      this.confirmModalEl.hidden = true;
-      this.pendingBuyItem = null;
+      this.closeConfirmModal();
     });
     this.confirmModalEl.querySelector('#cfCancelBtn')?.addEventListener('click', () => {
-      this.confirmModalEl.hidden = true;
-      this.pendingBuyItem = null;
+      this.closeConfirmModal();
     });
+
+    // Bấm backdrop bên ngoài modal để đóng
+    this.confirmModalEl.addEventListener('click', (e) => {
+      if (e.target === this.confirmModalEl) {
+        this.closeConfirmModal();
+      }
+    });
+
+    // Phím Escape đóng modal
+    window.addEventListener('keydown', this.onKeyDown);
+
+    // Three.js Raycaster events trên Canvas
+    this.canvas.addEventListener('click', this.handleCanvasPointer);
+    this.canvas.addEventListener('touchend', this.handleCanvasPointer);
+    this.canvas.addEventListener('pointermove', this.onCanvasPointerMove);
 
     // Xác nhận mua
     this.confirmModalEl.querySelector('#cfConfirmBtn')?.addEventListener('click', () => {
@@ -412,8 +461,7 @@ export class CowboyShop {
       const item = this.pendingBuyItem;
       const res = cowboyInventory.buyItem(item.kind, this.wallet);
 
-      this.confirmModalEl.hidden = true;
-      this.pendingBuyItem = null;
+      this.closeConfirmModal();
 
       if (res.success) {
         this.creditBalanceEl.textContent = String(this.wallet.getCredits());
@@ -448,6 +496,81 @@ export class CowboyShop {
       this.onExit?.();
     });
   }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && !this.confirmModalEl.hidden) {
+      this.closeConfirmModal();
+    }
+  };
+
+  private getRaycastTargets(): THREE.Object3D[] {
+    const targets: THREE.Object3D[] = [];
+    for (const m of this.itemModels) {
+      targets.push(m.group);
+    }
+    if (this.farmerNPC) {
+      targets.push(this.farmerNPC.group);
+    }
+    return targets;
+  }
+
+  private handleCanvasPointer = (event: MouseEvent | TouchEvent): void => {
+    if (!this.isRendering || !this.confirmModalEl.hidden) return;
+    let clientX = 0;
+    let clientY = 0;
+    if ('changedTouches' in event && event.changedTouches.length > 0) {
+      clientX = event.changedTouches[0].clientX;
+      clientY = event.changedTouches[0].clientY;
+    } else if ('clientX' in event) {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    } else {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    // Tìm đối tượng gần nhất (closest foreground hit)
+    const targets = this.getRaycastTargets();
+    const hits = this.raycaster.intersectObjects(targets, true);
+    if (hits.length === 0) return;
+
+    // Duyệt ngược lên cây node để xác định đối tượng trúng là vật phẩm hay Bác Nông Dân
+    let curr: THREE.Object3D | null = hits[0].object;
+    while (curr) {
+      if (curr.userData?.itemIndex !== undefined) {
+        const idx = curr.userData.itemIndex as number;
+        const itemDef = COWBOY_ITEMS_CATALOG[idx];
+        if (itemDef) {
+          cowboyAudio.playLassoTug();
+          this.openConfirmModal(itemDef);
+        }
+        return;
+      }
+      if (curr.userData?.isFarmer) {
+        this.showFarmerSpeech(t('cb_shop_farmer_speech'), 3500);
+        cowboyAudio.playVoice('cowboy_shop_welcome');
+        return;
+      }
+      curr = curr.parent;
+    }
+  };
+
+  private onCanvasPointerMove = (e: MouseEvent): void => {
+    if (!this.isRendering || !this.confirmModalEl.hidden) return;
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const targets = this.getRaycastTargets();
+    const hits = this.raycaster.intersectObjects(targets, true);
+    this.canvas.style.cursor = hits.length > 0 ? 'pointer' : 'default';
+  };
 
   private showFarmerSpeech(text: string, duration = 4000): void {
     const textEl = this.speechBubbleEl.querySelector('#cbFarmerSpeechText') as HTMLElement;
@@ -489,11 +612,24 @@ export class CowboyShop {
     this.renderer.render(this.scene, this.camera);
   };
 
-  public open(): void {
+  public open(isMidRound = false): void {
     this.rootEl.hidden = false;
     this.creditBalanceEl.textContent = String(this.wallet.getCredits());
     this.renderSlotsUI();
     this.onResize();
+
+    const nextBtn = this.rootEl.querySelector('#cbShopNextRoundBtn');
+    if (nextBtn) {
+      const txt = nextBtn.querySelector('.btn-txt');
+      const sub = nextBtn.querySelector('.btn-sub');
+      if (isMidRound) {
+        if (txt) txt.textContent = 'QUAY LẠI GAME';
+        if (sub) sub.textContent = 'Tiếp tục thời gian vòng chơi';
+      } else {
+        if (txt) txt.textContent = t('cb_shop_next_round');
+        if (sub) sub.textContent = t('cb_shop_next_sub');
+      }
+    }
 
     // Bắt đầu vòng lặp render 3D
     if (!this.isRendering) {
@@ -509,7 +645,7 @@ export class CowboyShop {
 
   public close(): void {
     this.rootEl.hidden = true;
-    this.confirmModalEl.hidden = true;
+    this.closeConfirmModal();
     this.isRendering = false;
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
@@ -524,6 +660,12 @@ export class CowboyShop {
   public destroy(): void {
     this.close();
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKeyDown);
+    if (this.canvas) {
+      this.canvas.removeEventListener('click', this.handleCanvasPointer);
+      this.canvas.removeEventListener('touchend', this.handleCanvasPointer);
+      this.canvas.removeEventListener('pointermove', this.onCanvasPointerMove);
+    }
 
     // Giải phóng tài nguyên môi trường sàn và tường
     if (this.floorMesh) {

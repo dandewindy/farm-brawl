@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { COWBOY_ITEMS_CATALOG, cowboyInventory } from './cowboyItems';
-import { HORSE_COWBOY_SVG } from './cowboyTypes';
+import { HORSE_COWBOY_SVG, isCowboyAdminName } from './cowboyTypes';
 
 export class CowboyHud {
   public rootEl: HTMLElement;
@@ -15,6 +15,7 @@ export class CowboyHud {
   private launchBtn!: HTMLButtonElement;
 
   public onOpenShop?: () => void;
+  private adminShopBtn!: HTMLButtonElement;
   private backpackBtn!: HTMLButtonElement;
   private exitBtn!: HTMLButtonElement;
   private toastBox!: HTMLElement;
@@ -91,6 +92,10 @@ export class CowboyHud {
         </div>
 
         <div class="cowboy-top-actions">
+          <button type="button" id="cbAdminShopBtn" class="cowboy-shop-btn admin-shop-btn" title="[Admin] Mở Cửa Hàng bất kỳ lúc nào" hidden>
+            <span class="ico">🏪</span>
+            <span class="txt">CỬA HÀNG</span>
+          </button>
           <button type="button" id="cbBackpackBtn" class="cowboy-backpack-btn" title="Kho vật phẩm trợ thủ">
             <span class="ico">🎒</span>
             <span class="txt" data-i18n="cb_backpack_lbl">KHO ĐỒ</span>
@@ -186,6 +191,7 @@ export class CowboyHud {
     this.autoCountdownValEl = this.rootEl.querySelector('#cbAutoCountdown')!;
     this.launchBtn = this.rootEl.querySelector('#cbLaunchBtn')!;
     // Shop button removed from active gameplay HUD (opens automatically when round ends)
+    this.adminShopBtn = this.rootEl.querySelector('#cbAdminShopBtn')!;
     this.backpackBtn = this.rootEl.querySelector('#cbBackpackBtn')!;
     this.exitBtn = this.rootEl.querySelector('#cbExitBtn')!;
     this.toastBox = this.rootEl.querySelector('#cbToastBox')!;
@@ -223,6 +229,23 @@ export class CowboyHud {
   }
 
   private bindEvents(): void {
+    const isAdmin = isCowboyAdminName();
+    if (this.adminShopBtn) {
+      if (isAdmin) {
+        this.adminShopBtn.hidden = false;
+        this.adminShopBtn.style.display = 'inline-flex';
+      } else {
+        this.adminShopBtn.hidden = true;
+        this.adminShopBtn.style.display = 'none';
+      }
+
+      this.adminShopBtn.addEventListener('click', () => {
+        if (this.isBusy || this.isModalOpen) return;
+        this.onOpenShop?.();
+      });
+    }
+
+
     // Nút chọn mức cược
     for (const btn of this.betButtons) {
       btn.addEventListener('click', () => {
@@ -425,6 +448,11 @@ export class CowboyHud {
       if (!this.isModalOpen && !this.isBusy) {
         this.setBet(parseInt(e.key, 10));
         this.resetAutoLaunchTimer();
+      }
+    } else if (isCowboyAdminName() && (e.key === 'b' || e.key === 'B' || e.key === 'F2')) {
+      if (!this.isModalOpen && !this.isBusy) {
+        e.preventDefault();
+        this.onOpenShop?.();
       }
     }
   };
