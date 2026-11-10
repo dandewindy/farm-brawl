@@ -236,38 +236,36 @@ export class CowboyHud {
           </div>
         </div>
 
-        <!-- 2P CONTROLS CARD (2 bên Trái Phải gọn gàng: Nhãn P1 - You / P2 Đang đợi + Nút phụ vòng tròn đổi dây cạnh nút quăng dây) -->
+        <!-- 2P CONTROLS CARD: P1 (Trái: Quăng dây sát góc trái -> Nút dây -> Items -> Badge) | P2 (Phải: Badge -> Items -> Nút dây -> Quăng dây sát góc phải) -->
         <div class="cowboy-controls-card mode-2p cb-card-hidden" id="cb2PControlsCard">
-          <!-- P1 ZONE (BÊN TRÁI) -->
+          <!-- P1 ZONE (BÊN TRÁI: Nút Quăng dây sát góc trái, ngón cái tay trái bấm rất tiện) -->
           <div class="cb-2p-player-zone p1-zone" id="cbP1Zone">
+            <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây P1">
+              <div class="btn-top">
+                <span class="txt">QUĂNG DÂY</span>
+              </div>
+            </button>
+            <button type="button" id="cbP1CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
+              <span class="rope-num" id="cbP1CycleVal">1 DÂY</span>
+              <small class="rope-sub" id="cbP1CycleCost">1 C</small>
+            </button>
+            <div class="cb-2p-items-row" id="cbP1ItemsRow"></div>
             <div class="cb-2p-status-badge local" id="cbP1StatusBadge">P1 - You</div>
-            <div class="cb-2p-zone-controls" id="cbP1ControlsGroup">
-              <button type="button" id="cbP1CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
-                <span class="rope-num" id="cbP1CycleVal">1 DÂY</span>
-                <small class="rope-sub" id="cbP1CycleCost">1 C</small>
-              </button>
-              <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây">
-                <div class="btn-top">
-                  <span class="txt">QUĂNG DÂY</span>
-                </div>
-              </button>
-            </div>
           </div>
 
-          <!-- P2 ZONE (BÊN PHẢI) -->
+          <!-- P2 ZONE (BÊN PHẢI: Badge -> Items -> Nút dây -> Quăng dây sát góc phải) -->
           <div class="cb-2p-player-zone p2-zone" id="cbP2Zone">
             <div class="cb-2p-status-badge waiting" id="cbP2StatusBadge">P2 Đang đợi</div>
-            <div class="cb-2p-zone-controls" id="cbP2ControlsGroup">
-              <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây">
-                <div class="btn-top">
-                  <span class="txt">QUĂNG DÂY</span>
-                </div>
-              </button>
-              <button type="button" id="cbP2CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
-                <span class="rope-num" id="cbP2CycleVal">1 DÂY</span>
-                <small class="rope-sub" id="cbP2CycleCost">1 C</small>
-              </button>
-            </div>
+            <div class="cb-2p-items-row" id="cbP2ItemsRow"></div>
+            <button type="button" id="cbP2CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
+              <span class="rope-num" id="cbP2CycleVal">1 DÂY</span>
+              <small class="rope-sub" id="cbP2CycleCost">1 C</small>
+            </button>
+            <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây P2">
+              <div class="btn-top">
+                <span class="txt">QUĂNG DÂY</span>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -571,75 +569,124 @@ export class CowboyHud {
     this.renderBackpackList();
   }
 
+  private createItemButton(
+    item: (typeof COWBOY_ITEMS_CATALOG)[number],
+    count: number,
+    isEquipped: boolean,
+    onToggle: () => void
+  ): HTMLElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `cb-quick-3d-slot ${isEquipped ? 'active' : ''}`;
+    btn.innerHTML = `
+      <div class="cb-item-3d-wrap">
+        <div class="cb-item-3d-spinner">
+          <span class="cb-item-3d-ico">${item.icon}</span>
+        </div>
+        <span class="cb-item-3d-pedestal"></span>
+      </div>
+      <span class="cb-item-qty-tag has-qty">x${count}</span>
+
+      <div class="cb-item-tooltip">
+        <div class="tt-header">
+          <span class="tt-name">${item.nameVi}</span>
+          <span class="tt-status ${isEquipped ? 'equipped' : 'ready'}">
+            ${isEquipped ? 'ĐANG DÙNG' : 'SẴN SÀNG'}
+          </span>
+        </div>
+        <p class="tt-desc">${item.descVi}</p>
+        <div class="tt-footer">
+          <span class="tt-effect">⚡ ${item.effectLabel}</span>
+          <small class="tt-action">${isEquipped ? 'Bấm để hủy' : 'Bấm để kích hoạt'}</small>
+        </div>
+      </div>
+    `;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onToggle();
+    });
+
+    return btn;
+  }
+
+  private handleItemUse(itemKind: string): void {
+    const kind = itemKind as any;
+    const count = cowboyInventory.getCount(kind);
+    if (count <= 0) {
+      this.showToast(t('cb_backpack_empty'), 2200);
+      return;
+    }
+    const isEquipped = cowboyInventory.isEquipped(kind);
+    const itemDef = COWBOY_ITEMS_CATALOG.find((x) => x.kind === kind);
+
+    if (kind === 'time_clock') {
+      if (cowboyInventory.consume('time_clock')) {
+        this.addRoundSeconds(60);
+        this.showToast('⏱️ <b>Đã dùng Đồng Hồ Gia Hạn:</b> +60 Giây vào vòng chơi!', 2500);
+        this.updateInventory();
+      }
+    } else if (kind === 'rainbow_net') {
+      if (isEquipped) {
+        cowboyInventory.unequipForRound('rainbow_net');
+        this.showToast('🌈 Đã bỏ kích hoạt Lưới Cầu Vồng.', 1800);
+      } else {
+        cowboyInventory.equipForRound('rainbow_net');
+        this.showToast('🌈 <b>Đã kích hoạt Lưới Cầu Vồng!</b> Lần quăng tới sẽ quét sạch màn hình!', 2800);
+      }
+      this.updateInventory();
+    } else {
+      if (isEquipped) {
+        cowboyInventory.unequipForRound(kind);
+        this.showToast(`Bỏ trang bị ${itemDef?.nameVi || kind}.`, 1600);
+      } else {
+        cowboyInventory.equipForRound(kind);
+        this.showToast(`✨ Đã kích hoạt <b>${itemDef?.nameVi || kind}</b> (${itemDef?.effectLabel || ''})!`, 2200);
+      }
+      this.updateInventory();
+    }
+  }
+
   private renderQuickItemBar(): void {
-    if (!this.quickItemsRow) return;
-    this.quickItemsRow.innerHTML = '';
+    const quickBar = this.rootEl.querySelector('#cbQuickItemBar') as HTMLElement | null;
+    if (this.quickItemsRow) {
+      this.quickItemsRow.innerHTML = '';
+      let ownedCount = 0;
+      for (const item of COWBOY_ITEMS_CATALOG) {
+        const count = cowboyInventory.getCount(item.kind);
+        if (count <= 0) continue; // Chỉ hiện item nào mà đã có, chưa có thì không cần hiện
+        ownedCount++;
+        const isEquipped = cowboyInventory.isEquipped(item.kind);
+        const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
+        this.quickItemsRow.appendChild(btn);
+      }
+      if (quickBar) {
+        quickBar.style.display = ownedCount > 0 ? 'flex' : 'none';
+      }
+    }
 
-    for (const item of COWBOY_ITEMS_CATALOG) {
-      const count = cowboyInventory.getCount(item.kind);
-      const isEquipped = cowboyInventory.isEquipped(item.kind);
-
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `cb-quick-3d-slot ${isEquipped ? 'active' : ''} ${count === 0 ? 'empty' : ''}`;
-      btn.innerHTML = `
-        <div class="cb-item-3d-wrap">
-          <div class="cb-item-3d-spinner">
-            <span class="cb-item-3d-ico">${item.icon}</span>
-          </div>
-          <span class="cb-item-3d-pedestal"></span>
-        </div>
-        <span class="cb-item-qty-tag ${count > 0 ? 'has-qty' : ''}">x${count}</span>
-
-        <div class="cb-item-tooltip">
-          <div class="tt-header">
-            <span class="tt-name">${item.nameVi}</span>
-            <span class="tt-status ${isEquipped ? 'equipped' : (count > 0 ? 'ready' : 'empty')}">
-              ${isEquipped ? 'ĐANG DÙNG' : (count > 0 ? 'SẴN SÀNG' : 'HẾT')}
-            </span>
-          </div>
-          <p class="tt-desc">${item.descVi}</p>
-          <div class="tt-footer">
-            <span class="tt-effect">⚡ ${item.effectLabel}</span>
-            <small class="tt-action">${count > 0 ? (isEquipped ? 'Bấm để hủy' : 'Bấm để kích hoạt') : 'Mở Cửa Hàng để mua'}</small>
-          </div>
-        </div>
-      `;
-
-      btn.addEventListener('click', () => {
-        if (count <= 0) {
-          this.showToast(t('cb_backpack_empty'), 2200);
-          return;
-        }
-
-        if (item.kind === 'time_clock') {
-          if (cowboyInventory.consume('time_clock')) {
-            this.addRoundSeconds(60);
-            this.showToast('⏱️ <b>Đã dùng Đồng Hồ Gia Hạn:</b> +60 Giây vào vòng chơi!', 2500);
-            this.updateInventory();
-          }
-        } else if (item.kind === 'rainbow_net') {
-          if (isEquipped) {
-            cowboyInventory.unequipForRound('rainbow_net');
-            this.showToast('🌈 Đã bỏ kích hoạt Lưới Cầu Vồng.', 1800);
-          } else {
-            cowboyInventory.equipForRound('rainbow_net');
-            this.showToast('🌈 <b>Đã kích hoạt Lưới Cầu Vồng!</b> Lần quăng tới sẽ quét sạch màn hình!', 2800);
-          }
-          this.updateInventory();
-        } else {
-          if (isEquipped) {
-            cowboyInventory.unequipForRound(item.kind);
-            this.showToast(`Bỏ trang bị ${item.nameVi}.`, 1600);
-          } else {
-            cowboyInventory.equipForRound(item.kind);
-            this.showToast(`✨ Đã kích hoạt <b>${item.nameVi}</b> (${item.effectLabel})!`, 2200);
-          }
-          this.updateInventory();
-        }
-      });
-
-      this.quickItemsRow.appendChild(btn);
+    // 2-Player mode item rows for P1 and P2: chỉ hiện item nào đã có
+    const p1Row = this.rootEl.querySelector('#cbP1ItemsRow') as HTMLElement | null;
+    const p2Row = this.rootEl.querySelector('#cbP2ItemsRow') as HTMLElement | null;
+    if (p1Row) {
+      p1Row.innerHTML = '';
+      for (const item of COWBOY_ITEMS_CATALOG) {
+        const count = cowboyInventory.getCount(item.kind);
+        if (count <= 0) continue;
+        const isEquipped = cowboyInventory.isEquipped(item.kind);
+        const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
+        p1Row.appendChild(btn);
+      }
+    }
+    if (p2Row) {
+      p2Row.innerHTML = '';
+      for (const item of COWBOY_ITEMS_CATALOG) {
+        const count = cowboyInventory.getCount(item.kind);
+        if (count <= 0) continue;
+        const isEquipped = cowboyInventory.isEquipped(item.kind);
+        const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
+        p2Row.appendChild(btn);
+      }
     }
   }
 

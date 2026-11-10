@@ -10223,77 +10223,99 @@ body.mobile-phone #adminToggleBtn {
     box-shadow: none !important;
   }
 
-  /* 2-Player Controls on Phone / Small Touch Screens:
-     Show ONLY the local player's controls (P1 on P1's phone, P2 on P2's phone)
-     Styled exactly like 1P for comfortable right-thumb throw action! */
-  .cowboy-controls-card.mode-2p.slot-p1 .cb-2p-player-zone.p2-zone,
-  .cowboy-controls-card.mode-2p:not(.slot-p2) .cb-2p-player-zone.p2-zone {
-    display: none !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p1-zone {
-    display: none !important;
-  }
-
+  /* 2-Player Controls on Phone:
+     Both P1 and P2 zones active & ergonomic!
+     - Left (P1): Quăng dây sát góc trái (bấm ngón cái trái) -> Nút dây -> Items P1 -> Badge P1
+     - Right (P2): Badge P2 -> Items P2 -> Nút dây -> Quăng dây sát góc phải (bấm ngón cái phải) */
   .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
     width: 100% !important;
     max-width: 100% !important;
     display: flex !important;
     flex-direction: row !important;
     align-items: flex-end !important;
-    justify-content: flex-start !important;
-    padding: 0 !important;
-    position: relative !important;
+    justify-content: space-between !important;
+    padding: 0 4px 2px !important;
+    margin: 0 auto !important;
     box-sizing: border-box !important;
+    gap: 6px !important;
   }
 
-  .cowboy-controls-card.mode-2p .cb-2p-player-zone {
-    width: 100% !important;
+  .cb-2p-player-zone {
     display: flex !important;
     flex-direction: row !important;
     align-items: flex-end !important;
-    justify-content: space-between !important;
-    position: relative !important;
-    padding-right: 96px !important; /* Space for right thumb throw action */
-    box-sizing: border-box !important;
+    gap: 4px !important;
+    flex: 0 1 auto !important;
   }
 
-  .cowboy-controls-card.mode-2p .cb-2p-status-badge {
-    align-self: center !important;
-    font-size: 11px !important;
-    padding: 3px 10px !important;
-    margin-bottom: 4px !important;
+  .cb-2p-player-zone.p1-zone {
+    justify-content: flex-start !important;
+    margin-right: auto !important;
   }
 
-  .cowboy-controls-card.mode-2p .cb-2p-zone-controls {
-    position: absolute !important;
-    right: 4px !important;
-    bottom: 2px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    z-index: 25 !important;
-    display: flex !important;
+  .cb-2p-player-zone.p2-zone {
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+  }
+
+  /* Nút Quăng Dây P1 sát góc trái, P2 sát góc phải - ngón cái hai bên bấm cực chuẩn */
+  .cb-2p-player-zone .cb-launch-circle-btn {
+    width: 68px !important;
+    height: 68px !important;
+    min-width: 68px !important;
+    min-height: 68px !important;
+  }
+
+  .cb-2p-player-zone .cb-launch-circle-btn .btn-top .txt {
+    font-size: 10.5px !important;
+  }
+
+  /* Nút phụ vòng tròn chọn số dây cạnh nút quăng dây */
+  .cb-2p-player-zone .cb-rope-circle-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .cb-2p-player-zone .cb-rope-circle-btn .rope-num {
+    font-size: 9.5px !important;
+  }
+
+  .cb-2p-player-zone .cb-rope-circle-btn .rope-sub {
+    font-size: 7.5px !important;
+  }
+
+  /* Hàng item đã sở hữu của P1 và P2 (chỉ hiện item đã có) */
+  .cb-2p-items-row {
+    display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 4px !important;
   }
 
-  /* P2 zone layout on mobile: order badge on left, controls on right */
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone {
-    flex-direction: row !important;
+  .cb-2p-items-row:empty {
+    display: none !important;
   }
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-2p-status-badge {
-    order: 1 !important;
+
+  .cb-2p-items-row .cb-quick-3d-slot {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    border-radius: 8px !important;
   }
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-2p-zone-controls {
-    order: 2 !important;
-    flex-direction: row !important;
+
+  .cb-2p-items-row .cb-item-qty-tag {
+    font-size: 7.5px !important;
+    padding: 0 3px !important;
   }
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-rope-circle-btn {
-    order: 1 !important;
-  }
-  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-launch-circle-btn {
-    order: 2 !important;
+
+  /* Badge P1 - You & P2 Đang đợi thu gọn nhẹ */
+  .cb-2p-status-badge {
+    font-size: 9.5px !important;
+    padding: 2px 7px !important;
+    margin-bottom: 4px !important;
   }
 
   /* Left items moved left */
@@ -12471,17 +12493,37 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-2p-player-zone {
   display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: 6px !important;
+  flex-direction: row !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
   position: relative;
 }
 
-.cb-2p-zone-controls {
-  display: flex !important;
+.cb-2p-player-zone.p1-zone {
+  justify-content: flex-start !important;
+}
+
+.cb-2p-player-zone.p2-zone {
+  justify-content: flex-end !important;
+}
+
+.cb-2p-items-row {
+  display: inline-flex !important;
   flex-direction: row !important;
   align-items: center !important;
-  gap: 12px !important;
+  gap: 6px !important;
+}
+
+.cb-2p-items-row:empty {
+  display: none !important;
+}
+
+.cb-2p-items-row .cb-quick-3d-slot {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 10px !important;
 }
 
 .cb-2p-status-badge {
@@ -12513,9 +12555,11 @@ body.mobile-phone #adminToggleBtn {
   color: #69f0ae !important;
 }
 
-.cb-2p-player-zone.remote-locked .cb-2p-zone-controls {
-  opacity: 0.58;
-  filter: saturate(0.65);
+.cb-2p-player-zone.remote-locked .cb-launch-circle-btn,
+.cb-2p-player-zone.remote-locked .cb-rope-circle-btn {
+  opacity: 0.52 !important;
+  filter: saturate(0.65) !important;
+  cursor: not-allowed !important;
 }
 
 /* Versus Result Modal (#cbVersusResultModal) */
@@ -12819,14 +12863,36 @@ body.mobile-phone #adminToggleBtn {
   }
 
   .cowboy-controls-card.mode-2p {
-    padding: 0 6px !important;
+    padding: 0 4px !important;
+  }
+
+  .cb-2p-player-zone {
+    gap: 3px !important;
+  }
+
+  .cb-2p-player-zone .cb-launch-circle-btn {
+    width: 60px !important;
+    height: 60px !important;
+    min-width: 60px !important;
+    min-height: 60px !important;
+  }
+
+  .cb-2p-player-zone .cb-launch-circle-btn .btn-top .txt {
+    font-size: 9.5px !important;
+  }
+
+  .cb-2p-items-row .cb-quick-3d-slot {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
   }
 
   .cb-rope-circle-btn {
-    width: 48px !important;
-    height: 48px !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
   }
 
   .cb-rope-circle-btn .rope-num {
