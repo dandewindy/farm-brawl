@@ -10209,7 +10209,7 @@ body.mobile-phone #adminToggleBtn {
     bottom: 0;
   }
 
-  .cowboy-controls-card:not(.mode-2p) {
+  .cowboy-controls-card:not(.mode-2p):not(.cb-card-hidden):not([hidden]) {
     width: 100% !important;
     max-width: 100% !important;
     display: flex !important;
@@ -10221,6 +10221,79 @@ body.mobile-phone #adminToggleBtn {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+  }
+
+  /* 2-Player Controls on Phone / Small Touch Screens:
+     Show ONLY the local player's controls (P1 on P1's phone, P2 on P2's phone)
+     Styled exactly like 1P for comfortable right-thumb throw action! */
+  .cowboy-controls-card.mode-2p.slot-p1 .cb-2p-player-zone.p2-zone,
+  .cowboy-controls-card.mode-2p:not(.slot-p2) .cb-2p-player-zone.p2-zone {
+    display: none !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p1-zone {
+    display: none !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
+    justify-content: flex-start !important;
+    padding: 0 !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+  }
+
+  .cowboy-controls-card.mode-2p .cb-2p-player-zone {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    padding-right: 96px !important; /* Space for right thumb throw action */
+    box-sizing: border-box !important;
+  }
+
+  .cowboy-controls-card.mode-2p .cb-2p-status-badge {
+    align-self: center !important;
+    font-size: 11px !important;
+    padding: 3px 10px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .cowboy-controls-card.mode-2p .cb-2p-zone-controls {
+    position: absolute !important;
+    right: 4px !important;
+    bottom: 2px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 25 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  /* P2 zone layout on mobile: order badge on left, controls on right */
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone {
+    flex-direction: row !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-2p-status-badge {
+    order: 1 !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-2p-zone-controls {
+    order: 2 !important;
+    flex-direction: row !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-rope-circle-btn {
+    order: 1 !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 .cb-2p-player-zone.p2-zone .cb-launch-circle-btn {
+    order: 2 !important;
   }
 
   /* Left items moved left */
@@ -10418,7 +10491,7 @@ body.mobile-phone #adminToggleBtn {
     bottom: 0;
   }
 
-  .cowboy-controls-card:not(.mode-2p) {
+  .cowboy-controls-card:not(.mode-2p):not(.cb-card-hidden):not([hidden]) {
     width: 100% !important;
     display: flex !important;
     flex-direction: row !important;
@@ -12384,7 +12457,7 @@ body.mobile-phone #adminToggleBtn {
 }
 
 /* 2P Bottom Controls: Symmetrical Left & Right with Concise Badge + Circular Rope & Throw Buttons */
-.cowboy-controls-card.mode-2p {
+.cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
   display: flex !important;
   flex-direction: row !important;
   align-items: flex-end !important;
@@ -12785,4 +12858,16 @@ body.mobile-phone #adminToggleBtn {
     font-size: 9.5px !important;
     padding: 3px 6px !important;
   }
+}
+
+/* Absolute top priority hiding for any element marked hidden or cb-card-hidden */
+.cowboy-controls-card.cb-card-hidden,
+.cowboy-controls-card[hidden],
+.cb-card-hidden,
+#cbStatsBar[hidden],
+#cb1PTitleBox[hidden],
+#cb2PTopHud[hidden],
+#cb2PCoopInfo[hidden],
+.cb-2p-open-coop[hidden] {
+  display: none !important;
 }

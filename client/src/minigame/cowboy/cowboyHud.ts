@@ -867,31 +867,46 @@ export class CowboyHud {
     const p2ScoreBox = this.rootEl.querySelector('#cbP2ScoreBox') as HTMLElement | null;
 
     topBar?.classList.toggle('mode-2p-top', enabled);
-    if (titleBox1P) titleBox1P.hidden = enabled;
-    if (statsBar1P) statsBar1P.hidden = enabled;
-    if (topHud2P) topHud2P.hidden = !enabled;
+    if (titleBox1P) {
+      titleBox1P.hidden = enabled;
+      titleBox1P.style.setProperty('display', enabled ? 'none' : '', 'important');
+    }
+    if (statsBar1P) {
+      statsBar1P.hidden = enabled;
+      statsBar1P.style.setProperty('display', enabled ? 'none' : '', 'important');
+    }
+    if (topHud2P) {
+      topHud2P.hidden = !enabled;
+      topHud2P.style.setProperty('display', enabled ? 'grid' : 'none', 'important');
+    }
     if (roomCodeVal2P) roomCodeVal2P.textContent = roomCode || '----';
-    if (coopInfo2P) coopInfo2P.hidden = !enabled || subMode !== 'campaign';
+    if (coopInfo2P) {
+      coopInfo2P.hidden = !enabled || subMode !== 'campaign';
+      coopInfo2P.style.setProperty('display', (!enabled || subMode !== 'campaign') ? 'none' : 'inline-block', 'important');
+    }
 
     // In 2P mode, hide bulky mid-round Shop/Backpack buttons so top bar stays clean & uncluttered
     if (this.backpackBtn) {
       this.backpackBtn.hidden = enabled;
-      this.backpackBtn.style.display = enabled ? 'none' : '';
+      this.backpackBtn.style.setProperty('display', enabled ? 'none' : '', 'important');
     }
     if (this.adminShopBtn) {
       const showAdmin = !enabled && isCowboyAdminName();
       this.adminShopBtn.hidden = !showAdmin;
-      this.adminShopBtn.style.display = showAdmin ? 'inline-flex' : 'none';
+      this.adminShopBtn.style.setProperty('display', showAdmin ? 'inline-flex' : 'none', 'important');
     }
 
-    if (card1P && card2P) {
-      if (enabled) {
-        card1P.classList.add('cb-card-hidden');
-        card2P.classList.remove('cb-card-hidden');
-      } else {
-        card1P.classList.remove('cb-card-hidden');
-        card2P.classList.add('cb-card-hidden');
-      }
+    if (card1P) {
+      card1P.classList.toggle('cb-card-hidden', enabled);
+      card1P.hidden = enabled;
+      card1P.style.setProperty('display', enabled ? 'none' : '', 'important');
+    }
+    if (card2P) {
+      card2P.classList.toggle('cb-card-hidden', !enabled);
+      card2P.hidden = !enabled;
+      card2P.style.setProperty('display', !enabled ? 'none' : '', 'important');
+      card2P.classList.toggle('slot-p1', this.mySlot === 0);
+      card2P.classList.toggle('slot-p2', this.mySlot === 1);
     }
 
     if (roomCodeBox) {
@@ -912,6 +927,12 @@ export class CowboyHud {
     this.guestConnected = guestConnected;
     this.p1Name = p1Name || 'P1';
     this.p2Name = p2Name || 'P2';
+
+    const card2P = this.rootEl.querySelector('#cb2PControlsCard') as HTMLElement | null;
+    if (card2P) {
+      card2P.classList.toggle('slot-p1', mySlot === 0);
+      card2P.classList.toggle('slot-p2', mySlot === 1);
+    }
 
     const p1Zone = this.rootEl.querySelector('#cbP1Zone') as HTMLElement | null;
     const p2Zone = this.rootEl.querySelector('#cbP2Zone') as HTMLElement | null;
