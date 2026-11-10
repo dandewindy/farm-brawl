@@ -1360,14 +1360,27 @@ export class CowboyArena {
     return this.prng ? this.prng() : Math.random();
   }
 
+  private disposeAnimalMesh(a: ActiveCowboyAnimal): void {
+    if (a.sparkleGroup) {
+      a.sparkleGroup.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).geometry?.dispose();
+          const mat = (child as THREE.Mesh).material;
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+          else mat?.dispose();
+        }
+      });
+      a.root.remove(a.sparkleGroup);
+    }
+    if (a.rainbowMats) {
+      for (const m of a.rainbowMats) m.dispose();
+    }
+    this.scene.remove(a.root);
+  }
+
   public clearAnimals(): void {
     for (let i = this.animals.length - 1; i >= 0; i--) {
-      const a = this.animals[i];
-      if (a.sparkleGroup) a.root.remove(a.sparkleGroup);
-      if (a.rainbowMats) {
-        for (const m of a.rainbowMats) m.dispose();
-      }
-      this.scene.remove(a.root);
+      this.disposeAnimalMesh(this.animals[i]);
     }
     this.animals = [];
   }
@@ -1434,6 +1447,7 @@ export class CowboyArena {
       dir: wire.dir,
       lane: wire.lane,
       state: 'running',
+      variant: wire.variant,
       isRainbow: wire.isRainbow,
       isSparkleX2: wire.isSparkleX2,
       score: wire.score,
@@ -1482,7 +1496,7 @@ export class CowboyArena {
         isSparkleX2: a.isSparkleX2,
         score: a.score,
         catchRate: a.catchRate,
-        variant: a.isRainbow ? 2 : 0,
+        variant: a.variant ?? (a.isRainbow ? 2 : 0),
       }));
   }
 
@@ -1884,6 +1898,7 @@ export class CowboyArena {
       dir,
       lane,
       state: 'running',
+      variant,
       isRainbow,
       isSparkleX2,
       score,
@@ -2436,15 +2451,7 @@ export class CowboyArena {
     const idx = this.animals.findIndex((a) => a.id === id);
     if (idx !== -1) {
       const a = this.animals[idx];
-      if (a.sparkleGroup) {
-        a.root.remove(a.sparkleGroup);
-      }
-      if (a.rainbowMats) {
-        for (const m of a.rainbowMats) {
-          m.dispose();
-        }
-      }
-      this.scene.remove(a.root);
+      this.disposeAnimalMesh(a);
       this.animals.splice(idx, 1);
       if (this.isTwoPlayerMode && !this.isReplicaMode) {
         this.onAnimalDespawn?.(id);

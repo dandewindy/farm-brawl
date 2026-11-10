@@ -903,7 +903,7 @@ export class GameRoom extends DurableObject {
       const items = Array.isArray(msg.items) ? msg.items.slice(0, 10) : [];
       this.broadcastCowboyPacket({ t: 'cb_items_sync', slot, items }, ws);
     } else if (msg.t === 'cb_animal_spawn') {
-      if (isHost && msg.animal && msg.animal.id) {
+      if (isHost && msg.animal && msg.animal.id && !this.cbState.claimedAnimalIds.has(msg.animal.id)) {
         this.cbState.activeAnimals.set(msg.animal.id, msg.animal);
         this.broadcastCowboyPacket({ t: 'cb_animal_spawn_sync', animal: msg.animal }, ws);
       }
@@ -926,13 +926,12 @@ export class GameRoom extends DurableObject {
       }
     } else if (msg.t === 'cb_animals_init') {
       if (isHost && Array.isArray(msg.animals)) {
+        const validAnimals = msg.animals.filter((a) => a && a.id && !this.cbState.claimedAnimalIds.has(a.id));
         this.cbState.activeAnimals.clear();
-        for (const a of msg.animals) {
-          if (a && a.id) {
-            this.cbState.activeAnimals.set(a.id, a);
-          }
+        for (const a of validAnimals) {
+          this.cbState.activeAnimals.set(a.id, a);
         }
-        this.broadcastCowboyPacket({ t: 'cb_animals_init_sync', animals: msg.animals }, ws);
+        this.broadcastCowboyPacket({ t: 'cb_animals_init_sync', animals: validAnimals }, ws);
       }
     }
   }

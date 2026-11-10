@@ -53,6 +53,7 @@ export interface ActiveCowboyAnimal {
   dir: 1 | -1; // 1: Trái sang phải, -1: Phải sang trái
   lane: number; // 0: Gần, 1: Giữa, 2: Xa
   state: 'running' | 'tug' | 'caught' | 'escaped';
+  variant?: number;
   isRainbow: boolean;
   isSparkleX2: boolean; // Hiệu ứng lấp lánh nhân đôi điểm (x2)
   score: number;
