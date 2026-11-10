@@ -208,6 +208,21 @@ export interface Snapshot {
 
 export type CowboySubMode = 'versus' | 'campaign';
 
+export interface CowboyAnimalWire {
+  id: number;
+  species: Species;
+  x: number;
+  z: number;
+  vx: number;
+  dir: 1 | -1;
+  lane: number;
+  isRainbow: boolean;
+  isSparkleX2: boolean;
+  score: number;
+  catchRate: number;
+  variant: number;
+}
+
 export interface CowboyRoomStateMsg {
   t: 'cb_room_state';
   roomCode: string;
@@ -228,6 +243,7 @@ export interface CowboyRoomStateMsg {
   p2Bet: number;
   yourSlot: 0 | 1;
   theme?: string;
+  activeAnimals?: CowboyAnimalWire[];
 }
 
 export type CowboyItemData = { kind: string; count: number };
@@ -248,6 +264,10 @@ export type ServerMsg =
   | { t: 'cb_stage_next_sync'; stage: number; seed: number; roundRemainingSec: number }
   | { t: 'cb_rematch_sync'; seed: number; subMode: CowboySubMode; durationSec: number; stage: number }
   | { t: 'cb_items_sync'; slot: 0 | 1; items: CowboyItemData[] }
+  | { t: 'cb_animal_spawn_sync'; animal: CowboyAnimalWire }
+  | { t: 'cb_animals_sync'; animals: Array<{ id: number; x: number; z: number; vx: number }> }
+  | { t: 'cb_animal_despawn_sync'; animalId: number }
+  | { t: 'cb_animals_init_sync'; animals: CowboyAnimalWire[] }
   | { t: 'cb_room_full' }
   | Snapshot;
 
@@ -279,5 +299,9 @@ export type ClientMsg =
   | { t: 'cb_stage_next'; stage: number; seed?: number }
   | { t: 'cb_rematch'; subMode?: CowboySubMode; durationSec?: number; seed?: number }
   | { t: 'cb_items'; slot: 0 | 1; items: CowboyItemData[] }
+  | { t: 'cb_animal_spawn'; animal: CowboyAnimalWire }
+  | { t: 'cb_animals_sync'; animals: Array<{ id: number; x: number; z: number; vx: number }> }
+  | { t: 'cb_animal_despawn'; animalId: number }
+  | { t: 'cb_animals_init'; animals: CowboyAnimalWire[] }
   | { t: 'cb_sync_timer'; remainingSec: number }
   | ({ t: 'input' } & Input);

@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { World } from '@shared/sim/world';
 import { TICK_MS, SKIN_COUNT } from '@shared/constants';
-import type { ClientMsg, ServerMsg } from '@shared/protocol';
+import type { ClientMsg, ServerMsg, CowboyAnimalWire } from '@shared/protocol';
 
 const GRACE_PERIOD_MS = 15000;
 
@@ -47,6 +47,7 @@ export class GameRoom extends DurableObject {
     p2Bet: 1,
     theme: 'farm',
     claimedAnimalIds: new Set<number>(),
+    activeAnimals: new Map<number, CowboyAnimalWire>(),
   };
 
   constructor(ctx: DurableObjectState, env: any) {
@@ -687,6 +688,7 @@ export class GameRoom extends DurableObject {
       p1Bet: this.cbState.p1Bet,
       p2Bet: this.cbState.p2Bet,
       theme: this.cbState.theme,
+      activeAnimals: Array.from(this.cbState.activeAnimals.values()),
     };
 
     if (hostOpen && this.cbHostWs) {
@@ -730,6 +732,7 @@ export class GameRoom extends DurableObject {
         this.cbHostWs = null;
         this.cbGuestWs = null;
         this.cbState.claimedAnimalIds.clear();
+        this.cbState.activeAnimals.clear();
       }
     }
   }
@@ -829,6 +832,7 @@ export class GameRoom extends DurableObject {
       }
       if (animalId > 0) {
         this.cbState.claimedAnimalIds.add(animalId);
+        this.cbState.activeAnimals.delete(animalId);
       }
       const pts = Math.max(1, Math.min(500, Math.floor(msg.score || 0)));
       if (slot === 0) {
@@ -863,6 +867,7 @@ export class GameRoom extends DurableObject {
       this.cbState.p1Score = 0;
       this.cbState.p2Score = 0;
       this.cbState.claimedAnimalIds.clear();
+      this.cbState.activeAnimals.clear();
       this.broadcastCowboyPacket({
         t: 'cb_stage_next_sync',
         stage: this.cbState.stage,
@@ -885,6 +890,7 @@ export class GameRoom extends DurableObject {
       this.cbState.p1Catches = 0;
       this.cbState.p2Catches = 0;
       this.cbState.claimedAnimalIds.clear();
+      this.cbState.activeAnimals.clear();
       this.broadcastCowboyPacket({
         t: 'cb_rematch_sync',
         seed: this.cbState.seed,
@@ -896,6 +902,38 @@ export class GameRoom extends DurableObject {
       const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
       const items = Array.isArray(msg.items) ? msg.items.slice(0, 10) : [];
       this.broadcastCowboyPacket({ t: 'cb_items_sync', slot, items }, ws);
+    } else if (msg.t === 'cb_animal_spawn') {
+      if (isHost && msg.animal && msg.animal.id) {
+        this.cbState.activeAnimals.set(msg.animal.id, msg.animal);
+        this.broadcastCowboyPacket({ t: 'cb_animal_spawn_sync', animal: msg.animal }, ws);
+      }
+    } else if (msg.t === 'cb_animals_sync') {
+      if (isHost && Array.isArray(msg.animals)) {
+        for (const u of msg.animals) {
+          const exist = this.cbState.activeAnimals.get(u.id);
+          if (exist) {
+            exist.x = u.x;
+            exist.z = u.z;
+            exist.vx = u.vx;
+          }
+        }
+        this.broadcastCowboyPacket({ t: 'cb_animals_sync', animals: msg.animals }, ws);
+      }
+    } else if (msg.t === 'cb_animal_despawn') {
+      if (isHost && msg.animalId) {
+        this.cbState.activeAnimals.delete(msg.animalId);
+        this.broadcastCowboyPacket({ t: 'cb_animal_despawn_sync', animalId: msg.animalId }, ws);
+      }
+    } else if (msg.t === 'cb_animals_init') {
+      if (isHost && Array.isArray(msg.animals)) {
+        this.cbState.activeAnimals.clear();
+        for (const a of msg.animals) {
+          if (a && a.id) {
+            this.cbState.activeAnimals.set(a.id, a);
+          }
+        }
+        this.broadcastCowboyPacket({ t: 'cb_animals_init_sync', animals: msg.animals }, ws);
+      }
     }
   }
 

@@ -4,6 +4,7 @@ import { buildFullAnimal } from '../../render/animals';
 import { cowboyAudio } from './cowboyAudio';
 import { cowboyInventory } from './cowboyItems';
 import { getCowboyTrackTexture, getCowboyMeadowTexture, getCowboyWoodTexture, getCowboyBarnTexture } from './cowboyTextures';
+import type { CowboyAnimalWire } from '@shared/protocol';
 
 
 // Module-level target spreads (reused to prevent GC allocations)
@@ -129,6 +130,13 @@ export class CowboyArena {
 
   private isTwoPlayerMode = false;
   private selectedRopeCountP2 = 1;
+  public isReplicaMode = false;
+  public onAnimalSpawn?: (animal: CowboyAnimalWire) => void;
+  public onAnimalDespawn?: (animalId: number) => void;
+
+  public setReplicaMode(val: boolean): void {
+    this.isReplicaMode = val;
+  }
   private prng: (() => number) | null = null;
 
   private isRunning = false;
@@ -163,23 +171,39 @@ export class CowboyArena {
     this.setTheme('farm');
 
     window.addEventListener('resize', this.onResize);
+    this.onResize();
   }
 
   private onResize = (): void => {
     if (!this.container) return;
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
-    this.camera.aspect = w / h;
+    const aspect = w / h;
+    this.camera.aspect = aspect;
+
+    // Khung hình đồng nhất giữa PC & Điện thoại:
+    // Giữ nguyên trường nhìn ngang (Horizontal FOV) >= 81.8 độ (chuẩn 16:9) để bãi quây và 2 dây không bị cắt
+    const BASE_ASPECT = 16 / 9;
+    const BASE_FOV = 52;
+    if (aspect < BASE_ASPECT) {
+      const baseHRad = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * BASE_ASPECT);
+      const newVRad = 2 * Math.atan(Math.tan(baseHRad / 2) / aspect);
+      this.camera.fov = THREE.MathUtils.radToDeg(newVRad);
+    } else {
+      this.camera.fov = BASE_FOV;
+    }
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
 
-    // Cập nhật vị trí 2 cột cửa sổ tự động neo sát mép ngoài màn hình
-    const aspect = this.camera.aspect || 1.77;
-    const halfWidthAtZ = 2.1 * Math.tan(THREE.MathUtils.degToRad(26)) * aspect;
+    // Cập nhật vị trí khung gỗ cửa sổ (Sill & Jambs) neo sát viền màn hình theo FOV thực tế
+    const halfHeightAtZ = 2.1 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const halfWidthAtZ = halfHeightAtZ * aspect;
     if (this.leftJamb) this.leftJamb.position.set(-halfWidthAtZ - 0.04, 0.40, -2.1);
     if (this.rightJamb) this.rightJamb.position.set(halfWidthAtZ + 0.04, 0.40, -2.1);
     if (this.leftBrace) this.leftBrace.position.set(-halfWidthAtZ + 0.12, -0.68, -2.1);
     if (this.rightBrace) this.rightBrace.position.set(halfWidthAtZ - 0.12, -0.68, -2.1);
+    if (this.sillBeam) this.sillBeam.position.set(0, -halfHeightAtZ - 0.04, -2.1);
+    if (this.sillCap) this.sillCap.position.set(0, -halfHeightAtZ + 0.11, -2.1);
   };
 
   private initLighting(): void {
@@ -1338,9 +1362,139 @@ export class CowboyArena {
 
   public clearAnimals(): void {
     for (let i = this.animals.length - 1; i >= 0; i--) {
-      this.retireAnimal(this.animals[i].id);
+      const a = this.animals[i];
+      if (a.sparkleGroup) a.root.remove(a.sparkleGroup);
+      if (a.rainbowMats) {
+        for (const m of a.rainbowMats) m.dispose();
+      }
+      this.scene.remove(a.root);
     }
     this.animals = [];
+  }
+
+  public spawnAnimalFromWire(wire: CowboyAnimalWire): void {
+    if (!wire || !wire.id) return;
+    const existing = this.animals.find((a) => a.id === wire.id);
+    if (existing) {
+      existing.x = wire.x;
+      existing.root.position.x = wire.x;
+      existing.vx = wire.vx;
+      return;
+    }
+
+    const chosen = COWBOY_SPECIES_LIST.find((c) => c.species === wire.species) || COWBOY_SPECIES_LIST[0];
+    const animalMesh = buildFullAnimal(wire.species, wire.variant ?? 0);
+    animalMesh.flowerHat.visible = false;
+    animalMesh.witchHat.visible = false;
+    animalMesh.cartGroup.visible = false;
+
+    const sc = chosen.scale;
+    animalMesh.root.scale.set(sc * (wire.dir === 1 ? 1 : -1), sc, sc);
+    animalMesh.root.position.set(wire.x, 0, wire.z);
+    this.scene.add(animalMesh.root);
+
+    let sparkleGroup: THREE.Group | undefined;
+    if (wire.isSparkleX2) {
+      sparkleGroup = new THREE.Group();
+      const starGeo = new THREE.OctahedronGeometry(0.18, 0);
+      const starMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+      for (let s = 0; s < 5; s++) {
+        const star = new THREE.Mesh(starGeo, starMat);
+        const ang = (s / 5) * Math.PI * 2;
+        star.position.set(Math.cos(ang) * 0.95, 1.25 + Math.sin(s * 1.5) * 0.25, Math.sin(ang) * 0.95);
+        sparkleGroup.add(star);
+      }
+      animalMesh.root.add(sparkleGroup);
+    }
+
+    const rainbowMats: THREE.MeshStandardMaterial[] = [];
+    if (wire.isRainbow) {
+      animalMesh.body.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh && !(child.userData && child.userData.eye)) {
+          const orig = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          if (orig) {
+            const cloned = orig.clone();
+            (child as THREE.Mesh).material = cloned;
+            rainbowMats.push(cloned);
+          }
+        }
+      });
+    }
+
+    this.animals.push({
+      id: wire.id,
+      species: wire.species,
+      config: chosen,
+      root: animalMesh.root,
+      legs: animalMesh.legs,
+      x: wire.x,
+      y: 0,
+      z: wire.z,
+      vx: wire.vx,
+      dir: wire.dir,
+      lane: wire.lane,
+      state: 'running',
+      isRainbow: wire.isRainbow,
+      isSparkleX2: wire.isSparkleX2,
+      score: wire.score,
+      catchRate: wire.catchRate,
+      tugTimer: 0,
+      runCycle: Math.random() * 10,
+      sparkleGroup,
+      rainbowMats,
+    });
+  }
+
+  public syncAnimalsPositions(updates: Array<{ id: number; x: number; z: number; vx: number }>): void {
+    if (!Array.isArray(updates)) return;
+    for (const u of updates) {
+      const a = this.animals.find((item) => item.id === u.id);
+      if (a && a.state === 'running') {
+        if (Math.abs(a.x - u.x) > 0.04) {
+          a.x = u.x;
+          a.root.position.x = u.x;
+        }
+        a.vx = u.vx;
+      }
+    }
+  }
+
+  public setAllAnimalsFromWire(wireList: CowboyAnimalWire[]): void {
+    this.clearAnimals();
+    if (!Array.isArray(wireList)) return;
+    for (const wire of wireList) {
+      this.spawnAnimalFromWire(wire);
+    }
+  }
+
+  public getActiveAnimalsWire(): CowboyAnimalWire[] {
+    return this.animals
+      .filter((a) => a.state === 'running')
+      .map((a) => ({
+        id: a.id,
+        species: a.species,
+        x: Math.round(a.x * 100) / 100,
+        z: a.z,
+        vx: a.vx,
+        dir: a.dir,
+        lane: a.lane,
+        isRainbow: a.isRainbow,
+        isSparkleX2: a.isSparkleX2,
+        score: a.score,
+        catchRate: a.catchRate,
+        variant: a.isRainbow ? 2 : 0,
+      }));
+  }
+
+  public getAnimalsSyncData(): Array<{ id: number; x: number; z: number; vx: number }> {
+    return this.animals
+      .filter((a) => a.state === 'running')
+      .map((a) => ({
+        id: a.id,
+        x: Math.round(a.x * 100) / 100,
+        z: Math.round(a.z * 100) / 100,
+        vx: Math.round(a.vx * 100) / 100,
+      }));
   }
 
   public remoteCatchAnimal(animalId: number, score: number): void {
@@ -1639,6 +1793,7 @@ export class CowboyArena {
   }
 
   private spawnAnimal(): void {
+    if (this.isReplicaMode) return;
     if (this.animals.length >= 8) return;
 
     const totalWeight = COWBOY_SPECIES_LIST.reduce((acc, c) => acc + c.spawnWeight, 0);
@@ -1669,7 +1824,8 @@ export class CowboyArena {
     const startX = dir === 1 ? -19 : 19;
     const speed = chosen.speed * (0.85 + this.rand() * 0.3);
 
-    const animalMesh = buildFullAnimal(chosen.species, isRainbow ? 2 : Math.floor(this.rand() * 3));
+    const variant = isRainbow ? 2 : Math.floor(this.rand() * 3);
+    const animalMesh = buildFullAnimal(chosen.species, variant);
     animalMesh.flowerHat.visible = false;
     animalMesh.witchHat.visible = false;
     animalMesh.cartGroup.visible = false;
@@ -1714,8 +1870,9 @@ export class CowboyArena {
       score = chosen.score * 2;
     }
 
-    this.animals.push({
-      id: this.nextAnimalId++,
+    const newId = this.nextAnimalId++;
+    const animalEntry: ActiveCowboyAnimal = {
+      id: newId,
       species: chosen.species,
       config: chosen,
       root: animalMesh.root,
@@ -1735,7 +1892,25 @@ export class CowboyArena {
       runCycle: Math.random() * 10,
       sparkleGroup,
       rainbowMats,
-    });
+    };
+    this.animals.push(animalEntry);
+
+    if (this.isTwoPlayerMode && !this.isReplicaMode) {
+      this.onAnimalSpawn?.({
+        id: newId,
+        species: chosen.species,
+        x: startX,
+        z: laneZ,
+        vx: dir * speed,
+        dir,
+        lane,
+        isRainbow,
+        isSparkleX2,
+        score,
+        catchRate: chosen.catchRate,
+        variant,
+      });
+    }
   }
 
   private updateReadyRopeGeometry(rope: LassoRope, time: number): void {
@@ -2257,7 +2432,7 @@ export class CowboyArena {
     }
   }
 
-  private retireAnimal(id: number): void {
+  public retireAnimal(id: number): void {
     const idx = this.animals.findIndex((a) => a.id === id);
     if (idx !== -1) {
       const a = this.animals[idx];
@@ -2271,6 +2446,9 @@ export class CowboyArena {
       }
       this.scene.remove(a.root);
       this.animals.splice(idx, 1);
+      if (this.isTwoPlayerMode && !this.isReplicaMode) {
+        this.onAnimalDespawn?.(id);
+      }
     }
   }
 
@@ -2281,11 +2459,13 @@ export class CowboyArena {
     const dt = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
 
-    this.spawnTimer += dt;
-    if (this.spawnTimer >= 0.70) {
-      this.spawnTimer = 0;
-      if (this.rand() < 0.75) {
-        this.spawnAnimal();
+    if (!this.isReplicaMode) {
+      this.spawnTimer += dt;
+      if (this.spawnTimer >= 0.70) {
+        this.spawnTimer = 0;
+        if (this.rand() < 0.75) {
+          this.spawnAnimal();
+        }
       }
     }
 

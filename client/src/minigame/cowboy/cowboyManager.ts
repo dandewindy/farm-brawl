@@ -50,6 +50,7 @@ export class CowboyManager {
   private timerSyncInterval: any = null;
 
   private rematchTimeout: number | null = null;
+  private animalsSyncInterval: any = null;
   private currentStage = 1;
   private stageScore = 0;
   private stageTarget = 80;
@@ -143,7 +144,20 @@ export class CowboyManager {
     this.arena.setTwoPlayerMode(this.isTwoPlayerMode);
     if (this.isTwoPlayerMode) {
       this.arena.setRandomSeed(this.roomSeed);
+      this.arena.setReplicaMode(false);
     }
+
+    this.arena.onAnimalSpawn = (wire) => {
+      if (this.isTwoPlayerMode && this.mySlot === 0) {
+        this.sendRoomPacket({ t: 'cb_animal_spawn', animal: wire });
+      }
+    };
+
+    this.arena.onAnimalDespawn = (animalId) => {
+      if (this.isTwoPlayerMode && this.mySlot === 0) {
+        this.sendRoomPacket({ t: 'cb_animal_despawn', animalId });
+      }
+    };
 
     this.hud = new CowboyHud(this.container);
     this.hud.setTwoPlayerMode(this.isTwoPlayerMode, this.subMode, this.roomCode);
@@ -650,6 +664,16 @@ export class CowboyManager {
           });
         }
       }, 4000);
+
+      if (this.animalsSyncInterval) clearInterval(this.animalsSyncInterval);
+      this.animalsSyncInterval = setInterval(() => {
+        if (this.isOpened && this.isTwoPlayerMode && this.mySlot === 0 && this.arena && this.guestConnected) {
+          const syncList = this.arena.getAnimalsSyncData();
+          if (syncList.length > 0) {
+            this.sendRoomPacket({ t: 'cb_animals_sync', animals: syncList });
+          }
+        }
+      }, 250);
     } catch (err) {
       console.warn('Cowboy 2P WS connection error:', err);
     }
@@ -659,6 +683,10 @@ export class CowboyManager {
     if (this.timerSyncInterval) {
       clearInterval(this.timerSyncInterval);
       this.timerSyncInterval = null;
+    }
+    if (this.animalsSyncInterval) {
+      clearInterval(this.animalsSyncInterval);
+      this.animalsSyncInterval = null;
     }
     if (this.roomWs) {
       try {
@@ -707,10 +735,26 @@ export class CowboyManager {
         this.arena?.setTheme(this.currentTheme);
       }
 
+      this.arena?.setReplicaMode(this.mySlot === 1);
+
+      // Khi là máy 2 (Guest): load toàn bộ danh sách con vật đồng bộ ngay từ room state
+      if (this.mySlot === 1 && Array.isArray(msg.activeAnimals) && msg.activeAnimals.length > 0) {
+        this.arena?.setAllAnimalsFromWire(msg.activeAnimals);
+      }
+
+      // Khi là máy 1 (Host): lúc có người thứ 2 vào phòng, lập tức gửi danh sách con vật thực tế tức thì
+      if (this.mySlot === 0 && !prevGuest && this.guestConnected && this.arena) {
+        this.sendRoomPacket({
+          t: 'cb_animals_init',
+          animals: this.arena.getActiveAnimalsWire(),
+        });
+      }
+
       if (msg.seed && msg.seed !== this.roomSeed) {
         this.roomSeed = msg.seed;
-        this.arena?.clearAnimals();
-        this.arena?.setRandomSeed(this.roomSeed);
+        if (this.mySlot === 0) {
+          this.arena?.setRandomSeed(this.roomSeed);
+        }
       }
 
       this.hud?.setTwoPlayerMode(true, this.subMode, this.roomCode);
@@ -749,6 +793,34 @@ export class CowboyManager {
 
     if (msg.t === 'cb_items_sync') {
       this.hud?.setTeammateItems(msg.slot, msg.items);
+      return;
+    }
+
+    if (msg.t === 'cb_animal_spawn_sync') {
+      if (this.mySlot === 1) {
+        this.arena?.spawnAnimalFromWire(msg.animal);
+      }
+      return;
+    }
+
+    if (msg.t === 'cb_animals_sync') {
+      if (this.mySlot === 1) {
+        this.arena?.syncAnimalsPositions(msg.animals);
+      }
+      return;
+    }
+
+    if (msg.t === 'cb_animal_despawn_sync') {
+      if (this.mySlot === 1) {
+        this.arena?.retireAnimal(msg.animalId);
+      }
+      return;
+    }
+
+    if (msg.t === 'cb_animals_init_sync') {
+      if (this.mySlot === 1) {
+        this.arena?.setAllAnimalsFromWire(msg.animals);
+      }
       return;
     }
 
@@ -812,7 +884,18 @@ export class CowboyManager {
       this.hud?.hideDefeatModal();
       this.hud?.updateScore(0, this.stageTarget, this.currentStage);
       this.hud?.update2PScores(0, 0);
+      this.arena?.clearAnimals();
       this.startNewRound(msg.roundRemainingSec || 180, msg.seed);
+      if (this.mySlot === 0 && this.arena) {
+        setTimeout(() => {
+          if (this.mySlot === 0 && this.arena) {
+            this.sendRoomPacket({
+              t: 'cb_animals_init',
+              animals: this.arena.getActiveAnimalsWire(),
+            });
+          }
+        }, 400);
+      }
       return;
     }
 
@@ -836,7 +919,18 @@ export class CowboyManager {
       if (this.subMode === 'campaign') {
         this.hud?.updateScore(0, this.stageTarget, this.currentStage);
       }
+      this.arena?.clearAnimals();
       this.startNewRound(this.subMode === 'campaign' ? 180 : this.matchDurationSec, msg.seed);
+      if (this.mySlot === 0 && this.arena) {
+        setTimeout(() => {
+          if (this.mySlot === 0 && this.arena) {
+            this.sendRoomPacket({
+              t: 'cb_animals_init',
+              animals: this.arena.getActiveAnimalsWire(),
+            });
+          }
+        }, 400);
+      }
       return;
     }
   }
