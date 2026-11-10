@@ -225,6 +225,7 @@ export class CowboyManager {
 
       const aimZ = isAimCharge ? this.arena.getCurrentAimZ(1) : -1.8;
       this.hud?.setBusy(true, 1);
+      this.syncStats();
       this.arena.launchVolleyWithAim(bet, aimZ, 1);
       this.sendRoomPacket({ t: 'cb_throw', slot: 1, count: bet, aimZ });
     };
@@ -354,7 +355,7 @@ export class CowboyManager {
         }
 
         this.stageScore = this.p1Score + this.p2Score;
-        this.hud?.update2PScores(this.p1Score, this.p2Score);
+        this.syncStats();
         if (this.subMode === 'campaign') {
           this.hud?.updateScore(this.stageScore, this.stageTarget, this.currentStage);
         }
@@ -712,7 +713,7 @@ export class CowboyManager {
       this.hud?.setBet(msg.p2Bet || 1, 1, true);
       this.arena?.setSelectedRopesCount(msg.p1Bet || 1, 0);
       this.arena?.setSelectedRopesCount(msg.p2Bet || 1, 1);
-      this.hud?.update2PScores(this.p1Score, this.p2Score);
+      this.syncStats();
       if (this.subMode === 'campaign') {
         this.hud?.updateScore(this.stageScore, this.stageTarget, this.currentStage);
       }
@@ -756,7 +757,13 @@ export class CowboyManager {
     }
 
     if (msg.t === 'cb_throw_sync') {
+      if (msg.slot === 0) {
+        this.p1Credits = Math.max(0, this.p1Credits - msg.count);
+      } else {
+        this.p2Credits = Math.max(0, this.p2Credits - msg.count);
+      }
       this.hud?.setBet(msg.count, msg.slot, true);
+      this.syncStats();
       this.arena?.launchVolleyWithAim(msg.count, msg.aimZ, msg.slot);
       return;
     }
@@ -766,9 +773,14 @@ export class CowboyManager {
       this.p2Score = msg.p2Score;
       this.p1Catches = msg.p1Catches;
       this.p2Catches = msg.p2Catches;
+      if (msg.slot === 0) {
+        this.p1Credits += msg.score;
+      } else {
+        this.p2Credits += msg.score;
+      }
       this.stageScore = this.p1Score + this.p2Score;
       this.arena?.remoteCatchAnimal(msg.animalId, msg.score);
-      this.hud?.update2PScores(this.p1Score, this.p2Score);
+      this.syncStats();
       if (this.subMode === 'campaign') {
         this.hud?.updateScore(this.stageScore, this.stageTarget, this.currentStage);
       }
@@ -851,11 +863,24 @@ export class CowboyManager {
 
   private syncStats(): void {
     if (!this.hud) return;
+    const myCredits = this.wallet.getCredits();
     this.hud.updateStats(
-      this.wallet.getCredits(),
+      myCredits,
       this.wallet.getTotalScore(),
       this.wallet.getTotalCatches()
     );
+    if (this.isTwoPlayerMode) {
+      const c1 = this.mySlot === 0 ? myCredits : this.p1Credits;
+      const c2 = (this.mySlot === 1 || !this.guestConnected) ? myCredits : this.p2Credits;
+      this.hud.update2PScores(
+        this.p1Score,
+        this.p2Score,
+        this.p1Catches,
+        this.p2Catches,
+        c1,
+        c2
+      );
+    }
   }
 
   private toScreenPosition(x: number, y: number, z: number): { x: number; y: number } {

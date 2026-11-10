@@ -85,8 +85,8 @@ export class CowboyHud {
   private render(): void {
     this.rootEl.innerHTML = `
       <!-- Top Marquee Bar -->
-      <div class="cowboy-top-bar">
-        <div class="cowboy-title-box">
+      <div class="cowboy-top-bar" id="cbTopBar">
+        <div class="cowboy-title-box" id="cb1PTitleBox">
           <span class="cowboy-ico">${HORSE_COWBOY_SVG}</span>
           <div class="cowboy-title-group">
             <span class="cowboy-title" data-i18n="cb_title">CAO BỒI KÉO BÒ</span>
@@ -111,11 +111,11 @@ export class CowboyHud {
             <span class="c-val" id="cbCreditsVal">20</span>
           </div>
           <div class="cowboy-stat-box p1-score" id="cbP1ScoreBox" hidden>
-            <span class="c-lbl" id="cbP1ScoreLbl">🟦 P1 (TRÁI)</span>
+            <span class="c-lbl" id="cbP1ScoreLbl">P1 - You</span>
             <span class="c-val" id="cbP1ScoreVal">0</span>
           </div>
           <div class="cowboy-stat-box p2-score" id="cbP2ScoreBox" hidden>
-            <span class="c-lbl" id="cbP2ScoreLbl">🟥 P2 (PHẢI)</span>
+            <span class="c-lbl" id="cbP2ScoreLbl">P2 Đang đợi</span>
             <span class="c-val" id="cbP2ScoreVal">0</span>
           </div>
           <div class="cowboy-stat-box score" id="cbScoreBox">
@@ -129,7 +129,51 @@ export class CowboyHud {
           </div>
         </div>
 
-        <div class="cowboy-top-actions">
+        <!-- 2-PLAYER DEDICATED CLEAN TOP HUD: P1 Div (Left) | Open Shared Info (Center) | P2 Div (Right) -->
+        <div class="cb-2p-top-hud" id="cb2PTopHud" hidden>
+          <!-- Bên trái: 1 Div duy nhất cho Người chơi 1 -->
+          <div class="cb-2p-player-card p1" id="cb2PPlayerCard1">
+            <div class="cb-2p-card-head">
+              <span class="p-dot p1"></span>
+              <span class="p-title" id="cb2PP1Title">P1 - You</span>
+            </div>
+            <div class="cb-2p-card-metrics">
+              <span>Điểm <b id="cb2PP1Score">0</b></span>
+              <i class="sep">•</i>
+              <span>Bắt <b id="cb2PP1Catches">0</b></span>
+              <i class="sep">•</i>
+              <span>🪙 <b id="cb2PP1Credits">20</b></span>
+            </div>
+          </div>
+
+          <!-- Ở giữa: Nền trống thông thoáng, hiển thị Thời gian + Mã phòng (+ Mục tiêu nếu Chinh phục màn) -->
+          <div class="cb-2p-top-center" id="cb2PTopCenter">
+            <div class="cb-2p-open-timer" id="cb2PRoundTimerVal">01:30</div>
+            <button type="button" class="cb-2p-open-room" id="cb2PRoomCodeBtn" title="Bấm để sao chép mã phòng">
+              Phòng: <b id="cb2PRoomCodeVal">----</b> 📋
+            </button>
+            <div class="cb-2p-open-coop" id="cb2PCoopInfo" hidden>
+              Màn <b id="cb2PStageVal">1</b> • Mục tiêu <b id="cb2PCoopScoreVal">0</b>/<b id="cb2PCoopTargetVal">120</b>
+            </div>
+          </div>
+
+          <!-- Bên phải: 1 Div duy nhất cho Người chơi 2 -->
+          <div class="cb-2p-player-card p2" id="cb2PPlayerCard2">
+            <div class="cb-2p-card-head">
+              <span class="p-dot p2"></span>
+              <span class="p-title" id="cb2PP2Title">P2 Đang đợi</span>
+            </div>
+            <div class="cb-2p-card-metrics">
+              <span>Điểm <b id="cb2PP2Score">0</b></span>
+              <i class="sep">•</i>
+              <span>Bắt <b id="cb2PP2Catches">0</b></span>
+              <i class="sep">•</i>
+              <span>🪙 <b id="cb2PP2Credits">20</b></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cowboy-top-actions" id="cbTopActions">
           <button type="button" id="cbAdminShopBtn" class="cowboy-shop-btn admin-shop-btn" title="[Admin] Mở Cửa Hàng bất kỳ lúc nào" hidden>
             <span class="txt">CỬA HÀNG</span>
           </button>
@@ -173,83 +217,57 @@ export class CowboyHud {
             <div class="cb-quick-items-row" id="cbQuickItemsRow"></div>
           </div>
 
-          <!-- CỘT GIỮA: Nút Quăng Dây Đỏ Tactile + Tự động sau -->
-          <div class="cb-ctrl-col cb-ctrl-center">
-            <button type="button" id="cbLaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
-              <div class="btn-top">
-                <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
-                <small class="key-hint" data-i18n="cb_space_hint">Space</small>
-              </div>
-            </button>
+          <!-- CỘT GIỮA / PHẢI: Nút Phụ Vòng Tròn Đổi Dây + Nút Quăng Dây Đỏ Tròn -->
+          <div class="cb-ctrl-col cb-ctrl-center cb-1p-action-cluster">
+            <div class="cb-action-pair">
+              <button type="button" id="cbCycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi số dây (1-5)">
+                <span class="rope-num" id="cbCycleBetVal">1 DÂY</span>
+                <small class="rope-sub" id="cbCycleBetCost">1 C</small>
+              </button>
+              <button type="button" id="cbLaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn nhanh để quăng ngay, hoặc nhấn giữ gồng để canh cự ly xa gần">
+                <div class="btn-top">
+                  <span class="txt" data-i18n="cb_launch_btn">QUĂNG DÂY</span>
+                </div>
+              </button>
+            </div>
             <div id="cbAutoLaunchHint" class="cb-auto-launch-hint">
               <span data-i18n="cb_auto_throw_hint">Tự động sau:</span> <span id="cbAutoCountdown">10</span> s
             </div>
           </div>
-
-          <!-- CỘT PHẢI: Nút Chọn Số Dây Xoay Vòng Thu Gọn (Condensed Cycle Bet Button) -->
-          <div class="cb-ctrl-col cb-ctrl-right">
-            <div class="cb-col-label">
-              <span class="ico">🪙</span>
-              <span data-i18n="cb_pick_ropes">SỐ DÂY (CREDIT)</span>
-            </div>
-            <div class="cb-cycle-bet-wrap">
-              <button type="button" id="cbCycleBetBtn" class="cb-cycle-bet-btn active" title="Bấm để đổi số dây (1-5)">
-                <div class="cb-cycle-num-row">
-                  <span class="cb-cycle-val" id="cbCycleBetVal">1 DÂY</span>
-                  <span class="cb-cycle-cost" id="cbCycleBetCost">(1 C)</span>
-                </div>
-              </button>
-              <div class="cb-cycle-hint" data-i18n="cb_cycle_hint">Bấm để đổi số dây (1-5)</div>
-            </div>
-          </div>
         </div>
 
-        <!-- 2P CONTROLS CARD (Màn hình chung 2 bên Trái Phải + Tự động chuyển quyền khi Máy 2 vào phòng) -->
+        <!-- 2P CONTROLS CARD (2 bên Trái Phải gọn gàng: Nhãn P1 - You / P2 Đang đợi + Nút phụ vòng tròn đổi dây cạnh nút quăng dây) -->
         <div class="cowboy-controls-card mode-2p cb-card-hidden" id="cb2PControlsCard">
           <!-- P1 ZONE (BÊN TRÁI) -->
           <div class="cb-2p-player-zone p1-zone" id="cbP1Zone">
+            <div class="cb-2p-status-badge local" id="cbP1StatusBadge">P1 - You</div>
             <div class="cb-2p-zone-controls" id="cbP1ControlsGroup">
-              <span class="cb-2p-tag p1" id="cbP1Tag">P1</span>
-              <div class="cb-cycle-bet-wrap">
-                <button type="button" id="cbP1CycleBetBtn" class="cb-cycle-bet-btn active" title="[P1] Bấm để đổi số dây (Phím Q)">
-                  <div class="cb-cycle-num-row">
-                    <span class="cb-cycle-val" id="cbP1CycleVal">1 DÂY</span>
-                    <span class="cb-cycle-cost" id="cbP1CycleCost">(1 C)</span>
-                  </div>
-                </button>
-                <div class="cb-cycle-hint" id="cbP1KeyHint">Phím Q</div>
-              </div>
-              <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P1] Nhấn hoặc giữ để quăng dây (Phím Space)">
+              <button type="button" id="cbP1CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
+                <span class="rope-num" id="cbP1CycleVal">1 DÂY</span>
+                <small class="rope-sub" id="cbP1CycleCost">1 C</small>
+              </button>
+              <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây">
                 <div class="btn-top">
                   <span class="txt">QUĂNG DÂY</span>
-                  <small class="key-hint" id="cbP1LaunchKeyHint">Space</small>
                 </div>
               </button>
             </div>
-            <div class="cb-2p-status-badge" id="cbP1StatusBadge">🟦 P1 (Bên trái): Đang điều khiển</div>
           </div>
 
           <!-- P2 ZONE (BÊN PHẢI) -->
           <div class="cb-2p-player-zone p2-zone" id="cbP2Zone">
+            <div class="cb-2p-status-badge waiting" id="cbP2StatusBadge">P2 Đang đợi</div>
             <div class="cb-2p-zone-controls" id="cbP2ControlsGroup">
-              <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P2] Nhấn hoặc giữ để quăng dây (Phím Enter)">
+              <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="Nhấn hoặc giữ để quăng dây">
                 <div class="btn-top">
                   <span class="txt">QUĂNG DÂY</span>
-                  <small class="key-hint" id="cbP2LaunchKeyHint">Enter</small>
                 </div>
               </button>
-              <div class="cb-cycle-bet-wrap">
-                <button type="button" id="cbP2CycleBetBtn" class="cb-cycle-bet-btn active" title="[P2] Bấm để đổi số dây (Phím P)">
-                  <div class="cb-cycle-num-row">
-                    <span class="cb-cycle-val" id="cbP2CycleVal">1 DÂY</span>
-                    <span class="cb-cycle-cost" id="cbP2CycleCost">(1 C)</span>
-                  </div>
-                </button>
-                <div class="cb-cycle-hint" id="cbP2KeyHint">Phím P</div>
-              </div>
-              <span class="cb-2p-tag p2" id="cbP2Tag">P2</span>
+              <button type="button" id="cbP2CycleBetBtn" class="cb-rope-circle-btn active" title="Bấm để đổi lần lượt số lượng dây (1-5)">
+                <span class="rope-num" id="cbP2CycleVal">1 DÂY</span>
+                <small class="rope-sub" id="cbP2CycleCost">1 C</small>
+              </button>
             </div>
-            <div class="cb-2p-status-badge waiting" id="cbP2StatusBadge">📡 Chưa có máy 2 vào mã: Tạm điều khiển trên máy này</div>
           </div>
         </div>
       </div>
@@ -421,13 +439,16 @@ export class CowboyHud {
       });
     }
 
-    // Copy room code from top bar
-    const roomCodeBox = this.rootEl.querySelector('#cbRoomCodeBox') as HTMLElement | null;
-    roomCodeBox?.addEventListener('click', async () => {
+    // Copy room code from top bar (both 1P/legacy box and 2P center button)
+    const copyRoomAction = async () => {
       if (!this.roomCode) return;
       await copyTextToClipboard(this.roomCode);
-      this.showToast(`📋 Đã sao chép mã phòng: <b>${this.roomCode}</b> (Gửi cho máy 2 nhập vào phòng!)`, 2200);
-    });
+      this.showToast(`📋 Đã sao chép mã phòng: <b>${this.roomCode}</b>`, 2000);
+    };
+    const roomCodeBox = this.rootEl.querySelector('#cbRoomCodeBox') as HTMLElement | null;
+    roomCodeBox?.addEventListener('click', copyRoomAction);
+    const roomCodeBtn2P = this.rootEl.querySelector('#cb2PRoomCodeBtn') as HTMLElement | null;
+    roomCodeBtn2P?.addEventListener('click', copyRoomAction);
 
     // Nút chọn mức cược xoay vòng thu gọn (1P)
     const cycleBtn = this.rootEl.querySelector('#cbCycleBetBtn') as HTMLButtonElement | null;
@@ -793,16 +814,16 @@ export class CowboyHud {
       const valEl = this.rootEl.querySelector('#cbCycleBetVal');
       const costEl = this.rootEl.querySelector('#cbCycleBetCost');
       if (valEl) valEl.textContent = `${bet} DÂY`;
-      if (costEl) costEl.textContent = `(${bet} C)`;
+      if (costEl) costEl.textContent = `${bet} C`;
       const p1Val = this.rootEl.querySelector('#cbP1CycleVal');
       const p1Cost = this.rootEl.querySelector('#cbP1CycleCost');
       if (p1Val) p1Val.textContent = `${bet} DÂY`;
-      if (p1Cost) p1Cost.textContent = `(${bet} C)`;
+      if (p1Cost) p1Cost.textContent = `${bet} C`;
     } else {
       const p2Val = this.rootEl.querySelector('#cbP2CycleVal');
       const p2Cost = this.rootEl.querySelector('#cbP2CycleCost');
       if (p2Val) p2Val.textContent = `${bet} DÂY`;
-      if (p2Cost) p2Cost.textContent = `(${bet} C)`;
+      if (p2Cost) p2Cost.textContent = `${bet} C`;
     }
   }
 
@@ -829,6 +850,13 @@ export class CowboyHud {
     this.subMode = subMode;
     this.roomCode = roomCode;
 
+    const topBar = this.rootEl.querySelector('#cbTopBar') as HTMLElement | null;
+    const titleBox1P = this.rootEl.querySelector('#cb1PTitleBox') as HTMLElement | null;
+    const statsBar1P = this.rootEl.querySelector('#cbStatsBar') as HTMLElement | null;
+    const topHud2P = this.rootEl.querySelector('#cb2PTopHud') as HTMLElement | null;
+    const roomCodeVal2P = this.rootEl.querySelector('#cb2PRoomCodeVal') as HTMLElement | null;
+    const coopInfo2P = this.rootEl.querySelector('#cb2PCoopInfo') as HTMLElement | null;
+
     const card1P = this.rootEl.querySelector('#cb1PControlsCard') as HTMLElement | null;
     const card2P = this.rootEl.querySelector('#cb2PControlsCard') as HTMLElement | null;
     const roomCodeBox = this.rootEl.querySelector('#cbRoomCodeBox') as HTMLElement | null;
@@ -837,6 +865,24 @@ export class CowboyHud {
     const scoreBox = this.rootEl.querySelector('#cbScoreBox') as HTMLElement | null;
     const p1ScoreBox = this.rootEl.querySelector('#cbP1ScoreBox') as HTMLElement | null;
     const p2ScoreBox = this.rootEl.querySelector('#cbP2ScoreBox') as HTMLElement | null;
+
+    topBar?.classList.toggle('mode-2p-top', enabled);
+    if (titleBox1P) titleBox1P.hidden = enabled;
+    if (statsBar1P) statsBar1P.hidden = enabled;
+    if (topHud2P) topHud2P.hidden = !enabled;
+    if (roomCodeVal2P) roomCodeVal2P.textContent = roomCode || '----';
+    if (coopInfo2P) coopInfo2P.hidden = !enabled || subMode !== 'campaign';
+
+    // In 2P mode, hide bulky mid-round Shop/Backpack buttons so top bar stays clean & uncluttered
+    if (this.backpackBtn) {
+      this.backpackBtn.hidden = enabled;
+      this.backpackBtn.style.display = enabled ? 'none' : '';
+    }
+    if (this.adminShopBtn) {
+      const showAdmin = !enabled && isCowboyAdminName();
+      this.adminShopBtn.hidden = !showAdmin;
+      this.adminShopBtn.style.display = showAdmin ? 'inline-flex' : 'none';
+    }
 
     if (card1P && card2P) {
       if (enabled) {
@@ -864,8 +910,8 @@ export class CowboyHud {
   public set2PControlState(mySlot: 0 | 1, guestConnected: boolean, p1Name: string, p2Name: string): void {
     this.mySlot = mySlot;
     this.guestConnected = guestConnected;
-    this.p1Name = p1Name || 'Người chơi 1';
-    this.p2Name = p2Name || 'Người chơi 2';
+    this.p1Name = p1Name || 'P1';
+    this.p2Name = p2Name || 'P2';
 
     const p1Zone = this.rootEl.querySelector('#cbP1Zone') as HTMLElement | null;
     const p2Zone = this.rootEl.querySelector('#cbP2Zone') as HTMLElement | null;
@@ -875,11 +921,21 @@ export class CowboyHud {
     const p2LaunchBtn = this.rootEl.querySelector('#cbP2LaunchBtn') as HTMLButtonElement | null;
     const p1Status = this.rootEl.querySelector('#cbP1StatusBadge') as HTMLElement | null;
     const p2Status = this.rootEl.querySelector('#cbP2StatusBadge') as HTMLElement | null;
-    const p1ScoreLbl = this.rootEl.querySelector('#cbP1ScoreLbl') as HTMLElement | null;
-    const p2ScoreLbl = this.rootEl.querySelector('#cbP2ScoreLbl') as HTMLElement | null;
+    const p1TopTitle = this.rootEl.querySelector('#cb2PP1Title') as HTMLElement | null;
+    const p2TopTitle = this.rootEl.querySelector('#cb2PP2Title') as HTMLElement | null;
+    const p1Card = this.rootEl.querySelector('#cb2PPlayerCard1') as HTMLElement | null;
+    const p2Card = this.rootEl.querySelector('#cb2PPlayerCard2') as HTMLElement | null;
 
-    if (p1ScoreLbl) p1ScoreLbl.textContent = `🟦 P1 (${this.p1Name})`;
-    if (p2ScoreLbl) p2ScoreLbl.textContent = `🟥 P2 (${this.p2Name})`;
+    const p1Label = mySlot === 0 ? 'P1 - You' : `P1 - ${this.p1Name}`;
+    const p2Label = mySlot === 1
+      ? 'P2 - You'
+      : (guestConnected ? `P2 - ${this.p2Name}` : 'P2 Đang đợi');
+
+    if (p1TopTitle) p1TopTitle.textContent = p1Label;
+    if (p2TopTitle) p2TopTitle.textContent = p2Label;
+    p1Card?.classList.toggle('is-you', mySlot === 0);
+    p2Card?.classList.toggle('is-you', mySlot === 1);
+    p2Card?.classList.toggle('is-waiting', !guestConnected && mySlot === 0);
 
     const canP1 = this.canControlSlotLocally(0);
     const canP2 = this.canControlSlotLocally(1);
@@ -893,40 +949,66 @@ export class CowboyHud {
     if (p2LaunchBtn) p2LaunchBtn.disabled = !canP2 || this.isP2Busy;
 
     if (p1Status) {
-      if (mySlot === 0) {
-        p1Status.className = 'cb-2p-status-badge local';
-        p1Status.textContent = `🟦 P1 (${this.p1Name}): Máy của bạn`;
-      } else {
-        p1Status.className = 'cb-2p-status-badge remote';
-        p1Status.textContent = `🟢 P1 (${this.p1Name}): Đang điều khiển từ máy 1`;
-      }
+      p1Status.className = mySlot === 0 ? 'cb-2p-status-badge local' : 'cb-2p-status-badge remote';
+      p1Status.textContent = p1Label;
     }
 
     if (p2Status) {
       if (mySlot === 1) {
         p2Status.className = 'cb-2p-status-badge local';
-        p2Status.textContent = `🟥 P2 (${this.p2Name}): Máy của bạn (Space / Enter)`;
       } else if (guestConnected) {
         p2Status.className = 'cb-2p-status-badge remote';
-        p2Status.textContent = `🟢 P2 (${this.p2Name}): Đang điều khiển từ máy 2`;
       } else {
         p2Status.className = 'cb-2p-status-badge waiting';
-        p2Status.textContent = `📡 Chờ máy 2 (Mã ${this.roomCode}) • Đang điều khiển chung`;
       }
+      p2Status.textContent = p2Label;
     }
   }
 
-  public update2PScores(p1Score: number, p2Score: number): void {
+  public update2PScores(
+    p1Score: number,
+    p2Score: number,
+    p1Catches?: number,
+    p2Catches?: number,
+    p1Credits?: number,
+    p2Credits?: number
+  ): void {
     const p1El = this.rootEl.querySelector('#cbP1ScoreVal');
     const p2El = this.rootEl.querySelector('#cbP2ScoreVal');
     if (p1El) p1El.textContent = String(p1Score);
     if (p2El) p2El.textContent = String(p2Score);
+
+    const p1Score2P = this.rootEl.querySelector('#cb2PP1Score');
+    const p2Score2P = this.rootEl.querySelector('#cb2PP2Score');
+    if (p1Score2P) p1Score2P.textContent = String(p1Score);
+    if (p2Score2P) p2Score2P.textContent = String(p2Score);
+
+    if (p1Catches !== undefined) {
+      const p1CatchesEl = this.rootEl.querySelector('#cb2PP1Catches');
+      if (p1CatchesEl) p1CatchesEl.textContent = String(p1Catches);
+    }
+    if (p2Catches !== undefined) {
+      const p2CatchesEl = this.rootEl.querySelector('#cb2PP2Catches');
+      if (p2CatchesEl) p2CatchesEl.textContent = String(p2Catches);
+    }
+    if (p1Credits !== undefined) {
+      const p1CreditsEl = this.rootEl.querySelector('#cb2PP1Credits');
+      if (p1CreditsEl) p1CreditsEl.textContent = String(p1Credits);
+    }
+    if (p2Credits !== undefined) {
+      const p2CreditsEl = this.rootEl.querySelector('#cb2PP2Credits');
+      if (p2CreditsEl) p2CreditsEl.textContent = String(p2Credits);
+    }
   }
 
   public updateScore(score: number, target: number, stage?: number): void {
     if (this.scoreValEl) this.scoreValEl.textContent = String(score);
     const targetValEl = this.rootEl.querySelector('#cbTargetVal');
     if (targetValEl) targetValEl.textContent = String(target);
+    const coopScore2P = this.rootEl.querySelector('#cb2PCoopScoreVal');
+    const coopTarget2P = this.rootEl.querySelector('#cb2PCoopTargetVal');
+    if (coopScore2P) coopScore2P.textContent = String(score);
+    if (coopTarget2P) coopTarget2P.textContent = String(target);
     const fillEl = this.rootEl.querySelector('#cbScoreFill') as HTMLElement | null;
     if (fillEl) {
       const pct = Math.min(100, Math.max(0, (score / Math.max(1, target)) * 100));
@@ -940,6 +1022,8 @@ export class CowboyHud {
     if (stage !== undefined) {
       const stageValEl = this.rootEl.querySelector('#cbStageVal');
       if (stageValEl) stageValEl.textContent = String(stage);
+      const stageVal2P = this.rootEl.querySelector('#cb2PStageVal');
+      if (stageVal2P) stageVal2P.textContent = String(stage);
     }
   }
 
@@ -1035,6 +1119,9 @@ export class CowboyHud {
     this.creditValEl.textContent = String(credits);
     if (!this.isTwoPlayerMode) {
       this.scoreValEl.textContent = String(score);
+    } else {
+      const localCreditEl = this.rootEl.querySelector(this.mySlot === 1 ? '#cb2PP2Credits' : '#cb2PP1Credits');
+      if (localCreditEl) localCreditEl.textContent = String(credits);
     }
     this.catchesValEl.textContent = String(catches);
   }
@@ -1100,7 +1187,13 @@ export class CowboyHud {
     const s = Math.max(0, this.roundSecondsLeft);
     const mm = Math.floor(s / 60).toString().padStart(2, '0');
     const ss = (s % 60).toString().padStart(2, '0');
-    this.roundTimerValEl.textContent = `${mm}:${ss}`;
+    const txt = `${mm}:${ss}`;
+    this.roundTimerValEl.textContent = txt;
+    const timer2P = this.rootEl.querySelector('#cb2PRoundTimerVal') as HTMLElement | null;
+    if (timer2P) {
+      timer2P.textContent = txt;
+      timer2P.classList.toggle('danger', s <= 30);
+    }
 
     if (s <= 30) {
       this.roundTimerBox.classList.add('danger');
