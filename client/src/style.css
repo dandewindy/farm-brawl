@@ -12561,16 +12561,23 @@ body.mobile-phone #adminToggleBtn {
 }
 
 /* 2P Bottom Controls on PC: Đưa cụm điều khiển P1 và P2 vào trong 1/8 vw (12.5vw) */
-.cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: flex-end !important;
-  justify-content: space-between !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  padding: 0 12.5vw !important; /* 1/8 vw trên PC */
-  margin: 0 !important;
-  box-sizing: border-box !important;
+@media (min-width: 901px) and (min-height: 541px) {
+  .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 12.5vw !important; /* 1/8 vw trên PC */
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 900px), (max-height: 540px) {
+  .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
+    padding: 0 !important;
+  }
 }
 
 .cb-2p-player-zone {
@@ -12793,6 +12800,7 @@ body.mobile-phone #adminToggleBtn {
     font-size: 11px !important;
   }
 
+  .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]),
   .cowboy-controls-card.mode-2p {
     padding: 0 !important;
   }
