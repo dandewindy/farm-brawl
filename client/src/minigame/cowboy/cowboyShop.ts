@@ -526,13 +526,30 @@ export class CowboyShop {
   }
 
   private bindEvents(): void {
-    // Đóng modal confirm
-    this.bindTap(this.confirmModalEl.querySelector('#cfCloseXBtn') as HTMLElement, () => {
-      this.closeConfirmModal();
-    });
-    this.bindTap(this.confirmModalEl.querySelector('#cfCancelBtn') as HTMLElement, () => {
-      this.closeConfirmModal();
-    });
+    // Đóng modal confirm: Gắn trực tiếp click, pointerdown, touchend không qua throttle bindTap để bấm là ăn ngay
+    const closeXBtn = this.confirmModalEl.querySelector('#cfCloseXBtn') as HTMLElement | null;
+    if (closeXBtn) {
+      const closeFn = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.closeConfirmModal();
+      };
+      closeXBtn.addEventListener('click', closeFn);
+      closeXBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      closeXBtn.addEventListener('touchend', closeFn, { passive: false });
+    }
+
+    const cancelBtn = this.confirmModalEl.querySelector('#cfCancelBtn') as HTMLElement | null;
+    if (cancelBtn) {
+      const cancelFn = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.closeConfirmModal();
+      };
+      cancelBtn.addEventListener('click', cancelFn);
+      cancelBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      cancelBtn.addEventListener('touchend', cancelFn, { passive: false });
+    }
 
     // Trang bị / Bỏ trang bị trong modal
     this.bindTap(this.confirmModalEl.querySelector('#cfEquipBtn') as HTMLElement, () => {
@@ -550,6 +567,11 @@ export class CowboyShop {
 
     // Bấm backdrop bên ngoài modal để đóng
     this.confirmModalEl.addEventListener('click', (e) => {
+      if (e.target === this.confirmModalEl) {
+        this.closeConfirmModal();
+      }
+    });
+    this.confirmModalEl.addEventListener('pointerdown', (e) => {
       if (e.target === this.confirmModalEl) {
         this.closeConfirmModal();
       }

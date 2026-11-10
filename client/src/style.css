@@ -10225,10 +10225,20 @@ body.mobile-phone #adminToggleBtn {
 
   /* ==========================================================================
      2-PLAYER CONTROLS ON MOBILE (PHONE LANDSCAPE / COMPACT):
-     - Local player has the Launch Button on the bottom-left corner for natural left thumb.
-     - Remote teammate side ONLY displays Teammate Status (Rope Count + Items + Name Badge)
-       with NO launch button at all!
+     - Bottom bar elevated 1/10 wh (10vh) and inset 1/10 vw (10vw)
+     - Launch button enlarged (82px)
+     - P1 ALWAYS on LEFT, P2 ALWAYS on RIGHT
+     - On P1 phone: P1 launch active, P2 launch hidden (shows rope + items)
+     - On P2 phone: P2 launch active on right, P1 launch hidden on left (shows rope + items)
+     - P2 items flow backwards to the left
      ========================================================================== */
+
+  .cowboy-bottom-bar {
+    bottom: 10vh !important; /* Chếch lên 1/10 wh */
+    padding: 0 10vw !important; /* Đưa vào trong 1/10 vw */
+    width: 100vw !important;
+    box-sizing: border-box !important;
+  }
 
   .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
     width: 100% !important;
@@ -10237,44 +10247,46 @@ body.mobile-phone #adminToggleBtn {
     flex-direction: row !important;
     align-items: flex-end !important;
     justify-content: space-between !important;
-    padding: 0 4px 2px !important;
-    margin: 0 auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
     box-sizing: border-box !important;
-    gap: 6px !important;
+    gap: 8px !important;
   }
 
   .cb-2p-player-zone {
     display: flex !important;
     flex-direction: row !important;
     align-items: flex-end !important;
-    gap: 4px !important;
+    gap: 6px !important;
     flex: 0 1 auto !important;
   }
 
+  /* Nút Quăng Dây to hơn: 82px */
   .cb-2p-player-zone .cb-launch-circle-btn {
-    width: 68px !important;
-    height: 68px !important;
-    min-width: 68px !important;
-    min-height: 68px !important;
+    width: 82px !important;
+    height: 82px !important;
+    min-width: 82px !important;
+    min-height: 82px !important;
   }
 
   .cb-2p-player-zone .cb-launch-circle-btn .btn-top .txt {
-    font-size: 10.5px !important;
+    font-size: 12px !important;
   }
 
+  /* Nút dây: 50px */
   .cb-2p-player-zone .cb-rope-circle-btn {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
+    width: 50px !important;
+    height: 50px !important;
+    min-width: 50px !important;
+    min-height: 50px !important;
   }
 
   .cb-2p-player-zone .cb-rope-circle-btn .rope-num {
-    font-size: 9.5px !important;
+    font-size: 11px !important;
   }
 
   .cb-2p-player-zone .cb-rope-circle-btn .rope-sub {
-    font-size: 7.5px !important;
+    font-size: 8.5px !important;
   }
 
   .cb-2p-items-row {
@@ -10289,136 +10301,94 @@ body.mobile-phone #adminToggleBtn {
   }
 
   .cb-2p-items-row .cb-quick-3d-slot {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
     border-radius: 8px !important;
   }
 
   .cb-2p-items-row .cb-item-qty-tag {
-    font-size: 7.5px !important;
+    font-size: 8px !important;
     padding: 0 3px !important;
   }
 
   .cb-2p-status-badge {
-    font-size: 9.5px !important;
-    padding: 2px 7px !important;
+    font-size: 10px !important;
+    padding: 2px 8px !important;
     margin-bottom: 4px !important;
   }
 
-  /* Default / Local is Player 1 (.slot-p1 or not .slot-p2):
-     - P1 (Left, order: 1): Launch Btn (far left) -> Cycle Bet Btn -> Items -> Badge
-     - P2 (Right, order: 2): Badge -> Items -> Cycle Bet Btn -> NO Launch Btn! */
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone {
+  /* P1 ZONE: ALWAYS ON THE LEFT */
+  .cb-2p-player-zone.p1-zone,
+  #cbP1Zone {
     order: 1 !important;
     justify-content: flex-start !important;
     margin-right: auto !important;
     margin-left: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
   }
 
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1LaunchBtn,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1LaunchBtn {
-    order: 1 !important;
-    display: inline-flex !important;
-  }
+  #cbP1Zone #cbP1LaunchBtn { order: 1 !important; }
+  #cbP1Zone #cbP1CycleBetBtn { order: 2 !important; }
+  #cbP1Zone #cbP1ItemsRow { order: 3 !important; }
+  #cbP1Zone #cbP1StatusBadge { order: 4 !important; }
 
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1CycleBetBtn,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1CycleBetBtn {
-    order: 2 !important;
-  }
-
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1ItemsRow,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1ItemsRow {
-    order: 3 !important;
-  }
-
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1StatusBadge,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1StatusBadge {
-    order: 4 !important;
-  }
-
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone {
+  /* P2 ZONE: ALWAYS ON THE RIGHT, items nằm ngược về bên trái */
+  .cb-2p-player-zone.p2-zone,
+  #cbP2Zone {
     order: 2 !important;
     justify-content: flex-end !important;
     margin-left: auto !important;
     margin-right: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
   }
 
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2StatusBadge,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2StatusBadge {
-    order: 1 !important;
-  }
+  #cbP2Zone #cbP2StatusBadge { order: 1 !important; }
+  #cbP2Zone #cbP2ItemsRow { order: 2 !important; }
+  #cbP2Zone #cbP2CycleBetBtn { order: 3 !important; }
+  #cbP2Zone #cbP2LaunchBtn { order: 4 !important; }
 
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2ItemsRow,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2ItemsRow {
-    order: 2 !important;
-  }
-
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2CycleBetBtn,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2CycleBetBtn {
-    order: 3 !important;
-    pointer-events: none !important;
-  }
-
-  /* KHONG HIEN NUT QUANG DAY P2 TREN MAY P1 (DIEN THOAI) */
-  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2LaunchBtn,
-  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2LaunchBtn {
-    display: none !important;
-  }
-
-  /* Local is Player 2 (.slot-p2 on P2's machine):
-     - P2 (Left, order: 1): Launch Btn (far left) -> Cycle Bet Btn -> Items -> Badge
-     - P1 (Right, order: 2): Badge -> Items -> Cycle Bet Btn -> NO Launch Btn! */
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone {
-    order: 1 !important;
-    justify-content: flex-start !important;
-    margin-right: auto !important;
-    margin-left: 0 !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2LaunchBtn {
-    order: 1 !important;
+  /* Máy của P1 (.slot-p1 hoặc mặc định):
+     - P1 điều khiển: hiện nút quăng dây P1
+     - P2 đồng đội: ẩn nút quăng dây P2, chỉ hiển thị số dây và item */
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1LaunchBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1LaunchBtn {
     display: inline-flex !important;
   }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2CycleBetBtn {
-    order: 2 !important;
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1CycleBetBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1CycleBetBtn {
+    pointer-events: auto !important;
   }
 
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2ItemsRow {
-    order: 3 !important;
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2LaunchBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2LaunchBtn {
+    display: none !important;
   }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2StatusBadge {
-    order: 4 !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone {
-    order: 2 !important;
-    justify-content: flex-end !important;
-    margin-left: auto !important;
-    margin-right: 0 !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1StatusBadge {
-    order: 1 !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1ItemsRow {
-    order: 2 !important;
-  }
-
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1CycleBetBtn {
-    order: 3 !important;
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2CycleBetBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2CycleBetBtn {
     pointer-events: none !important;
   }
 
-  /* KHONG HIEN NUT QUANG DAY P1 TREN MAY P2 (DIEN THOAI) */
-  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1LaunchBtn {
+  /* Máy của P2 (.slot-p2 khi người chơi 2 vào):
+     - P2 điều khiển máy của họ ở bên phải: hiện nút quăng dây P2
+     - P1 bên trái: ẩn nút quăng dây P1, chỉ hiển thị số dây và item của P1 */
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2LaunchBtn {
+    display: inline-flex !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2CycleBetBtn {
+    pointer-events: auto !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1LaunchBtn {
     display: none !important;
+  }
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1CycleBetBtn {
+    pointer-events: none !important;
   }
 
   /* Left items moved left */
@@ -10857,8 +10827,8 @@ body.mobile-phone #adminToggleBtn {
 /* Explicit Mobile Protection: Compact sizing on mobile/tablet screens */
 @media (max-width: 840px), (max-height: 540px) {
   .cowboy-bottom-bar {
-    bottom: 0 !important;
-    padding: 0 8px 6px !important;
+    bottom: 10vh !important;
+    padding: 0 10vw !important;
   }
 
   .cowboy-controls-card {
@@ -11803,27 +11773,35 @@ body.mobile-phone #adminToggleBtn {
 
 .cf-close-btn {
   position: absolute !important;
-  top: 12px !important;
-  right: 12px !important;
-  width: 32px !important;
-  height: 32px !important;
+  top: 10px !important;
+  right: 10px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
   border-radius: 50% !important;
-  background: rgba(0, 0, 0, 0.45) !important;
-  border: 1.5px solid rgba(255, 214, 71, 0.45) !important;
+  background: rgba(0, 0, 0, 0.65) !important;
+  border: 2px solid rgba(255, 214, 71, 0.7) !important;
   color: #ffd54f !important;
-  font-size: 15px !important;
-  font-weight: 800 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
   transition: all 0.15s !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55) !important;
 }
 
-.cf-close-btn:hover {
+.cf-close-btn:hover,
+.cf-close-btn:active {
   background: #ff5252 !important;
   border-color: #ff7875 !important;
   color: #fff !important;
+  transform: scale(1.08) !important;
 }
 
 .cf-icon {
@@ -12423,17 +12401,16 @@ body.mobile-phone #adminToggleBtn {
   display: none !important;
 }
 
-/* Unified Single Div for P1 (Left) and P2 (Right) */
+/* Unified Single Div for P1 (Left) and P2 (Right) - Nền trong suốt không cần bao viền gì cả, đưa vào trong 1/8 vw màn */
 .cb-2p-player-card {
   display: inline-flex !important;
   flex-direction: column !important;
   gap: 2px !important;
-  padding: 6px 14px !important;
-  border-radius: 12px !important;
-  background: rgba(18, 12, 8, 0.68) !important;
-  backdrop-filter: blur(6px) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.18) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  padding: 2px 4px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
   pointer-events: auto !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -12441,12 +12418,12 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-2p-player-card.p1 {
   justify-self: start !important;
-  border-color: rgba(79, 195, 247, 0.55) !important;
+  margin-left: 12.5vw !important; /* 1/8 vw màn */
 }
 
 .cb-2p-player-card.p2 {
   justify-self: end !important;
-  border-color: rgba(255, 110, 110, 0.55) !important;
+  margin-right: 12.5vw !important; /* 1/8 vw màn */
 }
 
 .cb-2p-card-head {
@@ -12474,12 +12451,13 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-2p-card-head .p-title {
   font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 900 !important;
   line-height: 1.1 !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.8) !important;
 }
 
 .cb-2p-player-card.p1 .p-title {
@@ -12498,6 +12476,7 @@ body.mobile-phone #adminToggleBtn {
   font-weight: 700 !important;
   color: #e8dccb !important;
   white-space: nowrap !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.8) !important;
 }
 
 .cb-2p-card-metrics b {
@@ -12512,13 +12491,13 @@ body.mobile-phone #adminToggleBtn {
   opacity: 0.45 !important;
 }
 
-/* Center Shared Area: Open Background (nền trống), NO border box */
+/* Center Shared Area: Bên trái là Màn x & mục tiêu, ở giữa là Thời gian to hơn 50%, bên phải là Mã phòng */
 .cb-2p-top-center {
   display: flex !important;
-  flex-direction: column !important;
+  flex-direction: row !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 1px !important;
+  justify-content: center !important;
+  gap: 16px !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -12529,18 +12508,31 @@ body.mobile-phone #adminToggleBtn {
 
 .cb-2p-open-timer {
   font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
-  font-size: 28px !important;
+  font-size: 42px !important; /* To hơn 50% so với 28px */
   font-weight: 900 !important;
   line-height: 1 !important;
   color: #ffffff !important;
   font-variant-numeric: tabular-nums !important;
   letter-spacing: 1px !important;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 14px rgba(0, 0, 0, 0.75) !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85) !important;
 }
 
 .cb-2p-open-timer.danger {
   color: #ff5252 !important;
   animation: timerPulse 0.8s infinite alternate !important;
+}
+
+.cb-2p-open-coop {
+  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  color: #b9f6ca !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.8) !important;
+  white-space: nowrap !important;
+}
+
+.cb-2p-open-coop[hidden] {
+  display: none !important;
 }
 
 .cb-2p-open-room {
@@ -12549,7 +12541,7 @@ body.mobile-phone #adminToggleBtn {
   padding: 1px 6px !important;
   margin: 0 !important;
   font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
   font-weight: 800 !important;
   color: #ffe082 !important;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.8) !important;
@@ -12568,29 +12560,16 @@ body.mobile-phone #adminToggleBtn {
   letter-spacing: 1px !important;
 }
 
-.cb-2p-open-coop {
-  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
-  font-size: 11.5px !important;
-  font-weight: 800 !important;
-  color: #b9f6ca !important;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95) !important;
-  white-space: nowrap !important;
-}
-
-.cb-2p-open-coop[hidden] {
-  display: none !important;
-}
-
-/* 2P Bottom Controls: Symmetrical Left & Right with Concise Badge + Circular Rope & Throw Buttons */
+/* 2P Bottom Controls on PC: Đưa cụm điều khiển P1 và P2 vào trong 1/8 vw (12.5vw) */
 .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
   display: flex !important;
   flex-direction: row !important;
   align-items: flex-end !important;
   justify-content: space-between !important;
   width: 100% !important;
-  max-width: 1020px !important;
-  padding: 0 18px !important;
-  margin: 0 auto !important;
+  max-width: 100% !important;
+  padding: 0 12.5vw !important; /* 1/8 vw trên PC */
+  margin: 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -12772,38 +12751,50 @@ body.mobile-phone #adminToggleBtn {
   }
 
   .cb-2p-player-card {
-    padding: 4px 10px !important;
-    border-radius: 9px !important;
+    padding: 2px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
     gap: 1px !important;
   }
 
+  .cb-2p-player-card.p1 {
+    margin-left: 10vw !important;
+  }
+
+  .cb-2p-player-card.p2 {
+    margin-right: 10vw !important;
+  }
+
   .cb-2p-card-head .p-title {
-    font-size: 11.5px !important;
+    font-size: 12px !important;
   }
 
   .cb-2p-card-metrics {
-    font-size: 10.5px !important;
+    font-size: 11px !important;
     gap: 5px !important;
   }
 
   .cb-2p-card-metrics b {
-    font-size: 12px !important;
+    font-size: 13px !important;
   }
 
   .cb-2p-open-timer {
-    font-size: 21px !important;
+    font-size: 32px !important; /* To hơn 50% */
   }
 
   .cb-2p-open-room {
-    font-size: 10.5px !important;
+    font-size: 11px !important;
   }
 
   .cb-2p-open-coop {
-    font-size: 9.5px !important;
+    font-size: 11px !important;
   }
 
   .cowboy-controls-card.mode-2p {
-    padding: 0 10px !important;
+    padding: 0 !important;
   }
 
   .cb-2p-zone-controls,
@@ -12940,25 +12931,28 @@ body.mobile-phone #adminToggleBtn {
   }
 
   .cb-2p-player-card {
-    padding: 3px 6px !important;
-    border-radius: 8px !important;
+    padding: 2px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
   }
 
   .cb-2p-card-head .p-title {
-    font-size: 10.5px !important;
+    font-size: 11px !important;
   }
 
   .cb-2p-card-metrics {
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     gap: 3px !important;
   }
 
   .cb-2p-card-metrics b {
-    font-size: 10.5px !important;
+    font-size: 11.5px !important;
   }
 
   .cb-2p-open-timer {
-    font-size: 18px !important;
+    font-size: 26px !important;
   }
 
   .cb-2p-open-room {

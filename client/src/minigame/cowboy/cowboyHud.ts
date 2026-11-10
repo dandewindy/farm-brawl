@@ -150,15 +150,15 @@ export class CowboyHud {
             </div>
           </div>
 
-          <!-- Ở giữa: Nền trống thông thoáng, hiển thị Thời gian + Mã phòng (+ Mục tiêu nếu Chinh phục màn) -->
+          <!-- Ở giữa: Nền trống thông thoáng, hiển thị Màn/Mục tiêu (Trái) | Thời gian to (Giữa) | Mã phòng (Phải) -->
           <div class="cb-2p-top-center" id="cb2PTopCenter">
+            <div class="cb-2p-open-coop" id="cb2PCoopInfo" hidden>
+              Màn <b id="cb2PStageVal">1</b> • Mục tiêu <b id="cb2PCoopScoreVal">0</b>/<b id="cb2PCoopTargetVal">120</b>
+            </div>
             <div class="cb-2p-open-timer" id="cb2PRoundTimerVal">01:30</div>
             <button type="button" class="cb-2p-open-room" id="cb2PRoomCodeBtn" title="Bấm để sao chép mã phòng">
               Phòng: <b id="cb2PRoomCodeVal">----</b> 📋
             </button>
-            <div class="cb-2p-open-coop" id="cb2PCoopInfo" hidden>
-              Màn <b id="cb2PStageVal">1</b> • Mục tiêu <b id="cb2PCoopScoreVal">0</b>/<b id="cb2PCoopTargetVal">120</b>
-            </div>
           </div>
 
           <!-- Bên phải: 1 Div duy nhất cho Người chơi 2 -->
