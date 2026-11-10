@@ -29,7 +29,7 @@ import { ToolRenderer, createHeartGeometry } from './render/tools';
 import { DolphinRenderer } from './render/dolphin';
 import { WorldRenderer } from './render/world';
 import { BananaRenderer } from './render/bananas';
-import { HudManager } from './ui/hud';
+import { HudManager, copyTextToClipboard } from './ui/hud';
 import { getArenaTheme, onThemeChange } from './theme';
 import { KidsPlayManager } from './features/kidsMode';
 import { KidsUiController } from './ui/kidsUi';
@@ -683,28 +683,192 @@ function setupCowboyLobbyHub(manager: CowboyManager, hudRef: HudManager) {
   });
 
   let selectedCowboyMode: 'solo' | 'friends' = 'solo';
+  let selectedSubMode: 'versus' | 'campaign' = 'versus';
+  let selectedDurationSec = 180;
+  let createdRoomCode = String(Math.floor(1000 + Math.random() * 9000));
+  let joinedRoomCode = '';
+
+  const cbSoloRulesWrap = document.getElementById('cbSoloRulesWrap');
+  const cbFriendPanel = document.getElementById('cbFriendPanel');
+  const cbCreatedRoomCodeEl = document.getElementById('cbCreatedRoomCode');
+  const cbBtnNewRoom = document.getElementById('cbBtnNewRoom');
+  const cbBtnCopyCode = document.getElementById('cbBtnCopyCode');
+  const cbBtnCopyLink = document.getElementById('cbBtnCopyLink');
+  const cbTimePickerWrap = document.getElementById('cbTimePickerWrap');
+  const cbBtnMatchTime = document.getElementById('cbBtnMatchTime');
+  const cbMatchTimeLabel = document.getElementById('cbMatchTimeLabel');
+  const cbMatchTimeMenu = document.getElementById('cbMatchTimeMenu');
+  const cbCustomTimeInput = document.getElementById('cbCustomTimeInput') as HTMLInputElement | null;
+  const cbBtnApplyCustomTime = document.getElementById('cbBtnApplyCustomTime');
+  const cbJoinRoomCodeInput = document.getElementById('cbJoinRoomCode') as HTMLInputElement | null;
+  const cbBtnApplyCode = document.getElementById('cbBtnApplyCode');
+  const cbRoomStatusNotice = document.getElementById('cbRoomStatusNotice');
+  const startCowboyBtn = document.getElementById('btnStartCowboyGame');
+
+  function formatDurationBadge(sec: number): string {
+    if (sec === 90) return '1p30';
+    if (sec % 60 === 0) return `${Math.round(sec / 60)}p`;
+    return `${Math.floor(sec / 60)}p${sec % 60}s`;
+  }
+
+  function sync2PPanelUi() {
+    if (cbCreatedRoomCodeEl) cbCreatedRoomCodeEl.textContent = createdRoomCode;
+    const isFriends = selectedCowboyMode === 'friends';
+    if (cbSoloRulesWrap) cbSoloRulesWrap.hidden = isFriends;
+    if (cbFriendPanel) cbFriendPanel.hidden = !isFriends;
+    if (cbTimePickerWrap) cbTimePickerWrap.hidden = selectedSubMode === 'campaign';
+    if (cbMatchTimeLabel) cbMatchTimeLabel.textContent = formatDurationBadge(selectedDurationSec);
+
+    if (cbRoomStatusNotice) {
+      if (joinedRoomCode) {
+        cbRoomStatusNotice.textContent = `✅ Đã chọn vào phòng #${joinedRoomCode} (Quyền điều khiển P2 bên phải sẽ thuộc về máy của bạn)`;
+      } else if (selectedSubMode === 'versus') {
+        cbRoomStatusNotice.textContent = `⚔️ Đối kháng (${formatDurationBadge(selectedDurationSec)}): Chưa có máy 2 vào mã ${createdRoomCode} thì điều khiển cả P1 & P2 trên máy này. Khi máy 2 vào mã, P2 tự chuyển sang máy 2!`;
+      } else {
+        cbRoomStatusNotice.textContent = `🤝 Chinh phục màn (Mã ${createdRoomCode}): 2 người hợp sức vượt chỉ tiêu điểm từng màn & mở Cửa hàng Bác Nông Dân!`;
+      }
+    }
+
+    if (startCowboyBtn) {
+      if (isFriends && joinedRoomCode) {
+        startCowboyBtn.textContent = `VÀO PHÒNG #${joinedRoomCode}`;
+      } else {
+        startCowboyBtn.textContent = 'VÀO TRẬN KÉO BÒ';
+      }
+    }
+  }
+
   const cbModeBtns = document.querySelectorAll('.cb-mode-btn');
   cbModeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       cbModeBtns.forEach((b) => b.classList.remove('on'));
       btn.classList.add('on');
       selectedCowboyMode = (btn.getAttribute('data-cb-mode') as 'solo' | 'friends') || 'solo';
+      sync2PPanelUi();
     });
   });
 
-  const startCowboyBtn = document.getElementById('btnStartCowboyGame');
-  startCowboyBtn?.addEventListener('click', () => {
+  const cbSubModeBtns = document.querySelectorAll('.cb-submode-btn');
+  cbSubModeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      cbSubModeBtns.forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+      selectedSubMode = (btn.getAttribute('data-cb-submode') as 'versus' | 'campaign') || 'versus';
+      sync2PPanelUi();
+    });
+  });
+
+  cbBtnNewRoom?.addEventListener('click', () => {
+    createdRoomCode = String(Math.floor(1000 + Math.random() * 9000));
+    joinedRoomCode = '';
+    if (cbJoinRoomCodeInput) cbJoinRoomCodeInput.value = '';
+    sync2PPanelUi();
+    hudRef.showToast(`🎲 Đã tạo mã phòng mới: ${createdRoomCode}`, 1800);
+  });
+
+  cbBtnCopyCode?.addEventListener('click', async () => {
+    const code = joinedRoomCode || createdRoomCode;
+    await copyTextToClipboard(code);
+    hudRef.showToast(`📋 Đã sao chép mã phòng: ${code}`, 1800);
+  });
+
+  cbBtnCopyLink?.addEventListener('click', async () => {
+    const code = joinedRoomCode || createdRoomCode;
+    const url = new URL(window.location.href);
+    url.searchParams.set('cbroom', code);
+    await copyTextToClipboard(url.toString());
+    hudRef.showToast(`🔗 Đã sao chép link mời phòng #${code}`, 2000);
+  });
+
+  cbBtnMatchTime?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (cbMatchTimeMenu) cbMatchTimeMenu.hidden = !cbMatchTimeMenu.hidden;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (cbMatchTimeMenu && !cbMatchTimeMenu.hidden && !cbMatchTimeMenu.contains(e.target as Node) && e.target !== cbBtnMatchTime) {
+      cbMatchTimeMenu.hidden = true;
+    }
+  });
+
+  const cbTimeOptBtns = cbMatchTimeMenu?.querySelectorAll('.time-opt') || [];
+  cbTimeOptBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      cbTimeOptBtns.forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+      selectedDurationSec = parseInt(btn.getAttribute('data-cb-time') || '180', 10) || 180;
+      if (cbMatchTimeMenu) cbMatchTimeMenu.hidden = true;
+      sync2PPanelUi();
+    });
+  });
+
+  cbBtnApplyCustomTime?.addEventListener('click', () => {
+    const mins = Math.max(1, Math.min(15, parseInt(cbCustomTimeInput?.value || '3', 10) || 3));
+    selectedDurationSec = mins * 60;
+    cbTimeOptBtns.forEach((b) => b.classList.remove('on'));
+    if (cbMatchTimeMenu) cbMatchTimeMenu.hidden = true;
+    sync2PPanelUi();
+  });
+
+  cbJoinRoomCodeInput?.addEventListener('input', () => {
+    const clean = cbJoinRoomCodeInput.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    cbJoinRoomCodeInput.value = clean;
+    joinedRoomCode = clean;
+    sync2PPanelUi();
+  });
+
+  function launchCowboySession(forceJoinGuest = false) {
     unlockAudio();
     if (cowboyKids.isEnabled() && cowboyKids.checkTimeExpired()) {
       alert('⏰ Đã hết giờ chơi hôm nay của bé! Hãy nhờ ba mẹ nhập mã PIN để mở khóa.');
       return;
     }
-    const opened = manager.open(selectedTheme, selectedCowboyMode);
+    const cleanInputCode = cbJoinRoomCodeInput?.value.trim().toUpperCase() || '';
+    const isJoiningGuest = forceJoinGuest || Boolean(cleanInputCode);
+    const activeCode = cleanInputCode || createdRoomCode;
+    const opened = manager.open(selectedTheme, selectedCowboyMode, {
+      subMode: selectedSubMode,
+      durationSec: selectedDurationSec,
+      roomCode: activeCode,
+      isJoiningGuest,
+    });
     if (opened) {
       if (startEl) startEl.hidden = true;
       hudRef.stopPreview();
     }
+  }
+
+  cbBtnApplyCode?.addEventListener('click', () => {
+    const clean = cbJoinRoomCodeInput?.value.trim().toUpperCase() || '';
+    if (!clean) {
+      hudRef.showToast('⚠️ Vui lòng nhập mã phòng bạn bè!', 2000);
+      cbJoinRoomCodeInput?.focus();
+      return;
+    }
+    joinedRoomCode = clean;
+    sync2PPanelUi();
+    launchCowboySession(true);
   });
+
+  startCowboyBtn?.addEventListener('click', () => {
+    launchCowboySession(false);
+  });
+
+  sync2PPanelUi();
+
+  // Auto-open Cowboy 2P tab if ?cbroom=XXXX is in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const cbRoomParam = (urlParams.get('cbroom') || '').trim().toUpperCase();
+  if (cbRoomParam) {
+    selectedCowboyMode = 'friends';
+    joinedRoomCode = cbRoomParam;
+    if (cbJoinRoomCodeInput) cbJoinRoomCodeInput.value = cbRoomParam;
+    cbModeBtns.forEach((b) => {
+      b.classList.toggle('on', b.getAttribute('data-cb-mode') === 'friends');
+    });
+    sync2PPanelUi();
+    setTimeout(() => switchLobbyTab('cowboy'), 60);
+  }
 
 
   const kidsBtn = document.getElementById('btnLobbyKids');
@@ -1206,7 +1370,7 @@ window.addEventListener('touchstart', (e) => {
   if (e.touches.length > 0) {
     touchStartClientY = e.touches[0].clientY;
     const target = e.target as HTMLElement | null;
-    const isInteractive = target?.closest('button, input, select, textarea, a, .drawer-modal, .card, #gameControls, #netPerf, #pwaModal, .center-modal-card');
+    const isInteractive = target?.closest('button, input, select, textarea, a, .drawer-modal, .card, #gameControls, #netPerf, #pwaModal, .center-modal-card, #cowboyShopRoot, #cowboyArcadeRoot, .cb-shop-confirm-card');
     // If on touch device, cancel default touch in top edge zone (<75px) to prevent system swipe-down gesture
     if (!isInteractive && e.cancelable && isTouchDevice) {
       if (e.touches[0].clientY < 75) {
@@ -1231,7 +1395,7 @@ window.addEventListener('touchmove', (e) => {
   const dy = currentY - touchStartClientY;
 
   const target = e.target as HTMLElement | null;
-  const isScrollable = target?.closest('.drawer-cols, .sp-palette, .screen, .center-modal-card, .pwa-card');
+  const isScrollable = target?.closest('.drawer-cols, .sp-palette, .screen, .center-modal-card, .pwa-card, .cb-shop-confirm-card, .cb-backpack-grid');
 
   if (isScrollable) {
     const el = isScrollable as HTMLElement;

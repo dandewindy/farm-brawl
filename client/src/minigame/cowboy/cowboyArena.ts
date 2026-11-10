@@ -107,10 +107,13 @@ export class CowboyArena {
 
   private spawnTimer = 0;
 
-  // Cơ chế nhấn giữ gồng canh cự ly xa gần
+  // Cơ chế nhấn giữ gồng canh cự ly xa gần (độc lập cho P1 và P2)
   private isAimCharging = false;
   private aimChargeStartTime = 0;
   private currentAimZ = 1.0;
+  private isAimChargingP2 = false;
+  private aimChargeStartTimeP2 = 0;
+  private currentAimZP2 = 1.0;
   private selectedRopeCount = 1;
   private isNetSweeping = false;
   private currentTheme: CowboyThemeId = 'farm';
@@ -126,6 +129,7 @@ export class CowboyArena {
 
   private isTwoPlayerMode = false;
   private selectedRopeCountP2 = 1;
+  private prng: (() => number) | null = null;
 
   private isRunning = false;
   private animFrameId = 0;
@@ -1311,6 +1315,50 @@ export class CowboyArena {
     return this.animals;
   }
 
+
+  public setRandomSeed(seed: number | null): void {
+    if (seed === null || seed === undefined || seed <= 0) {
+      this.prng = null;
+      return;
+    }
+    let a = seed >>> 0;
+    this.prng = () => {
+      let t = (a += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    this.nextAnimalId = 1;
+    this.spawnTimer = 0;
+  }
+
+  private rand(): number {
+    return this.prng ? this.prng() : Math.random();
+  }
+
+  public clearAnimals(): void {
+    for (let i = this.animals.length - 1; i >= 0; i--) {
+      this.retireAnimal(this.animals[i].id);
+    }
+    this.animals = [];
+  }
+
+  public remoteCatchAnimal(animalId: number, score: number): void {
+    const animal = this.animals.find((a) => a.id === animalId);
+    if (!animal) return;
+    for (const r of this.ropes) {
+      if (r.caughtAnimalId === animalId) {
+        r.caughtAnimalId = null;
+        if (r.state === 'tug' || r.state === 'pulling') {
+          r.state = 'miss';
+        }
+      }
+    }
+    this.spawnCoinBurst(animal.x, 1.2, animal.z, animal.isRainbow);
+    this.spawn3DScorePopup(animal.x, 1.6, animal.z, score || animal.score, animal.isRainbow || animal.isSparkleX2);
+    this.retireAnimal(animalId);
+  }
+
   public setTwoPlayerMode(enabled: boolean): void {
     this.isTwoPlayerMode = enabled;
     this.syncReadyRopes();
@@ -1336,20 +1384,22 @@ export class CowboyArena {
   public syncReadyRopes(targetPlayerIndex?: 0 | 1): void {
     const countP1 = this.selectedRopeCount;
     const countP2 = this.selectedRopeCountP2;
-    const originP1X = this.isTwoPlayerMode ? -2.8 : 0;
-    const originP2X = 2.8;
 
     // P1 Ropes (0..4)
     if (targetPlayerIndex === undefined || targetPlayerIndex === 0) {
       for (let i = 0; i < 5; i++) {
         const rope = this.ropes[i];
-        rope.startX = originP1X + (i - (countP1 - 1) / 2) * 0.32;
+        const pose = this.getReadyRopePose(0, i, countP1);
+        rope.startX = pose.startX;
+        rope.startY = pose.startY;
+        rope.startZ = pose.startZ;
         if (i < countP1) {
           rope.state = 'ready';
           rope.progress = 0;
           rope.caughtAnimalId = null;
           rope.ribbonMesh.visible = true;
           rope.loopMesh.visible = true;
+          this.updateReadyRopeGeometry(rope, performance.now() * 0.001);
         } else {
           rope.state = 'idle';
           rope.progress = 0;
@@ -1365,13 +1415,17 @@ export class CowboyArena {
       for (let i = 5; i < 10; i++) {
         const rope = this.ropes[i];
         const p2Idx = i - 5;
-        rope.startX = originP2X + (p2Idx - (countP2 - 1) / 2) * 0.32;
+        const pose = this.getReadyRopePose(1, p2Idx, countP2);
+        rope.startX = pose.startX;
+        rope.startY = pose.startY;
+        rope.startZ = pose.startZ;
         if (this.isTwoPlayerMode && p2Idx < countP2) {
           rope.state = 'ready';
           rope.progress = 0;
           rope.caughtAnimalId = null;
           rope.ribbonMesh.visible = true;
           rope.loopMesh.visible = true;
+          this.updateReadyRopeGeometry(rope, performance.now() * 0.001);
         } else {
           rope.state = 'idle';
           rope.progress = 0;
@@ -1383,28 +1437,88 @@ export class CowboyArena {
     }
   }
 
+  /** Tính toán đồng nhất tọa độ điểm neo tay cầm và vòng thòng lọng chờ cho cả hiển thị lẫn lúc phóng */
+  private getReadyRopePose(playerIndex: number, localIdx: number, count: number): {
+    startX: number;
+    startY: number;
+    startZ: number;
+    loopX: number;
+    loopY: number;
+    loopZ: number;
+    slotCenterX: number;
+    spreadScale: number;
+  } {
+    const slotCenterX = this.isTwoPlayerMode ? (playerIndex === 0 ? -2.2 : 2.2) : 0;
+    const spreadScale = this.isTwoPlayerMode ? 0.55 : 1.0;
+
+    const startX = slotCenterX + (localIdx - (count - 1) / 2) * (0.38 * spreadScale);
+    const startY = 0.62;
+    const startZ = 4.8;
+
+    const readyTargets: [number, number, number][][] = [
+      [[0, 1.65, 2.7]],
+      [[-1.25, 1.62, 2.7], [1.25, 1.62, 2.7]],
+      [[-1.90, 1.58, 2.65], [0, 1.68, 2.7], [1.90, 1.58, 2.65]],
+      [[-2.20, 1.54, 2.6], [-0.75, 1.64, 2.65], [0.75, 1.64, 2.65], [2.20, 1.54, 2.6]],
+      [[-2.30, 1.50, 2.55], [-1.15, 1.60, 2.6], [0, 1.70, 2.7], [1.15, 1.60, 2.6], [2.30, 1.50, 2.55]],
+    ];
+
+    const targets = readyTargets[count - 1] || readyTargets[0];
+    const target = targets[localIdx] || [0, 1.62, 2.7];
+
+    const loopX = slotCenterX + target[0] * spreadScale;
+    let loopY = target[1];
+    let loopZ = target[2];
+
+    const isCharging = playerIndex === 0 ? this.isAimCharging : this.isAimChargingP2;
+    const chargeStart = playerIndex === 0 ? this.aimChargeStartTime : this.aimChargeStartTimeP2;
+    if (isCharging) {
+      const elapsed = (performance.now() - chargeStart) * 0.001;
+      const reachCycle = 0.5 - 0.5 * Math.cos(elapsed * 4.0);
+      const aimZ = 2.2 + (-2.5 - 2.2) * reachCycle;
+      if (playerIndex === 0) this.currentAimZ = aimZ;
+      else this.currentAimZP2 = aimZ;
+      const bobY = Math.sin(elapsed * 6.5) * 0.35;
+      loopY = 1.62 + bobY;
+      loopZ = aimZ;
+    }
+
+    return { startX, startY, startZ, loopX, loopY, loopZ, slotCenterX, spreadScale };
+  }
+
   /** Bắt đầu gồng dây canh cự ly xa gần khi nhấn giữ nút Quăng dây / phím Space */
-  public startAimCharge(): void {
-    if (!this.canLaunch()) return;
-    this.isAimCharging = true;
-    this.aimChargeStartTime = performance.now();
-    this.currentAimZ = 1.0;
+  public startAimCharge(playerIndex = 0): void {
+    if (!this.canLaunch(playerIndex)) return;
+    if (playerIndex === 0) {
+      this.isAimCharging = true;
+      this.aimChargeStartTime = performance.now();
+      this.currentAimZ = 1.0;
+    } else {
+      this.isAimChargingP2 = true;
+      this.aimChargeStartTimeP2 = performance.now();
+      this.currentAimZP2 = 1.0;
+    }
   }
 
   /** Dừng trạng thái gồng dây */
-  public stopAimCharge(): void {
-    this.isAimCharging = false;
+  public stopAimCharge(playerIndex = 0): void {
+    if (playerIndex === 0) {
+      this.isAimCharging = false;
+    } else {
+      this.isAimChargingP2 = false;
+    }
   }
 
   /** Lấy cự ly Z đang được canh hiện tại */
-  public getCurrentAimZ(): number {
-    return this.currentAimZ;
+  public getCurrentAimZ(playerIndex = 0): number {
+    return playerIndex === 0 ? this.currentAimZ : this.currentAimZP2;
   }
 
   /** Phóng thòng lọng tới cự ly Z đã canh sẵn khi thả nút */
   public launchVolleyWithAim(ropeCount: number, targetZ: number, playerIndex = 0): boolean {
     if (!this.canLaunch(playerIndex)) return false;
     if (playerIndex === 0) this.isAimCharging = false;
+    else this.isAimChargingP2 = false;
 
     cowboyAudio.playLassoThrow();
 
@@ -1425,20 +1539,23 @@ export class CowboyArena {
     const clampedZ = Math.max(-2.5, Math.min(2.2, targetZ));
 
     const offsetStart = playerIndex === 0 ? 0 : 5;
-    const baseOriginX = playerIndex === 0 ? (this.isTwoPlayerMode ? -2.8 : 0) : 2.8;
-    const centerTargetX = playerIndex === 0 ? (this.isTwoPlayerMode ? -1.8 : 0) : 1.8;
 
     for (let i = 0; i < count; i++) {
       const rope = this.ropes[offsetStart + i];
+      const pose = this.getReadyRopePose(playerIndex, i, count);
       rope.state = 'flying';
       rope.progress = 0;
       rope.caughtAnimalId = null;
 
-      rope.startX = baseOriginX + (i - (count - 1) / 2) * 0.42;
-      rope.startY = 0.38;
-      rope.startZ = 5.2;
+      // Neo tay cầm và điểm xuất phát vòng dây khớp 100% với vị trí hiển thị ở trạng thái chờ
+      rope.startX = pose.startX;
+      rope.startY = pose.startY;
+      rope.startZ = pose.startZ;
+      rope.launchLoopX = pose.loopX;
+      rope.launchLoopY = pose.loopY;
+      rope.launchLoopZ = pose.loopZ;
 
-      rope.targetX = centerTargetX + targets[i] * (this.isTwoPlayerMode ? 0.7 : 1.0);
+      rope.targetX = pose.slotCenterX + targets[i] * pose.spreadScale;
       rope.targetY = 1.1;
       rope.targetZ = clampedZ;
 
@@ -1525,7 +1642,7 @@ export class CowboyArena {
     if (this.animals.length >= 8) return;
 
     const totalWeight = COWBOY_SPECIES_LIST.reduce((acc, c) => acc + c.spawnWeight, 0);
-    let r = Math.random() * totalWeight;
+    let r = this.rand() * totalWeight;
     let chosen = COWBOY_SPECIES_LIST[0];
     for (const c of COWBOY_SPECIES_LIST) {
       if (r <= c.spawnWeight) {
@@ -1539,20 +1656,20 @@ export class CowboyArena {
     const hasClover = cowboyInventory.isEquipped('lucky_clover');
     // Thú cầu vồng hiếm hơn hẳn, tiền x3
     const rainbowChance = hasClover ? 0.035 : 0.015;
-    const isRainbow = Math.random() < rainbowChance;
+    const isRainbow = this.rand() < rainbowChance;
 
     const sparkleChance = hasClover ? 0.28 : 0.15;
-    const isSparkleX2 = !isRainbow && Math.random() < sparkleChance;
+    const isSparkleX2 = !isRainbow && this.rand() < sparkleChance;
 
-    const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-    const lane = Math.floor(Math.random() * 3);
+    const dir: 1 | -1 = this.rand() < 0.5 ? 1 : -1;
+    const lane = Math.floor(this.rand() * 3);
     const zCoords = [1.0, -0.6, -2.4];
     const laneZ = zCoords[lane];
 
     const startX = dir === 1 ? -19 : 19;
-    const speed = chosen.speed * (0.85 + Math.random() * 0.3);
+    const speed = chosen.speed * (0.85 + this.rand() * 0.3);
 
-    const animalMesh = buildFullAnimal(chosen.species, isRainbow ? 2 : Math.floor(Math.random() * 3));
+    const animalMesh = buildFullAnimal(chosen.species, isRainbow ? 2 : Math.floor(this.rand() * 3));
     animalMesh.flowerHat.visible = false;
     animalMesh.witchHat.visible = false;
     animalMesh.cartGroup.visible = false;
@@ -1624,56 +1741,31 @@ export class CowboyArena {
   private updateReadyRopeGeometry(rope: LassoRope, time: number): void {
     if (!rope.ribbonMesh.visible) return;
 
-    const count = this.selectedRopeCount;
-    const i = rope.id;
+    const pIdx = rope.playerIndex ?? (rope.id < 5 ? 0 : 1);
+    const localIdx = pIdx === 0 ? rope.id : rope.id - 5;
+    const count = pIdx === 0 ? this.selectedRopeCount : this.selectedRopeCountP2;
 
-    const startX = (i - (count - 1) / 2) * 0.38;
-    const startY = 0.62;
-    const startZ = 4.8;
-
-    // Vị trí các vòng thòng lọng chờ sẵn, thu gọn vừa vặn bên trong khung hình (hiển thị trọn vẹn cả 5 dây)
-    // Căn chỉnh 5 vòng thòng lọng hoàn toàn nằm gọn trong khung nhìn màn hình (kể cả iPad 4:3 và màn hình hẹp)
-    const readyTargets: [number, number, number][][] = [
-      [[0, 1.65, 2.7]],
-      [[-1.25, 1.62, 2.7], [1.25, 1.62, 2.7]],
-      [[-1.90, 1.58, 2.65], [0, 1.68, 2.7], [1.90, 1.58, 2.65]],
-      [[-2.20, 1.54, 2.6], [-0.75, 1.64, 2.65], [0.75, 1.64, 2.65], [2.20, 1.54, 2.6]],
-      [[-2.30, 1.50, 2.55], [-1.15, 1.60, 2.6], [0, 1.70, 2.7], [1.15, 1.60, 2.6], [2.30, 1.50, 2.55]],
-    ];
-
-    const targets = readyTargets[count - 1] || readyTargets[0];
-    const target = targets[i] || [0, 1.62, 2.7];
-
-    const targetX = target[0];
-    let targetY = target[1];
-    let targetZ = target[2];
-
-    // Khi đang nhấn giữ gồng nút Quăng dây:
-    // Đưa dây ra xa hoặc về gần liên tục (Z oscillation) và đưa lên xuống (Y bobbing) để canh cự ly
-    if (this.isAimCharging) {
-      const elapsed = (performance.now() - this.aimChargeStartTime) * 0.001;
-      // Chu kỳ dao động mượt mà 0..1 từ gần (2.2) đến xa (-2.5)
-      const reachCycle = 0.5 - 0.5 * Math.cos(elapsed * 4.0);
-      const aimZ = 2.2 + (-2.5 - 2.2) * reachCycle;
-      this.currentAimZ = aimZ;
-      const bobY = Math.sin(elapsed * 6.5) * 0.35;
-      targetY = 1.62 + bobY;
-      targetZ = aimZ;
-    }
+    const pose = this.getReadyRopePose(pIdx, localIdx, count);
+    const startX = pose.startX;
+    const startY = pose.startY;
+    const startZ = pose.startZ;
+    const targetX = pose.loopX;
+    const targetY = pose.loopY;
+    const targetZ = pose.loopZ;
 
     // Toàn bộ sợi dây thòng lọng dao động nhẹ nhàng, tự nhiên trong không gian 3D
-    const oscY = Math.sin(time * 3.2 + i * 0.9) * 0.055;
-    const oscX = Math.cos(time * 2.4 + i * 0.7) * 0.035;
-    const oscZ = Math.sin(time * 2.8 + i * 0.8) * 0.025;
+    const oscY = Math.sin(time * 3.2 + localIdx * 0.9 + pIdx * 1.7) * 0.055;
+    const oscX = Math.cos(time * 2.4 + localIdx * 0.7 + pIdx * 1.3) * 0.035;
+    const oscZ = Math.sin(time * 2.8 + localIdx * 0.8 + pIdx * 1.1) * 0.025;
     rope.loopMesh.position.set(targetX + oscX, targetY + oscY, targetZ + oscZ);
 
-    const oscPitch = Math.sin(time * 2.5 + i) * 0.045;
-    const oscRoll = Math.cos(time * 2.1 + i) * 0.04;
+    const oscPitch = Math.sin(time * 2.5 + localIdx) * 0.045;
+    const oscRoll = Math.cos(time * 2.1 + localIdx) * 0.04;
     rope.loopMesh.rotation.set(0.68 + oscPitch, 0, oscRoll);
     rope.loopMesh.scale.set(1.0, 1.0, 1.0);
 
     // Nút thắt (honda) xoay tròn liên tục quanh vành elip của thòng lọng
-    const spinAngle = time * 10.5 + i * 1.6;
+    const spinAngle = time * 10.5 + localIdx * 1.6 + pIdx * 2.1;
     const localKnotX = 1.25 * 0.95 * Math.cos(spinAngle);
     const localKnotZ = 0.76 * 0.95 * Math.sin(spinAngle);
 
@@ -1701,8 +1793,8 @@ export class CowboyArena {
       // Đảm bảo đuôi dây luôn tracking dính chặt 100% vào vòng dây không bị tách rời
       const env = Math.sin(t * Math.PI);
       const sag = env * -0.12;
-      const waveX = Math.sin(time * 4.8 + t * 4.0 + i) * 0.032 * env;
-      const waveY = Math.cos(time * 3.8 + t * 3.5 + i) * 0.025 * env;
+      const waveX = Math.sin(time * 4.8 + t * 4.0 + localIdx) * 0.032 * env;
+      const waveY = Math.cos(time * 3.8 + t * 3.5 + localIdx) * 0.025 * env;
 
       const curX = it * startX + t * endX + waveX;
       const curY = it * startY + t * endY + sag + waveY;
@@ -1841,8 +1933,10 @@ export class CowboyArena {
   }
 
   private checkRopeCollision(rope: LassoRope): void {
-    const tipX = rope.startX + (rope.targetX - rope.startX) * rope.progress;
-    const tipZ = rope.startZ + (rope.targetZ - rope.startZ) * rope.progress;
+    const originLoopX = rope.launchLoopX ?? rope.startX;
+    const originLoopZ = rope.launchLoopZ ?? rope.startZ;
+    const tipX = originLoopX + (rope.targetX - originLoopX) * rope.progress;
+    const tipZ = originLoopZ + (rope.targetZ - originLoopZ) * rope.progress;
 
     for (const a of this.animals) {
       if (a.state !== 'running') continue;
@@ -1865,10 +1959,13 @@ export class CowboyArena {
 
     this.scratchP0.set(rope.startX, rope.startY, rope.startZ);
 
-    // 1. Tính toán vị trí tâm vòng thòng lọng theo quỹ đạo bay hoặc con thú bị bắt
-    let loopCenterX = rope.startX + (rope.targetX - rope.startX) * rope.progress;
-    let loopCenterY = rope.startY + (rope.targetY - rope.startY) * rope.progress + Math.sin(rope.progress * Math.PI) * 1.5;
-    let loopCenterZ = rope.startZ + (rope.targetZ - rope.startZ) * rope.progress;
+    // 1. Tính toán vị trí tâm vòng thòng lọng xuất phát khớp 100% từ vị trí dây chờ (launchLoopX/Y/Z) đến mục tiêu
+    const originLoopX = rope.launchLoopX ?? rope.startX;
+    const originLoopY = rope.launchLoopY ?? rope.startY;
+    const originLoopZ = rope.launchLoopZ ?? rope.startZ;
+    let loopCenterX = originLoopX + (rope.targetX - originLoopX) * rope.progress;
+    let loopCenterY = originLoopY + (rope.targetY - originLoopY) * rope.progress + Math.sin(rope.progress * Math.PI) * 1.15;
+    let loopCenterZ = originLoopZ + (rope.targetZ - originLoopZ) * rope.progress;
 
     if (rope.caughtAnimalId !== null) {
       const a = this.animals.find((an) => an.id === rope.caughtAnimalId);
@@ -2187,7 +2284,7 @@ export class CowboyArena {
     this.spawnTimer += dt;
     if (this.spawnTimer >= 0.70) {
       this.spawnTimer = 0;
-      if (Math.random() < 0.75) {
+      if (this.rand() < 0.75) {
         this.spawnAnimal();
       }
     }

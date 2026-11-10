@@ -206,6 +206,30 @@ export interface Snapshot {
   doColo?: string;
 }
 
+export type CowboySubMode = 'versus' | 'campaign';
+
+export interface CowboyRoomStateMsg {
+  t: 'cb_room_state';
+  roomCode: string;
+  seed: number;
+  subMode: CowboySubMode;
+  durationSec: number;
+  stage: number;
+  roundRemainingSec: number;
+  p1Name: string;
+  p2Name: string;
+  guestConnected: boolean;
+  controlEpoch: number;
+  p1Score: number;
+  p2Score: number;
+  p1Catches: number;
+  p2Catches: number;
+  p1Bet: number;
+  p2Bet: number;
+  yourSlot: 0 | 1;
+  theme?: string;
+}
+
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[]; matchDuration?: number }
   | { t: 'joined'; id: number; token?: string; colo?: string; doColo?: string }
@@ -214,6 +238,14 @@ export type ServerMsg =
   | { t: 'relocate_shard'; nextShard: number; badDoColo?: string; edgeColo?: string }
   | { t: 'team_counts'; c0: number; c1: number }
   | { t: 'match_duration'; duration: number }
+  | CowboyRoomStateMsg
+  | { t: 'cb_bet_sync'; slot: 0 | 1; count: number }
+  | { t: 'cb_aim_sync'; slot: 0 | 1; charging: boolean; aimZ: number }
+  | { t: 'cb_throw_sync'; slot: 0 | 1; count: number; aimZ: number }
+  | { t: 'cb_catch_sync'; slot: 0 | 1; animalId: number; score: number; species?: string; p1Score: number; p2Score: number; p1Catches: number; p2Catches: number }
+  | { t: 'cb_stage_next_sync'; stage: number; seed: number; roundRemainingSec: number }
+  | { t: 'cb_rematch_sync'; seed: number; subMode: CowboySubMode; durationSec: number; stage: number }
+  | { t: 'cb_room_full' }
   | Snapshot;
 
 export type AdminAction =
@@ -236,4 +268,12 @@ export type ClientMsg =
   | { t: 'team_select'; team: number }
   | { t: 'set_match_duration'; duration: number }
   | { t: 'admin'; cmd: AdminAction }
+  | { t: 'cb_join'; roomCode: string; name: string; preferredSlot?: 0 | 1; subMode?: CowboySubMode; durationSec?: number; theme?: string; roundRemainingSec?: number; p1Score?: number; p2Score?: number; p1Catches?: number; p2Catches?: number; stage?: number; seed?: number }
+  | { t: 'cb_bet'; slot: 0 | 1; count: number }
+  | { t: 'cb_aim'; slot: 0 | 1; charging: boolean; aimZ: number }
+  | { t: 'cb_throw'; slot: 0 | 1; count: number; aimZ: number }
+  | { t: 'cb_catch'; slot: 0 | 1; animalId: number; score: number; species?: string }
+  | { t: 'cb_stage_next'; stage: number; seed?: number }
+  | { t: 'cb_rematch'; subMode?: CowboySubMode; durationSec?: number; seed?: number }
+  | { t: 'cb_sync_timer'; remainingSec: number }
   | ({ t: 'input' } & Input);

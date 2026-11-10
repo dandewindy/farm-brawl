@@ -755,7 +755,7 @@
             </button>
             <button type="button" class="cb-mode-btn" data-cb-mode="friends">
               <span class="n">2 NGƯỜI CHƠI</span>
-              <span class="p">Chung 1 màn hình</span>
+              <span class="p">Cùng máy / Online</span>
             </button>
           </div>
 
@@ -796,25 +796,89 @@
           </div>
         </div>
 
-        <!-- Right Column: Rules & Play Button (Matching VÀO NÔNG TRẠI style) -->
+        <!-- Right Column: Rules / 2P Room Panel & Play Button (Matching VÀO NÔNG TRẠI style) -->
         <div class="cb-lobby-col-right">
-          <p class="sec-label" data-i18n="cb_rules_title">CƠ CHẾ VÒNG CHƠI</p>
-          <div class="cb-rules-card">
-            <div class="cb-rule-row">
-              <span class="r-ico">⏱️</span>
-              <div class="r-txt" data-i18n="cb_rule_3min"><b>3 Phút Mỗi Vòng:</b> Quăng dây trúng thú giật điểm thưởng! Hết giờ mở Cửa hàng.</div>
+          <div id="cbSoloRulesWrap" class="cb-solo-rules-wrap">
+            <p class="sec-label" data-i18n="cb_rules_title">CƠ CHẾ VÒNG CHƠI</p>
+            <div class="cb-rules-card">
+              <div class="cb-rule-row">
+                <span class="r-ico">⏱️</span>
+                <div class="r-txt" data-i18n="cb_rule_3min"><b>3 Phút Mỗi Vòng:</b> Quăng dây trúng thú giật điểm thưởng! Đạt mục tiêu màn để mở Cửa hàng.</div>
+              </div>
+              <div class="cb-rule-row">
+                <span class="r-ico">⚡</span>
+                <div class="r-txt" data-i18n="cb_rule_auto10s"><b>Nhấn Giữ Canh Lực:</b> Nhấn giữ nút Quăng dây (hoặc Space) để canh cự ly xa gần, thả ra để phóng!</div>
+              </div>
+              <div class="cb-rule-row">
+                <span class="r-ico">✨</span>
+                <div class="r-txt" data-i18n="cb_rule_mythic"><b>Thú Hiếm &amp; Thần Thoại:</b> Cơ hội gặp thú Lấp Lánh x2 điểm và Thú Cầu Vồng x3 điểm siêu hiếm!</div>
+              </div>
+              <div class="cb-rule-row">
+                <span class="r-ico">🎒</span>
+                <div class="r-txt" data-i18n="cb_rule_items"><b>Vật Phẩm Trợ Thủ:</b> Giày tăng tốc, Khiên chống hụt, Thuốc tăng lực XXX, Lưới cầu vồng quét sạch màn hình.</div>
+              </div>
             </div>
-            <div class="cb-rule-row">
-              <span class="r-ico">⚡</span>
-              <div class="r-txt" data-i18n="cb_rule_auto10s"><b>Tự Động Quăng Sau 10s:</b> Nếu bạn giữ dây không bấm trong 10 giây, dây sẽ tự động phóng!</div>
+          </div>
+
+          <!-- 2-Player Sub-Mode & Room Code Panel -->
+          <div id="cbFriendPanel" class="friend-panel cb-friend-panel" hidden>
+            <p class="sec-label cb-fp-sec-label">THỂ THỨC 2 NGƯỜI &amp; MÃ PHÒNG</p>
+            <div id="cbSubModes" class="cb-submodes-row">
+              <button type="button" class="cb-submode-btn on" data-cb-submode="versus">
+                <span class="n">⚔️ ĐỐI KHÁNG</span>
+                <span class="p">Đua điểm • Phân thắng bại</span>
+              </button>
+              <button type="button" class="cb-submode-btn" data-cb-submode="campaign">
+                <span class="n">🤝 CHINH PHỤC MÀN</span>
+                <span class="p">Hợp sức vượt từng màn</span>
+              </button>
             </div>
-            <div class="cb-rule-row">
-              <span class="r-ico">✨</span>
-              <div class="r-txt" data-i18n="cb_rule_mythic"><b>Thú Hiếm &amp; Thần Thoại:</b> Cơ hội gặp thú Lấp Lánh x2 điểm và Thú Cầu Vồng x3 điểm siêu hiếm!</div>
+
+            <div class="fp-section cb-fp-room-section">
+              <div class="room-box cb-room-box">
+                <div class="room-badge room-badge-simple cb-room-badge">
+                  <span class="cb-room-prefix">MÃ:</span>
+                  <span id="cbCreatedRoomCode">----</span>
+                  <button type="button" id="cbBtnNewRoom" class="btn-copy-ico" title="Tạo mã phòng mới">🎲</button>
+                  <button type="button" id="cbBtnCopyCode" class="btn-copy-ico" title="Sao chép mã phòng">📋</button>
+                  <button type="button" id="cbBtnCopyLink" class="btn-copy-ico" title="Sao chép link mời bạn bè">🔗</button>
+                  <div id="cbTimePickerWrap" class="time-picker-wrap">
+                    <button type="button" id="cbBtnMatchTime" class="btn-copy-ico btn-time-ico" title="Thời gian thi đấu đối kháng">
+                      <span class="ico">⏱️</span><span id="cbMatchTimeLabel" class="time-val">3p</span>
+                    </button>
+                    <div id="cbMatchTimeMenu" class="time-picker-menu" hidden>
+                      <div class="time-picker-header">THỜI GIAN ĐỐI KHÁNG</div>
+                      <button type="button" class="time-opt" data-cb-time="90">
+                        <span class="t-badge">1p30</span>
+                        <span class="t-text">1 phút 30 giây</span>
+                      </button>
+                      <button type="button" class="time-opt on" data-cb-time="180">
+                        <span class="t-badge">3p</span>
+                        <span class="t-text">3 phút (Chuẩn)</span>
+                      </button>
+                      <button type="button" class="time-opt" data-cb-time="300">
+                        <span class="t-badge">5p</span>
+                        <span class="t-text">5 phút</span>
+                      </button>
+                      <div class="time-custom-box">
+                        <div class="time-custom-row">
+                          <input type="number" id="cbCustomTimeInput" class="time-custom-input" min="1" max="15" placeholder="Số phút..." />
+                          <button type="button" id="cbBtnApplyCustomTime" class="time-custom-btn">Đặt</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="cb-rule-row">
-              <span class="r-ico">🎒</span>
-              <div class="r-txt" data-i18n="cb_rule_items"><b>Vật Phẩm Trợ Thủ:</b> Giày tăng tốc, Khiên chống hụt, Thuốc tăng lực XXX, Lưới cầu vồng quét sạch màn hình.</div>
+
+            <div class="fp-divider"><span>HOẶC NHẬP MÃ VÀO PHÒNG (MÁY 2)</span></div>
+            <div class="fp-join-row">
+              <input id="cbJoinRoomCode" class="room-code-input" placeholder="Mã phòng (VD: 8392)" maxlength="8" autocomplete="off" spellcheck="false">
+              <button type="button" id="cbBtnApplyCode" class="btn-wood-sm">Vào mã</button>
+            </div>
+            <div id="cbRoomStatusNotice" class="room-notice cb-room-notice">
+              💡 Mặc định điều khiển cả P1 &amp; P2 trên máy này. Khi máy 2 nhập mã vào, quyền điều khiển P2 tự động chuyển sang máy 2!
             </div>
           </div>
 

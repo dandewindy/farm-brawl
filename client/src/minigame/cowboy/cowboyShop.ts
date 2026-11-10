@@ -262,34 +262,141 @@ export class CowboyShop {
     window.addEventListener('resize', this.onResize);
   }
 
+  private lastTapTime = 0;
+
+  private bindTap(el: HTMLElement | null | undefined, handler: (e: Event) => void): void {
+    if (!el) return;
+    const wrapped = (e: Event) => {
+      const now = performance.now();
+      if (now - this.lastTapTime < 320) return;
+      this.lastTapTime = now;
+      e.stopPropagation();
+      handler(e);
+    };
+    el.addEventListener('touchend', (e) => {
+      if (e.cancelable) e.preventDefault();
+      wrapped(e);
+    }, { passive: false });
+    el.addEventListener('click', wrapped);
+  }
+
   private onResize = (): void => {
     if (!this.rootEl || this.rootEl.hidden) return;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const rect = this.rootEl.getBoundingClientRect();
+    const w = Math.round(rect.width) || window.innerWidth || 1024;
+    const h = Math.round(rect.height) || window.innerHeight || 768;
     const aspect = w / h;
     this.camera.aspect = aspect;
 
     // Responsive 3D camera framing based on aspect ratio
     if (aspect < 1.0) {
-      // Mobile Portrait: widen FOV & camera distance so farmer + stall fit in view
-      this.camera.fov = 64;
-      this.camera.position.set(-0.4, 2.2, 9.2);
-      this.camera.lookAt(-0.2, 1.6, 0);
+      // Mobile Portrait: center on the 3-column stall so all 6 items fit horizontally
+      this.camera.fov = 60;
+      const dist = Math.max(8.6, 4.25 / Math.max(0.38, aspect));
+      this.camera.position.set(0.62, 2.02, dist);
+      this.camera.lookAt(0.62, 1.72, 0);
     } else if (aspect < 1.5) {
       // Tablet / 4:3
-      this.camera.fov = 52;
-      this.camera.position.set(0, 2.1, 7.6);
-      this.camera.lookAt(0, 1.65, 0);
+      this.camera.fov = 50;
+      this.camera.position.set(0.20, 2.05, 7.3);
+      this.camera.lookAt(0.20, 1.68, 0);
+    } else if (h <= 540) {
+      // Mobile Landscape (e.g., 667x375, 844x390, 1024x418): frame stall larger & centered
+      this.camera.fov = 41;
+      this.camera.position.set(0.25, 1.94, 6.25);
+      this.camera.lookAt(0.25, 1.70, 0);
     } else {
-      // Standard 16:9 widescreen
+      // Standard 16:9 desktop widescreen
       this.camera.fov = 46;
       this.camera.position.set(0, 2.05, 6.8);
       this.camera.lookAt(0, 1.65, 0);
     }
 
     this.camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld(true);
     this.renderer.setSize(w, h);
+    this.updateSlotsProjection();
   };
+
+  private updateSlotsProjection(): void {
+    if (!this.camera || !this.slotsContainer || this.itemModels.length === 0) return;
+    const rect = this.rootEl.getBoundingClientRect();
+    const w = Math.round(rect.width) || window.innerWidth || 1024;
+    const h = Math.round(rect.height) || window.innerHeight || 768;
+    const aspect = w / h;
+    this.camera.updateMatrixWorld(true);
+    this.camera.updateProjectionMatrix();
+
+    // Compute horizontal column spacing in screen pixels so adjacent slots never overlap
+    let maxAllowedSlotW = 220;
+    if (this.itemModels.length >= 2) {
+      const p0 = this.itemModels[0].pedestalPos.clone().project(this.camera);
+      const p1 = this.itemModels[1].pedestalPos.clone().project(this.camera);
+      const colDistPx = Math.abs((p1.x - p0.x) * 0.5 * w);
+      if (colDistPx > 40) {
+        maxAllowedSlotW = Math.floor(colDistPx - 6);
+      }
+    }
+
+    // Compute vertical row spacing in screen pixels so top and bottom shelves never overlap
+    let maxAllowedSlotH = 180;
+    if (this.itemModels.length >= 4) {
+      const r0 = this.itemModels[0].pedestalPos.clone().project(this.camera);
+      const r1 = this.itemModels[3].pedestalPos.clone().project(this.camera);
+      const rowDistPx = Math.abs((r0.y - r1.y) * 0.5 * h);
+      if (rowDistPx > 40) {
+        maxAllowedSlotH = Math.floor(rowDistPx - 6);
+      }
+    }
+
+    for (let idx = 0; idx < this.itemModels.length; idx++) {
+      const model = this.itemModels[idx];
+      const slotEl = this.slotsContainer.querySelector(`.slot-${idx}`) as HTMLElement | null;
+      if (!model || !slotEl) continue;
+
+      const ped = model.pedestalPos;
+      const topPt = new THREE.Vector3(ped.x, ped.y + 0.84, ped.z).project(this.camera);
+      const botPt = new THREE.Vector3(ped.x, ped.y - 0.14, ped.z).project(this.camera);
+      const leftPt = new THREE.Vector3(ped.x - 0.62, ped.y + 0.36, ped.z).project(this.camera);
+      const rightPt = new THREE.Vector3(ped.x + 0.62, ped.y + 0.36, ped.z).project(this.camera);
+
+      const topY = (-topPt.y * 0.5 + 0.5) * h;
+      const botY = (-botPt.y * 0.5 + 0.5) * h;
+      const leftX = (leftPt.x * 0.5 + 0.5) * w;
+      const rightX = (rightPt.x * 0.5 + 0.5) * w;
+
+      const rawW = Math.max(60, rightX - leftX);
+      const rawH = Math.max(48, botY - topY);
+      const slotW = Math.min(maxAllowedSlotW, rawW);
+      const slotH = Math.min(maxAllowedSlotH, rawH);
+      const cx = (leftX + rightX) * 0.5;
+      const cy = (topY + botY) * 0.5;
+
+      slotEl.style.position = 'absolute';
+      slotEl.style.left = `${Math.round(cx - slotW / 2)}px`;
+      slotEl.style.top = `${Math.round(cy - slotH / 2)}px`;
+      slotEl.style.width = `${Math.round(slotW)}px`;
+      slotEl.style.height = `${Math.round(slotH)}px`;
+      slotEl.style.minWidth = '0';
+    }
+
+    if (this.speechBubbleEl) {
+      if (aspect < 1.0) {
+        this.speechBubbleEl.style.left = '50%';
+        this.speechBubbleEl.style.top = '56px';
+        this.speechBubbleEl.style.transform = 'translateX(-50%)';
+      } else {
+        const farmerHeadPt = new THREE.Vector3(-2.6, 2.75, 0.4).project(this.camera);
+        const fx = (farmerHeadPt.x * 0.5 + 0.5) * w;
+        const fy = (-farmerHeadPt.y * 0.5 + 0.5) * h;
+        const bubbleLeft = Math.max(10, Math.round(fx - (h <= 540 ? 95 : 115)));
+        const bubbleTop = Math.max(h <= 540 ? 46 : 74, Math.round(fy - (h <= 540 ? 48 : 74)));
+        this.speechBubbleEl.style.left = `${bubbleLeft}px`;
+        this.speechBubbleEl.style.top = `${bubbleTop}px`;
+        this.speechBubbleEl.style.transform = 'none';
+      }
+    }
+  }
 
   private renderSlotsUI(): void {
     this.slotsContainer.innerHTML = '';
@@ -306,7 +413,7 @@ export class CowboyShop {
 
       // Ô trưng bày rộng thoáng, chỉ hiển thị pill tag giá gỗ nhỏ bên dưới và badge sở hữu
       slot.innerHTML = `
-        <span class="slot-owned-badge ${isEquipped ? 'equipped' : (owned > 0 ? 'owned' : '')}">
+        <span class="slot-owned-badge ${isEquipped ? 'equipped' : (owned > 0 ? 'owned' : 'is-empty')}">
           ${isEquipped ? '✅ ' + t('cb_equipped') : (owned > 0 ? `🎒 x${owned}` : '')}
         </span>
         <div class="slot-price-pill">
@@ -344,9 +451,8 @@ export class CowboyShop {
         if (tooltip) tooltip.hidden = true;
       });
 
-      // BẤM VÀO Ô TRÊN GIAN HÀNG ĐỂ MỞ BẢNG CHI TIẾT VÀ CHỌN MUA / TRANG BỊ
-      slot.addEventListener('click', (e) => {
-        e.stopPropagation();
+      // BẤM / CHẠM VÀO Ô TRÊN GIAN HÀNG ĐỂ MỞ BẢNG CHI TIẾT VÀ CHỌN MUA / TRANG BỊ
+      this.bindTap(slot, () => {
         if (tooltip) {
           tooltip.hidden = true;
           tooltip.style.display = 'none';
@@ -357,6 +463,7 @@ export class CowboyShop {
 
       this.slotsContainer.appendChild(slot);
     });
+    this.updateSlotsProjection();
   }
 
   public openConfirmModal(item: CowboyItemDef): void {
@@ -393,16 +500,6 @@ export class CowboyShop {
         cfEquipBtn.style.display = 'block';
         cfEquipBtn.textContent = isEquipped ? 'BỎ TRANG BỊ' : 'TRANG BỊ NGAY';
         cfEquipBtn.className = `cf-btn-equip ${isEquipped ? 'equipped' : ''}`;
-        cfEquipBtn.onclick = () => {
-          if (cowboyInventory.isEquipped(item.kind)) {
-            cowboyInventory.unequipForRound(item.kind);
-          } else {
-            cowboyInventory.equipForRound(item.kind);
-          }
-          cowboyAudio.playLassoTug();
-          this.renderSlotsUI();
-          this.openConfirmModal(item);
-        };
       } else {
         cfEquipBtn.hidden = true;
         cfEquipBtn.style.display = 'none';
@@ -430,11 +527,25 @@ export class CowboyShop {
 
   private bindEvents(): void {
     // Đóng modal confirm
-    this.confirmModalEl.querySelector('#cfCloseXBtn')?.addEventListener('click', () => {
+    this.bindTap(this.confirmModalEl.querySelector('#cfCloseXBtn') as HTMLElement, () => {
       this.closeConfirmModal();
     });
-    this.confirmModalEl.querySelector('#cfCancelBtn')?.addEventListener('click', () => {
+    this.bindTap(this.confirmModalEl.querySelector('#cfCancelBtn') as HTMLElement, () => {
       this.closeConfirmModal();
+    });
+
+    // Trang bị / Bỏ trang bị trong modal
+    this.bindTap(this.confirmModalEl.querySelector('#cfEquipBtn') as HTMLElement, () => {
+      if (!this.pendingBuyItem) return;
+      const item = this.pendingBuyItem;
+      if (cowboyInventory.isEquipped(item.kind)) {
+        cowboyInventory.unequipForRound(item.kind);
+      } else {
+        cowboyInventory.equipForRound(item.kind);
+      }
+      cowboyAudio.playLassoTug();
+      this.renderSlotsUI();
+      this.openConfirmModal(item);
     });
 
     // Bấm backdrop bên ngoài modal để đóng
@@ -453,7 +564,7 @@ export class CowboyShop {
     this.canvas.addEventListener('pointermove', this.onCanvasPointerMove);
 
     // Xác nhận mua
-    this.confirmModalEl.querySelector('#cfConfirmBtn')?.addEventListener('click', () => {
+    this.bindTap(this.confirmModalEl.querySelector('#cfConfirmBtn') as HTMLElement, () => {
       if (!this.pendingBuyItem) return;
       const item = this.pendingBuyItem;
       const res = cowboyInventory.buyItem(item.kind, this.wallet);
@@ -483,13 +594,13 @@ export class CowboyShop {
     });
 
     // Nút "Qua màn mới" -> bắt đầu round mới
-    this.rootEl.querySelector('#cbShopNextRoundBtn')?.addEventListener('click', () => {
+    this.bindTap(this.rootEl.querySelector('#cbShopNextRoundBtn') as HTMLElement, () => {
       this.close();
       this.onResumeGame?.();
     });
 
     // Nút "Thoát" -> trở về lobby
-    this.rootEl.querySelector('#cbShopExitBtn')?.addEventListener('click', () => {
+    this.bindTap(this.rootEl.querySelector('#cbShopExitBtn') as HTMLElement, () => {
       this.close();
       this.onExit?.();
     });
@@ -615,6 +726,8 @@ export class CowboyShop {
     this.creditBalanceEl.textContent = String(this.wallet.getCredits());
     this.renderSlotsUI();
     this.onResize();
+    requestAnimationFrame(() => this.onResize());
+    setTimeout(() => this.onResize(), 120);
 
     const nextBtn = this.rootEl.querySelector('#cbShopNextRoundBtn');
     if (nextBtn) {

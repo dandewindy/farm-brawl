@@ -25,6 +25,30 @@ export class GameRoom extends DurableObject {
   private doColoPromise: Promise<string> | null = null;
   private readonly playerTiming = new Map<number, { lastClientTs: number; receivedAtServerMs: number; ackedInSnapshot: boolean }>();
 
+  // Cowboy 2P Room State (Hybrid Local + Online Handover)
+  private cbHostWs: WebSocket | null = null;
+  private cbGuestWs: WebSocket | null = null;
+  private cbState = {
+    roomCode: '',
+    seed: Math.floor(Math.random() * 899999 + 100000),
+    subMode: 'versus' as 'versus' | 'campaign',
+    durationSec: 180,
+    stage: 1,
+    roundRemainingSec: 180,
+    roundSyncedAtMs: 0,
+    p1Name: 'Người chơi 1',
+    p2Name: 'Người chơi 2',
+    controlEpoch: 1,
+    p1Score: 0,
+    p2Score: 0,
+    p1Catches: 0,
+    p2Catches: 0,
+    p1Bet: 1,
+    p2Bet: 1,
+    theme: 'farm',
+    claimedAnimalIds: new Set<number>(),
+  };
+
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.world = new World();
@@ -269,6 +293,7 @@ export class GameRoom extends DurableObject {
         }
       }
       this.broadcastTeamCounts();
+      this.handleCowboySocketClose(ws);
       this.checkRoomEmpty();
     };
 
@@ -628,6 +653,245 @@ export class GameRoom extends DurableObject {
       if (playerId) {
         this.world.executeAdminCommand(playerId, msg.cmd);
       }
+    } else if (msg.t.startsWith('cb_')) {
+      this.onCowboyMessage(ws, msg);
+    }
+  }
+
+  private getCowboyRemainingSec(): number {
+    if (this.cbState.roundSyncedAtMs <= 0) return this.cbState.roundRemainingSec;
+    const elapsedSec = Math.floor((Date.now() - this.cbState.roundSyncedAtMs) / 1000);
+    return Math.max(0, this.cbState.roundRemainingSec - elapsedSec);
+  }
+
+  private broadcastCowboyRoomState(): void {
+    const hostOpen = Boolean(this.cbHostWs && this.cbHostWs.readyState === 1);
+    const guestOpen = Boolean(this.cbGuestWs && this.cbGuestWs.readyState === 1);
+    const remainingSec = this.getCowboyRemainingSec();
+    const baseState = {
+      t: 'cb_room_state' as const,
+      roomCode: this.cbState.roomCode,
+      seed: this.cbState.seed,
+      subMode: this.cbState.subMode,
+      durationSec: this.cbState.durationSec,
+      stage: this.cbState.stage,
+      roundRemainingSec: remainingSec,
+      p1Name: this.cbState.p1Name,
+      p2Name: this.cbState.p2Name,
+      guestConnected: guestOpen,
+      controlEpoch: this.cbState.controlEpoch,
+      p1Score: this.cbState.p1Score,
+      p2Score: this.cbState.p2Score,
+      p1Catches: this.cbState.p1Catches,
+      p2Catches: this.cbState.p2Catches,
+      p1Bet: this.cbState.p1Bet,
+      p2Bet: this.cbState.p2Bet,
+      theme: this.cbState.theme,
+    };
+
+    if (hostOpen && this.cbHostWs) {
+      try {
+        this.cbHostWs.send(JSON.stringify({ ...baseState, yourSlot: 0 }));
+      } catch (_) {}
+    }
+    if (guestOpen && this.cbGuestWs) {
+      try {
+        this.cbGuestWs.send(JSON.stringify({ ...baseState, yourSlot: 1 }));
+      } catch (_) {}
+    }
+  }
+
+  private broadcastCowboyPacket(packetObj: ServerMsg, excludeWs?: WebSocket): void {
+    const raw = JSON.stringify(packetObj);
+    for (const sock of [this.cbHostWs, this.cbGuestWs]) {
+      if (sock && sock !== excludeWs && sock.readyState === 1) {
+        try {
+          sock.send(raw);
+        } catch (_) {}
+      }
+    }
+  }
+
+  private handleCowboySocketClose(ws: WebSocket): void {
+    if (ws === this.cbGuestWs) {
+      this.cbGuestWs = null;
+      this.cbState.controlEpoch++;
+      this.broadcastCowboyRoomState();
+    } else if (ws === this.cbHostWs) {
+      if (this.cbGuestWs && this.cbGuestWs.readyState === 1) {
+        // Promote Guest to Host if Host leaves mid-session
+        this.cbHostWs = this.cbGuestWs;
+        this.cbGuestWs = null;
+        this.cbState.p1Name = this.cbState.p2Name;
+        this.cbState.p2Name = 'Người chơi 2';
+        this.cbState.controlEpoch++;
+        this.broadcastCowboyRoomState();
+      } else {
+        this.cbHostWs = null;
+        this.cbGuestWs = null;
+        this.cbState.claimedAnimalIds.clear();
+      }
+    }
+  }
+
+  private onCowboyMessage(ws: WebSocket, msg: ClientMsg): void {
+    const hostOpen = Boolean(this.cbHostWs && this.cbHostWs.readyState === 1);
+    const guestOpen = Boolean(this.cbGuestWs && this.cbGuestWs.readyState === 1);
+
+    if (msg.t === 'cb_join') {
+      const cleanName = (msg.name || '').trim().slice(0, 16);
+      if (!hostOpen || this.cbHostWs === ws) {
+        this.cbHostWs = ws;
+        this.cbState.roomCode = (msg.roomCode || this.cbState.roomCode || '').trim();
+        this.cbState.p1Name = cleanName || 'Người chơi 1';
+        if (!guestOpen) {
+          this.cbState.subMode = msg.subMode === 'campaign' ? 'campaign' : 'versus';
+          const dur = msg.subMode === 'campaign'
+            ? 180
+            : Math.max(30, Math.min(900, Math.floor(msg.durationSec || 180)));
+          this.cbState.durationSec = dur;
+          this.cbState.stage = Math.max(1, Math.floor(msg.stage || 1));
+          this.cbState.roundRemainingSec = msg.roundRemainingSec !== undefined ? Math.max(1, Math.floor(msg.roundRemainingSec)) : dur;
+          this.cbState.roundSyncedAtMs = Date.now();
+          this.cbState.seed = msg.seed || Math.floor(Math.random() * 899999 + 100000);
+          this.cbState.p1Score = Math.max(0, Math.floor(msg.p1Score || 0));
+          this.cbState.p2Score = Math.max(0, Math.floor(msg.p2Score || 0));
+          this.cbState.p1Catches = Math.max(0, Math.floor(msg.p1Catches || 0));
+          this.cbState.p2Catches = Math.max(0, Math.floor(msg.p2Catches || 0));
+          this.cbState.p1Bet = 1;
+          this.cbState.p2Bet = 1;
+          if (msg.theme) this.cbState.theme = msg.theme;
+          this.cbState.claimedAnimalIds.clear();
+        }
+        this.cbState.controlEpoch++;
+        this.broadcastCowboyRoomState();
+      } else if (!guestOpen || this.cbGuestWs === ws) {
+        this.cbGuestWs = ws;
+        this.cbState.p2Name = cleanName || 'Người chơi 2';
+        this.cbState.controlEpoch++;
+        this.broadcastCowboyRoomState();
+      } else {
+        try {
+          ws.send(JSON.stringify({ t: 'cb_room_full' }));
+        } catch (_) {}
+      }
+      return;
+    }
+
+    const isHost = ws === this.cbHostWs;
+    const isGuest = ws === this.cbGuestWs;
+    if (!isHost && !isGuest) return;
+
+    const canControlSlot = (slot: 0 | 1): boolean => {
+      if (slot === 0) return isHost;
+      return guestOpen ? isGuest : isHost;
+    };
+
+    if (msg.t === 'cb_bet') {
+      const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
+      if (!canControlSlot(slot)) return;
+      const count = Math.max(1, Math.min(5, Math.floor(msg.count || 1)));
+      if (slot === 0) this.cbState.p1Bet = count;
+      else this.cbState.p2Bet = count;
+      this.broadcastCowboyPacket({ t: 'cb_bet_sync', slot, count }, ws);
+    } else if (msg.t === 'cb_aim') {
+      const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
+      if (!canControlSlot(slot)) return;
+      this.broadcastCowboyPacket(
+        {
+          t: 'cb_aim_sync',
+          slot,
+          charging: Boolean(msg.charging),
+          aimZ: Number(msg.aimZ) || 0,
+        },
+        ws
+      );
+    } else if (msg.t === 'cb_throw') {
+      const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
+      if (!canControlSlot(slot)) return;
+      const count = Math.max(1, Math.min(5, Math.floor(msg.count || 1)));
+      if (slot === 0) this.cbState.p1Bet = count;
+      else this.cbState.p2Bet = count;
+      this.broadcastCowboyPacket(
+        {
+          t: 'cb_throw_sync',
+          slot,
+          count,
+          aimZ: Number(msg.aimZ) || 0,
+        },
+        ws
+      );
+    } else if (msg.t === 'cb_catch') {
+      const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
+      const animalId = Math.floor(msg.animalId || 0);
+      if (animalId > 0 && this.cbState.claimedAnimalIds.has(animalId)) {
+        return; // Prevent duplicate scoring if both clients claim the same animal
+      }
+      if (animalId > 0) {
+        this.cbState.claimedAnimalIds.add(animalId);
+      }
+      const pts = Math.max(1, Math.min(500, Math.floor(msg.score || 0)));
+      if (slot === 0) {
+        this.cbState.p1Score += pts;
+        this.cbState.p1Catches += 1;
+      } else {
+        this.cbState.p2Score += pts;
+        this.cbState.p2Catches += 1;
+      }
+      this.broadcastCowboyPacket({
+        t: 'cb_catch_sync',
+        slot,
+        animalId,
+        score: pts,
+        species: msg.species,
+        p1Score: this.cbState.p1Score,
+        p2Score: this.cbState.p2Score,
+        p1Catches: this.cbState.p1Catches,
+        p2Catches: this.cbState.p2Catches,
+      });
+    } else if (msg.t === 'cb_sync_timer') {
+      if (isHost) {
+        this.cbState.roundRemainingSec = Math.max(0, Math.floor(msg.remainingSec || 0));
+        this.cbState.roundSyncedAtMs = Date.now();
+      }
+    } else if (msg.t === 'cb_stage_next') {
+      const nextStage = Math.max(1, Math.floor(msg.stage || this.cbState.stage + 1));
+      this.cbState.stage = nextStage;
+      this.cbState.seed = msg.seed || Math.floor(Math.random() * 899999 + 100000);
+      this.cbState.roundRemainingSec = 180;
+      this.cbState.roundSyncedAtMs = Date.now();
+      this.cbState.p1Score = 0;
+      this.cbState.p2Score = 0;
+      this.cbState.claimedAnimalIds.clear();
+      this.broadcastCowboyPacket({
+        t: 'cb_stage_next_sync',
+        stage: this.cbState.stage,
+        seed: this.cbState.seed,
+        roundRemainingSec: 180,
+      });
+    } else if (msg.t === 'cb_rematch') {
+      if (msg.subMode) {
+        this.cbState.subMode = msg.subMode === 'campaign' ? 'campaign' : 'versus';
+      }
+      if (msg.durationSec) {
+        this.cbState.durationSec = Math.max(30, Math.min(900, Math.floor(msg.durationSec)));
+      }
+      this.cbState.stage = 1;
+      this.cbState.roundRemainingSec = this.cbState.subMode === 'campaign' ? 180 : this.cbState.durationSec;
+      this.cbState.roundSyncedAtMs = Date.now();
+      this.cbState.seed = msg.seed || Math.floor(Math.random() * 899999 + 100000);
+      this.cbState.p1Score = 0;
+      this.cbState.p2Score = 0;
+      this.cbState.p1Catches = 0;
+      this.cbState.p2Catches = 0;
+      this.cbState.claimedAnimalIds.clear();
+      this.broadcastCowboyPacket({
+        t: 'cb_rematch_sync',
+        seed: this.cbState.seed,
+        subMode: this.cbState.subMode,
+        durationSec: this.cbState.durationSec,
+        stage: this.cbState.stage,
+      });
     }
   }
 

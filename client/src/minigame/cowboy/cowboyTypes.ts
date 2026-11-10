@@ -75,6 +75,9 @@ export interface LassoRope {
   startX: number;
   startY: number;
   startZ: number;
+  launchLoopX?: number;
+  launchLoopY?: number;
+  launchLoopZ?: number;
   targetX: number;
   targetY: number;
   targetZ: number;
@@ -186,4 +189,11 @@ export function getStageTargetScore(stage: number): number {
   if (stage <= 5) return baseTargets[stage - 1];
   const k = stage - 5;
   return Math.round(650 + 200 * k + (25 * k * (k + 1)) / 2);
+}
+
+export function getCoopStageTargetScore(stage: number): number {
+  const baseTargets = [120, 260, 420, 620, 880];
+  if (stage <= 5) return baseTargets[stage - 1];
+  const k = stage - 5;
+  return Math.round(880 + 280 * k + (35 * k * (k + 1)) / 2);
 }

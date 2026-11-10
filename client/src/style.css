@@ -11039,7 +11039,9 @@ body.mobile-phone #adminToggleBtn {
     margin: 0 !important;
     padding: 0 !important;
     width: auto !important;
-    max-width: none !important;
+    max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
     gap: 6px !important;
     flex-shrink: 0 !important;
   }
@@ -11176,7 +11178,7 @@ body.mobile-phone #adminToggleBtn {
   }
 
   .cb-banner-title {
-    font-size: 19px !important;
+    font-size: 15.5px !important;
     white-space: nowrap !important;
   }
 
@@ -11466,5 +11468,953 @@ body.mobile-phone #adminToggleBtn {
     padding: 6px 12px !important;
     font-size: 15px !important;
     margin-top: 4px !important;
+  }
+}
+
+
+/* ==========================================================================
+   COWBOY 3D SHOP: EXACT CAMERA-PROJECTED SLOTS & RESTORED CONFIRM MODAL
+   100% aligned with 3D pedestals across Desktop, Mobile Landscape & Portrait
+   ========================================================================== */
+
+/* Container spans full 0..w, 0..h viewport so JS camera-projected coordinates match 1:1 */
+#cowboyShopRoot .cb-shop-shelves-ui {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  display: block !important;
+  z-index: 6 !important;
+}
+
+#cowboyShopRoot .cb-shop-slots-grid {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+#cowboyShopRoot .cb-shelf-slot {
+  position: absolute !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding: 4px !important;
+  border-radius: 14px !important;
+  border: 2px solid transparent !important;
+  background: transparent !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s !important;
+}
+
+#cowboyShopRoot .cb-shelf-slot:hover,
+#cowboyShopRoot .cb-shelf-slot:focus-visible {
+  border-color: rgba(255, 214, 71, 0.92) !important;
+  background: radial-gradient(circle at 50% 55%, rgba(255, 214, 71, 0.22) 0%, transparent 75%) !important;
+  box-shadow: 0 0 22px rgba(255, 214, 71, 0.45) !important;
+}
+
+#cowboyShopRoot .cb-shelf-slot.is-equipped {
+  border-color: rgba(0, 230, 118, 0.75) !important;
+  background: radial-gradient(circle at 50% 55%, rgba(0, 230, 118, 0.15) 0%, transparent 75%) !important;
+}
+
+#cowboyShopRoot .slot-owned-badge.is-empty {
+  display: none !important;
+}
+
+#cowboyShopRoot .slot-owned-badge {
+  top: 4px !important;
+  right: 4px !important;
+  font-size: 10.5px !important;
+  padding: 2px 7px !important;
+  border-radius: 9px !important;
+  white-space: nowrap !important;
+}
+
+#cowboyShopRoot .slot-price-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  padding: 4px 10px !important;
+  border-radius: 16px !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important; } #cowboyShopRoot .slot-price-pill .p-name { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; min-width: 0 !important;
+}
+
+/* Restore & Polish Shop Purchase / Equip Confirmation Modal (#cbShopConfirmModal) */
+.cb-shop-confirm-modal-wrap {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 100050 !important;
+  background: rgba(12, 7, 4, 0.78) !important;
+  backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 12px !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+.cb-shop-confirm-modal-wrap[hidden] {
+  display: none !important;
+}
+
+.cb-shop-confirm-card {
+  position: relative !important;
+  width: min(440px, 92vw) !important;
+  max-width: 440px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  background: linear-gradient(180deg, #381f17 0%, #20100a 100%) !important;
+  border: 2.5px solid #ffd54f !important;
+  border-radius: 20px !important;
+  padding: 22px 24px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  animation: zoomIn 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28) !important;
+}
+
+.cf-close-btn {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 1.5px solid rgba(255, 214, 71, 0.45) !important;
+  color: #ffd54f !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s !important;
+}
+
+.cf-close-btn:hover {
+  background: #ff5252 !important;
+  border-color: #ff7875 !important;
+  color: #fff !important;
+}
+
+.cf-icon {
+  font-size: 46px !important;
+  line-height: 1.1 !important;
+  margin-bottom: 6px !important;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) !important;
+}
+
+.cf-title {
+  margin: 0 0 6px !important;
+  font-size: 21px !important;
+  color: #ffd54f !important;
+  font-weight: 900 !important;
+  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
+  letter-spacing: 0.4px !important;
+}
+
+.cf-effect-pill {
+  display: inline-block !important;
+  padding: 3px 12px !important;
+  background: rgba(0, 230, 118, 0.18) !important;
+  border: 1px solid #00e676 !important;
+  border-radius: 12px !important;
+  color: #00e676 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  margin-bottom: 10px !important;
+}
+
+.cf-desc {
+  margin: 0 0 14px !important;
+  font-size: 13px !important;
+  color: #ffecb3 !important;
+  line-height: 1.45 !important;
+}
+
+.cf-meta-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.42) !important;
+  border-radius: 12px !important;
+  margin-bottom: 16px !important;
+  box-sizing: border-box !important;
+}
+
+.cf-owned-count {
+  font-size: 12.5px !important;
+  color: #e0e0e0 !important;
+}
+
+.cf-owned-count b {
+  color: #00e676 !important;
+  font-size: 13.5px !important;
+}
+
+.cf-price-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  border: 1.5px solid rgba(255, 213, 79, 0.55) !important;
+  padding: 4px 12px !important;
+  border-radius: 14px !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  color: #ffd54f !important;
+}
+
+.cf-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.cf-action-row {
+  display: flex !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.cf-btn-buy,
+.cf-btn-equip {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.4px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  transition: transform 0.08s, filter 0.12s !important;
+}
+
+.cf-btn-buy {
+  background: linear-gradient(180deg, #ffb300, #ff8f00) !important;
+  border: 2px solid #ffe082 !important;
+  color: #2b170e !important;
+  box-shadow: 0 3px 0 #b26a00, 0 4px 12px rgba(255, 179, 0, 0.35) !important;
+}
+
+.cf-btn-equip {
+  background: linear-gradient(180deg, #43a047, #2e7d32) !important;
+  border: 2px solid #81c784 !important;
+  color: #fff !important;
+  box-shadow: 0 3px 0 #1b5e20 !important;
+}
+
+.cf-btn-equip.equipped {
+  background: linear-gradient(180deg, #ff9800, #f57c00) !important;
+  border-color: #ffb74d !important;
+  box-shadow: 0 3px 0 #e65100 !important;
+}
+
+.cf-btn-cancel {
+  width: 100% !important;
+  padding: 9px 14px !important;
+  background: #4e342e !important;
+  border: 1.5px solid #6d4c41 !important;
+  border-radius: 12px !important;
+  color: #d7ccc8 !important;
+  font-family: var(--f-display, 'Baloo 2', sans-serif) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+}
+
+/* Mobile Landscape Shop Overrides (max-height: 540px) */
+@media (max-height: 540px) {
+  #cowboyShopRoot .cb-shop-ui-layer {
+    padding: 6px 12px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-header-bar {
+    padding: 4px 12px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    border-radius: 10px !important;
+  }
+
+  #cowboyShopRoot .cb-brand-ico {
+    font-size: 20px !important;
+  }
+
+  #cowboyShopRoot .cb-brand-title {
+    font-size: 14.5px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-wallet-badge {
+    padding: 3px 10px !important;
+    gap: 6px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-wallet-badge .w-ico {
+    font-size: 16px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-wallet-badge .w-lbl {
+    font-size: 8px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-wallet-badge .w-val {
+    font-size: 14px !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble {
+    display: flex !important;
+    max-width: 185px !important;
+    padding: 5px 8px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+    border-width: 1.5px !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble .speech-avatar {
+    font-size: 18px !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble .speech-name {
+    font-size: 9.5px !important;
+    margin-bottom: 1px !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble .speech-msg {
+    font-size: 8.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill {
+    padding: 2px 7px !important;
+    gap: 3px !important;
+    border-width: 1.5px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-ico {
+    font-size: 10px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-val {
+    font-size: 10.5px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-name {
+    font-size: 9.5px !important;
+  }
+
+  #cowboyShopRoot .slot-owned-badge {
+    font-size: 8.5px !important;
+    padding: 1px 5px !important;
+    top: 2px !important;
+    right: 2px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-bottom-bar {
+    padding: 4px 10px !important;
+    gap: 10px !important;
+  }
+
+  #cowboyShopRoot .cb-btn-shop-next,
+  #cowboyShopRoot .cb-btn-shop-exit {
+    height: 34px !important;
+    min-width: 115px !important;
+    padding: 4px 14px !important;
+    font-size: 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .cb-shop-confirm-card {
+    width: min(390px, 92vw) !important;
+    padding: 12px 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .cf-icon {
+    font-size: 28px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .cf-title {
+    font-size: 16px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .cf-effect-pill {
+    font-size: 10.5px !important;
+    padding: 2px 8px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .cf-desc {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    margin-bottom: 8px !important;
+  }
+
+  .cf-meta-row {
+    padding: 5px 10px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .cf-owned-count,
+  .cf-price-badge {
+    font-size: 11px !important;
+  }
+
+  .cf-btn-buy,
+  .cf-btn-equip {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .cf-btn-cancel {
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+  }
+}
+
+/* Mobile Portrait Shop Overrides (max-width: 768px and portrait) */
+@media (max-width: 768px) and (orientation: portrait) {
+  #cowboyShopRoot .cb-shop-ui-layer {
+    padding: 8px 10px !important;
+  }
+
+  #cowboyShopRoot .cb-shop-header-bar {
+    padding: 6px 12px !important;
+    height: 44px !important;
+  }
+
+  #cowboyShopRoot .cb-brand-ico {
+    font-size: 22px !important;
+  }
+
+  #cowboyShopRoot .cb-brand-title {
+    font-size: 15px !important;
+  }
+
+  #cowboyShopRoot .cb-brand-subtitle {
+    display: none !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble {
+    display: flex !important;
+    width: min(350px, 92vw) !important;
+    max-width: 92vw !important;
+    padding: 6px 10px !important;
+    gap: 8px !important;
+  }
+
+  #cowboyShopRoot .cb-farmer-speech-bubble::after {
+    display: none !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill {
+    padding: 2px 6px !important;
+    gap: 2px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-ico {
+    font-size: 9.5px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-val {
+    font-size: 10px !important;
+  }
+
+  #cowboyShopRoot .slot-price-pill .p-name {
+    font-size: 8.5px !important;
+  }
+}
+
+.cf-price-badge,
+.cf-owned-count {
+  white-space: nowrap !important;
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  #cowboyShopRoot .cb-shop-wallet-badge {
+    padding: 4px 10px !important;
+    gap: 6px !important;
+    border-radius: 16px !important;
+  }
+  #cowboyShopRoot .cb-shop-wallet-badge .w-ico {
+    font-size: 16px !important;
+  }
+  #cowboyShopRoot .cb-shop-wallet-badge .w-lbl {
+    font-size: 8px !important;
+  }
+  #cowboyShopRoot .cb-shop-wallet-badge .w-val {
+    font-size: 14px !important;
+  }
+}
+
+
+/* ==========================================================================
+   COWBOY 2-PLAYER MODE UPGRADE: LOBBY, HANDOVER & VERSUS MODAL
+   ========================================================================== */
+
+.cb-solo-rules-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-solo-rules-wrap[hidden],
+.cb-friend-panel[hidden] {
+  display: none !important;
+}
+
+.cb-friend-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(24, 15, 9, 0.72);
+  border: 1.5px solid rgba(255, 214, 71, 0.32);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.cb-fp-sec-label {
+  margin: 0 0 2px 0 !important;
+}
+
+.cb-submodes-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cb-submode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #3a2618 0%, #26180f 100%);
+  border: 2px solid #5c3d28;
+  border-radius: 10px;
+  color: #f5e6d3;
+  cursor: pointer;
+  transition: transform 0.14s, border-color 0.14s, background 0.14s, box-shadow 0.14s;
+  font-family: 'Baloo 2', system-ui, sans-serif;
+}
+
+.cb-submode-btn .n {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fff6e5;
+  line-height: 1.15;
+}
+
+.cb-submode-btn .p {
+  font-size: 10.5px;
+  color: #c5ad92;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
+.cb-submode-btn.on {
+  background: linear-gradient(180deg, #5e3b1e 0%, #3d2410 100%);
+  border-color: #ffd647;
+  box-shadow: 0 0 12px rgba(255, 214, 71, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.cb-submode-btn.on .n {
+  color: #ffd647;
+}
+
+.cb-room-box {
+  margin: 0 !important;
+}
+
+.cb-room-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(18, 11, 6, 0.85);
+  border: 1.5px solid rgba(255, 214, 71, 0.45);
+  border-radius: 10px;
+}
+
+.cb-room-prefix {
+  font-size: 11px;
+  font-weight: 800;
+  color: #c5ad92;
+  letter-spacing: 0.5px;
+}
+
+#cbCreatedRoomCode {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd647;
+  letter-spacing: 2px;
+  font-family: 'Baloo 2', monospace, sans-serif;
+  margin-right: 2px;
+}
+
+.cb-room-notice {
+  font-size: 11px;
+  line-height: 1.3;
+  color: #e8d2b5;
+  background: rgba(255, 214, 71, 0.08);
+  border-left: 3px solid #ffd647;
+  padding: 5px 8px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+/* Top HUD 2P Stat Boxes */
+.cowboy-stat-box.room-code {
+  cursor: pointer;
+  border-color: rgba(255, 214, 71, 0.65) !important;
+  background: linear-gradient(180deg, rgba(78, 50, 24, 0.92), rgba(42, 26, 12, 0.95)) !important;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.cowboy-stat-box.room-code:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 10px rgba(255, 214, 71, 0.35);
+}
+
+.cowboy-stat-box.room-code .c-val {
+  color: #ffd647 !important;
+  letter-spacing: 1px;
+}
+
+.cowboy-stat-box.p1-score {
+  border-color: rgba(79, 195, 247, 0.7) !important;
+  background: linear-gradient(180deg, rgba(16, 48, 78, 0.9), rgba(10, 28, 48, 0.94)) !important;
+}
+
+.cowboy-stat-box.p1-score .c-lbl {
+  color: #81d4fa !important;
+}
+
+.cowboy-stat-box.p1-score .c-val {
+  color: #4fc3f7 !important;
+}
+
+.cowboy-stat-box.p2-score {
+  border-color: rgba(255, 110, 110, 0.7) !important;
+  background: linear-gradient(180deg, rgba(78, 22, 22, 0.9), rgba(46, 12, 12, 0.94)) !important;
+}
+
+.cowboy-stat-box.p2-score .c-lbl {
+  color: #ff8a80 !important;
+}
+
+.cowboy-stat-box.p2-score .c-val {
+  color: #ff5252 !important;
+}
+
+/* 2P Controls & Handover Status Pill */
+.cb-2p-player-zone {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+  position: relative;
+}
+
+.cb-2p-zone-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cb-2p-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(20, 13, 8, 0.85);
+  border: 1px solid rgba(255, 214, 71, 0.38);
+  color: #ffe082;
+  white-space: nowrap;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.cb-2p-status-badge.local {
+  border-color: rgba(79, 195, 247, 0.65);
+  color: #b3e5fc;
+}
+
+.cb-2p-status-badge.remote {
+  border-color: rgba(0, 230, 118, 0.75);
+  background: rgba(8, 42, 24, 0.9);
+  color: #69f0ae;
+}
+
+.cb-2p-player-zone.remote-locked .cb-2p-zone-controls {
+  opacity: 0.58;
+  filter: saturate(0.65);
+}
+
+/* Versus Result Modal (#cbVersusResultModal) */
+.cb-versus-modal-card {
+  max-width: 480px !important;
+  width: min(480px, 92vw) !important;
+}
+
+.cb-versus-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.cb-v-card {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 10px;
+  border-radius: 14px;
+  background: rgba(24, 15, 9, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.cb-v-card.p1 {
+  border-color: rgba(79, 195, 247, 0.45);
+}
+
+.cb-v-card.p2 {
+  border-color: rgba(255, 82, 82, 0.45);
+}
+
+.cb-v-card.winner {
+  transform: scale(1.04);
+  border-color: #ffd647 !important;
+  box-shadow: 0 0 22px rgba(255, 214, 71, 0.35);
+  background: linear-gradient(180deg, rgba(72, 48, 20, 0.92), rgba(34, 21, 10, 0.95));
+}
+
+.cb-v-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-v-badge.p1 {
+  background: rgba(79, 195, 247, 0.18);
+  color: #81d4fa;
+}
+
+.cb-v-badge.p2 {
+  background: rgba(255, 82, 82, 0.18);
+  color: #ff8a80;
+}
+
+.cb-v-score {
+  font-size: 34px;
+  font-weight: 900;
+  color: #ffd647;
+  line-height: 1.05;
+  text-shadow: 0 2px 0 #1b1008;
+}
+
+.cb-v-unit {
+  font-size: 10px;
+  font-weight: 800;
+  color: #d7ccc8;
+  letter-spacing: 1px;
+}
+
+.cb-v-catches {
+  margin-top: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #ffe0b2;
+}
+
+.cb-v-vs {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd647;
+  padding: 6px 8px;
+  border-radius: 50%;
+  background: rgba(255, 214, 71, 0.14);
+  border: 1.5px solid rgba(255, 214, 71, 0.4);
+}
+
+/* Compact Mobile Landscape Overrides for 2P Lobby Panel & Modals */
+@media (max-height: 520px) {
+  .cb-friend-panel {
+    gap: 4px !important;
+    padding: 5px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .cb-submodes-row {
+    gap: 5px !important;
+  }
+
+  .cb-submode-btn {
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+  }
+
+  .cb-submode-btn .n {
+    font-size: 10.5px !important;
+  }
+
+  .cb-submode-btn .p {
+    font-size: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  .cb-room-badge {
+    padding: 3px 6px !important;
+    gap: 4px !important;
+    border-radius: 7px !important;
+  }
+
+  #cbCreatedRoomCode {
+    font-size: 13.5px !important;
+    letter-spacing: 1px !important;
+  }
+
+  .cb-friend-panel .btn-copy-ico {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    font-size: 11px !important;
+    padding: 0 4px !important;
+  }
+
+  .cb-friend-panel .btn-time-ico {
+    width: auto !important;
+    padding: 0 6px !important;
+  }
+
+  .cb-friend-panel .fp-divider {
+    margin: 1px 0 !important;
+    font-size: 8px !important;
+  }
+
+  .cb-friend-panel .fp-join-row {
+    gap: 4px !important;
+  }
+
+  .cb-friend-panel .room-code-input {
+    height: 25px !important;
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .cb-friend-panel .btn-wood-sm {
+    height: 25px !important;
+    font-size: 10.5px !important;
+    padding: 0 8px !important;
+  }
+
+  .cb-room-notice {
+    font-size: 8.5px !important;
+    line-height: 1.15 !important;
+    padding: 2px 6px !important;
+    margin-top: 0 !important;
+  }
+
+  .cb-2p-status-badge {
+    font-size: 9px !important;
+    padding: 1px 7px !important;
+    max-width: 210px !important;
+  }
+
+  .cb-versus-modal-card {
+    padding: 12px 14px !important;
+  }
+
+  .cb-versus-cards {
+    margin: 8px 0 10px !important;
+    gap: 8px !important;
+  }
+
+  .cb-v-card {
+    padding: 6px 8px !important;
+  }
+
+  .cb-v-score {
+    font-size: 24px !important;
+  }
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  .cb-friend-panel {
+    gap: 5px !important;
+    padding: 6px 8px !important;
+  }
+
+  .cb-submode-btn {
+    padding: 5px 6px !important;
+  }
+
+  .cb-submode-btn .n {
+    font-size: 11.5px !important;
+  }
+
+  .cb-submode-btn .p {
+    font-size: 9px !important;
+  }
+
+  .cb-room-notice {
+    font-size: 9.5px !important;
+    padding: 3px 6px !important;
   }
 }

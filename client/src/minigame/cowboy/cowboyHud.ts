@@ -1,6 +1,8 @@
 import { t } from '../../i18n';
+import { copyTextToClipboard } from '../../ui/hud';
 import { COWBOY_ITEMS_CATALOG, cowboyInventory } from './cowboyItems';
 import { HORSE_COWBOY_SVG, isCowboyAdminName } from './cowboyTypes';
+import type { CowboySubMode } from '@shared/protocol';
 
 export class CowboyHud {
   public rootEl: HTMLElement;
@@ -27,18 +29,27 @@ export class CowboyHud {
   private currentBet = 1;
   public isModalOpen = false;
   private isBusy = false;
+  private isP2Busy = false;
 
-  // Game Modes State: Campaign vs 2-Player Shared Screen
+  // Game Modes State: Campaign vs 2-Player Hybrid (Same-Device + Online Handover)
   private isTwoPlayerMode = false;
+  private subMode: CowboySubMode = 'versus';
+  private roomCode = '';
+  private mySlot: 0 | 1 = 0;
+  private guestConnected = false;
+  private p1Name = 'Người chơi 1';
+  private p2Name = 'Người chơi 2';
   private p1Bet = 1;
   private p2Bet = 1;
 
-  public onP2Launch?: (isAimCharge: boolean, aimZ: number) => void;
+  public onP2ChargeStart?: () => void;
+  public onP2Launch?: (isAimCharge: boolean, durationMs: number) => void;
   public onP2BetChange?: (bet: number) => void;
   public onRetryFromStage1?: () => void;
+  public onVersusRematch?: () => void;
   private activeTimeouts: any[] = [];
 
-  // 3-Minute Round Timer
+  // Round Timer
   private roundSecondsLeft = 180;
   private roundTimerInterval: any = null;
   private roundEndTimeout: any = null;
@@ -53,6 +64,8 @@ export class CowboyHud {
   public onLaunch?: (bet: number) => void;
   private isCharging = false;
   private chargeStartTime = 0;
+  private isChargingP2 = false;
+  private chargeStartTimeP2 = 0;
   public onExit?: () => void;
   public onRoundEnd?: () => void;
   public onClaimRelief?: () => void;
@@ -81,6 +94,10 @@ export class CowboyHud {
         </div>
 
         <div class="cowboy-stats-bar" id="cbStatsBar">
+          <div class="cowboy-stat-box room-code" id="cbRoomCodeBox" title="Bấm để sao chép mã phòng mời bạn bè" hidden>
+            <span class="c-lbl">MÃ PHÒNG</span>
+            <span class="c-val"><span id="cbHudRoomCodeVal">----</span> 📋</span>
+          </div>
           <div class="cowboy-stat-box stage" id="cbStageBox">
             <span class="c-lbl" data-i18n="cb_stage">MÀN</span>
             <span class="c-val" id="cbStageVal">1</span>
@@ -93,12 +110,20 @@ export class CowboyHud {
             <span class="c-lbl">CREDIT</span>
             <span class="c-val" id="cbCreditsVal">20</span>
           </div>
+          <div class="cowboy-stat-box p1-score" id="cbP1ScoreBox" hidden>
+            <span class="c-lbl" id="cbP1ScoreLbl">🟦 P1 (TRÁI)</span>
+            <span class="c-val" id="cbP1ScoreVal">0</span>
+          </div>
+          <div class="cowboy-stat-box p2-score" id="cbP2ScoreBox" hidden>
+            <span class="c-lbl" id="cbP2ScoreLbl">🟥 P2 (PHẢI)</span>
+            <span class="c-val" id="cbP2ScoreVal">0</span>
+          </div>
           <div class="cowboy-stat-box score" id="cbScoreBox">
             <span class="c-lbl" data-i18n="cb_score">MỤC TIÊU</span>
             <span class="c-val"><span id="cbScoreVal">0</span> / <span id="cbTargetVal">80</span></span>
             <div class="cb-score-progress-bar"><div class="cb-score-progress-fill" id="cbScoreFill" style="width: 0%;"></div></div>
           </div>
-          <div class="cowboy-stat-box catches">
+          <div class="cowboy-stat-box catches" id="cbCatchesBox">
             <span class="c-lbl" data-i18n="cb_catches">ĐÃ BẮT</span>
             <span class="c-val" id="cbCatchesVal">0</span>
           </div>
@@ -135,7 +160,7 @@ export class CowboyHud {
       <!-- Toast notifications -->
       <div id="cbToastBox" class="cowboy-toast-box"></div>
 
-      <!-- Bottom Arcade Controls: 1P Card (Nút Xoay Vòng) vs 2P Card (2 Bên Trái Phải) -->
+      <!-- Bottom Arcade Controls: 1P Card vs 2P Card (2 Bên Trái Phải) -->
       <div class="cowboy-bottom-bar">
         <!-- 1P CONTROLS CARD -->
         <div class="cowboy-controls-card" id="cb1PControlsCard">
@@ -179,46 +204,52 @@ export class CowboyHud {
           </div>
         </div>
 
-        <!-- 2P CONTROLS CARD (Màn hình chung 2 người đối kháng) -->
+        <!-- 2P CONTROLS CARD (Màn hình chung 2 bên Trái Phải + Tự động chuyển quyền khi Máy 2 vào phòng) -->
         <div class="cowboy-controls-card mode-2p cb-card-hidden" id="cb2PControlsCard">
           <!-- P1 ZONE (BÊN TRÁI) -->
-          <div class="cb-2p-player-zone p1-zone">
-            <span class="cb-2p-tag p1">P1</span>
-            <div class="cb-cycle-bet-wrap">
-              <button type="button" id="cbP1CycleBetBtn" class="cb-cycle-bet-btn active" title="[P1] Bấm để đổi số dây (Phím Q)">
-                <div class="cb-cycle-num-row">
-                  <span class="cb-cycle-val" id="cbP1CycleVal">1 DÂY</span>
-                  <span class="cb-cycle-cost" id="cbP1CycleCost">(1 C)</span>
+          <div class="cb-2p-player-zone p1-zone" id="cbP1Zone">
+            <div class="cb-2p-zone-controls" id="cbP1ControlsGroup">
+              <span class="cb-2p-tag p1" id="cbP1Tag">P1</span>
+              <div class="cb-cycle-bet-wrap">
+                <button type="button" id="cbP1CycleBetBtn" class="cb-cycle-bet-btn active" title="[P1] Bấm để đổi số dây (Phím Q)">
+                  <div class="cb-cycle-num-row">
+                    <span class="cb-cycle-val" id="cbP1CycleVal">1 DÂY</span>
+                    <span class="cb-cycle-cost" id="cbP1CycleCost">(1 C)</span>
+                  </div>
+                </button>
+                <div class="cb-cycle-hint" id="cbP1KeyHint">Phím Q</div>
+              </div>
+              <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P1] Nhấn hoặc giữ để quăng dây (Phím Space)">
+                <div class="btn-top">
+                  <span class="txt">QUĂNG DÂY</span>
+                  <small class="key-hint" id="cbP1LaunchKeyHint">Space</small>
                 </div>
               </button>
-              <div class="cb-cycle-hint">Phím Q</div>
             </div>
-            <button type="button" id="cbP1LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P1] Quăng dây (Phím Space)">
-              <div class="btn-top">
-                <span class="txt">QUĂNG DÂY</span>
-                <small class="key-hint">Space</small>
-              </div>
-            </button>
+            <div class="cb-2p-status-badge" id="cbP1StatusBadge">🟦 P1 (Bên trái): Đang điều khiển</div>
           </div>
 
           <!-- P2 ZONE (BÊN PHẢI) -->
-          <div class="cb-2p-player-zone p2-zone">
-            <span class="cb-2p-tag p2">P2</span>
-            <div class="cb-cycle-bet-wrap">
-              <button type="button" id="cbP2CycleBetBtn" class="cb-cycle-bet-btn active" title="[P2] Bấm để đổi số dây (Phím P)">
-                <div class="cb-cycle-num-row">
-                  <span class="cb-cycle-val" id="cbP2CycleVal">1 DÂY</span>
-                  <span class="cb-cycle-cost" id="cbP2CycleCost">(1 C)</span>
+          <div class="cb-2p-player-zone p2-zone" id="cbP2Zone">
+            <div class="cb-2p-zone-controls" id="cbP2ControlsGroup">
+              <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P2] Nhấn hoặc giữ để quăng dây (Phím Enter)">
+                <div class="btn-top">
+                  <span class="txt">QUĂNG DÂY</span>
+                  <small class="key-hint" id="cbP2LaunchKeyHint">Enter</small>
                 </div>
               </button>
-              <div class="cb-cycle-hint">Phím P</div>
-            </div>
-            <button type="button" id="cbP2LaunchBtn" class="cowboy-red-button cb-launch-circle-btn" title="[P2] Quăng dây (Phím Enter)">
-              <div class="btn-top">
-                <span class="txt">QUĂNG DÂY</span>
-                <small class="key-hint">Enter</small>
+              <div class="cb-cycle-bet-wrap">
+                <button type="button" id="cbP2CycleBetBtn" class="cb-cycle-bet-btn active" title="[P2] Bấm để đổi số dây (Phím P)">
+                  <div class="cb-cycle-num-row">
+                    <span class="cb-cycle-val" id="cbP2CycleVal">1 DÂY</span>
+                    <span class="cb-cycle-cost" id="cbP2CycleCost">(1 C)</span>
+                  </div>
+                </button>
+                <div class="cb-cycle-hint" id="cbP2KeyHint">Phím P</div>
               </div>
-            </button>
+              <span class="cb-2p-tag p2" id="cbP2Tag">P2</span>
+            </div>
+            <div class="cb-2p-status-badge waiting" id="cbP2StatusBadge">📡 Chưa có máy 2 vào mã: Tạm điều khiển trên máy này</div>
           </div>
         </div>
       </div>
@@ -249,6 +280,34 @@ export class CowboyHud {
         </div>
       </div>
 
+      <!-- Modal Kết Quả Thi Đấu Đối Kháng 2 Người -->
+      <div id="cbVersusResultModal" class="cowboy-modal-wrap" hidden>
+        <div class="cowboy-modal-card cb-versus-modal-card">
+          <div class="cm-icon" id="cbVersusIcon">🏆</div>
+          <h3 class="cm-title" id="cbVersusTitle">P1 CHIẾN THẮNG!</h3>
+          <p class="cm-desc" id="cbVersusDesc">Kết quả chung cuộc sau thời gian thi đấu đối kháng</p>
+          <div class="cb-versus-cards">
+            <div class="cb-v-card p1" id="cbVersusCardP1">
+              <span class="cb-v-badge p1" id="cbVersusNameP1">🟦 P1 (TRÁI)</span>
+              <div class="cb-v-score" id="cbVersusScoreP1">0</div>
+              <span class="cb-v-unit">ĐIỂM</span>
+              <span class="cb-v-catches" id="cbVersusCatchesP1">Đã bắt: 0 thú</span>
+            </div>
+            <div class="cb-v-vs">VS</div>
+            <div class="cb-v-card p2" id="cbVersusCardP2">
+              <span class="cb-v-badge p2" id="cbVersusNameP2">🟥 P2 (PHẢI)</span>
+              <div class="cb-v-score" id="cbVersusScoreP2">0</div>
+              <span class="cb-v-unit">ĐIỂM</span>
+              <span class="cb-v-catches" id="cbVersusCatchesP2">Đã bắt: 0 thú</span>
+            </div>
+          </div>
+          <div class="cm-actions">
+            <button type="button" id="cbVersusRematchBtn" class="cb-btn-relief">🔄 ĐẤU LẠI VÁN MỚI</button>
+            <button type="button" id="cbVersusExitBtn" class="cb-btn-exit">VỀ SẢNH CHÍNH</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Modal Cứu Trợ Credit -->
       <div id="cbReliefModal" class="cowboy-modal-wrap" hidden>
         <div class="cowboy-modal-card">
@@ -270,7 +329,6 @@ export class CowboyHud {
     this.roundTimerValEl = this.rootEl.querySelector('#cbRoundTimerVal')!;
     this.autoCountdownValEl = this.rootEl.querySelector('#cbAutoCountdown')!;
     this.launchBtn = this.rootEl.querySelector('#cbLaunchBtn')!;
-    // Shop button removed from active gameplay HUD (opens automatically when round ends)
     this.adminShopBtn = this.rootEl.querySelector('#cbAdminShopBtn')!;
     this.backpackBtn = this.rootEl.querySelector('#cbBackpackBtn')!;
     this.exitBtn = this.rootEl.querySelector('#cbExitBtn')!;
@@ -279,14 +337,24 @@ export class CowboyHud {
     this.quickItemsRow = this.rootEl.querySelector('#cbQuickItemsRow')!;
     this.backpackModal = this.rootEl.querySelector('#cbBackpackModal')!;
     this.backpackGrid = this.rootEl.querySelector('#cbBackpackGrid')!;
+  }
 
+  private canControlSlotLocally(slot: 0 | 1): boolean {
+    if (!this.isTwoPlayerMode) return slot === 0;
+    if (this.mySlot === 1) return slot === 1;
+    // Host (mySlot === 0): controls P1 always, and controls P2 only when Guest is not connected
+    if (slot === 0) return true;
+    return !this.guestConnected;
   }
 
   private startCharge(): void {
     if (this.isModalOpen || this.isBusy || this.isCharging) return;
+    if (this.isTwoPlayerMode && !this.canControlSlotLocally(0)) return;
     this.isCharging = true;
     this.chargeStartTime = performance.now();
     this.launchBtn.classList.add('is-charging');
+    const p1Btn = this.rootEl.querySelector('#cbP1LaunchBtn');
+    p1Btn?.classList.add('is-charging');
     this.onChargeStart?.();
   }
 
@@ -294,10 +362,16 @@ export class CowboyHud {
     if (!this.isCharging) return;
     this.isCharging = false;
     this.launchBtn.classList.remove('is-charging');
+    const p1Btn = this.rootEl.querySelector('#cbP1LaunchBtn');
+    p1Btn?.classList.remove('is-charging');
     const duration = performance.now() - this.chargeStartTime;
     this.resetAutoLaunchTimer();
     this.launchBtn.classList.add('is-pressed');
-    const tid = setTimeout(() => this.launchBtn.classList.remove('is-pressed'), 120);
+    p1Btn?.classList.add('is-pressed');
+    const tid = setTimeout(() => {
+      this.launchBtn.classList.remove('is-pressed');
+      p1Btn?.classList.remove('is-pressed');
+    }, 120);
     this.activeTimeouts.push(tid);
 
     if (duration > 120) {
@@ -305,6 +379,29 @@ export class CowboyHud {
     } else {
       this.onLaunch?.(this.currentBet);
     }
+  }
+
+  private startChargeP2(): void {
+    if (!this.isTwoPlayerMode || this.isModalOpen || this.isP2Busy || this.isChargingP2) return;
+    if (!this.canControlSlotLocally(1)) return;
+    this.isChargingP2 = true;
+    this.chargeStartTimeP2 = performance.now();
+    const p2Btn = this.rootEl.querySelector('#cbP2LaunchBtn');
+    p2Btn?.classList.add('is-charging');
+    this.onP2ChargeStart?.();
+  }
+
+  private releaseChargeP2(): void {
+    if (!this.isChargingP2) return;
+    this.isChargingP2 = false;
+    const p2Btn = this.rootEl.querySelector('#cbP2LaunchBtn');
+    p2Btn?.classList.remove('is-charging');
+    const duration = performance.now() - this.chargeStartTimeP2;
+    p2Btn?.classList.add('is-pressed');
+    const tid = setTimeout(() => p2Btn?.classList.remove('is-pressed'), 120);
+    this.activeTimeouts.push(tid);
+
+    this.onP2Launch?.(duration > 120, duration);
   }
 
   private bindEvents(): void {
@@ -324,8 +421,15 @@ export class CowboyHud {
       });
     }
 
+    // Copy room code from top bar
+    const roomCodeBox = this.rootEl.querySelector('#cbRoomCodeBox') as HTMLElement | null;
+    roomCodeBox?.addEventListener('click', async () => {
+      if (!this.roomCode) return;
+      await copyTextToClipboard(this.roomCode);
+      this.showToast(`📋 Đã sao chép mã phòng: <b>${this.roomCode}</b> (Gửi cho máy 2 nhập vào phòng!)`, 2200);
+    });
 
-    // Nút chọn mức cược xoay vòng thu gọn (Condensed Cycle Bet Button)
+    // Nút chọn mức cược xoay vòng thu gọn (1P)
     const cycleBtn = this.rootEl.querySelector('#cbCycleBetBtn') as HTMLButtonElement | null;
     cycleBtn?.addEventListener('click', () => {
       if (this.isBusy || this.isModalOpen) return;
@@ -336,28 +440,28 @@ export class CowboyHud {
     // 2-Player controls bindings
     const p1CycleBtn = this.rootEl.querySelector('#cbP1CycleBetBtn') as HTMLButtonElement | null;
     p1CycleBtn?.addEventListener('click', () => {
-      if (this.isBusy || this.isModalOpen) return;
+      if (this.isBusy || this.isModalOpen || !this.canControlSlotLocally(0)) return;
       this.cycleBet(0);
     });
 
     const p2CycleBtn = this.rootEl.querySelector('#cbP2CycleBetBtn') as HTMLButtonElement | null;
     p2CycleBtn?.addEventListener('click', () => {
-      if (this.isBusy || this.isModalOpen) return;
+      if (this.isP2Busy || this.isModalOpen || !this.canControlSlotLocally(1)) return;
       this.cycleBet(1);
     });
 
     const p1LaunchBtn = this.rootEl.querySelector('#cbP1LaunchBtn') as HTMLButtonElement | null;
     p1LaunchBtn?.addEventListener('pointerdown', (e) => {
-      if (!this.isTwoPlayerMode || this.isModalOpen || this.isBusy) return;
+      if (!this.isTwoPlayerMode || this.isModalOpen || this.isBusy || !this.canControlSlotLocally(0)) return;
       e.preventDefault();
       this.startCharge();
     });
 
     const p2LaunchBtn = this.rootEl.querySelector('#cbP2LaunchBtn') as HTMLButtonElement | null;
     p2LaunchBtn?.addEventListener('pointerdown', (e) => {
-      if (!this.isTwoPlayerMode || this.isModalOpen) return;
+      if (!this.isTwoPlayerMode || this.isModalOpen || this.isP2Busy || !this.canControlSlotLocally(1)) return;
       e.preventDefault();
-      this.onP2Launch?.(false, 1.0);
+      this.startChargeP2();
     });
 
     // Defeat modal buttons
@@ -373,7 +477,20 @@ export class CowboyHud {
       this.onExit?.();
     });
 
-    // Nút Quăng dây hỗ trợ nhấn nhanh & nhấn giữ gồng canh cự ly xa gần
+    // Versus result modal buttons
+    const versusRematchBtn = this.rootEl.querySelector('#cbVersusRematchBtn') as HTMLButtonElement | null;
+    versusRematchBtn?.addEventListener('click', () => {
+      this.hideVersusResultModal();
+      this.onVersusRematch?.();
+    });
+
+    const versusExitBtn = this.rootEl.querySelector('#cbVersusExitBtn') as HTMLButtonElement | null;
+    versusExitBtn?.addEventListener('click', () => {
+      this.hideVersusResultModal();
+      this.onExit?.();
+    });
+
+    // Nút Quăng dây 1P
     this.launchBtn.addEventListener('pointerdown', (e) => {
       if (this.isTwoPlayerMode || this.isModalOpen || this.isBusy) return;
       e.preventDefault();
@@ -382,15 +499,16 @@ export class CowboyHud {
 
     window.addEventListener('pointerup', () => {
       if (this.isCharging) this.releaseCharge();
+      if (this.isChargingP2) this.releaseChargeP2();
     });
 
     window.addEventListener('pointercancel', () => {
       if (this.isCharging) this.releaseCharge();
+      if (this.isChargingP2) this.releaseChargeP2();
     });
 
-    // Nút Kho Đồ
+    // Nút Fullscreen
     const fsBtn = this.rootEl.querySelector('#cbFsBtn') as HTMLButtonElement | null;
-    // Đồng bộ icon fullscreen ngay khi gắn HUD
     window.dispatchEvent(new Event('fullscreenchange'));
 
     fsBtn?.addEventListener('click', (e) => {
@@ -403,22 +521,18 @@ export class CowboyHud {
       this.openBackpackModal();
     });
 
-    // Nút đóng Kho Đồ
     const closeBpBtn = this.rootEl.querySelector('#cbCloseBackpackBtn') as HTMLButtonElement;
     closeBpBtn?.addEventListener('click', () => {
       this.closeBackpackModal();
     });
 
-    // Nút Thoát
     this.exitBtn.addEventListener('click', () => {
       this.onExit?.();
     });
 
-    // Bấm phím Space để quăng dây
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
 
-    // Xử lý modal cứu trợ
     const claimBtn = this.rootEl.querySelector('#cbClaimReliefBtn') as HTMLButtonElement;
     claimBtn?.addEventListener('click', () => {
       this.onClaimRelief?.();
@@ -456,7 +570,6 @@ export class CowboyHud {
         </div>
         <span class="cb-item-qty-tag ${count > 0 ? 'has-qty' : ''}">x${count}</span>
 
-        <!-- Floating Tooltip on Hover -->
         <div class="cb-item-tooltip">
           <div class="tt-header">
             <span class="tt-name">${item.nameVi}</span>
@@ -478,7 +591,6 @@ export class CowboyHud {
           return;
         }
 
-        // Handle instant use or equip toggle
         if (item.kind === 'time_clock') {
           if (cowboyInventory.consume('time_clock')) {
             this.addRoundSeconds(60);
@@ -495,7 +607,6 @@ export class CowboyHud {
           }
           this.updateInventory();
         } else {
-          // Toggle round active
           if (isEquipped) {
             cowboyInventory.unequipForRound(item.kind);
             this.showToast(`Bỏ trang bị ${item.nameVi}.`, 1600);
@@ -558,26 +669,44 @@ export class CowboyHud {
     this.updateRoundTimerDisplay();
   }
 
+  public setRoundSeconds(seconds: number): void {
+    this.roundSecondsLeft = Math.max(0, Math.floor(seconds));
+    this.updateRoundTimerDisplay();
+  }
+
+  public getRoundSeconds(): number {
+    return this.roundSecondsLeft;
+  }
+
   private onKeyDown = (e: KeyboardEvent): void => {
     if (this.rootEl.hidden) return;
     if (e.code === 'Space') {
       if (e.repeat) return;
-      if (this.isModalOpen || this.isBusy) return;
+      if (this.isModalOpen) return;
       e.preventDefault();
-      this.startCharge();
+      if (this.isTwoPlayerMode && this.mySlot === 1) {
+        this.startChargeP2();
+      } else {
+        this.startCharge();
+      }
     } else if (e.code === 'KeyQ') {
-      if (!this.isModalOpen && !this.isBusy) {
-        this.cycleBet(0);
-        this.resetAutoLaunchTimer();
+      if (!this.isModalOpen) {
+        if (this.isTwoPlayerMode && this.mySlot === 1) {
+          if (!this.isP2Busy) this.cycleBet(1);
+        } else if (!this.isBusy && this.canControlSlotLocally(0)) {
+          this.cycleBet(0);
+          this.resetAutoLaunchTimer();
+        }
       }
     } else if (e.code === 'KeyP') {
-      if (!this.isModalOpen) {
+      if (!this.isModalOpen && this.canControlSlotLocally(1) && !this.isP2Busy) {
         this.cycleBet(1);
       }
     } else if (e.code === 'Enter') {
-      if (this.isTwoPlayerMode && !this.isModalOpen) {
+      if (e.repeat) return;
+      if (this.isTwoPlayerMode && !this.isModalOpen && this.canControlSlotLocally(1)) {
         e.preventDefault();
-        this.onP2Launch?.(false, 1.0);
+        this.startChargeP2();
       }
     } else if (e.code === 'Escape') {
       if (this.isModalOpen) {
@@ -587,9 +716,12 @@ export class CowboyHud {
         this.onExit?.();
       }
     } else if (e.key >= '1' && e.key <= '5') {
-      if (!this.isModalOpen && !this.isBusy) {
-        this.setBet(parseInt(e.key, 10));
-        this.resetAutoLaunchTimer();
+      if (!this.isModalOpen) {
+        const targetSlot: 0 | 1 = (this.isTwoPlayerMode && this.mySlot === 1) ? 1 : 0;
+        if (this.canControlSlotLocally(targetSlot)) {
+          this.setBet(parseInt(e.key, 10), targetSlot);
+          this.resetAutoLaunchTimer();
+        }
       }
     } else if (isCowboyAdminName() && (e.key === 'b' || e.key === 'B' || e.key === 'F2')) {
       if (!this.isModalOpen && !this.isBusy) {
@@ -603,20 +735,40 @@ export class CowboyHud {
     if (this.rootEl.hidden) return;
     if (e.code === 'Space') {
       e.preventDefault();
-      if (this.isCharging) {
-        this.releaseCharge();
-      }
+      if (this.isCharging) this.releaseCharge();
+      if (this.isChargingP2) this.releaseChargeP2();
+    } else if (e.code === 'Enter') {
+      e.preventDefault();
+      if (this.isChargingP2) this.releaseChargeP2();
     }
   };
 
-  public setBusy(busy: boolean): void {
+  public setBusy(busy: boolean, playerIndex = 0): void {
+    if (playerIndex === 1) {
+      this.isP2Busy = busy;
+      const p2Btn = this.rootEl.querySelector('#cbP2LaunchBtn') as HTMLButtonElement | null;
+      if (p2Btn && this.canControlSlotLocally(1)) {
+        p2Btn.disabled = busy;
+        p2Btn.style.opacity = busy ? '0.7' : '1';
+      }
+      return;
+    }
     this.isBusy = busy;
+    const p1Btn = this.rootEl.querySelector('#cbP1LaunchBtn') as HTMLButtonElement | null;
     if (busy) {
       this.launchBtn.disabled = true;
       this.launchBtn.style.opacity = '0.7';
+      if (p1Btn && this.canControlSlotLocally(0)) {
+        p1Btn.disabled = true;
+        p1Btn.style.opacity = '0.7';
+      }
     } else {
       this.launchBtn.disabled = false;
       this.launchBtn.style.opacity = '1';
+      if (p1Btn && this.canControlSlotLocally(0)) {
+        p1Btn.disabled = false;
+        p1Btn.style.opacity = '1';
+      }
       this.resetAutoLaunchTimer();
     }
   }
@@ -654,17 +806,17 @@ export class CowboyHud {
     }
   }
 
-  public setBet(bet: number, playerIndex = 0): void {
+  public setBet(bet: number, playerIndex = 0, silent = false): void {
     const clamped = Math.max(1, Math.min(5, bet));
     if (playerIndex === 0) {
       this.p1Bet = clamped;
       this.currentBet = clamped;
       this.updateCycleBetDisplay(0, clamped);
-      this.onBetChange?.(clamped);
+      if (!silent) this.onBetChange?.(clamped);
     } else {
       this.p2Bet = clamped;
       this.updateCycleBetDisplay(1, clamped);
-      this.onP2BetChange?.(clamped);
+      if (!silent) this.onP2BetChange?.(clamped);
     }
   }
 
@@ -672,10 +824,20 @@ export class CowboyHud {
     return playerIndex === 0 ? this.p1Bet : this.p2Bet;
   }
 
-  public setTwoPlayerMode(enabled: boolean): void {
+  public setTwoPlayerMode(enabled: boolean, subMode: CowboySubMode = 'versus', roomCode = ''): void {
     this.isTwoPlayerMode = enabled;
+    this.subMode = subMode;
+    this.roomCode = roomCode;
+
     const card1P = this.rootEl.querySelector('#cb1PControlsCard') as HTMLElement | null;
     const card2P = this.rootEl.querySelector('#cb2PControlsCard') as HTMLElement | null;
+    const roomCodeBox = this.rootEl.querySelector('#cbRoomCodeBox') as HTMLElement | null;
+    const roomCodeVal = this.rootEl.querySelector('#cbHudRoomCodeVal') as HTMLElement | null;
+    const stageBox = this.rootEl.querySelector('#cbStageBox') as HTMLElement | null;
+    const scoreBox = this.rootEl.querySelector('#cbScoreBox') as HTMLElement | null;
+    const p1ScoreBox = this.rootEl.querySelector('#cbP1ScoreBox') as HTMLElement | null;
+    const p2ScoreBox = this.rootEl.querySelector('#cbP2ScoreBox') as HTMLElement | null;
+
     if (card1P && card2P) {
       if (enabled) {
         card1P.classList.add('cb-card-hidden');
@@ -685,6 +847,80 @@ export class CowboyHud {
         card2P.classList.add('cb-card-hidden');
       }
     }
+
+    if (roomCodeBox) {
+      roomCodeBox.hidden = !enabled || !roomCode;
+      if (roomCodeVal && roomCode) roomCodeVal.textContent = roomCode;
+    }
+
+    if (p1ScoreBox) p1ScoreBox.hidden = !enabled;
+    if (p2ScoreBox) p2ScoreBox.hidden = !enabled;
+
+    const showCampaignTarget = !enabled || subMode === 'campaign';
+    if (stageBox) stageBox.hidden = !showCampaignTarget;
+    if (scoreBox) scoreBox.hidden = !showCampaignTarget;
+  }
+
+  public set2PControlState(mySlot: 0 | 1, guestConnected: boolean, p1Name: string, p2Name: string): void {
+    this.mySlot = mySlot;
+    this.guestConnected = guestConnected;
+    this.p1Name = p1Name || 'Người chơi 1';
+    this.p2Name = p2Name || 'Người chơi 2';
+
+    const p1Zone = this.rootEl.querySelector('#cbP1Zone') as HTMLElement | null;
+    const p2Zone = this.rootEl.querySelector('#cbP2Zone') as HTMLElement | null;
+    const p1CycleBtn = this.rootEl.querySelector('#cbP1CycleBetBtn') as HTMLButtonElement | null;
+    const p1LaunchBtn = this.rootEl.querySelector('#cbP1LaunchBtn') as HTMLButtonElement | null;
+    const p2CycleBtn = this.rootEl.querySelector('#cbP2CycleBetBtn') as HTMLButtonElement | null;
+    const p2LaunchBtn = this.rootEl.querySelector('#cbP2LaunchBtn') as HTMLButtonElement | null;
+    const p1Status = this.rootEl.querySelector('#cbP1StatusBadge') as HTMLElement | null;
+    const p2Status = this.rootEl.querySelector('#cbP2StatusBadge') as HTMLElement | null;
+    const p1ScoreLbl = this.rootEl.querySelector('#cbP1ScoreLbl') as HTMLElement | null;
+    const p2ScoreLbl = this.rootEl.querySelector('#cbP2ScoreLbl') as HTMLElement | null;
+
+    if (p1ScoreLbl) p1ScoreLbl.textContent = `🟦 P1 (${this.p1Name})`;
+    if (p2ScoreLbl) p2ScoreLbl.textContent = `🟥 P2 (${this.p2Name})`;
+
+    const canP1 = this.canControlSlotLocally(0);
+    const canP2 = this.canControlSlotLocally(1);
+
+    p1Zone?.classList.toggle('remote-locked', !canP1);
+    p2Zone?.classList.toggle('remote-locked', !canP2);
+
+    if (p1CycleBtn) p1CycleBtn.disabled = !canP1;
+    if (p1LaunchBtn) p1LaunchBtn.disabled = !canP1 || this.isBusy;
+    if (p2CycleBtn) p2CycleBtn.disabled = !canP2;
+    if (p2LaunchBtn) p2LaunchBtn.disabled = !canP2 || this.isP2Busy;
+
+    if (p1Status) {
+      if (mySlot === 0) {
+        p1Status.className = 'cb-2p-status-badge local';
+        p1Status.textContent = `🟦 P1 (${this.p1Name}): Máy của bạn`;
+      } else {
+        p1Status.className = 'cb-2p-status-badge remote';
+        p1Status.textContent = `🟢 P1 (${this.p1Name}): Đang điều khiển từ máy 1`;
+      }
+    }
+
+    if (p2Status) {
+      if (mySlot === 1) {
+        p2Status.className = 'cb-2p-status-badge local';
+        p2Status.textContent = `🟥 P2 (${this.p2Name}): Máy của bạn (Space / Enter)`;
+      } else if (guestConnected) {
+        p2Status.className = 'cb-2p-status-badge remote';
+        p2Status.textContent = `🟢 P2 (${this.p2Name}): Đang điều khiển từ máy 2`;
+      } else {
+        p2Status.className = 'cb-2p-status-badge waiting';
+        p2Status.textContent = `📡 Chờ máy 2 (Mã ${this.roomCode}) • Đang điều khiển chung`;
+      }
+    }
+  }
+
+  public update2PScores(p1Score: number, p2Score: number): void {
+    const p1El = this.rootEl.querySelector('#cbP1ScoreVal');
+    const p2El = this.rootEl.querySelector('#cbP2ScoreVal');
+    if (p1El) p1El.textContent = String(p1Score);
+    if (p2El) p2El.textContent = String(p2Score);
   }
 
   public updateScore(score: number, target: number, stage?: number): void {
@@ -707,12 +943,83 @@ export class CowboyHud {
     }
   }
 
+  public showVersusResultModal(
+    p1Score: number,
+    p2Score: number,
+    p1Catches: number,
+    p2Catches: number,
+    p1Name = 'Người chơi 1',
+    p2Name = 'Người chơi 2'
+  ): void {
+    const modal = this.rootEl.querySelector('#cbVersusResultModal') as HTMLElement | null;
+    if (!modal) return;
+
+    const iconEl = this.rootEl.querySelector('#cbVersusIcon');
+    const titleEl = this.rootEl.querySelector('#cbVersusTitle') as HTMLElement | null;
+    const descEl = this.rootEl.querySelector('#cbVersusDesc');
+    const cardP1 = this.rootEl.querySelector('#cbVersusCardP1');
+    const cardP2 = this.rootEl.querySelector('#cbVersusCardP2');
+    const nameP1El = this.rootEl.querySelector('#cbVersusNameP1');
+    const nameP2El = this.rootEl.querySelector('#cbVersusNameP2');
+    const scoreP1El = this.rootEl.querySelector('#cbVersusScoreP1');
+    const scoreP2El = this.rootEl.querySelector('#cbVersusScoreP2');
+    const catchesP1El = this.rootEl.querySelector('#cbVersusCatchesP1');
+    const catchesP2El = this.rootEl.querySelector('#cbVersusCatchesP2');
+
+    if (nameP1El) nameP1El.textContent = `🟦 P1 • ${p1Name}`;
+    if (nameP2El) nameP2El.textContent = `🟥 P2 • ${p2Name}`;
+    if (scoreP1El) scoreP1El.textContent = String(p1Score);
+    if (scoreP2El) scoreP2El.textContent = String(p2Score);
+    if (catchesP1El) catchesP1El.textContent = `Đã bắt: ${p1Catches} thú`;
+    if (catchesP2El) catchesP2El.textContent = `Đã bắt: ${p2Catches} thú`;
+
+    cardP1?.classList.remove('winner');
+    cardP2?.classList.remove('winner');
+
+    if (p1Score > p2Score) {
+      if (iconEl) iconEl.textContent = '🏆';
+      if (titleEl) {
+        titleEl.textContent = `🏆 P1 (${p1Name}) CHIẾN THẮNG!`;
+        titleEl.style.color = '#ffd647';
+      }
+      if (descEl) descEl.innerHTML = `P1 dẫn trước với cách biệt <b>+${p1Score - p2Score} điểm</b>!`;
+      cardP1?.classList.add('winner');
+    } else if (p2Score > p1Score) {
+      if (iconEl) iconEl.textContent = '🏆';
+      if (titleEl) {
+        titleEl.textContent = `🏆 P2 (${p2Name}) CHIẾN THẮNG!`;
+        titleEl.style.color = '#ffd647';
+      }
+      if (descEl) descEl.innerHTML = `P2 dẫn trước với cách biệt <b>+${p2Score - p1Score} điểm</b>!`;
+      cardP2?.classList.add('winner');
+    } else {
+      if (iconEl) iconEl.textContent = '🤝';
+      if (titleEl) {
+        titleEl.textContent = '🤝 TRẬN ĐẤU HÒA KỊCH TÍNH!';
+        titleEl.style.color = '#80d8ff';
+      }
+      if (descEl) descEl.innerHTML = `Hai cao bồi ngang tài ngang sức với <b>${p1Score} điểm</b>!`;
+      cardP1?.classList.add('winner');
+      cardP2?.classList.add('winner');
+    }
+
+    modal.hidden = false;
+    this.isModalOpen = true;
+  }
+
+  public hideVersusResultModal(): void {
+    const modal = this.rootEl.querySelector('#cbVersusResultModal') as HTMLElement | null;
+    if (modal) modal.hidden = true;
+    this.isModalOpen = false;
+  }
+
   public showDefeatModal(stage: number, score: number, target: number): void {
     const modal = this.rootEl.querySelector('#cbDefeatModal') as HTMLElement | null;
     if (!modal) return;
     const msgEl = this.rootEl.querySelector('#cbDefeatMsg');
     if (msgEl) {
-      msgEl.innerHTML = `Bạn đạt <b>${score} / ${target} điểm</b> ở Màn ${stage}.<br>Chưa đủ mốc qua màn, hãy thử lại để phục thù nào!`;
+      const label = this.isTwoPlayerMode ? 'Tổng điểm 2 người đạt' : 'Bạn đạt';
+      msgEl.innerHTML = `${label} <b>${score} / ${target} điểm</b> ở Màn ${stage}.<br>Chưa đủ mốc qua màn, hãy thử lại để phục thù nào!`;
     }
     modal.hidden = false;
     this.isModalOpen = true;
@@ -726,11 +1033,12 @@ export class CowboyHud {
 
   public updateStats(credits: number, score: number, catches: number): void {
     this.creditValEl.textContent = String(credits);
-    this.scoreValEl.textContent = String(score);
+    if (!this.isTwoPlayerMode) {
+      this.scoreValEl.textContent = String(score);
+    }
     this.catchesValEl.textContent = String(catches);
   }
 
-  /** Khởi động đếm ngược 3 phút (hoặc 4 phút nếu có Đồng Hồ Gia Hạn) */
   public startRoundTimer(seconds = 180): void {
     this.stopRoundTimer();
     this.roundSecondsLeft = seconds;
@@ -742,11 +1050,14 @@ export class CowboyHud {
 
       if (this.roundSecondsLeft <= 0) {
         this.stopRoundTimer();
-        this.showToast('⏰ <b>HẾT GIỜ VÒNG CHƠI!</b> Chuyển về Cửa Hàng trang bị vật phẩm...', 2800);
+        const msg = (this.isTwoPlayerMode && this.subMode === 'versus')
+          ? '⏰ <b>HẾT GIỜ THI ĐẤU!</b> Đang tổng kết bảng điểm đối kháng...'
+          : '⏰ <b>HẾT GIỜ VÒNG CHƠI!</b> Đang kiểm tra điểm mục tiêu...';
+        this.showToast(msg, 2600);
         this.roundEndTimeout = setTimeout(() => {
           this.roundEndTimeout = null;
           this.onRoundEnd?.();
-        }, 1200);
+        }, 1000);
       }
     }, 1000);
   }
@@ -766,11 +1077,10 @@ export class CowboyHud {
 
       if (this.roundSecondsLeft <= 0) {
         this.stopRoundTimer();
-        this.showToast('⏰ <b>HẾT GIỜ VÒNG CHƠI!</b> Chuyển về Cửa Hàng trang bị vật phẩm...', 2800);
         this.roundEndTimeout = setTimeout(() => {
           this.roundEndTimeout = null;
           this.onRoundEnd?.();
-        }, 1200);
+        }, 1000);
       }
     }, 1000);
   }
@@ -799,14 +1109,13 @@ export class CowboyHud {
     }
   }
 
-  /** Đếm ngược 10s tự động phóng dây khi người chơi không thao tác */
   private startAutoLaunchTimer(): void {
     this.stopAutoLaunchTimer();
     this.autoLaunchSecondsLeft = 10;
     this.updateAutoLaunchDisplay();
 
     this.autoLaunchInterval = setInterval(() => {
-      if (document.hidden || this.isBusy || this.isModalOpen || this.rootEl.hidden || this.isCharging) return;
+      if (this.isTwoPlayerMode || document.hidden || this.isBusy || this.isModalOpen || this.rootEl.hidden || this.isCharging) return;
 
       this.autoLaunchSecondsLeft--;
       this.updateAutoLaunchDisplay();
@@ -837,7 +1146,6 @@ export class CowboyHud {
     }
   }
 
-  /** Hiển thị chữ nổi bay lên khi kéo dính hoặc tuột mất */
   public showFloatText(text: string, type: 'win' | 'miss' | 'jackpot', screenX: number, screenY: number): void {
     const el = document.createElement('div');
     el.className = `cb-float-item ${type}`;
@@ -854,7 +1162,6 @@ export class CowboyHud {
     this.activeTimeouts.push(tid);
   }
 
-  /** Thông báo toast */
   public showToast(msg: string, duration = 2200): void {
     const el = document.createElement('div');
     el.className = 'cb-toast-item';
@@ -871,7 +1178,6 @@ export class CowboyHud {
     this.activeTimeouts.push(tid);
   }
 
-  /** Hiển thị modal nhận cứu trợ */
   public showReliefModal(remainingToday: number): void {
     const modal = this.rootEl.querySelector('#cbReliefModal') as HTMLElement;
     const msgEl = this.rootEl.querySelector('#cbReliefMsg') as HTMLElement;

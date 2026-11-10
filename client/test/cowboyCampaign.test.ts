@@ -9,7 +9,7 @@ const storage = new Map<string, string>();
   clear: () => storage.clear(),
 };
 
-import { getStageTargetScore } from '../src/minigame/cowboy/cowboyTypes';
+import { getStageTargetScore, getCoopStageTargetScore } from '../src/minigame/cowboy/cowboyTypes';
 import { CowboyWallet } from '../src/minigame/cowboy/cowboyWallet';
 
 describe('Cowboy Campaign & Modes Progression', () => {
@@ -17,7 +17,7 @@ describe('Cowboy Campaign & Modes Progression', () => {
     storage.clear();
   });
 
-  it('correctly calculates balanced stage target scores', () => {
+  it('correctly calculates balanced stage target scores for solo campaign', () => {
     expect(getStageTargetScore(1)).toBe(80);
     expect(getStageTargetScore(2)).toBe(180);
     expect(getStageTargetScore(3)).toBe(300);
@@ -25,6 +25,33 @@ describe('Cowboy Campaign & Modes Progression', () => {
     expect(getStageTargetScore(5)).toBe(650);
     expect(getStageTargetScore(6)).toBe(875);
     expect(getStageTargetScore(7)).toBe(1125);
+  });
+
+  it('correctly calculates 2-player co-op stage target scores', () => {
+    expect(getCoopStageTargetScore(1)).toBe(120);
+    expect(getCoopStageTargetScore(2)).toBe(260);
+    expect(getCoopStageTargetScore(3)).toBe(420);
+    expect(getCoopStageTargetScore(4)).toBe(620);
+    expect(getCoopStageTargetScore(5)).toBe(880);
+    expect(getCoopStageTargetScore(6)).toBe(1195);
+  });
+
+  it('evaluates 2-player hybrid control handover matrix accurately', () => {
+    const canControlSlot = (mySlot: 0 | 1, guestConnected: boolean, targetSlot: 0 | 1) => {
+      if (mySlot === 1) return targetSlot === 1;
+      if (targetSlot === 0) return true;
+      return !guestConnected;
+    };
+
+    // Host alone (no 2nd device joined yet) -> controls both P1 (0) and P2 (1)
+    expect(canControlSlot(0, false, 0)).toBe(true);
+    expect(canControlSlot(0, false, 1)).toBe(true);
+
+    // 2nd device joins -> Host only controls P1 (0), Guest controls P2 (1)
+    expect(canControlSlot(0, true, 0)).toBe(true);
+    expect(canControlSlot(0, true, 1)).toBe(false);
+    expect(canControlSlot(1, true, 0)).toBe(false);
+    expect(canControlSlot(1, true, 1)).toBe(true);
   });
 
   it('correctly adds credits directly to wallet without inflating catch counts', () => {
