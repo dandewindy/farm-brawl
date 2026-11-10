@@ -10223,10 +10223,13 @@ body.mobile-phone #adminToggleBtn {
     box-shadow: none !important;
   }
 
-  /* 2-Player Controls on Phone:
-     Both P1 and P2 zones active & ergonomic!
-     - Left (P1): Quăng dây sát góc trái (bấm ngón cái trái) -> Nút dây -> Items P1 -> Badge P1
-     - Right (P2): Badge P2 -> Items P2 -> Nút dây -> Quăng dây sát góc phải (bấm ngón cái phải) */
+  /* ==========================================================================
+     2-PLAYER CONTROLS ON MOBILE (PHONE LANDSCAPE / COMPACT):
+     - Local player has the Launch Button on the bottom-left corner for natural left thumb.
+     - Remote teammate side ONLY displays Teammate Status (Rope Count + Items + Name Badge)
+       with NO launch button at all!
+     ========================================================================== */
+
   .cowboy-controls-card.mode-2p:not(.cb-card-hidden):not([hidden]) {
     width: 100% !important;
     max-width: 100% !important;
@@ -10248,17 +10251,6 @@ body.mobile-phone #adminToggleBtn {
     flex: 0 1 auto !important;
   }
 
-  .cb-2p-player-zone.p1-zone {
-    justify-content: flex-start !important;
-    margin-right: auto !important;
-  }
-
-  .cb-2p-player-zone.p2-zone {
-    justify-content: flex-end !important;
-    margin-left: auto !important;
-  }
-
-  /* Nút Quăng Dây P1 sát góc trái, P2 sát góc phải - ngón cái hai bên bấm cực chuẩn */
   .cb-2p-player-zone .cb-launch-circle-btn {
     width: 68px !important;
     height: 68px !important;
@@ -10270,7 +10262,6 @@ body.mobile-phone #adminToggleBtn {
     font-size: 10.5px !important;
   }
 
-  /* Nút phụ vòng tròn chọn số dây cạnh nút quăng dây */
   .cb-2p-player-zone .cb-rope-circle-btn {
     width: 44px !important;
     height: 44px !important;
@@ -10286,7 +10277,6 @@ body.mobile-phone #adminToggleBtn {
     font-size: 7.5px !important;
   }
 
-  /* Hàng item đã sở hữu của P1 và P2 (chỉ hiện item đã có) */
   .cb-2p-items-row {
     display: inline-flex !important;
     flex-direction: row !important;
@@ -10311,11 +10301,124 @@ body.mobile-phone #adminToggleBtn {
     padding: 0 3px !important;
   }
 
-  /* Badge P1 - You & P2 Đang đợi thu gọn nhẹ */
   .cb-2p-status-badge {
     font-size: 9.5px !important;
     padding: 2px 7px !important;
     margin-bottom: 4px !important;
+  }
+
+  /* Default / Local is Player 1 (.slot-p1 or not .slot-p2):
+     - P1 (Left, order: 1): Launch Btn (far left) -> Cycle Bet Btn -> Items -> Badge
+     - P2 (Right, order: 2): Badge -> Items -> Cycle Bet Btn -> NO Launch Btn! */
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone {
+    order: 1 !important;
+    justify-content: flex-start !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1LaunchBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1LaunchBtn {
+    order: 1 !important;
+    display: inline-flex !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1CycleBetBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1CycleBetBtn {
+    order: 2 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1ItemsRow,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1ItemsRow {
+    order: 3 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP1Zone #cbP1StatusBadge,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP1Zone #cbP1StatusBadge {
+    order: 4 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone {
+    order: 2 !important;
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2StatusBadge,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2StatusBadge {
+    order: 1 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2ItemsRow,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2ItemsRow {
+    order: 2 !important;
+  }
+
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2CycleBetBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2CycleBetBtn {
+    order: 3 !important;
+    pointer-events: none !important;
+  }
+
+  /* KHONG HIEN NUT QUANG DAY P2 TREN MAY P1 (DIEN THOAI) */
+  .cowboy-controls-card.mode-2p:not(.slot-p2) #cbP2Zone #cbP2LaunchBtn,
+  .cowboy-controls-card.mode-2p.slot-p1 #cbP2Zone #cbP2LaunchBtn {
+    display: none !important;
+  }
+
+  /* Local is Player 2 (.slot-p2 on P2's machine):
+     - P2 (Left, order: 1): Launch Btn (far left) -> Cycle Bet Btn -> Items -> Badge
+     - P1 (Right, order: 2): Badge -> Items -> Cycle Bet Btn -> NO Launch Btn! */
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone {
+    order: 1 !important;
+    justify-content: flex-start !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2LaunchBtn {
+    order: 1 !important;
+    display: inline-flex !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2CycleBetBtn {
+    order: 2 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2ItemsRow {
+    order: 3 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP2Zone #cbP2StatusBadge {
+    order: 4 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone {
+    order: 2 !important;
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1StatusBadge {
+    order: 1 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1ItemsRow {
+    order: 2 !important;
+  }
+
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1CycleBetBtn {
+    order: 3 !important;
+    pointer-events: none !important;
+  }
+
+  /* KHONG HIEN NUT QUANG DAY P1 TREN MAY P2 (DIEN THOAI) */
+  .cowboy-controls-card.mode-2p.slot-p2 #cbP1Zone #cbP1LaunchBtn {
+    display: none !important;
   }
 
   /* Left items moved left */
@@ -10754,7 +10857,7 @@ body.mobile-phone #adminToggleBtn {
 /* Explicit Mobile Protection: Compact sizing on mobile/tablet screens */
 @media (max-width: 840px), (max-height: 540px) {
   .cowboy-bottom-bar {
-    bottom: calc(10px + 8vh) !important;
+    bottom: 0 !important;
     padding: 0 8px 6px !important;
   }
 

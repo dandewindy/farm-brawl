@@ -230,6 +230,8 @@ export interface CowboyRoomStateMsg {
   theme?: string;
 }
 
+export type CowboyItemData = { kind: string; count: number };
+
 export type ServerMsg =
   | { t: 'init'; cfg: Cfg; map: MapData; players: PlayerMeta[]; food: FoodWire[]; tick: number; tools?: ToolWire[]; matchDuration?: number }
   | { t: 'joined'; id: number; token?: string; colo?: string; doColo?: string }
@@ -245,6 +247,7 @@ export type ServerMsg =
   | { t: 'cb_catch_sync'; slot: 0 | 1; animalId: number; score: number; species?: string; p1Score: number; p2Score: number; p1Catches: number; p2Catches: number }
   | { t: 'cb_stage_next_sync'; stage: number; seed: number; roundRemainingSec: number }
   | { t: 'cb_rematch_sync'; seed: number; subMode: CowboySubMode; durationSec: number; stage: number }
+  | { t: 'cb_items_sync'; slot: 0 | 1; items: CowboyItemData[] }
   | { t: 'cb_room_full' }
   | Snapshot;
 
@@ -275,5 +278,6 @@ export type ClientMsg =
   | { t: 'cb_catch'; slot: 0 | 1; animalId: number; score: number; species?: string }
   | { t: 'cb_stage_next'; stage: number; seed?: number }
   | { t: 'cb_rematch'; subMode?: CowboySubMode; durationSec?: number; seed?: number }
+  | { t: 'cb_items'; slot: 0 | 1; items: CowboyItemData[] }
   | { t: 'cb_sync_timer'; remainingSec: number }
   | ({ t: 'input' } & Input);

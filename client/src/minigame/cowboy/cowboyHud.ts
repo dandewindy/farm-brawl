@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { copyTextToClipboard } from '../../ui/hud';
 import { COWBOY_ITEMS_CATALOG, cowboyInventory } from './cowboyItems';
 import { HORSE_COWBOY_SVG, isCowboyAdminName } from './cowboyTypes';
-import type { CowboySubMode } from '@shared/protocol';
+import type { CowboyItemData, CowboySubMode } from '@shared/protocol';
 
 export class CowboyHud {
   public rootEl: HTMLElement;
@@ -41,6 +41,10 @@ export class CowboyHud {
   private p2Name = 'Người chơi 2';
   private p1Bet = 1;
   private p2Bet = 1;
+
+  public onItemChange?: (items: CowboyItemData[]) => void;
+  private teammateItemsP1: CowboyItemData[] = [];
+  private teammateItemsP2: CowboyItemData[] = [];
 
   public onP2ChargeStart?: () => void;
   public onP2Launch?: (isAimCharge: boolean, durationMs: number) => void;
@@ -567,6 +571,42 @@ export class CowboyHud {
   public updateInventory(): void {
     this.renderQuickItemBar();
     this.renderBackpackList();
+    this.notifyItemChange();
+  }
+
+  public notifyItemChange(): void {
+    const owned: CowboyItemData[] = COWBOY_ITEMS_CATALOG
+      .map((item) => ({ kind: item.kind, count: cowboyInventory.getCount(item.kind) }))
+      .filter((x) => x.count > 0);
+    this.onItemChange?.(owned);
+  }
+
+  public setTeammateItems(slot: 0 | 1, items: CowboyItemData[]): void {
+    if (slot === 0) {
+      this.teammateItemsP1 = Array.isArray(items) ? items : [];
+    } else {
+      this.teammateItemsP2 = Array.isArray(items) ? items : [];
+    }
+    this.renderQuickItemBar();
+  }
+
+  private createTeammateItemBadge(
+    item: (typeof COWBOY_ITEMS_CATALOG)[number],
+    count: number
+  ): HTMLElement {
+    const badge = document.createElement('div');
+    badge.className = 'cb-quick-3d-slot tm-item-badge';
+    badge.title = `${item.nameVi} (x${count}) • Vật phẩm của đồng đội`;
+    badge.innerHTML = `
+      <div class="cb-item-3d-wrap">
+        <div class="cb-item-3d-spinner">
+          <span class="cb-item-3d-ico">${item.icon}</span>
+        </div>
+        <span class="cb-item-3d-pedestal"></span>
+      </div>
+      <span class="cb-item-qty-tag has-qty">x${count}</span>
+    `;
+    return badge;
   }
 
   private createItemButton(
@@ -668,24 +708,50 @@ export class CowboyHud {
     // 2-Player mode item rows for P1 and P2: chỉ hiện item nào đã có
     const p1Row = this.rootEl.querySelector('#cbP1ItemsRow') as HTMLElement | null;
     const p2Row = this.rootEl.querySelector('#cbP2ItemsRow') as HTMLElement | null;
+
     if (p1Row) {
       p1Row.innerHTML = '';
-      for (const item of COWBOY_ITEMS_CATALOG) {
-        const count = cowboyInventory.getCount(item.kind);
-        if (count <= 0) continue;
-        const isEquipped = cowboyInventory.isEquipped(item.kind);
-        const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
-        p1Row.appendChild(btn);
+      if (this.mySlot === 0) {
+        // P1 is local player
+        for (const item of COWBOY_ITEMS_CATALOG) {
+          const count = cowboyInventory.getCount(item.kind);
+          if (count <= 0) continue;
+          const isEquipped = cowboyInventory.isEquipped(item.kind);
+          const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
+          p1Row.appendChild(btn);
+        }
+      } else {
+        // P1 is remote teammate for P2
+        for (const tmItem of this.teammateItemsP1) {
+          if (!tmItem || tmItem.count <= 0) continue;
+          const def = COWBOY_ITEMS_CATALOG.find((x) => x.kind === tmItem.kind);
+          if (def) {
+            p1Row.appendChild(this.createTeammateItemBadge(def, tmItem.count));
+          }
+        }
       }
     }
+
     if (p2Row) {
       p2Row.innerHTML = '';
-      for (const item of COWBOY_ITEMS_CATALOG) {
-        const count = cowboyInventory.getCount(item.kind);
-        if (count <= 0) continue;
-        const isEquipped = cowboyInventory.isEquipped(item.kind);
-        const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
-        p2Row.appendChild(btn);
+      if (this.mySlot === 1) {
+        // P2 is local player
+        for (const item of COWBOY_ITEMS_CATALOG) {
+          const count = cowboyInventory.getCount(item.kind);
+          if (count <= 0) continue;
+          const isEquipped = cowboyInventory.isEquipped(item.kind);
+          const btn = this.createItemButton(item, count, isEquipped, () => this.handleItemUse(item.kind));
+          p2Row.appendChild(btn);
+        }
+      } else {
+        // P2 is remote teammate for P1
+        for (const tmItem of this.teammateItemsP2) {
+          if (!tmItem || tmItem.count <= 0) continue;
+          const def = COWBOY_ITEMS_CATALOG.find((x) => x.kind === tmItem.kind);
+          if (def) {
+            p2Row.appendChild(this.createTeammateItemBadge(def, tmItem.count));
+          }
+        }
       }
     }
   }
@@ -967,6 +1033,8 @@ export class CowboyHud {
     const showCampaignTarget = !enabled || subMode === 'campaign';
     if (stageBox) stageBox.hidden = !showCampaignTarget;
     if (scoreBox) scoreBox.hidden = !showCampaignTarget;
+    this.renderQuickItemBar();
+    this.notifyItemChange();
   }
 
   public set2PControlState(mySlot: 0 | 1, guestConnected: boolean, p1Name: string, p2Name: string): void {
@@ -1031,6 +1099,8 @@ export class CowboyHud {
       }
       p2Status.textContent = p2Label;
     }
+    this.renderQuickItemBar();
+    this.notifyItemChange();
   }
 
   public update2PScores(

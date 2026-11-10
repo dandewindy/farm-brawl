@@ -192,6 +192,12 @@ export class CowboyManager {
       this.sendRoomPacket({ t: 'cb_bet', slot: 1, count: bet });
     };
 
+    this.hud.onItemChange = (items) => {
+      if (this.isTwoPlayerMode) {
+        this.sendRoomPacket({ t: 'cb_items', slot: this.mySlot, items });
+      }
+    };
+
     this.hud.onP2ChargeStart = () => {
       if (!this.isTwoPlayerMode || !this.arena?.canLaunch(1)) return;
       this.arena.startAimCharge(1);
@@ -741,6 +747,11 @@ export class CowboyManager {
       return;
     }
 
+    if (msg.t === 'cb_items_sync') {
+      this.hud?.setTeammateItems(msg.slot, msg.items);
+      return;
+    }
+
     if (msg.t === 'cb_bet_sync') {
       this.hud?.setBet(msg.count, msg.slot, true);
       this.arena?.setSelectedRopesCount(msg.count, msg.slot);
@@ -859,6 +870,7 @@ export class CowboyManager {
     this.hud?.startRoundTimer(finalDuration);
     this.arena?.syncReadyRopes();
     this.arena?.start();
+    this.hud?.notifyItemChange();
   }
 
   private syncStats(): void {

@@ -892,6 +892,10 @@ export class GameRoom extends DurableObject {
         durationSec: this.cbState.durationSec,
         stage: this.cbState.stage,
       });
+    } else if (msg.t === 'cb_items') {
+      const slot: 0 | 1 = msg.slot === 1 ? 1 : 0;
+      const items = Array.isArray(msg.items) ? msg.items.slice(0, 10) : [];
+      this.broadcastCowboyPacket({ t: 'cb_items_sync', slot, items }, ws);
     }
   }
 
