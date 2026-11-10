@@ -437,7 +437,7 @@ export class CowboyManager {
     this.arena.onMiss = (animal: ActiveCowboyAnimal) => {
       volleyMisses++;
       const screenPos = this.toScreenPosition(animal.x, 1.2, animal.z);
-      this.hud?.showFloatText('TUỘT MẤT!', 'miss', screenPos.x, screenPos.y);
+      this.hud?.showFloatText('VUỘT MẤT!', 'miss', screenPos.x, screenPos.y);
     };
 
     this.arena.onVolleyFinish = (playerIndex = 0) => {

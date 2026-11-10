@@ -121,12 +121,30 @@ BASE_VOICE_LINES: list[tuple[str, str, str]] = [
     ("die_self_till", "Thùy Dung", "Bạn bị xe máy cày cán dẹp lép!"),
     ("die_self_dynamite", "Thùy Dung", "Bạn bị pháo nổ tung!"),
     ("die_self_crush", "Thùy Dung", "Bạn đã bị cán dẹp lép!"),
+
+    # Nhóm H: Cao bồi kéo bò (Cowboy Arcade Minigame)
+    ("cowboy_catch", "Thùy Dung", "Đã bắt trúng rồi!"),
+    ("cowboy_miss", "Thùy Dung", "Vuột mất rồi!"),
+    ("cowboy_welcome", "Thục Đoan", "Chào mừng đến với cao bồi kéo bò!"),
+    ("cowboy_shop_welcome", "Thục Đoan", "Chào mừng đến với cửa hàng nông trại! Hãy chọn vật phẩm hỗ trợ đắc lực nhé!"),
+    ("cowboy_empty", "Thục Đoan", "Hết credit rồi! Hãy nhận trợ cấp để chơi tiếp nhé!"),
+    ("cowboy_jackpot", "Thùy Dung", "Trúng lớn rồi! Siêu thú cầu vồng!"),
+    ("cowboy_hit_sparkle", "Thùy Dung", "Trúng thú lấp lánh rồi! Nhân đôi điểm số!"),
+    ("cowboy_hit_swan", "Thùy Dung", "Dính Thiên Nga rồi! Cộng hai mươi điểm!"),
+    ("cowboy_hit_ram", "Thùy Dung", "Dính Cừu Kim Cương rồi! Cộng hai mươi lăm điểm!"),
+    ("cowboy_hit_wolf", "Thùy Dung", "Dính Sói Băng rồi! Cộng ba mươi điểm!"),
+    ("cowboy_hit_boar", "Thùy Dung", "Dính Heo Rừng rồi! Cộng ba mươi lăm điểm!"),
+    ("cowboy_hit_gorilla", "Thùy Dung", "Dính Khỉ Đột rồi! Cộng bốn mươi điểm!"),
+    ("cowboy_hit_bull", "Thùy Dung", "Dính Bò Tót rồi! Cộng năm mươi điểm!"),
+    ("cowboy_hit_pegasus", "Thùy Dung", "Dính Kỳ Lân rồi! Cộng sáu mươi điểm!"),
+    ("cowboy_hit_phoenix", "Thùy Dung", "Bắt được Phượng Hoàng rồi! Cộng tám mươi điểm!"),
+    ("cowboy_hit_mammoth", "Thùy Dung", "Trúng Voi Ma Mút rồi! Một trăm điểm cực khủng!"),
 ]
 
 
 def build_all_voice_lines() -> list[tuple[str, str, str]]:
     lines = list(BASE_VOICE_LINES)
-    # Nhóm H: Bị con vật khác hạ gục (11 con vật x 7 nguyên nhân)
+    # Nhóm I: Bị con vật khác hạ gục (11 con vật x 7 nguyên nhân)
     for sp_key, sp_vi in SPECIES_VI.items():
         for cause_key, cause_vi in CAUSE_BY_VI.items():
             key = f"die_{sp_key}_{cause_key}"
